@@ -1,7 +1,7 @@
 
 import jsonwebtoken from 'jsonwebtoken';
 import { saveBuildLog } from '../buildPacks/common';
-import { asyncExecShell, decrypt, prisma } from '../common';
+import { decrypt, executeCommand, prisma } from '../common';
 
 export default async function ({
 	applicationId,
@@ -43,9 +43,11 @@ export default async function ({
 				applicationId
 			});
 		}
-		await asyncExecShell(
-			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
-		);
+		await executeCommand({
+			command:
+				`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `,
+			shell: true
+		});
 
 	} else {
 		const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
@@ -81,11 +83,13 @@ export default async function ({
 				applicationId
 			});
 		}
-		await asyncExecShell(
-			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `
-		);
+		await executeCommand({
+			command:
+				`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `,
+			shell: true
+		});
 	}
-	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
-
+	const { stdout: commit } = await executeCommand({ command: `cd ${workdir}/ && git rev-parse HEAD`, shell: true });
+	console.log({ commit })
 	return commit.replace('\n', '');
 }

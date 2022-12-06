@@ -17,6 +17,7 @@ import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
 import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common';
 import { scheduler } from './scheduler';
+import type { ExecaChildProcess } from 'execa';
 
 export const version = '3.12.0';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -63,7 +64,6 @@ const otherTraefikEndpoint = isDev
 	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 export const uniqueName = (): string => uniqueNamesGenerator(customConfig);
-export const asyncExecShell = util.promisify(exec);
 export const asyncExecShellStream = async ({
 	debug,
 	buildId,
@@ -303,7 +303,7 @@ export async function isDomainConfigured({
 
 export async function getContainerUsage(dockerId: string, container: string): Promise<any> {
 	try {
-		const { stdout } = await executeDockerCmd({
+		const { stdout } = await executeCommand({
 			dockerId,
 			command: `docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"`
 		});
@@ -508,36 +508,13 @@ export async function createRemoteEngineConfiguration(id: string) {
 		remoteUser
 	} = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } });
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 });
-	// Needed for remote docker compose
-	// const { stdout: numberOfSSHAgentsRunning } = await asyncExecShell(
-	// 	`ps ax | grep [s]sh-agent | grep coolify-ssh-agent.pid | grep -v grep | wc -l`
-	// );
-	// if (numberOfSSHAgentsRunning !== '' && Number(numberOfSSHAgentsRunning.trim()) == 0) {
-	// 	try {
-	// 		await fs.stat(`/tmp/coolify-ssh-agent.pid`);
-	// 		await fs.rm(`/tmp/coolify-ssh-agent.pid`);
-	// 	} catch (error) { }
-	// 	await asyncExecShell(`eval $(ssh-agent -sa /tmp/coolify-ssh-agent.pid)`);
-	// }
-	// await asyncExecShell(`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh-add -q ${sshKeyFile}`);
-
-	// const { stdout: numberOfSSHTunnelsRunning } = await asyncExecShell(
-	// 	`ps ax | grep 'ssh -F /dev/null -o StrictHostKeyChecking no -fNL ${localPort}:localhost:${remotePort}' | grep -v grep | wc -l`
-	// );
-	// if (numberOfSSHTunnelsRunning !== '' && Number(numberOfSSHTunnelsRunning.trim()) == 0) {
-	// 	try {
-	// 		await asyncExecShell(
-	// 			`SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid ssh -F /dev/null -o "StrictHostKeyChecking no" -fNL ${localPort}:localhost:${remotePort} ${remoteUser}@${remoteIpAddress}`
-	// 		);
-	// 	} catch (error) { }
-	// }
 	const config = sshConfig.parse('');
 	const Host = `${remoteIpAddress}-remote`
 
 	try {
-		await asyncExecShell(`ssh-keygen -R ${Host}`);
-		await asyncExecShell(`ssh-keygen -R ${remoteIpAddress}`);
-		await asyncExecShell(`ssh-keygen -R localhost:${localPort}`);
+		await executeCommand({ command: `ssh-keygen -R ${Host}` });
+		await executeCommand({ command: `ssh-keygen -R ${remoteIpAddress}` });
+		await executeCommand({ command: `ssh-keygen -R localhost:${localPort}` });
 	} catch (error) { }
 
 
@@ -566,8 +543,102 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config));
 }
+export async function executeCommand({ command, dockerId = null, sshCommand = false, shell = false, buildId, applicationId, debug }: { command: string, sshCommand?: boolean, shell?: boolean, dockerId?: string, buildId?: string, applicationId?: string, debug?: boolean }): Promise<ExecaChildProcess<string>> {
+	const { execa, execaCommand } = await import('execa')
+	const { parse } = await import('shell-quote')
+	const parsedCommand = parse(command);
+	const dockerCommand = parsedCommand[0];
+	const dockerArgs = parsedCommand.slice(1);
+
+	if (dockerId) {
+		let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
+		if (remoteEngine) {
+			await createRemoteEngineConfiguration(dockerId);
+			engine = `ssh://${remoteIpAddress}-remote`;
+		} else {
+			engine = 'unix:///var/run/docker.sock';
+		}
+		if (process.env.CODESANDBOX_HOST) {
+			if (command.startsWith('docker compose')) {
+				command = command.replace(/docker compose/gi, 'docker-compose');
+			}
+		}
+		if (sshCommand) {
+			if (shell) {
+				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`, { shell: true, stdio: 'inherit' });
+			}
+			return await execa('ssh', [`${remoteIpAddress}-remote`, ...dockerArgs]);
+		}
+		return await new Promise(async (resolve, reject) => {
+			let subprocess = null;
+			if (shell) {
+				subprocess = execaCommand(command, {
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+				});
+			} else {
+				subprocess = execa(dockerCommand, dockerArgs, {
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+				});
+			}
+			const logs = [];
+			subprocess.stdout.on('data', async (data) => {
+				const stdout = data.toString();
+				const array = stdout.split('\n');
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						const log = {
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						}
+						logs.push(log);
+						if (debug) {
+							await saveBuildLog(log);
+						}
+					}
+				}
+			});
+			subprocess.stderr.on('data', async (data) => {
+				const stderr = data.toString();
+				const array = stderr.split('\n');
+				for (const line of array) {
+					if (line !== '\n' && line !== '') {
+						const log = {
+							line: `${line.replace('\n', '')}`,
+							buildId,
+							applicationId
+						}
+						logs.push(log);
+						if (debug) {
+							await saveBuildLog(log);
+						}
+					}
+				}
+			});
+			subprocess.on('exit', async (code) => {
+				await asyncSleep(1000);
+				if (code === 0) {
+					resolve(code);
+				} else {
+					if (!debug) {
+						for (const log of logs) {
+							await saveBuildLog(log);
+						}
+					}
+					reject(code);
+				}
+			});
+		})
+	} else {
+		if (shell) {
+			return execaCommand(command, { shell: true });
+		}
+		return await execa(dockerCommand, dockerArgs);
+	}
+}
 export async function executeSSHCmd({ dockerId, command }) {
-	const { execaCommand } = await import('execa')
+	const { execaCommand, execa } = await import('execa')
+	const { parse } = await import('shell-quote')
 	let { remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId)
@@ -577,10 +648,12 @@ export async function executeSSHCmd({ dockerId, command }) {
 			command = command.replace(/docker compose/gi, 'docker-compose')
 		}
 	}
-	return await execaCommand(`ssh ${remoteIpAddress}-remote ${command}`)
+	const dockerArgs = parse(command);
+	return await execa('ssh', [`${remoteIpAddress}-remote`, ...dockerArgs]);
 }
 export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
-	const { execaCommand } = await import('execa')
+	const { execa } = await import('execa')
+	const { parse } = await import('shell-quote')
 	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
 	if (remoteEngine) {
 		await createRemoteEngineConfiguration(dockerId);
@@ -593,10 +666,13 @@ export async function executeDockerCmd({ debug, buildId, applicationId, dockerId
 			command = command.replace(/docker compose/gi, 'docker-compose');
 		}
 	}
+	const parsedCommand = parse(command);
+	const dockerCommand = parsedCommand[0];
+	const dockerArgs = parsedCommand.slice(1);
 	if (command.startsWith(`docker build`) || command.startsWith(`pack build`) || command.startsWith(`docker compose build`)) {
 		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
 	}
-	return await execaCommand(command, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine }, shell: true })
+	return await execa(dockerCommand, dockerArgs, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } });
 }
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
@@ -604,18 +680,18 @@ export async function startTraefikProxy(id: string): Promise<void> {
 	const { id: settingsId, ipv4, ipv6 } = await listSettings();
 
 	if (!found) {
-		const { stdout: coolifyNetwork } = await executeDockerCmd({
+		const { stdout: coolifyNetwork } = await executeCommand({
 			dockerId: id,
 			command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`
 		});
 
 		if (!coolifyNetwork) {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId: id,
 				command: `docker network create --attachable coolify-infra`
 			});
 		}
-		const { stdout: Config } = await executeDockerCmd({
+		const { stdout: Config } = await executeCommand({
 			dockerId: id,
 			command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
 		});
@@ -630,7 +706,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			}
 			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`;
 		}
-		await executeDockerCmd({
+		await executeCommand({
 			dockerId: id,
 			command: `docker run --restart always \
 			--add-host 'host.docker.internal:host-gateway' \
@@ -655,7 +731,6 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
 			--log.level=error`
 		});
-		await prisma.setting.update({ where: { id: settingsId }, data: { proxyHash: null } });
 		await prisma.destinationDocker.update({
 			where: { id },
 			data: { isCoolifyProxyUsed: true }
@@ -679,13 +754,13 @@ export async function startTraefikProxy(id: string): Promise<void> {
 
 export async function configureNetworkTraefikProxy(destination: any): Promise<void> {
 	const { id } = destination;
-	const { stdout: networks } = await executeDockerCmd({
+	const { stdout: networks } = await executeCommand({
 		dockerId: id,
 		command: `docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
 	});
 	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
 	if (!configuredNetworks.includes(destination.network)) {
-		await executeDockerCmd({
+		await executeCommand({
 			dockerId: destination.id,
 			command: `docker network connect ${destination.network} coolify-proxy`
 		});
@@ -700,13 +775,12 @@ export async function stopTraefikProxy(
 		where: { id },
 		data: { isCoolifyProxyUsed: false }
 	});
-	const { id: settingsId } = await prisma.setting.findFirst({});
-	await prisma.setting.update({ where: { id: settingsId }, data: { proxyHash: null } });
 	try {
 		if (found) {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId: id,
-				command: `docker stop -t 0 coolify-proxy && docker rm coolify-proxy`
+				command: `docker stop -t 0 coolify-proxy && docker rm coolify-proxy`,
+				shell: true
 			});
 		}
 	} catch (error) {
@@ -1099,9 +1173,9 @@ export const createDirectories = async ({
 		workdirFound = !!(await fs.stat(workdir));
 	} catch (error) { }
 	if (workdirFound) {
-		await asyncExecShell(`rm -fr ${workdir}`);
+		await executeCommand({ command: `rm -fr ${workdir}` });
 	}
-	await asyncExecShell(`mkdir -p ${workdir}`);
+	await executeCommand({ command: `mkdir -p ${workdir}` });
 	return {
 		workdir,
 		repodir
@@ -1117,7 +1191,7 @@ export async function stopDatabaseContainer(database: any): Promise<boolean> {
 	} = database;
 	if (destinationDockerId) {
 		try {
-			const { stdout } = await executeDockerCmd({
+			const { stdout } = await executeCommand({
 				dockerId,
 				command: `docker inspect --format '{{json .State}}' ${id}`
 			});
@@ -1145,9 +1219,10 @@ export async function stopTcpHttpProxy(
 	const { found } = await checkContainer({ dockerId, container });
 	try {
 		if (found) {
-			return await executeDockerCmd({
+			return await executeCommand({
 				dockerId,
-				command: `docker stop -t 0 ${container} && docker rm ${container}`
+				command: `docker stop -t 0 ${container} && docker rm ${container}`,
+				shell: true
 			});
 		}
 	} catch (error) {
@@ -1169,34 +1244,34 @@ export async function updatePasswordInDb(database, user, newPassword, isRoot) {
 	} = database;
 	if (destinationDockerId) {
 		if (type === 'mysql') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"ALTER USER '${user}'@'%' IDENTIFIED WITH caching_sha2_password BY '${newPassword}';\"`
 			});
 		} else if (type === 'mariadb') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker exec ${id} mysql -u ${rootUser} -p${rootUserPassword} -e \"SET PASSWORD FOR '${user}'@'%' = PASSWORD('${newPassword}');\"`
 			});
 		} else if (type === 'postgresql') {
 			if (isRoot) {
-				await executeDockerCmd({
+				await executeCommand({
 					dockerId,
 					command: `docker exec ${id} psql postgresql://postgres:${rootUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role postgres WITH PASSWORD '${newPassword}'"`
 				});
 			} else {
-				await executeDockerCmd({
+				await executeCommand({
 					dockerId,
 					command: `docker exec ${id} psql postgresql://${dbUser}:${dbUserPassword}@${id}:5432/${defaultDatabase} -c "ALTER role ${user} WITH PASSWORD '${newPassword}'"`
 				});
 			}
 		} else if (type === 'mongodb') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker exec ${id} mongo 'mongodb://${rootUser}:${rootUserPassword}@${id}:27017/admin?readPreference=primary&ssl=false' --eval "db.changeUserPassword('${user}','${newPassword}')"`
 			});
 		} else if (type === 'redis') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker exec ${id} redis-cli -u redis://${dbUserPassword}@${id}:6379 --raw CONFIG SET requirepass ${newPassword}`
 			});
@@ -1370,7 +1445,7 @@ export async function startTraefikTCPProxy(
 	});
 	try {
 		if (foundDependentContainer && !found) {
-			const { stdout: Config } = await executeDockerCmd({
+			const { stdout: Config } = await executeCommand({
 				dockerId,
 				command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
 			});
@@ -1417,16 +1492,17 @@ export async function startTraefikTCPProxy(
 				}
 			};
 			await fs.writeFile(`/tmp/docker-compose-${id}.yaml`, yaml.dump(tcpProxy));
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker compose -f /tmp/docker-compose-${id}.yaml up -d`
 			});
 			await fs.rm(`/tmp/docker-compose-${id}.yaml`);
 		}
 		if (!foundDependentContainer && found) {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
-				command: `docker stop -t 0 ${container} && docker rm ${container}`
+				command: `docker stop -t 0 ${container} && docker rm ${container}`,
+				shell: true
 			});
 		}
 	} catch (error) {
@@ -1537,7 +1613,7 @@ export async function stopBuild(buildId, applicationId) {
 					await cleanupDB(buildId, applicationId);
 					return reject(new Error('Canceled.'));
 				}
-				const { stdout: buildContainers } = await executeDockerCmd({
+				const { stdout: buildContainers } = await executeCommand({
 					dockerId,
 					command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'`
 				});
@@ -1580,26 +1656,28 @@ export function convertTolOldVolumeNames(type) {
 export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 	// Cleanup old coolify images
 	try {
-		let { stdout: images } = await executeDockerCmd({
+		let { stdout: images } = await executeCommand({
 			dockerId,
-			command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r`
+			command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r`,
+			shell: true
 		});
 
 		images = images.trim();
 		if (images) {
-			await executeDockerCmd({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r` });
+			await executeCommand({ dockerId, command: `docker rmi -f ${images}" -q | xargs -r`, shell: true });
 		}
 	} catch (error) { }
 	if (lowDiskSpace || force) {
 		// Cleanup images that are not used
 		try {
-			await executeDockerCmd({ dockerId, command: `docker image prune -f` });
+			await executeCommand({ dockerId, command: `docker image prune -f` });
 		} catch (error) { }
 
 		const { numberOfDockerImagesKeptLocally } = await prisma.setting.findUnique({ where: { id: '0' } })
-		const { stdout: images } = await executeDockerCmd({
+		const { stdout: images } = await executeCommand({
 			dockerId,
-			command: `docker images | grep -v "<none>" | grep -v REPOSITORY | awk '{print $1, $2}'`
+			command: `docker images | grep -v "<none>" | grep -v REPOSITORY | awk '{print $1, $2}'`,
+			shell: true
 		});
 		const imagesArray = images.trim().replaceAll(' ', ':').split('\n');
 		const imagesSet = new Set(imagesArray.map((image) => image.split(':')[0]));
@@ -1618,12 +1696,12 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 			}
 		}
 		for (const image of deleteImage) {
-			await executeDockerCmd({ dockerId, command: `docker image rm -f ${image}` });
+			await executeCommand({ dockerId, command: `docker image rm -f ${image}` });
 		}
 
 		// Prune coolify managed containers
 		try {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command: `docker container prune -f --filter "label=coolify.managed=true"`
 			});
@@ -1631,7 +1709,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 
 		// Cleanup build caches
 		try {
-			await executeDockerCmd({ dockerId, command: `docker builder prune -a -f` });
+			await executeCommand({ dockerId, command: `docker builder prune -a -f` });
 		} catch (error) { }
 	}
 }
@@ -1718,11 +1796,11 @@ export async function pushToRegistry(application: any, workdir: string, tag: str
 	const location = `${workdir}/.docker`
 	const tagCommand = `docker tag ${application.id}:${tag} ${imageName}:${customTag}`
 	const pushCommand = `docker --config ${location} push ${imageName}:${customTag}`
-	await executeDockerCmd({
+	await executeCommand({
 		dockerId: application.destinationDockerId,
 		command: tagCommand
 	})
-	await executeDockerCmd({
+	await executeCommand({
 		dockerId: application.destinationDockerId,
 		command: pushCommand
 	})

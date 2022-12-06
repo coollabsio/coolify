@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import {
-	asyncExecShell,
 	asyncSleep,
 	cleanupDockerStorage,
 	errorHandler,
@@ -15,6 +14,7 @@ import {
 	version,
 	sentryDSN,
 	executeDockerCmd,
+	executeCommand,
 } from "../../../lib/common";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -38,7 +38,7 @@ export async function backup(request: FastifyRequest) {
 			// 	dockerId: database.destinationDockerId,
 			// 	command: `docker pull coollabsio/backup:latest`,
 			// })
-			std = await executeDockerCmd({
+			std = await executeCommand({
 				dockerId: database.destinationDockerId,
 				command: `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v coolify-local-backup:/app/backups -e CONTAINERS_TO_BACKUP="${backupData}" coollabsio/backup`
 			})
@@ -141,14 +141,10 @@ export async function update(request: FastifyRequest<Update>) {
 	try {
 		if (!isDev) {
 			const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
-			await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-			await asyncExecShell(`env | grep COOLIFY > .env`);
-			await asyncExecShell(
-				`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
-			);
-			await asyncExecShell(
-				`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
-			);
+			await executeCommand({ command: `docker pull coollabsio/coolify:${latestVersion}` });
+			await executeCommand({ command: `env | grep COOLIFY > .env` });
+			await executeCommand({ command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env` });
+			await executeCommand({ command: `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"` });
 			return {};
 		} else {
 			await asyncSleep(2000);
@@ -177,7 +173,7 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 		const teamId = request.user.teamId;
 		if (teamId === "0") {
 			if (!isDev) {
-				asyncExecShell(`docker restart coolify`);
+				await executeCommand({ command: `docker restart coolify` });
 				return {};
 			} else {
 				return {};

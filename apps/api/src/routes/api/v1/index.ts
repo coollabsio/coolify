@@ -53,9 +53,9 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 		onRequest: [fastify.authenticate]
 	}, async (request) => await cleanupManually(request));
 
-	fastify.get('/internal/backup/:backupData', {
-		onRequest: [fastify.authenticate]
-	}, async (request) => await backup(request));
+	// fastify.get('/internal/backup/:backupData', {
+	// 	onRequest: [fastify.authenticate]
+	// }, async (request) => await backup(request));
 };
 
 export default root;

@@ -1,4 +1,4 @@
-import { base64Encode, decrypt, encrypt, executeDockerCmd, generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
+import { base64Encode, decrypt, encrypt, executeCommand,  generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -656,7 +656,7 @@ export async function buildImage({
 		location = await saveDockerRegistryCredentials({ url, username, password, workdir })
 	}
 
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
+	await executeCommand({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {

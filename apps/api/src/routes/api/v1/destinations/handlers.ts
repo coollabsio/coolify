@@ -4,7 +4,7 @@ import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
 import os from 'os';
 
-import { asyncExecShell, createRemoteEngineConfiguration, decrypt, errorHandler, executeDockerCmd, executeSSHCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { createRemoteEngineConfiguration, decrypt, errorHandler, executeCommand,  executeSSHCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -79,9 +79,9 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
         let { name, network, engine, isCoolifyProxyUsed, remoteIpAddress, remoteUser, remotePort } = request.body
         if (id === 'new') {
             if (engine) {
-                const { stdout } = await asyncExecShell(`DOCKER_HOST=unix:///var/run/docker.sock docker network ls --filter 'name=^${network}$' --format '{{json .}}'`);
+                const { stdout } = await await executeCommand({ command: `docker network ls --filter 'name=^${network}$' --format '{{json .}}'` });
                 if (stdout === '') {
-                    await asyncExecShell(`DOCKER_HOST=unix:///var/run/docker.sock docker network create --attachable ${network}`);
+                    await await executeCommand({ command: `docker network create --attachable ${network}` });
                 }
                 await prisma.destinationDocker.create({
                     data: { name, teams: { connect: { id: teamId } }, engine, network, isCoolifyProxyUsed }
@@ -122,13 +122,13 @@ export async function deleteDestination(request: FastifyRequest<OnlyId>) {
         const { network, remoteVerified, engine, isCoolifyProxyUsed } = await prisma.destinationDocker.findUnique({ where: { id } });
         if (isCoolifyProxyUsed) {
             if (engine || remoteVerified) {
-                const { stdout: found } = await executeDockerCmd({
+                const { stdout: found } = await executeCommand({
                     dockerId: id,
                     command: `docker ps -a --filter network=${network} --filter name=coolify-proxy --format '{{.}}'`
                 })
                 if (found) {
-                    await executeDockerCmd({ dockerId: id, command: `docker network disconnect ${network} coolify-proxy` })
-                    await executeDockerCmd({ dockerId: id, command: `docker network rm ${network}` })
+                    await executeCommand({ dockerId: id, command: `docker network disconnect ${network} coolify-proxy` })
+                    await executeCommand({ dockerId: id, command: `docker network rm ${network}` })
                 }
             }
         }
@@ -206,13 +206,13 @@ export async function verifyRemoteDockerEngineFn(id: string) {
     await createRemoteEngineConfiguration(id);
     const { remoteIpAddress, network, isCoolifyProxyUsed } = await prisma.destinationDocker.findFirst({ where: { id } })
     const host = `ssh://${remoteIpAddress}-remote`
-    const { stdout } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`);
+    const { stdout } = await executeCommand({ command: `docker network ls --filter 'name=${network}' --no-trunc --format "{{json .}}"`, dockerId: id });
     if (!stdout) {
-        await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable ${network}`);
+        await executeCommand({ command: `docker network create --attachable ${network}`, dockerId: id });
     }
-    const { stdout: coolifyNetwork } = await asyncExecShell(`DOCKER_HOST=${host} docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`);
+    const { stdout: coolifyNetwork } = await executeCommand({ command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`, dockerId: id });
     if (!coolifyNetwork) {
-        await asyncExecShell(`DOCKER_HOST=${host} docker network create --attachable coolify-infra`);
+        await executeCommand({ command: `docker network create --attachable coolify-infra`, dockerId: id });
     }
     if (isCoolifyProxyUsed) await startTraefikProxy(id);
     try {

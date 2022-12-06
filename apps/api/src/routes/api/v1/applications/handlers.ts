@@ -8,7 +8,7 @@ import csv from 'csvtojson';
 
 import { day } from '../../../../lib/dayjs';
 import { saveDockerRegistryCredentials, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeCommand, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
@@ -78,7 +78,7 @@ export async function cleanupUnconfiguredApplications(request: FastifyRequest<an
         for (const application of applications) {
             if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn)) {
                 if (application?.destinationDockerId && application.destinationDocker?.network) {
-                    const { stdout: containers } = await executeDockerCmd({
+                    const { stdout: containers } = await executeCommand({
                         dockerId: application.destinationDocker.id,
                         command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${application.id} --format '{{json .}}'`
                     })
@@ -113,7 +113,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
             if (application.buildPack === 'compose') {
-                const { stdout: containers } = await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: application.destinationDocker.id,
                     command:
                         `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
@@ -485,7 +485,7 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
             if (imageId) {
                 image = imageId
             } else {
-                const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
+                const { stdout: container } = await executeCommand({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
                 const containersArray = container.trim().split('\n');
                 for (const container of containersArray) {
                     const containerObj = formatLabelsOnDocker(container);
@@ -504,7 +504,7 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
 
             let imageFoundLocally = false;
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId,
                     command: `docker image inspect ${image}`
                 })
@@ -514,7 +514,7 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
             }
             let imageFoundRemotely = false;
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId,
                     command: `docker ${location ? `--config ${location}` : ''} pull ${image}`
                 })
@@ -570,13 +570,13 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
             };
             await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
             try {
-                await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
-                await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+                await executeCommand({ dockerId, command: `docker stop -t 0 ${id}` })
+                await executeCommand({ dockerId, command: `docker rm ${id}` })
             } catch (error) {
                 //
             }
 
-            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            await executeCommand({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
             return reply.code(201).send();
         }
         throw { status: 500, message: 'Application cannot be restarted.' }
@@ -592,7 +592,7 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
         if (application?.destinationDockerId) {
             const { id: dockerId } = application.destinationDocker;
             if (application.buildPack === 'compose') {
-                const { stdout: containers } = await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: application.destinationDocker.id,
                     command:
                         `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
@@ -627,7 +627,7 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
             include: { destinationDocker: true }
         });
         if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
-            const { stdout: containers } = await executeDockerCmd({
+            const { stdout: containers } = await executeCommand({
                 dockerId: application.destinationDocker.id,
                 command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
             })
@@ -720,8 +720,8 @@ export async function getDockerImages(request) {
         const application: any = await getApplicationFromDB(id, teamId);
         let imagesAvailables = [];
         try {
-            const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache` });
-            const { stdout: runningImage } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
+            const { stdout } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache`, shell: true });
+            const { stdout: runningImage } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
             const images = stdout.trim().split('\n');
 
             for (const image of images) {
@@ -1184,7 +1184,7 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
             const { workdir } = await createDirectories({ repository, buildId });
             const labels = []
             let image = null
-            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}-${pullmergeRequestId}' --format '{{json .}}'` })
+            const { stdout: container } = await executeCommand({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}-${pullmergeRequestId}' --format '{{json .}}'` })
             const containersArray = container.trim().split('\n');
             for (const container of containersArray) {
                 const containerObj = formatLabelsOnDocker(container);
@@ -1197,7 +1197,7 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
             }
             let imageFound = false;
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId,
                     command: `docker image inspect ${image}`
                 })
@@ -1251,9 +1251,9 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
                 volumes: Object.assign({}, ...composeVolumes)
             };
             await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}-${pullmergeRequestId}` })
-            await executeDockerCmd({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` })
-            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            await executeCommand({ dockerId, command: `docker stop -t 0 ${id}-${pullmergeRequestId}` })
+            await executeCommand({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` })
+            await executeCommand({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
             return reply.code(201).send();
         }
         throw { status: 500, message: 'Application cannot be restarted.' }
@@ -1294,7 +1294,7 @@ export async function loadPreviews(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
-        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        const { stdout } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
         if (stdout === '') {
             throw { status: 500, message: 'No previews found.' }
         }
@@ -1369,7 +1369,7 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
         if (destinationDockerId) {
             try {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
+                const { stdout, stderr } = await executeCommand({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -1560,19 +1560,19 @@ export async function createdBranchDatabase(database: any, baseDatabaseBranch: s
         if (destinationDockerId) {
             if (type === 'postgresql') {
                 const decryptedRootUserPassword = decrypt(rootUserPassword);
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} pg_dump -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/${baseDatabaseBranch}" --encoding=UTF8 --schema-only -f /tmp/${baseDatabaseBranch}.dump`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "CREATE DATABASE branch_${pullmergeRequestId}"`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/branch_${pullmergeRequestId}" -f /tmp/${baseDatabaseBranch}.dump`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "ALTER DATABASE branch_${pullmergeRequestId} OWNER TO ${dbUser}"`
                 })
@@ -1591,12 +1591,12 @@ export async function removeBranchDatabase(database: any, pullmergeRequestId: st
             if (type === 'postgresql') {
                 const decryptedRootUserPassword = decrypt(rootUserPassword);
                 // Terminate all connections to the database
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'branch_${pullmergeRequestId}' AND pid <> pg_backend_pid();"`
                 })
 
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "DROP DATABASE branch_${pullmergeRequestId}"`
                 })

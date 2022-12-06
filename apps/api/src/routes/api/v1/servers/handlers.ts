@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import { errorHandler, executeDockerCmd, prisma, createRemoteEngineConfiguration, executeSSHCmd } from '../../../../lib/common';
+import { errorHandler, prisma, executeSSHCmd } from '../../../../lib/common';
 import os from 'node:os';
 import osu from 'node-os-utils';
 

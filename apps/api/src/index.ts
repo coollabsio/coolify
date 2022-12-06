@@ -9,7 +9,7 @@ import autoLoad from '@fastify/autoload';
 import socketIO from 'fastify-socket.io'
 import socketIOServer from './realtime'
 
-import { asyncExecShell, cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeDockerCmd, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
+import { cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeCommand, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
@@ -261,7 +261,7 @@ async function initServer() {
 	}
 	try {
 		console.log(`[001] Initializing server...`);
-		await asyncExecShell(`docker network create --attachable coolify`);
+		await executeCommand({ command: `docker network create --attachable coolify` });
 	} catch (error) { }
 	try {
 		console.log(`[002] Cleanup stucked builds...`);
@@ -272,7 +272,7 @@ async function initServer() {
 	} catch (error) { }
 	try {
 		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
-		if (!isDev) await fs.rm('/tmp/build-sources', { recursive: true, force: true })
+		await fs.rm('/tmp/build-sources', { recursive: true, force: true })
 	} catch (error) {
 		console.log(error)
 	}
@@ -323,14 +323,10 @@ async function autoUpdater() {
 				if (!isDev) {
 					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 					if (isAutoUpdateEnabled) {
-						await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-						await asyncExecShell(`env | grep '^COOLIFY' > .env`);
-						await asyncExecShell(
-							`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
-						);
-						await asyncExecShell(
-							`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
-						);
+						await executeCommand({ command: `docker pull coollabsio/coolify:${latestVersion}` })
+						await executeCommand({ command: `env | grep '^COOLIFY' > .env` })
+						await executeCommand({ command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env` })
+						await executeCommand({ command: `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"` })
 					}
 				} else {
 					console.log('Updating (not really in dev mode).');
@@ -351,8 +347,8 @@ async function checkFluentBit() {
 			});
 			const { found } = await checkContainer({ dockerId: id, container: 'coolify-fluentbit', remove: true });
 			if (!found) {
-				await asyncExecShell(`env | grep '^COOLIFY' > .env`);
-				await asyncExecShell(`docker compose up -d fluent-bit`);
+				await executeCommand({ command: `env | grep '^COOLIFY' > .env` });
+				await executeCommand({ command: `docker compose up -d fluent-bit` });
 			}
 		}
 	} catch (error) {
@@ -462,13 +458,13 @@ async function copySSLCertificates() {
 	} catch (error) {
 		console.log(error)
 	} finally {
-		await asyncExecShell(`find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete`)
+		await executeCommand({ command: `find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete` })
 	}
 }
 
 async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddress: string) {
 	try {
-		await asyncExecShell(`scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/`)
+		await executeCommand({ command: `scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/` })
 		await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
 		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
 		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
@@ -478,9 +474,9 @@ async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddr
 }
 async function copyLocalCertificates(id: string) {
 	try {
-		await asyncExecShell(`docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`)
-		await asyncExecShell(`docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/`)
-		await asyncExecShell(`docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/`)
+		await executeCommand({ command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'`, shell: true })
+		await executeCommand({ command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
+		await executeCommand({ command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
 	} catch (error) {
 		console.log({ error })
 	}
@@ -498,12 +494,13 @@ async function cleanupStorage() {
 		try {
 			let stdout = null
 			if (!isDev) {
-				const output = await executeDockerCmd({ dockerId: destination.id, command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'` })
+				const output = await executeCommand({ dockerId: destination.id, command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'`, shell: true })
 				stdout = output.stdout;
 			} else {
-				const output = await asyncExecShell(
-					`df -kPT /`
-				);
+				const output = await executeCommand({
+					command:
+						`df -kPT /`
+				});
 				stdout = output.stdout;
 			}
 			let lines = stdout.trim().split('\n');

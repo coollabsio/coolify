@@ -2,7 +2,7 @@ import { promises as dns } from 'dns';
 import { X509Certificate } from 'node:crypto';
 import * as Sentry from '@sentry/node';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { asyncExecShell, checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, getDomain, isDev, isDNSValid, isDomainConfigured, listSettings, prisma, sentryDSN, version } from '../../../../lib/common';
+import { checkDomainsIsValidInDNS, decrypt, encrypt, errorHandler, executeCommand, getDomain, isDev, isDNSValid, isDomainConfigured, listSettings, prisma, sentryDSN, version } from '../../../../lib/common';
 import { AddDefaultRegistry, CheckDNS, CheckDomain, DeleteDomain, OnlyIdInBody, SaveSettings, SaveSSHKey, SetDefaultRegistry } from './types';
 
 
@@ -182,7 +182,7 @@ export async function deleteCertificates(request: FastifyRequest<OnlyIdInBody>, 
     try {
         const teamId = request.user.teamId;
         const { id } = request.body;
-        await asyncExecShell(`docker exec coolify-proxy sh -c 'rm -f /etc/traefik/acme/custom/${id}-key.pem /etc/traefik/acme/custom/${id}-cert.pem'`)
+        await executeCommand({ command: `docker exec coolify-proxy sh -c 'rm -f /etc/traefik/acme/custom/${id}-key.pem /etc/traefik/acme/custom/${id}-cert.pem'`, shell: true })
         await prisma.certificate.deleteMany({ where: { id, teamId } })
         return reply.code(201).send()
     } catch ({ status, message }) {

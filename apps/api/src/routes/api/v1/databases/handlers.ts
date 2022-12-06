@@ -3,7 +3,7 @@ import type { FastifyRequest } from 'fastify';
 import { FastifyReply } from 'fastify';
 import yaml from 'js-yaml';
 import fs from 'fs/promises';
-import { ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
+import { ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeCommand, generateDatabaseConfiguration, generatePassword, getContainerUsage, getDatabaseImage, getDatabaseVersions, getFreePublicPort, listSettings, makeLabelForStandaloneDatabase, prisma, startTraefikTCPProxy, stopDatabaseContainer, stopTcpHttpProxy, supportedDatabaseTypesAndVersions, uniqueName, updatePasswordInDb } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 
 import type { OnlyId } from '../../../../types';
@@ -89,7 +89,7 @@ export async function getDatabaseStatus(request: FastifyRequest<OnlyId>) {
             const { destinationDockerId, destinationDocker } = database;
             if (destinationDockerId) {
                 try {
-                    const { stdout } = await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
+                    const { stdout } = await executeCommand({ dockerId: destinationDocker.id, command: `docker inspect --format '{{json .State}}' ${id}` })
 
                     if (JSON.parse(stdout).Running) {
                         isRunning = true;
@@ -208,7 +208,7 @@ export async function saveDatabaseDestination(request: FastifyRequest<SaveDataba
         if (destinationDockerId) {
             if (type && version) {
                 const baseImage = getDatabaseImage(type, arch);
-                executeDockerCmd({ dockerId, command: `docker pull ${baseImage}:${version}` })
+                executeCommand({ dockerId, command: `docker pull ${baseImage}:${version}` })
             }
         }
         return reply.code(201).send({})
@@ -298,7 +298,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
         };
         const composeFileDestination = `${workdir}/docker-compose.yaml`;
         await fs.writeFile(composeFileDestination, yaml.dump(composeFile));
-        await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up -d` })
+        await executeCommand({ dockerId: destinationDocker.id, command: `docker compose -f ${composeFileDestination} up -d` })
         if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
         return {};
 
@@ -347,7 +347,7 @@ export async function getDatabaseLogs(request: FastifyRequest<GetDatabaseLogs>) 
                 // const found = await checkContainer({ dockerId, container: id })
                 // if (found) {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
+                const { stdout, stderr } = await executeCommand({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${id}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)

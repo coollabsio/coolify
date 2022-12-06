@@ -4,7 +4,7 @@ import fs from 'fs/promises';
 import yaml from 'js-yaml';
 
 import { copyBaseConfigurationFiles, makeLabelForSimpleDockerfile, makeLabelForStandaloneApplication, saveBuildLog, saveDockerRegistryCredentials, setDefaultConfiguration } from '../lib/buildPacks/common';
-import { createDirectories, decrypt, defaultComposeConfiguration, executeDockerCmd, getDomain, prisma, decryptApplication, isDev, pushToRegistry } from '../lib/common';
+import { createDirectories, decrypt, defaultComposeConfiguration, getDomain, prisma, decryptApplication, isDev, pushToRegistry, executeCommand } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
 
@@ -70,14 +70,19 @@ import * as buildpacks from '../lib/buildPacks';
 									if (destinationDockerId) {
 										await prisma.build.update({ where: { id: buildId }, data: { status: 'running' } });
 										try {
-											await executeDockerCmd({
+											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}`
 											})
-											await executeDockerCmd({
-												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
-											})
+											if (containers) {
+												const containerArray = containers.split('\n');
+												if (containerArray.length > 0) {
+													for (const container of containerArray) {
+														await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+														await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+													}
+												}
+											}
 										} catch (error) {
 											//
 										}
@@ -154,7 +159,7 @@ import * as buildpacks from '../lib/buildPacks';
 												volumes: Object.assign({}, ...composeVolumes)
 											};
 											await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-											await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await executeCommand({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
 											await saveBuildLog({ line: 'Deployed successfully', buildId, applicationId });
 										} catch (error) {
 											await saveBuildLog({ line: error, buildId, applicationId });
@@ -187,9 +192,7 @@ import * as buildpacks from '../lib/buildPacks';
 									if (error instanceof Error) {
 										await saveBuildLog({ line: error.message, buildId, applicationId: application.id });
 									}
-									if (!isDev) {
-										await fs.rm(workdir, { recursive: true, force: true });
-									}
+									await fs.rm(workdir, { recursive: true, force: true });
 									return;
 								}
 								try {
@@ -208,9 +211,7 @@ import * as buildpacks from '../lib/buildPacks';
 										await saveBuildLog({ line: error.stderr, buildId, applicationId });
 									}
 								} finally {
-									if (!isDev) {
-										await fs.rm(workdir, { recursive: true, force: true });
-									}
+									await fs.rm(workdir, { recursive: true, force: true });
 									await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 								}
 								return;
@@ -409,7 +410,7 @@ import * as buildpacks from '../lib/buildPacks';
 									}
 
 									try {
-										await executeDockerCmd({
+										await executeCommand({
 											dockerId: destinationDocker.id,
 											command: `docker image inspect ${applicationId}:${tag}`
 										})
@@ -423,7 +424,7 @@ import * as buildpacks from '../lib/buildPacks';
 									}
 
 									try {
-										await executeDockerCmd({
+										await executeCommand({
 											dockerId: destinationDocker.id,
 											command: `docker ${location ? `--config ${location}` : ''} pull ${imageName}:${customTag}`
 										})
@@ -514,19 +515,24 @@ import * as buildpacks from '../lib/buildPacks';
 
 									if (buildPack === 'compose') {
 										try {
-											await executeDockerCmd({
+											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=coolify.applicationId=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+												command: `docker ps -a --filter 'label=coolify.applicationId=${applicationId}' --format {{.ID}}`
 											})
-											await executeDockerCmd({
-												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=coolify.applicationId=${applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
-											})
+											if (containers) {
+												const containerArray = containers.split('\n');
+												if (containerArray.length > 0) {
+													for (const container of containerArray) {
+														await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+														await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+													}
+												}
+											}
 										} catch (error) {
 											//
 										}
 										try {
-											await executeDockerCmd({ debug, buildId, applicationId, dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await executeCommand({ debug, buildId, applicationId, dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
 											await saveBuildLog({ line: 'Deployed successfully', buildId, applicationId });
 											await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 											await prisma.application.update({
@@ -549,14 +555,19 @@ import * as buildpacks from '../lib/buildPacks';
 
 									} else {
 										try {
-											await executeDockerCmd({
+											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}`
 											})
-											await executeDockerCmd({
-												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
-											})
+											if (containers) {
+												const containerArray = containers.split('\n');
+												if (containerArray.length > 0) {
+													for (const container of containerArray) {
+														await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+														await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+													}
+												}
+											}
 										} catch (error) {
 											//
 										}
@@ -622,7 +633,7 @@ import * as buildpacks from '../lib/buildPacks';
 												volumes: Object.assign({}, ...composeVolumes)
 											};
 											await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-											await executeDockerCmd({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
+											await executeCommand({ dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
 											await saveBuildLog({ line: 'Deployed successfully', buildId, applicationId });
 										} catch (error) {
 											await saveBuildLog({ line: error, buildId, applicationId });
@@ -660,9 +671,7 @@ import * as buildpacks from '../lib/buildPacks';
 								if (error instanceof Error) {
 									await saveBuildLog({ line: error.message, buildId, applicationId: application.id });
 								}
-								if (!isDev) {
-									await fs.rm(workdir, { recursive: true, force: true });
-								}
+								await fs.rm(workdir, { recursive: true, force: true });
 								return;
 							}
 							try {
@@ -680,9 +689,7 @@ import * as buildpacks from '../lib/buildPacks';
 								}
 
 							} finally {
-								if (!isDev) {
-									await fs.rm(workdir, { recursive: true, force: true });
-								}
+								await fs.rm(workdir, { recursive: true, force: true });
 								await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 							}
 						});
