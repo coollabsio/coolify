@@ -335,19 +335,21 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, id, port) }
 					if (previews) {
 						const { stdout } = await executeCommand({ dockerId, command: `docker container ls --filter="status=running" --filter="network=${network}" --filter="name=${id}-" --format="{{json .Names}}"` })
-						const containers = stdout
-							.trim()
-							.split('\n')
-							.filter((a) => a)
-							.map((c) => c.replace(/"/g, ''));
-						if (containers.length > 0) {
-							for (const container of containers) {
-								const previewDomain = `${container.split('-')[1]}${coolifySettings.previewSeparator}${domain}`;
-								const nakedDomain = previewDomain.replace(/^www\./, '');
-								const pathPrefix = '/'
-								const serviceId = `${container}-${port || 'default'}`
-								traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, previewDomain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
-								traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, container, port) }
+						if (stdout) {
+							const containers = stdout
+								.trim()
+								.split('\n')
+								.filter((a) => a)
+								.map((c) => c.replace(/"/g, ''));
+							if (containers.length > 0) {
+								for (const container of containers) {
+									const previewDomain = `${container.split('-')[1]}${coolifySettings.previewSeparator}${domain}`;
+									const nakedDomain = previewDomain.replace(/^www\./, '');
+									const pathPrefix = '/'
+									const serviceId = `${container}-${port || 'default'}`
+									traefik.http.routers = { ...traefik.http.routers, ...generateRouters(serviceId, previewDomain, nakedDomain, pathPrefix, isHttps, isWWW, dualCerts, isCustomSSL) }
+									traefik.http.services = { ...traefik.http.services, ...generateServices(serviceId, container, port) }
+								}
 							}
 						}
 					}
@@ -362,9 +364,11 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 			services.forEach((app) => dockerIds.add(app.destinationDocker.id));
 			for (const dockerId of dockerIds) {
 				const { stdout: container } = await executeCommand({ dockerId, command: `docker container ls --filter 'label=coolify.managed=true' --format '{{ .Names}}'` })
-				const containersArray = container.trim().split('\n');
-				if (containersArray.length > 0) {
-					runningContainers[dockerId] = containersArray
+				if (container) {
+					const containersArray = container.trim().split('\n');
+					if (containersArray.length > 0) {
+						runningContainers[dockerId] = containersArray
+					}
 				}
 			}
 			for (const service of services) {
