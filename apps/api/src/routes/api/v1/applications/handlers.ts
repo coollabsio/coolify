@@ -843,23 +843,22 @@ export async function saveApplicationSource(request: FastifyRequest<SaveApplicat
         const { id } = request.params
         const { gitSourceId, forPublic, type, simpleDockerfile } = request.body
         if (forPublic) {
-            if (gitSourceId) {
-                await prisma.application.update({
-                    where: { id },
-                    data: { gitSource: { connect: { id: gitSourceId } } }
-                });
-            } else {
-                const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
-                await prisma.application.update({
-                    where: { id },
-                    data: { gitSource: { connect: { id: publicGit.id } } }
-                });
-            }
+            const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: publicGit.id } } }
+            });
         }
         if (simpleDockerfile) {
             await prisma.application.update({
                 where: { id },
                 data: { simpleDockerfile, settings: { update: { autodeploy: false } } }
+            });
+        }
+        if (gitSourceId) {
+            await prisma.application.update({
+                where: { id },
+                data: { gitSource: { connect: { id: gitSourceId } } }
             });
         }
 
