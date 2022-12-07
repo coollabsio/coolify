@@ -1075,6 +1075,7 @@ export async function makeLabelForStandaloneDatabase({ id, image, volume }) {
 		'coolify.managed=true',
 		`coolify.version=${version}`,
 		`coolify.type=standalone-database`,
+		`coolify.name=${database.name}`,
 		`coolify.configuration=${base64Encode(
 			JSON.stringify({
 				version,
