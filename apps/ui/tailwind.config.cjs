@@ -42,6 +42,7 @@ module.exports = {
 			colors: {
 				"applications": "#16A34A",
 				"databases": "#9333EA",
+				"databases-100": "#9b46ea",
 				"destinations": "#0284C7",
 				"sources": "#EA580C",
 				"services": "#DB2777",

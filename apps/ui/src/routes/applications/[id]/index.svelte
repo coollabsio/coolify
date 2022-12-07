@@ -495,9 +495,9 @@
 				{#if !isSimpleDockerfile}
 					<div class="grid grid-cols-2 items-center">
 						<label for="gitSource">{$t('application.git_source')}</label>
-						{#if isDisabled || application.settings.isPublicRepository}
+						{#if isDisabled || application.settings?.isPublicRepository}
 							<input
-								disabled={isDisabled || application.settings.isPublicRepository}
+								disabled={isDisabled || application.settings?.isPublicRepository}
 								class="w-full"
 								value={application.gitSource?.name}
 							/>
@@ -526,7 +526,7 @@
 							/>
 							<a
 								href="{application.gitSource
-									.htmlUrl}/{application.repository}/commits/{application.branch}"
+									?.htmlUrl}/{application.repository}/commits/{application.branch}"
 								target="_blank noreferrer"
 								class="btn btn-primary text-xs"
 								>Commits<svg
@@ -548,10 +548,10 @@
 					</div>
 					<div class="grid grid-cols-2 items-center">
 						<label for="repository">{$t('application.git_repository')}</label>
-						{#if isDisabled || application.settings.isPublicRepository}
+						{#if isDisabled || application.settings?.isPublicRepository}
 							<input
 								class="w-full"
-								disabled={isDisabled || application.settings.isPublicRepository}
+								disabled={isDisabled || application.settings?.isPublicRepository}
 								value="{application.repository}/{application.branch}"
 							/>
 						{:else}
@@ -633,7 +633,7 @@
 					<label for="destination">{$t('application.destination')}</label>
 					<div class="no-underline">
 						<input
-							value={application.destinationDocker.name}
+							value={application.destinationDocker?.name}
 							id="destination"
 							disabled
 							class="bg-transparent w-full"
@@ -880,7 +880,7 @@
 										/>
 									</div>
 									<div class="text-center bg-green-600 rounded">
-										Connected to {application.connectedDatabase.databaseId}
+										Connected to {application.connectedDatabase?.databaseId}
 									</div>
 								{/if}
 							{/if}
@@ -1230,7 +1230,7 @@
 								readonly={!$appSession.isAdmin}
 								name="port"
 								id="port"
-								required={!!dockerComposeConfiguration[service.name].fqdn}
+								required={!!dockerComposeConfiguration[service.name]?.fqdn}
 								bind:value={dockerComposeConfiguration[service.name].port}
 							/>
 						</div>

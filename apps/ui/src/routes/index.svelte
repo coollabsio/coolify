@@ -31,7 +31,7 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get, post } from '$lib/api';
+	import { del, get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { appSession, search } from '$lib/store';
@@ -42,6 +42,7 @@
 	import { dev } from '$app/env';
 	import NewResource from './_NewResource.svelte';
 	import { onMount } from 'svelte';
+	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	let numberOfGetStatus = 0;
 	let status: any = {};
@@ -432,6 +433,39 @@
 			return errorNotification(error);
 		}
 	}
+	async function deleteApplication(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this application!');
+			if (sure) {
+				await del(`/applications/${id}`, { force: true });
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function deleteService(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this service!');
+			if (sure) {
+				await del(`/services/${id}`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function deleteDatabase(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this database!');
+			if (sure) {
+				await del(`/databases/${id}`, { force: true });
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
 </script>
 
 <nav class="header">
@@ -749,6 +783,11 @@
 												</svg>
 											</a>
 										{/if}
+										<button
+											class="icons hover:bg-green-500"
+											on:click|stopPropagation|preventDefault={() =>
+												deleteApplication(application.id)}><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>
@@ -857,6 +896,11 @@
 											</svg>
 										</a>
 									{/if}
+									<button
+										class="icons hover:bg-green-500"
+										on:click|stopPropagation|preventDefault={() =>
+											deleteApplication(application.id)}><DeleteIcon /></button
+									>
 								</div>
 							</div>
 						</div>
@@ -947,6 +991,11 @@
 													</svg>
 												</a>
 											{/if}
+											<button
+												class="icons hover:bg-pink-500"
+												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+												><DeleteIcon /></button
+											>
 										</div>
 									</div>
 								</div>
@@ -1028,6 +1077,11 @@
 												</svg>
 											</a>
 										{/if}
+										<button
+											class="icons hover:bg-pink-500"
+											on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+											><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>
@@ -1119,6 +1173,11 @@
 													</svg>
 												</div>
 											{/if}
+											<button
+												class="icons hover:bg-databases-100"
+												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
+												><DeleteIcon /></button
+											>
 										</div>
 									</div>
 								</div>
@@ -1200,6 +1259,11 @@
 												</svg>
 											</div>
 										{/if}
+										<button
+											class="icons hover:bg-databases"
+											on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
+											><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>
