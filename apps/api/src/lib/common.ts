@@ -565,9 +565,9 @@ export async function executeCommand({ command, dockerId = null, sshCommand = fa
 		}
 		if (sshCommand) {
 			if (shell) {
-				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`, { shell: true, stdio: 'inherit' });
+				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`);
 			}
-			return await execa('ssh', [`${remoteIpAddress}-remote`, ...dockerArgs]);
+			return await execa('ssh', [`${remoteIpAddress}-remote`, dockerCommand, ...dockerArgs]);
 		}
 		if (stream) {
 			return await new Promise(async (resolve, reject) => {
