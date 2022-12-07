@@ -1,5 +1,5 @@
 import { saveBuildLog } from "../buildPacks/common";
-import {  executeCommand } from "../common";
+import { executeCommand } from "../common";
 
 export default async function ({
 	applicationId,
@@ -33,13 +33,13 @@ export default async function ({
 	}
 
 	await saveBuildLog({
-		line: `Cloning ${repository}:${branch} branch`,
+		line: `Cloning ${repository}:${branch}...`,
 		buildId,
 		applicationId
 	});
 	if (gitCommitHash) {
 		await saveBuildLog({
-			line: `Checking out ${gitCommitHash} commit`,
+			line: `Checking out ${gitCommitHash} commit...`,
 			buildId,
 			applicationId
 		});

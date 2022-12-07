@@ -543,7 +543,7 @@ export async function createRemoteEngineConfiguration(id: string) {
 	}
 	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config));
 }
-export async function executeCommand({ command, dockerId = null, sshCommand = false, shell = false, buildId, applicationId, debug }: { command: string, sshCommand?: boolean, shell?: boolean, dockerId?: string, buildId?: string, applicationId?: string, debug?: boolean }): Promise<ExecaChildProcess<string>> {
+export async function executeCommand({ command, dockerId = null, sshCommand = false, shell = false, stream = false, buildId, applicationId, debug }: { command: string, sshCommand?: boolean, shell?: boolean, stream?: boolean, dockerId?: string, buildId?: string, applicationId?: string, debug?: boolean }): Promise<ExecaChildProcess<string>> {
 	const { execa, execaCommand } = await import('execa')
 	const { parse } = await import('shell-quote')
 	const parsedCommand = parse(command);
@@ -569,66 +569,78 @@ export async function executeCommand({ command, dockerId = null, sshCommand = fa
 			}
 			return await execa('ssh', [`${remoteIpAddress}-remote`, ...dockerArgs]);
 		}
-		return await new Promise(async (resolve, reject) => {
-			let subprocess = null;
+		if (stream) {
+			return await new Promise(async (resolve, reject) => {
+				let subprocess = null;
+				if (shell) {
+					subprocess = execaCommand(command, {
+						env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+					});
+				} else {
+					subprocess = execa(dockerCommand, dockerArgs, {
+						env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+					});
+				}
+				const logs = [];
+				subprocess.stdout.on('data', async (data) => {
+					const stdout = data.toString();
+					const array = stdout.split('\n');
+					for (const line of array) {
+						if (line !== '\n' && line !== '') {
+							const log = {
+								line: `${line.replace('\n', '')}`,
+								buildId,
+								applicationId
+							}
+							logs.push(log);
+							if (debug) {
+								await saveBuildLog(log);
+							}
+						}
+					}
+				});
+				subprocess.stderr.on('data', async (data) => {
+					const stderr = data.toString();
+					const array = stderr.split('\n');
+					for (const line of array) {
+						if (line !== '\n' && line !== '') {
+							const log = {
+								line: `${line.replace('\n', '')}`,
+								buildId,
+								applicationId
+							}
+							logs.push(log);
+							if (debug) {
+								await saveBuildLog(log);
+							}
+						}
+					}
+				});
+				subprocess.on('exit', async (code) => {
+					if (code === 0) {
+						resolve(code);
+					} else {
+						if (!debug) {
+							for (const log of logs) {
+								await saveBuildLog(log);
+							}
+						}
+						reject(code);
+					}
+				});
+			})
+		} else {
 			if (shell) {
-				subprocess = execaCommand(command, {
+				return await execaCommand(command, {
 					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
 			} else {
-				subprocess = execa(dockerCommand, dockerArgs, {
+				return await execa(dockerCommand, dockerArgs, {
 					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
 			}
-			const logs = [];
-			subprocess.stdout.on('data', async (data) => {
-				const stdout = data.toString();
-				const array = stdout.split('\n');
-				for (const line of array) {
-					if (line !== '\n' && line !== '') {
-						const log = {
-							line: `${line.replace('\n', '')}`,
-							buildId,
-							applicationId
-						}
-						logs.push(log);
-						if (debug) {
-							await saveBuildLog(log);
-						}
-					}
-				}
-			});
-			subprocess.stderr.on('data', async (data) => {
-				const stderr = data.toString();
-				const array = stderr.split('\n');
-				for (const line of array) {
-					if (line !== '\n' && line !== '') {
-						const log = {
-							line: `${line.replace('\n', '')}`,
-							buildId,
-							applicationId
-						}
-						logs.push(log);
-						if (debug) {
-							await saveBuildLog(log);
-						}
-					}
-				}
-			});
-			subprocess.on('exit', async (code) => {
-				await asyncSleep(1000);
-				if (code === 0) {
-					resolve(code);
-				} else {
-					if (!debug) {
-						for (const log of logs) {
-							await saveBuildLog(log);
-						}
-					}
-					reject(code);
-				}
-			});
-		})
+		}
+
 	} else {
 		if (shell) {
 			return execaCommand(command, { shell: true });
@@ -636,44 +648,7 @@ export async function executeCommand({ command, dockerId = null, sshCommand = fa
 		return await execa(dockerCommand, dockerArgs);
 	}
 }
-export async function executeSSHCmd({ dockerId, command }) {
-	const { execaCommand, execa } = await import('execa')
-	const { parse } = await import('shell-quote')
-	let { remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
-	if (remoteEngine) {
-		await createRemoteEngineConfiguration(dockerId)
-	}
-	if (process.env.CODESANDBOX_HOST) {
-		if (command.startsWith('docker compose')) {
-			command = command.replace(/docker compose/gi, 'docker-compose')
-		}
-	}
-	const dockerArgs = parse(command);
-	return await execa('ssh', [`${remoteIpAddress}-remote`, ...dockerArgs]);
-}
-export async function executeDockerCmd({ debug, buildId, applicationId, dockerId, command }: { debug?: boolean, buildId?: string, applicationId?: string, dockerId: string, command: string }): Promise<any> {
-	const { execa } = await import('execa')
-	const { parse } = await import('shell-quote')
-	let { remoteEngine, remoteIpAddress, engine } = await prisma.destinationDocker.findUnique({ where: { id: dockerId } })
-	if (remoteEngine) {
-		await createRemoteEngineConfiguration(dockerId);
-		engine = `ssh://${remoteIpAddress}-remote`;
-	} else {
-		engine = 'unix:///var/run/docker.sock';
-	}
-	if (process.env.CODESANDBOX_HOST) {
-		if (command.startsWith('docker compose')) {
-			command = command.replace(/docker compose/gi, 'docker-compose');
-		}
-	}
-	const parsedCommand = parse(command);
-	const dockerCommand = parsedCommand[0];
-	const dockerArgs = parsedCommand.slice(1);
-	if (command.startsWith(`docker build`) || command.startsWith(`pack build`) || command.startsWith(`docker compose build`)) {
-		return await asyncExecShellStream({ debug, buildId, applicationId, command, engine });
-	}
-	return await execa(dockerCommand, dockerArgs, { env: { DOCKER_BUILDKIT: "1", DOCKER_HOST: engine } });
-}
+
 export async function startTraefikProxy(id: string): Promise<void> {
 	const { engine, network, remoteEngine, remoteIpAddress } = await prisma.destinationDocker.findUnique({ where: { id } })
 	const { found } = await checkContainer({ dockerId: id, container: 'coolify-proxy', remove: true });

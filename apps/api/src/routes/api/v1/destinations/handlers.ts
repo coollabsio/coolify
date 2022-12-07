@@ -4,7 +4,7 @@ import sshConfig from 'ssh-config'
 import fs from 'fs/promises'
 import os from 'os';
 
-import { createRemoteEngineConfiguration, decrypt, errorHandler, executeCommand,  executeSSHCmd, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
+import { createRemoteEngineConfiguration, decrypt, errorHandler, executeCommand, listSettings, prisma, startTraefikProxy, stopTraefikProxy } from '../../../../lib/common';
 import { checkContainer } from '../../../../lib/docker';
 
 import type { OnlyId } from '../../../../types';
@@ -216,7 +216,7 @@ export async function verifyRemoteDockerEngineFn(id: string) {
     }
     if (isCoolifyProxyUsed) await startTraefikProxy(id);
     try {
-        const { stdout: daemonJson } = await executeSSHCmd({ dockerId: id, command: `cat /etc/docker/daemon.json` });
+        const { stdout: daemonJson } = await executeCommand({ sshCommand: true, dockerId: id, command: `cat /etc/docker/daemon.json` });
         let daemonJsonParsed = JSON.parse(daemonJson);
         let isUpdated = false;
         if (!daemonJsonParsed['live-restore'] || daemonJsonParsed['live-restore'] !== true) {
@@ -231,8 +231,8 @@ export async function verifyRemoteDockerEngineFn(id: string) {
             }
         }
         if (isUpdated) {
-            await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
-            await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
+            await executeCommand({ sshCommand: true, shell: true, dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
+            await executeCommand({ sshCommand: true, dockerId: id, command: `systemctl restart docker` });
         }
     } catch (error) {
         const daemonJsonParsed = {
@@ -241,8 +241,8 @@ export async function verifyRemoteDockerEngineFn(id: string) {
                 "buildkit": true
             }
         }
-        await executeSSHCmd({ dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
-        await executeSSHCmd({ dockerId: id, command: `systemctl restart docker` });
+        await executeCommand({ sshCommand: true, shell: true, dockerId: id, command: `echo '${JSON.stringify(daemonJsonParsed)}' > /etc/docker/daemon.json` });
+        await executeCommand({ sshCommand: true, dockerId: id, command: `systemctl restart docker` });
     } finally {
         await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } })
     }

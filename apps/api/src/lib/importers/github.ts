@@ -32,13 +32,13 @@ export default async function ({
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
 	if (forPublic) {
 		await saveBuildLog({
-			line: `Cloning ${repository}:${branch} branch`,
+			line: `Cloning ${repository}:${branch}...`,
 			buildId,
 			applicationId
 		});
 		if (gitCommitHash) {
 			await saveBuildLog({
-				line: `Checking out ${gitCommitHash} commit`,
+				line: `Checking out ${gitCommitHash} commit...`,
 				buildId,
 				applicationId
 			});
@@ -72,13 +72,13 @@ export default async function ({
 			})
 			.json();
 		await saveBuildLog({
-			line: `Cloning ${repository}:${branch} branch`,
+			line: `Cloning ${repository}:${branch}...`,
 			buildId,
 			applicationId
 		});
 		if (gitCommitHash) {
 			await saveBuildLog({
-				line: `Checking out ${gitCommitHash} commit`,
+				line: `Checking out ${gitCommitHash} commit...`,
 				buildId,
 				applicationId
 			});
@@ -90,6 +90,5 @@ export default async function ({
 		});
 	}
 	const { stdout: commit } = await executeCommand({ command: `cd ${workdir}/ && git rev-parse HEAD`, shell: true });
-	console.log({ commit })
 	return commit.replace('\n', '');
 }

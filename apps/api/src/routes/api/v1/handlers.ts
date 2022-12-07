@@ -13,7 +13,6 @@ import {
 	uniqueName,
 	version,
 	sentryDSN,
-	executeDockerCmd,
 	executeCommand,
 } from "../../../lib/common";
 import { scheduler } from "../../../lib/scheduler";

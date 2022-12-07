@@ -1,4 +1,4 @@
-import { base64Encode, decrypt, encrypt, executeCommand,  generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
+import { base64Encode, decrypt, encrypt, executeCommand, generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -489,6 +489,8 @@ export const saveBuildLog = async ({
 	buildId: string;
 	applicationId: string;
 }): Promise<any> => {
+	if (buildId === 'undefined' || buildId === 'null' || !buildId) return;
+	if (applicationId === 'undefined' || applicationId === 'null' || !applicationId) return;
 	const { default: got } = await import('got')
 	if (typeof line === 'object' && line) {
 		if (line.shortMessage) {
@@ -656,16 +658,11 @@ export async function buildImage({
 		location = await saveDockerRegistryCredentials({ url, username, password, workdir })
 	}
 
-	await executeCommand({ debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
+	await executeCommand({ stream: true, debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
 		throw new Error('Canceled.')
-	}
-	if (isCache) {
-		await saveBuildLog({ line: `Built successfully`, buildId, applicationId });
-	} else {
-		await saveBuildLog({ line: `Built successfully`, buildId, applicationId });
 	}
 }
 export function makeLabelForSimpleDockerfile({ applicationId, port, type }) {

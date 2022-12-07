@@ -167,7 +167,8 @@
 		}
 	}
 	async function getStatus() {
-		if (($status.application.loading && stopping) || $status.application.restarting === true) return;
+		if (($status.application.loading && stopping) || $status.application.restarting === true)
+			return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
 
@@ -453,7 +454,7 @@
 			<button
 				class="btn btn-sm gap-2"
 				disabled={!$isDeploymentEnabled}
-				on:click={() => handleDeploySubmit(false)}
+				on:click={() => handleDeploySubmit(true)}
 			>
 				{#if $status.application.overallStatus !== 'degraded'}
 					<svg

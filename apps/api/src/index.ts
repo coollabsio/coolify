@@ -9,7 +9,7 @@ import autoLoad from '@fastify/autoload';
 import socketIO from 'fastify-socket.io'
 import socketIOServer from './realtime'
 
-import { cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeCommand, executeSSHCmd, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
+import { cleanupDockerStorage, createRemoteEngineConfiguration, decrypt, executeCommand, generateDatabaseConfiguration, isDev, listSettings, prisma, sentryDSN, startTraefikProxy, startTraefikTCPProxy, version } from './lib/common';
 import { scheduler } from './lib/scheduler';
 import { compareVersions } from 'compare-versions';
 import Graceful from '@ladjs/graceful'
@@ -465,9 +465,9 @@ async function copySSLCertificates() {
 async function copyRemoteCertificates(id: string, dockerId: string, remoteIpAddress: string) {
 	try {
 		await executeCommand({ command: `scp /tmp/${id}-cert.pem /tmp/${id}-key.pem ${remoteIpAddress}:/tmp/` })
-		await executeSSHCmd({ dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
-		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
-		await executeSSHCmd({ dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
+		await executeCommand({ sshCommand: true, shell: true, dockerId, command: `docker exec coolify-proxy sh -c 'test -d /etc/traefik/acme/custom/ || mkdir -p /etc/traefik/acme/custom/'` })
+		await executeCommand({ sshCommand: true, dockerId, command: `docker cp /tmp/${id}-key.pem coolify-proxy:/etc/traefik/acme/custom/` })
+		await executeCommand({ sshCommand: true, dockerId, command: `docker cp /tmp/${id}-cert.pem coolify-proxy:/etc/traefik/acme/custom/` })
 	} catch (error) {
 		console.log({ error })
 	}
