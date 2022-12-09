@@ -1652,7 +1652,7 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 		const { numberOfDockerImagesKeptLocally } = await prisma.setting.findUnique({ where: { id: '0' } })
 		const { stdout: images } = await executeCommand({
 			dockerId,
-			command: `docker images | grep -v "<none>" | grep -v REPOSITORY | awk '{print $1, $2}'`,
+			command: `docker images|grep -v "<none>"|grep -v REPOSITORY|awk '{print $1, $2}'`,
 			shell: true
 		});
 		const imagesArray = images.trim().replaceAll(' ', ':').split('\n');
