@@ -1151,9 +1151,9 @@
 												{/if}
 											</div>
 										</div>
-										<div class="flex justify-end items-end space-x-2 h-10">
+										<div class="flex justify-end items-center space-x-2 h-10">
 											{#if database.settings?.isPublic}
-												<div title="Public">
+												<div title="Public" class="icons hover:bg-transparent">
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
 														class="h-6 w-6 "
