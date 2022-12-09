@@ -1,7 +1,7 @@
 
 import jsonwebtoken from 'jsonwebtoken';
 import { saveBuildLog } from '../buildPacks/common';
-import { asyncExecShell, decrypt, prisma } from '../common';
+import { decrypt, executeCommand, prisma } from '../common';
 
 export default async function ({
 	applicationId,
@@ -9,6 +9,7 @@ export default async function ({
 	githubAppId,
 	repository,
 	apiUrl,
+	gitCommitHash,
 	htmlUrl,
 	branch,
 	buildId,
@@ -20,6 +21,7 @@ export default async function ({
 	githubAppId: string;
 	repository: string;
 	apiUrl: string;
+	gitCommitHash?: string;
 	htmlUrl: string;
 	branch: string;
 	buildId: string;
@@ -28,16 +30,24 @@ export default async function ({
 }): Promise<string> {
 	const { default: got } = await import('got')
 	const url = htmlUrl.replace('https://', '').replace('http://', '');
-	await saveBuildLog({ line: 'GitHub importer started.', buildId, applicationId });
 	if (forPublic) {
 		await saveBuildLog({
-			line: `Cloning ${repository}:${branch} branch.`,
+			line: `Cloning ${repository}:${branch}...`,
 			buildId,
 			applicationId
 		});
-		await asyncExecShell(
-			`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
-		);
+		if (gitCommitHash) {
+			await saveBuildLog({
+				line: `Checking out ${gitCommitHash} commit...`,
+				buildId,
+				applicationId
+			});
+		}
+		await executeCommand({
+			command:
+				`git clone -q -b ${branch} https://${url}/${repository}.git ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `,
+			shell: true
+		});
 
 	} else {
 		const body = await prisma.githubApp.findUnique({ where: { id: githubAppId } });
@@ -62,15 +72,23 @@ export default async function ({
 			})
 			.json();
 		await saveBuildLog({
-			line: `Cloning ${repository}:${branch} branch.`,
+			line: `Cloning ${repository}:${branch}...`,
 			buildId,
 			applicationId
 		});
-		await asyncExecShell(
-			`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git submodule update --init --recursive && git lfs pull && cd .. `
-		);
+		if (gitCommitHash) {
+			await saveBuildLog({
+				line: `Checking out ${gitCommitHash} commit...`,
+				buildId,
+				applicationId
+			});
+		}
+		await executeCommand({
+			command:
+				`git clone -q -b ${branch} https://x-access-token:${token}@${url}/${repository}.git --config core.sshCommand="ssh -p ${customPort}" ${workdir}/ && cd ${workdir} && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `,
+			shell: true
+		});
 	}
-	const { stdout: commit } = await asyncExecShell(`cd ${workdir}/ && git rev-parse HEAD`);
-
+	const { stdout: commit } = await executeCommand({ command: `cd ${workdir}/ && git rev-parse HEAD`, shell: true });
 	return commit.replace('\n', '');
 }

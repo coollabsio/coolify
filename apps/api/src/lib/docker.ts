@@ -1,4 +1,4 @@
-import { executeDockerCmd } from './common';
+import { executeCommand } from './common';
 
 export function formatLabelsOnDocker(data) {
 	return data.trim().split('\n').map(a => JSON.parse(a)).map((container) => {
@@ -16,7 +16,7 @@ export function formatLabelsOnDocker(data) {
 export async function checkContainer({ dockerId, container, remove = false }: { dockerId: string, container: string, remove?: boolean }): Promise<{ found: boolean, status?: { isExited: boolean, isRunning: boolean, isRestarting: boolean } }> {
 	let containerFound = false;
 	try {
-		const { stdout } = await executeDockerCmd({
+		const { stdout } = await executeCommand({
 			dockerId,
 			command:
 				`docker inspect --format '{{json .State}}' ${container}`
@@ -28,27 +28,26 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 		const isRestarting = status === 'restarting'
 		const isExited = status === 'exited'
 		if (status === 'created') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command:
 					`docker rm ${container}`
 			});
 		}
 		if (remove && status === 'exited') {
-			await executeDockerCmd({
+			await executeCommand({
 				dockerId,
 				command:
 					`docker rm ${container}`
 			});
 		}
-		
+
 		return {
 			found: containerFound,
 			status: {
 				isRunning,
 				isRestarting,
 				isExited
-
 			}
 		};
 	} catch (err) {
@@ -63,7 +62,7 @@ export async function checkContainer({ dockerId, container, remove = false }: { 
 export async function isContainerExited(dockerId: string, containerName: string): Promise<boolean> {
 	let isExited = false;
 	try {
-		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect -f '{{.State.Status}}' ${containerName}` })
+		const { stdout } = await executeCommand({ dockerId, command: `docker inspect -f '{{.State.Status}}' ${containerName}` })
 		if (stdout.trim() === 'exited') {
 			isExited = true;
 		}
@@ -82,13 +81,13 @@ export async function removeContainer({
 	dockerId: string;
 }): Promise<void> {
 	try {
-		const { stdout } = await executeDockerCmd({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
+		const { stdout } = await executeCommand({ dockerId, command: `docker inspect --format '{{json .State}}' ${id}` })
 		if (JSON.parse(stdout).Running) {
-			await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
-			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+			await executeCommand({ dockerId, command: `docker stop -t 0 ${id}` })
+			await executeCommand({ dockerId, command: `docker rm ${id}` })
 		}
 		if (JSON.parse(stdout).Status === 'exited') {
-			await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
+			await executeCommand({ dockerId, command: `docker rm ${id}` })
 		}
 	} catch (error) {
 		throw error;

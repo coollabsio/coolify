@@ -4,7 +4,7 @@ import yaml from 'js-yaml';
 import bcrypt from 'bcryptjs';
 import cuid from 'cuid';
 
-import { prisma, uniqueName, asyncExecShell, getServiceFromDB, getContainerUsage, isDomainConfigured, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, executeDockerCmd, checkDomainsIsValidInDNS, checkExposedPort, listSettings, generateToken } from '../../../../lib/common';
+import { prisma, uniqueName, getServiceFromDB, getContainerUsage, isDomainConfigured, fixType, decrypt, encrypt, ComposeFile, getFreePublicPort, getDomain, errorHandler, generatePassword, isDev, stopTcpHttpProxy, checkDomainsIsValidInDNS, checkExposedPort, listSettings, generateToken, executeCommand } from '../../../../lib/common';
 import { day } from '../../../../lib/dayjs';
 import { checkContainer, } from '../../../../lib/docker';
 import { removeService } from '../../../../lib/services/common';
@@ -48,14 +48,19 @@ export async function cleanupUnconfiguredServices(request: FastifyRequest) {
         for (const service of services) {
             if (!service.fqdn) {
                 if (service.destinationDockerId) {
-                    await executeDockerCmd({
+                    const { stdout: containers } = await executeCommand({
                         dockerId: service.destinationDockerId,
-                        command: `docker ps -a --filter 'label=com.docker.compose.project=${service.id}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+                        command: `docker ps -a --filter 'label=com.docker.compose.project=${service.id}' --format {{.ID}}`
                     })
-                    await executeDockerCmd({
-                        dockerId: service.destinationDockerId,
-                        command: `docker ps -a --filter 'label=com.docker.compose.project=${service.id}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
-                    })
+                    if (containers) {
+                        const containerArray = containers.split('\n');
+                        if (containerArray.length > 0) {
+                            for (const container of containerArray) {
+                                await executeCommand({ dockerId: service.destinationDockerId, command: `docker stop -t 0 ${container}` })
+                                await executeCommand({ dockerId: service.destinationDockerId, command: `docker rm --force ${container}` })
+                            }
+                        }
+                    }
                 }
                 await removeService({ id: service.id });
             }
@@ -73,58 +78,61 @@ export async function getServiceStatus(request: FastifyRequest<OnlyId>) {
         const { destinationDockerId, settings } = service;
         let payload = {}
         if (destinationDockerId) {
-            const { stdout: containers } = await executeDockerCmd({
+            const { stdout: containers } = await executeCommand({
                 dockerId: service.destinationDocker.id,
                 command:
                     `docker ps -a --filter "label=com.docker.compose.project=${id}" --format '{{json .}}'`
             });
-            const containersArray = containers.trim().split('\n');
-            if (containersArray.length > 0 && containersArray[0] !== '') {
-                const templates = await getTemplates();
-                let template = templates.find(t => t.type === service.type);
-                const templateStr = JSON.stringify(template)
-                if (templateStr) {
-                    template = JSON.parse(templateStr.replaceAll('$$id', service.id));
-                }
-                for (const container of containersArray) {
-                    let isRunning = false;
-                    let isExited = false;
-                    let isRestarting = false;
-                    let isExcluded = false;
-                    const containerObj = JSON.parse(container);
-                    const exclude = template?.services[containerObj.Names]?.exclude;
-                    if (exclude) {
+            if (containers) {
+                const containersArray = containers.trim().split('\n');
+                if (containersArray.length > 0 && containersArray[0] !== '') {
+                    const templates = await getTemplates();
+                    let template = templates.find(t => t.type === service.type);
+                    const templateStr = JSON.stringify(template)
+                    if (templateStr) {
+                        template = JSON.parse(templateStr.replaceAll('$$id', service.id));
+                    }
+                    for (const container of containersArray) {
+                        let isRunning = false;
+                        let isExited = false;
+                        let isRestarting = false;
+                        let isExcluded = false;
+                        const containerObj = JSON.parse(container);
+                        const exclude = template?.services[containerObj.Names]?.exclude;
+                        if (exclude) {
+                            payload[containerObj.Names] = {
+                                status: {
+                                    isExcluded: true,
+                                    isRunning: false,
+                                    isExited: false,
+                                    isRestarting: false,
+                                }
+                            }
+                            continue;
+                        }
+
+                        const status = containerObj.State
+                        if (status === 'running') {
+                            isRunning = true;
+                        }
+                        if (status === 'exited') {
+                            isExited = true;
+                        }
+                        if (status === 'restarting') {
+                            isRestarting = true;
+                        }
                         payload[containerObj.Names] = {
                             status: {
-                                isExcluded: true,
-                                isRunning: false,
-                                isExited: false,
-                                isRestarting: false,
+                                isExcluded,
+                                isRunning,
+                                isExited,
+                                isRestarting
                             }
-                        }
-                        continue;
-                    }
-
-                    const status = containerObj.State
-                    if (status === 'running') {
-                        isRunning = true;
-                    }
-                    if (status === 'exited') {
-                        isExited = true;
-                    }
-                    if (status === 'restarting') {
-                        isRestarting = true;
-                    }
-                    payload[containerObj.Names] = {
-                        status: {
-                            isExcluded,
-                            isRunning,
-                            isExited,
-                            isRestarting
                         }
                     }
                 }
             }
+
         }
         return payload
     } catch ({ status, message }) {
@@ -239,13 +247,13 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 if (value === '$$generate_fqdn') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '"' || '' + '"')
                 } else if (value === '$$generate_fqdn_slash') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/'  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.fqdn + '/' + '"')
                 } else if (value === '$$generate_domain') {
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, getDomain(service.fqdn) + '"')
                 } else if (service.destinationDocker?.network && value === '$$generate_network') {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, service.destinationDocker.network + '"')
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value  + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value + '"')
                 }
             }
         }
@@ -443,7 +451,7 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
         if (destinationDockerId) {
             try {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
+                const { stdout, stderr } = await executeCommand({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -749,7 +757,7 @@ export async function activatePlausibleUsers(request: FastifyRequest<OnlyId>, re
         if (destinationDockerId) {
             const databaseUrl = serviceSecret.find((secret) => secret.name === 'DATABASE_URL');
             if (databaseUrl) {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDocker.id,
                     command: `docker exec ${id}-postgresql psql -H ${databaseUrl.value} -c "UPDATE users SET email_verified = true;"`
                 })
@@ -770,9 +778,10 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
             destinationDocker,
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            await executeDockerCmd({
+            await executeCommand({
                 dockerId: destinationDocker.id,
-                command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\"`
+                command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\"`,
+                shell: true
             })
             return await reply.code(201).send()
         }
@@ -812,36 +821,42 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
             if (user) ftpUser = user;
             if (savedPassword) ftpPassword = decrypt(savedPassword);
 
-            const { stdout: password } = await asyncExecShell(
-                `echo ${ftpPassword} | openssl passwd -1 -stdin`
+            // TODO: rewrite these to usable without shell
+            const { stdout: password } = await executeCommand({
+                command:
+                    `echo ${ftpPassword} | openssl passwd -1 -stdin`,
+                shell: true
+            }
             );
             if (destinationDockerId) {
                 try {
                     await fs.stat(hostkeyDir);
                 } catch (error) {
-                    await asyncExecShell(`mkdir -p ${hostkeyDir}`);
+                    await executeCommand({ command: `mkdir -p ${hostkeyDir}` });
                 }
                 if (!ftpHostKey) {
-                    await asyncExecShell(
-                        `ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
+                    await executeCommand({
+                        command:
+                            `ssh-keygen -t ed25519 -f ssh_host_ed25519_key -N "" -q -f ${hostkeyDir}/${id}.ed25519`
+                    }
                     );
-                    const { stdout: ftpHostKey } = await asyncExecShell(`cat ${hostkeyDir}/${id}.ed25519`);
+                    const { stdout: ftpHostKey } = await executeCommand({ command: `cat ${hostkeyDir}/${id}.ed25519` });
                     await prisma.wordpress.update({
                         where: { serviceId: id },
                         data: { ftpHostKey: encrypt(ftpHostKey) }
                     });
                 } else {
-                    await asyncExecShell(`echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`);
+                    await executeCommand({ command: `echo "${decrypt(ftpHostKey)}" > ${hostkeyDir}/${id}.ed25519`, shell: true });
                 }
                 if (!ftpHostKeyPrivate) {
-                    await asyncExecShell(`ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa`);
-                    const { stdout: ftpHostKeyPrivate } = await asyncExecShell(`cat ${hostkeyDir}/${id}.rsa`);
+                    await executeCommand({ command: `ssh-keygen -t rsa -b 4096 -N "" -f ${hostkeyDir}/${id}.rsa` });
+                    const { stdout: ftpHostKeyPrivate } = await executeCommand({ command: `cat ${hostkeyDir}/${id}.rsa` });
                     await prisma.wordpress.update({
                         where: { serviceId: id },
                         data: { ftpHostKeyPrivate: encrypt(ftpHostKeyPrivate) }
                     });
                 } else {
-                    await asyncExecShell(`echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`);
+                    await executeCommand({ command: `echo "${decrypt(ftpHostKeyPrivate)}" > ${hostkeyDir}/${id}.rsa`, shell: true });
                 }
 
                 await prisma.wordpress.update({
@@ -856,9 +871,10 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 try {
                     const { found: isRunning } = await checkContainer({ dockerId: destinationDocker.id, container: `${id}-ftp` });
                     if (isRunning) {
-                        await executeDockerCmd({
+                        await executeCommand({
                             dockerId: destinationDocker.id,
-                            command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                            command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`,
+                            shell: true
                         })
                     }
                 } catch (error) { }
@@ -902,9 +918,9 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                     `${hostkeyDir}/${id}.sh`,
                     `#!/bin/bash\nchmod 600 /etc/ssh/ssh_host_ed25519_key /etc/ssh/ssh_host_rsa_key\nuserdel -f xfs\nchown -R 33:33 /home/${ftpUser}/wordpress/`
                 );
-                await asyncExecShell(`chmod +x ${hostkeyDir}/${id}.sh`);
+                await executeCommand({ command: `chmod +x ${hostkeyDir}/${id}.sh` });
                 await fs.writeFile(`${hostkeyDir}/${id}-docker-compose.yml`, yaml.dump(compose));
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDocker.id,
                     command: `docker compose -f ${hostkeyDir}/${id}-docker-compose.yml up -d`
                 })
@@ -921,9 +937,10 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
                 data: { ftpPublicPort: null }
             });
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDocker.id,
-                    command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`
+                    command: `docker stop -t 0 ${id}-ftp && docker rm ${id}-ftp`,
+                    shell: true
                 })
 
             } catch (error) {
@@ -937,8 +954,10 @@ export async function activateWordpressFtp(request: FastifyRequest<ActivateWordp
         return errorHandler({ status, message })
     } finally {
         try {
-            await asyncExecShell(
-                `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
+            await executeCommand({
+                command:
+                    `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
+            }
             );
         } catch (error) { }
 

@@ -1,6 +1,6 @@
 import { promises as fs } from 'fs';
 import TOML from '@iarna/toml';
-import { asyncExecShell } from '../common';
+import {  executeCommand } from '../common';
 import { buildCacheImageWithCargo, buildImage } from './common';
 
 const createDockerfile = async (data, image, name): Promise<void> => {
@@ -28,7 +28,7 @@ const createDockerfile = async (data, image, name): Promise<void> => {
 export default async function (data) {
 	try {
 		const { workdir, baseImage, baseBuildImage } = data;
-		const { stdout: cargoToml } = await asyncExecShell(`cat ${workdir}/Cargo.toml`);
+		const { stdout: cargoToml } = await executeCommand({ command: `cat ${workdir}/Cargo.toml` });
 		const parsedToml: any = TOML.parse(cargoToml);
 		const name = parsedToml.package.name;
 		await buildCacheImageWithCargo(data, baseBuildImage);

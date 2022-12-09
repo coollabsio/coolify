@@ -64,6 +64,8 @@
 </script>
 
 <script lang="ts">
+	export let settings: any;
+	export let sentryDSN: any;
 	export let baseSettings: any;
 	export let pendingInvitations: any = 0;
 
@@ -95,12 +97,24 @@
 	import Toasts from '$lib/components/Toasts.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { onMount } from 'svelte';
+	import LocalePicker from '$lib/components/LocalePicker.svelte';
+	import * as Sentry from '@sentry/svelte';
+	import { BrowserTracing } from '@sentry/tracing';
+	import { dev } from '$app/env';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
 	if (permission) $appSession.permission = permission;
 	if (isAdmin) $appSession.isAdmin = isAdmin;
-
+	// if (settings?.doNotTrack === false) {
+	// 	Sentry.init({
+	// 		dsn: sentryDSN,
+	// 		environment: dev ? 'development' : 'production',
+	// 		integrations: [new BrowserTracing()],
+	// 		release: $appSession.version?.toString(),
+	// 		tracesSampleRate: 0.2
+	// 	});
+	// }
 	async function logout() {
 		try {
 			Cookies.remove('token');
@@ -110,14 +124,16 @@
 		}
 	}
 	onMount(async () => {
-		io.connect();
-		io.on('start-service', (message) => {
-			const { serviceId, state } = message;
-			$status.service.startup[serviceId] = state;
-			if (state === 0 || state === 1) {
-				delete $status.service.startup[serviceId];
-			}
-		});
+		if ($appSession.userId) {
+			io.connect();
+			io.on('start-service', (message) => {
+				const { serviceId, state } = message;
+				$status.service.startup[serviceId] = state;
+				if (state === 0 || state === 1) {
+					delete $status.service.startup[serviceId];
+				}
+			});
+		}
 	});
 </script>
 
@@ -136,10 +152,16 @@
 		<PageLoader />
 	</div>
 {/if}
+
 <div class="drawer">
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 	<div class="drawer-content">
 		{#if $appSession.userId}
+			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
+			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
+				>Settings</Tooltip
+			>
+			<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			<nav class="nav-main hidden lg:block z-20">
 				<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
 					{#if !$appSession.whiteLabeled}
@@ -246,7 +268,7 @@
 						<a
 							id="settings"
 							sveltekit:prefetch
-							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/ssh'}
+							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/docker'}
 							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
 							class:bg-coolgray-500={$page.url.pathname.startsWith('/settings')}
@@ -292,6 +314,9 @@
 								<path d="M7 12h14l-3 -3m0 6l3 -3" />
 							</svg>
 						</div>
+						<!-- <div class="lg:block">
+							<LocalePicker/>
+						</div> -->
 						<div
 							class="w-full text-center font-bold text-stone-400 hover:bg-coolgray-200 hover:text-white"
 						>
@@ -311,19 +336,22 @@
 			{/if}
 		{/if}
 		<div
-			class="navbar lg:hidden space-x-2 flex flex-row items-center bg-coollabs"
+			class="navbar lg:hidden space-x-2 flex flex-row justify-between bg-coollabs"
 			class:hidden={!$appSession.userId}
 		>
-			<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-				<span class="burger bg-white" />
-			</label>
-			<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
-				{#if !$appSession.whiteLabeled}
-					<h3 class="mb-0 text-white">Coolify</h3>
-				{/if}
+			<div>
+				<label for="main-drawer" class="drawer-button btn btn-square btn-ghost flex-col">
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+					<span class="burger bg-white" />
+				</label>
+				<div class="prose flex flex-row justify-between space-x-1 w-full items-center pr-3">
+					{#if !$appSession.whiteLabeled}
+						<h3 class="mb-0 text-white">Coolify</h3>
+					{/if}
+				</div>
 			</div>
+			<!-- <LocalePicker /> -->
 		</div>
 		<main>
 			<div class={$appSession.userId ? 'lg:pl-16' : null}>
@@ -478,7 +506,3 @@
 		</ul>
 	</div>
 </div>
-
-<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
-<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black">Settings</Tooltip>
-<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>

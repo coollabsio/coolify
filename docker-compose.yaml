@@ -11,6 +11,7 @@ services:
         protocol: tcp
         mode: host
     volumes:
+      - 'coolify-local-backup:/app/backups'
       - 'coolify-db:/app/db'
       - 'coolify-logs:/app/logs'
       - 'coolify-ssl-certs:/app/ssl'
@@ -34,6 +35,8 @@ networks:
     name: coolify-infra
 
 volumes:
+  coolify-local-backup:
+    name: coolify-local-backup
   coolify-logs:
     name: coolify-logs
   coolify-db:

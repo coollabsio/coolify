@@ -19,12 +19,15 @@ export interface SaveApplication extends OnlyId {
         denoMainFile: string,
         denoOptions: string,
         baseImage: string,
+        gitCommitHash: string,
         baseBuildImage: string,
         deploymentType: string,
         baseDatabaseBranch: string,
         dockerComposeFile: string,
         dockerComposeFileLocation: string,
-        dockerComposeConfiguration: string
+        dockerComposeConfiguration: string,
+        simpleDockerfile: string,
+        dockerRegistryImageName: string
     }
 }
 export interface SaveApplicationSettings extends OnlyId {
@@ -55,7 +58,7 @@ export interface GetImages {
     Body: { buildPack: string, deploymentType: string }
 }
 export interface SaveApplicationSource extends OnlyId {
-    Body: { gitSourceId?: string | null, forPublic?: boolean, type?: string }
+    Body: { gitSourceId?: string | null, forPublic?: boolean, type?: string, simpleDockerfile?: string }
 }
 export interface CheckRepository extends OnlyId {
     Querystring: { repository: string, branch: string }
@@ -139,5 +142,13 @@ export interface RestartPreviewApplication {
     Params: {
         id: string,
         pullmergeRequestId: string | null,
+    }
+}
+export interface RestartApplication {
+    Params: {
+        id: string,
+    },
+    Body: {
+        imageId: string | null,
     }
 }

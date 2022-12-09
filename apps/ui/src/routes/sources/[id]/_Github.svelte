@@ -152,13 +152,12 @@
 				/>
 				<Setting
 					customClass="pt-4"
-					isBeta={true}
 					id="autodeploy"
 					isCenter={false}
 					bind:setting={source.isSystemWide}
 					on:click={() => changeSettings('isSystemWide', false)}
-					title="System Wide Git Source"
-					description="System Wide Git Sources are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
+					title="System Wide Git"
+					description="System Wide Git are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
 				/>
 			</div>
 		</form>
@@ -239,7 +238,6 @@
 				/>
 				<Setting
 					customClass="pt-4"
-					isBeta={true}
 					id="autodeploy"
 					isCenter={false}
 					disabled={$appSession.teamId !== '0'}

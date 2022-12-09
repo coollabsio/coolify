@@ -31,7 +31,7 @@
 	export let destinations: any;
 
 	let filtered: any = setInitials();
-	import { get, post } from '$lib/api';
+	import { del, get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { appSession, search } from '$lib/store';
@@ -42,6 +42,7 @@
 	import { dev } from '$app/env';
 	import NewResource from './_NewResource.svelte';
 	import { onMount } from 'svelte';
+	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
 	let numberOfGetStatus = 0;
 	let status: any = {};
@@ -151,7 +152,7 @@
 	}
 
 	async function getStatus(resources: any, force: boolean = false) {
-		const { id, buildPack, dualCerts, type } = resources;
+		const { id, buildPack, dualCerts, type, simpleDockerfile } = resources;
 		if (buildPack && applications.length + filtered.otherApplications.length > 10 && !force) {
 			noInitialStatus.applications = true;
 			return;
@@ -172,7 +173,7 @@
 			numberOfGetStatus++;
 			let isRunning = false;
 			let isDegraded = false;
-			if (buildPack) {
+			if (buildPack || simpleDockerfile) {
 				const response = await get(`/applications/${id}/status`);
 				if (response.length === 0) {
 					isRunning = false;
@@ -426,6 +427,39 @@
 			);
 			if (sure) {
 				await post(`/databases/cleanup/unconfigured`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function deleteApplication(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this application!');
+			if (sure) {
+				await del(`/applications/${id}`, { force: true });
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function deleteService(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this service!');
+			if (sure) {
+				await del(`/services/${id}`, {});
+				return window.location.reload();
+			}
+		} catch (error) {
+			return errorNotification(error);
+		}
+	}
+	async function deleteDatabase(id: string) {
+		try {
+			const sure = confirm('Are you sure? This will delete this database!');
+			if (sure) {
+				await del(`/databases/${id}`, { force: true });
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -749,6 +783,11 @@
 												</svg>
 											</a>
 										{/if}
+										<button
+											class="icons hover:bg-green-500"
+											on:click|stopPropagation|preventDefault={() =>
+												deleteApplication(application.id)}><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>
@@ -857,6 +896,11 @@
 											</svg>
 										</a>
 									{/if}
+									<button
+										class="icons hover:bg-green-500"
+										on:click|stopPropagation|preventDefault={() =>
+											deleteApplication(application.id)}><DeleteIcon /></button
+									>
 								</div>
 							</div>
 						</div>
@@ -947,6 +991,11 @@
 													</svg>
 												</a>
 											{/if}
+											<button
+												class="icons hover:bg-pink-500"
+												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+												><DeleteIcon /></button
+											>
 										</div>
 									</div>
 								</div>
@@ -1028,6 +1077,11 @@
 												</svg>
 											</a>
 										{/if}
+										<button
+											class="icons hover:bg-pink-500"
+											on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+											><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>
@@ -1097,9 +1151,9 @@
 												{/if}
 											</div>
 										</div>
-										<div class="flex justify-end items-end space-x-2 h-10">
+										<div class="flex justify-end items-center space-x-2 h-10">
 											{#if database.settings?.isPublic}
-												<div title="Public">
+												<div title="Public" class="icons hover:bg-transparent">
 													<svg
 														xmlns="http://www.w3.org/2000/svg"
 														class="h-6 w-6 "
@@ -1119,6 +1173,11 @@
 													</svg>
 												</div>
 											{/if}
+											<button
+												class="icons hover:bg-databases-100"
+												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
+												><DeleteIcon /></button
+											>
 										</div>
 									</div>
 								</div>
@@ -1200,6 +1259,11 @@
 												</svg>
 											</div>
 										{/if}
+										<button
+											class="icons hover:bg-databases"
+											on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
+											><DeleteIcon /></button
+										>
 									</div>
 								</div>
 							</div>

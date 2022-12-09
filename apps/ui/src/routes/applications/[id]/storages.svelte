@@ -35,6 +35,9 @@
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
 					let [volume, target] = volumeName.split(':');
+					if (volume === '.') {
+						volume = target;
+					}
 					if (!target) {
 						target = volume;
 						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
@@ -83,7 +86,7 @@
 				<Storage on:refresh={refreshStorage} {storage} />
 			{/key}
 		{/each}
-		<div class="title pt-10">
+		<div class="Preview Secrets" class:pt-10={predefinedVolumes.length > 0}>
 			Add New Volume <Explainer
 				position="dropdown-bottom"
 				explanation={$t('application.storage.persistent_storage_explainer')}

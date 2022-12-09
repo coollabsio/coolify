@@ -1,12 +1,15 @@
-import { isDev } from "./common";
+import { isARM, isDev } from "./common";
 import fs from 'fs/promises';
 export async function getTemplates() {
     const templatePath = isDev ? './templates.json' : '/app/templates.json';
     const open = await fs.open(templatePath, 'r');
-    let data;
     try {
-        data = await open.readFile({ encoding: 'utf-8' });
-        return JSON.parse(data);
+        let data = await open.readFile({ encoding: 'utf-8' });
+        let jsonData = JSON.parse(data)
+        if (isARM(process.arch)) {
+            jsonData = jsonData.filter(d => d.arch !== 'amd64')
+        }
+        return jsonData;
     } catch (error) {
         return []
     } finally {

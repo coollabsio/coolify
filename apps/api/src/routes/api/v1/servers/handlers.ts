@@ -1,5 +1,5 @@
 import type { FastifyRequest } from 'fastify';
-import { errorHandler, executeDockerCmd, prisma, createRemoteEngineConfiguration, executeSSHCmd } from '../../../../lib/common';
+import { errorHandler, prisma, executeCommand } from '../../../../lib/common';
 import os from 'node:os';
 import osu from 'node-os-utils';
 
@@ -71,10 +71,10 @@ export async function showUsage(request: FastifyRequest) {
     let { remoteEngine } = request.query
     remoteEngine = remoteEngine === 'true' ? true : false
     if (remoteEngine) {
-        const { stdout: stats } = await executeSSHCmd({ dockerId: id, command: `vmstat -s` })
-        const { stdout: disks } = await executeSSHCmd({ dockerId: id, command: `df -m / --output=size,used,pcent|grep -v 'Used'| xargs` })
-        const { stdout: cpus } = await executeSSHCmd({ dockerId: id, command: `nproc --all` })
-        const { stdout: cpuUsage } = await executeSSHCmd({ dockerId: id, command: `echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]` })
+        const { stdout: stats } = await executeCommand({ sshCommand: true, dockerId: id, command: `vmstat -s` })
+        const { stdout: disks } = await executeCommand({ sshCommand: true, shell: true, dockerId: id, command: `df -m / --output=size,used,pcent|grep -v 'Used'| xargs` })
+        const { stdout: cpus } = await executeCommand({ sshCommand: true, dockerId: id, command: `nproc --all` })
+        const { stdout: cpuUsage } = await executeCommand({ sshCommand: true, shell: true, dockerId: id, command: `echo $[100-$(vmstat 1 2|tail -1|awk '{print $15}')]` })
         const parsed: any = parseFromText(stats)
         return {
             usage: {

@@ -50,25 +50,25 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { goto } from '$app/navigation';
 	import Beta from '$lib/components/Beta.svelte';
+	import { saveForm } from './utils';
 
 	const { id } = $page.params;
-
 	$: isDisabled =
 		!$appSession.isAdmin ||
 		$status.application.overallStatus === 'degraded' ||
 		$status.application.overallStatus === 'healthy' ||
 		$status.application.initialLoading;
-
 	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 	let statues: any = {};
 	let loading = {
 		save: false,
 		reloadCompose: false
 	};
+	let isSimpleDockerfile = !!application.simpleDockerfile;
 	let fqdnEl: any = null;
 	let forceSave = false;
 	let isPublicRepository = application.settings?.isPublicRepository;
-	let apiUrl = application.gitSource.apiUrl;
+	let apiUrl = application.gitSource?.apiUrl;
 	let branch = application.branch;
 	let repository = application.repository;
 	let debug = application.settings?.debug;
@@ -78,12 +78,12 @@
 	let autodeploy = application.settings?.autodeploy;
 	let isBot = application.settings?.isBot;
 	let isDBBranching = application.settings?.isDBBranching;
-	let htmlUrl = application.gitSource.htmlUrl;
+	let htmlUrl = application.gitSource?.htmlUrl;
 
 	let dockerComposeFile = JSON.parse(application.dockerComposeFile) || null;
 	let dockerComposeServices: any[] = [];
-	let dockerComposeFileLocation = application.dockerComposeFileLocation;
 	let dockerComposeConfiguration = JSON.parse(application.dockerComposeConfiguration) || {};
+	let originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 
 	let baseDatabaseBranch: any = application?.connectedDatabase?.hostedDatabaseDBName || null;
 	let nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
@@ -243,8 +243,12 @@
 		if (toast) loading.save = true;
 		try {
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
-			if (application.deploymentType)
+			if (application.deploymentType) {
 				application.deploymentType = application.deploymentType.toLowerCase();
+			}
+			if (originalDockerComposeFileLocation !== application.dockerComposeFileLocation) {
+				await reloadCompose();
+			}
 			if (!isBot) {
 				await post(`/applications/${id}/check`, {
 					fqdn: application.fqdn,
@@ -263,21 +267,18 @@
 					}
 				}
 			}
-			await post(`/applications/${id}`, {
-				...application,
-				baseDatabaseBranch,
-				dockerComposeConfiguration: JSON.stringify(dockerComposeConfiguration)
-			});
+			await saveForm(id, application, baseDatabaseBranch, dockerComposeConfiguration);
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
 
 			forceSave = false;
-
-			toast &&
+			if (toast) {
 				addToast({
 					message: 'Configuration saved.',
 					type: 'success'
 				});
+			}
+
 			if (application.fqdn && application.fqdn.startsWith('https')) {
 				isHttps = true;
 			} else {
@@ -365,6 +366,9 @@
 	async function reloadCompose() {
 		if (loading.reloadCompose) return;
 		loading.reloadCompose = true;
+		const composeLocation = application.dockerComposeFileLocation.startsWith('/')
+			? application.dockerComposeFileLocation
+			: `/${application.dockerComposeFileLocation}`;
 		try {
 			if (application.gitSource.type === 'github') {
 				const headers = isPublicRepository
@@ -373,9 +377,10 @@
 							Authorization: `token ${$appSession.tokens.github}`
 					  };
 				const data = await get(
-					`${apiUrl}/repos/${repository}/contents/${dockerComposeFileLocation}?ref=${branch}`,
+					`${apiUrl}/repos/${repository}/contents/${composeLocation}?ref=${branch}`,
 					{
 						...headers,
+						'If-None-Match': '',
 						Accept: 'application/vnd.github.v2.json'
 					}
 				);
@@ -405,7 +410,7 @@
 				});
 				const dockerComposeFileYml = files.find(
 					(file: { name: string; type: string }) =>
-						file.name === dockerComposeFileLocation && file.type === 'blob'
+						file.name === composeLocation && file.type === 'blob'
 				);
 				const id = dockerComposeFileYml.id;
 
@@ -424,12 +429,17 @@
 					await handleSubmit(false);
 				}
 			}
-
+			originalDockerComposeFileLocation = application.dockerComposeFileLocation;
 			addToast({
 				message: 'Compose file reloaded.',
 				type: 'success'
 			});
-		} catch (error) {
+		} catch (error: any) {
+			if (error.message === 'Not Found') {
+				error.message = `Can't find ${application.dockerComposeFileLocation} file.`;
+				errorNotification(error);
+				throw error;
+			}
 			errorNotification(error);
 		} finally {
 			loading.reloadCompose = false;
@@ -462,7 +472,7 @@
 </script>
 
 <div class="w-full">
-	<form on:submit|preventDefault={() => handleSubmit()}>
+	<form id="saveForm" on:submit|preventDefault={() => handleSubmit()}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
 				<div class="title font-bold pb-3">General</div>
@@ -482,68 +492,148 @@
 					<label for="name">{$t('forms.name')}</label>
 					<input name="name" id="name" class="w-full" bind:value={application.name} required />
 				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="gitSource">{$t('application.git_source')}</label>
-					{#if isDisabled || application.settings.isPublicRepository}
-						<input
-							disabled={isDisabled || application.settings.isPublicRepository}
-							class="w-full"
-							value={application.gitSource.name}
-						/>
-					{:else}
-						<a
-							href={`/applications/${id}/configuration/source?from=/applications/${id}`}
-							class="no-underline"
-							><input
-								value={application.gitSource.name}
-								id="gitSource"
-								class="cursor-pointer hover:bg-coolgray-500 w-full"
-							/></a
-						>
-					{/if}
-				</div>
-				<div class="grid grid-cols-2 items-center">
-					<label for="repository">{$t('application.git_repository')}</label>
-					{#if isDisabled || application.settings.isPublicRepository}
-						<input
-							class="w-full"
-							disabled={isDisabled || application.settings.isPublicRepository}
-							value="{application.repository}/{application.branch}"
-						/>
-					{:else}
-						<a
-							href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
-							class="no-underline"
-							><input
+				{#if !isSimpleDockerfile}
+					<div class="grid grid-cols-2 items-center">
+						<label for="gitSource">{$t('application.git_source')}</label>
+						{#if isDisabled || application.settings?.isPublicRepository}
+							<input
+								disabled={isDisabled || application.settings?.isPublicRepository}
+								class="w-full"
+								value={application.gitSource?.name}
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/source?from=/applications/${id}`}
+								class="no-underline"
+								><input
+									value={application.gitSource?.name}
+									id="gitSource"
+									class="cursor-pointer hover:bg-coolgray-500 w-full"
+								/></a
+							>
+						{/if}
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<label for="repository">Git commit</label>
+						<div class="flex gap-2">
+							<input
+								id="commit"
+								name="commit"
+								class="w-full"
+								disabled={isDisabled}
+								placeholder="default: latest commit"
+								bind:value={application.gitCommitHash}
+							/>
+							<a
+								href="{application.gitSource
+									?.htmlUrl}/{application.repository}/commits/{application.branch}"
+								target="_blank noreferrer"
+								class="btn btn-primary text-xs"
+								>Commits<svg
+									xmlns="http://www.w3.org/2000/svg"
+									fill="currentColor"
+									viewBox="0 0 24 24"
+									stroke-width="3"
+									stroke="currentColor"
+									class="w-3 h-3 text-white ml-2"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+									/>
+								</svg></a
+							>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<label for="repository">{$t('application.git_repository')}</label>
+						{#if isDisabled || application.settings?.isPublicRepository}
+							<input
+								class="w-full"
+								disabled={isDisabled || application.settings?.isPublicRepository}
 								value="{application.repository}/{application.branch}"
-								id="repository"
-								class="cursor-pointer hover:bg-coolgray-500 w-full"
-							/></a
-						>
-					{/if}
-				</div>
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/repository?from=/applications/${id}&to=/applications/${id}/configuration/buildpack`}
+								class="no-underline"
+								><input
+									value="{application.repository}/{application.branch}"
+									id="repository"
+									class="cursor-pointer hover:bg-coolgray-500 w-full"
+								/></a
+							>
+						{/if}
+					</div>
+				{/if}
 				<div class="grid grid-cols-2 items-center">
-					<label for="buildPack">{$t('application.build_pack')} </label>
+					<label for="registry">Docker Registry</label>
 					{#if isDisabled}
-						<input class="capitalize w-full" disabled={isDisabled} value={application.buildPack} />
+						<input
+							class="capitalize w-full"
+							disabled={isDisabled}
+							value={application.dockerRegistry?.name || 'DockerHub (unauthenticated)'}
+						/>
 					{:else}
 						<a
-							href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
+							href={`/applications/${id}/configuration/registry?from=/applications/${id}`}
 							class="no-underline"
 						>
 							<input
-								value={application.buildPack}
-								id="buildPack"
+								value={application.dockerRegistry?.name || 'DockerHub (unauthenticated)'}
+								id="registry"
 								class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
 							/></a
 						>
 					{/if}
 				</div>
+				{#if application.dockerRegistry?.id && application.gitSourceId}
+					<div class="grid grid-cols-2 items-center">
+						<label for="registry"
+							>Push Image to Registry <Explainer
+								explanation="Push the build image to the specific Docker Registry.<br><br>This is useful if you want to use the image in other places. If you don't fill this the image will be only available on the server.<br><br>Tag is optional. If you don't fill it, the tag will be the same as the git commit hash."
+							/></label
+						>
+						<input
+							name="dockerRegistryImageName"
+							id="dockerRegistryImageName"
+							readonly={isDisabled}
+							disabled={isDisabled}
+							class="w-full"
+							placeholder="e.g. coollabsio/myimage (tag will be commit sha) or coollabsio/myimage:tag"
+							bind:value={application.dockerRegistryImageName}
+						/>
+					</div>
+				{/if}
+				{#if !isSimpleDockerfile}
+					<div class="grid grid-cols-2 items-center">
+						<label for="buildPack">{$t('application.build_pack')} </label>
+						{#if isDisabled}
+							<input
+								class="capitalize w-full"
+								disabled={isDisabled}
+								value={application.buildPack}
+							/>
+						{:else}
+							<a
+								href={`/applications/${id}/configuration/buildpack?from=/applications/${id}`}
+								class="no-underline"
+							>
+								<input
+									value={application.buildPack}
+									id="buildPack"
+									class="cursor-pointer hover:bg-coolgray-500 capitalize w-full"
+								/></a
+							>
+						{/if}
+					</div>
+				{/if}
 				<div class="grid grid-cols-2 items-center">
 					<label for="destination">{$t('application.destination')}</label>
 					<div class="no-underline">
 						<input
-							value={application.destinationDocker.name}
+							value={application.destinationDocker?.name}
 							id="destination"
 							disabled
 							class="bg-transparent w-full"
@@ -648,7 +738,44 @@
 					{/if}
 				{/if}
 			</div>
-			{#if application.buildPack !== 'compose'}
+			{#if isSimpleDockerfile}
+				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
+					Configuration
+				</div>
+
+				<div class="grid grid-flow-row gap-2 px-4 pr-5">
+					<div class="grid grid-cols-2 items-center  pt-4">
+						<label for="simpleDockerfile">Dockerfile</label>
+						<div class="flex gap-2">
+							<textarea
+								rows="10"
+								id="simpleDockerfile"
+								name="simpleDockerfile"
+								class="w-full"
+								disabled={isDisabled}
+								bind:value={application.simpleDockerfile}
+							/>
+						</div>
+					</div>
+					<div class="grid grid-cols-2 items-center">
+						<label for="port"
+							>{$t('forms.port')}
+							<Explainer
+								explanation={'The port your application listens inside the docker container.'}
+							/></label
+						>
+						<input
+							class="w-full"
+							disabled={isDisabled}
+							readonly={!$appSession.isAdmin}
+							name="port"
+							id="port"
+							bind:value={application.port}
+							placeholder="{$t('forms.default')}: 3000"
+						/>
+					</div>
+				</div>
+			{:else if application.buildPack !== 'compose'}
 				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
 					Configuration
 				</div>
@@ -753,7 +880,7 @@
 										/>
 									</div>
 									<div class="text-center bg-green-600 rounded">
-										Connected to {application.connectedDatabase.databaseId}
+										Connected to {application.connectedDatabase?.databaseId}
 									</div>
 								{/if}
 							{/if}
@@ -959,6 +1086,7 @@
 									placeholder="default: /Dockerfile"
 								/>
 								{#if application.baseDirectory}
+									<!-- svelte-ignore a11y-label-has-associated-control -->
 									<label class="label">
 										<span class="label-text-alt text-xs"
 											>Path: {application.baseDirectory.replace(
@@ -1008,6 +1136,25 @@
 					{/if}
 				</div>
 				<div class="grid grid-flow-row gap-2">
+					<div class="grid grid-cols-2 items-center px-8 pb-4">
+						<label for="dockerComposeFileLocation"
+							>Docker Compose File Location
+							<Explainer
+								explanation="You can specify a custom docker compose file location. <br> Should be absolute path, like <span class='text-settings font-bold'>/data/docker-compose.yml</span> or <span class='text-settings font-bold'>/docker-compose.yml.</span>"
+							/>
+						</label>
+						<div>
+							<input
+								class="w-full"
+								disabled={isDisabled}
+								readonly={!$appSession.isAdmin}
+								name="dockerComposeFileLocation"
+								id="dockerComposeFileLocation"
+								bind:value={application.dockerComposeFileLocation}
+								placeholder="eg: /docker-compose.yml"
+							/>
+						</div>
+					</div>
 					{#each dockerComposeServices as service}
 						<div
 							class="grid items-center bg-coolgray-100 rounded border border-coolgray-300 p-2 px-4"
@@ -1083,7 +1230,7 @@
 								readonly={!$appSession.isAdmin}
 								name="port"
 								id="port"
-								required={!!dockerComposeConfiguration[service.name].fqdn}
+								required={!!dockerComposeConfiguration[service.name]?.fqdn}
 								bind:value={dockerComposeConfiguration[service.name].port}
 							/>
 						</div>

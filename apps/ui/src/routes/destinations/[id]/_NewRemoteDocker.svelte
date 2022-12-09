@@ -2,13 +2,14 @@
 	export let payload: any;
 
 	import { goto } from '$app/navigation';
-
+	import { page } from '$app/stores';
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
 	import { t } from '$lib/translations';
 
+	const from = $page.url.searchParams.get('from');
 	let loading = false;
 
 	async function handleSubmit() {
@@ -19,7 +20,7 @@
 			const { id } = await post(`/destinations/new`, {
 				...payload
 			});
-			return await goto(`/destinations/${id}`);
+			return await goto(from || `/destinations/${id}`);
 		} catch (error) {
 			return errorNotification(error);
 		} finally {

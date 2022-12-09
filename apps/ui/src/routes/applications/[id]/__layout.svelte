@@ -2,8 +2,14 @@
 	import type { Load } from '@sveltejs/kit';
 	function checkConfiguration(application: any): string | null {
 		let configurationPhase = null;
-		if (!application.gitSourceId) {
-			configurationPhase = 'source';
+		if (!application.gitSourceId && !application.simpleDockerfile) {
+			return (configurationPhase = 'source');
+		}
+		if (application.simpleDockerfile) {
+			if (!application.destinationDockerId) {
+				configurationPhase = 'destination';
+			}
+			return configurationPhase;
 		} else if (!application.repository && !application.branch) {
 			configurationPhase = 'repository';
 		} else if (!application.destinationDockerId) {
@@ -70,8 +76,8 @@
 		selectedBuildId
 	} from '$lib/store';
 	import { errorNotification, handlerNotFoundLoad } from '$lib/common';
-	import Tooltip from '$lib/components/Tooltip.svelte';
 	import Menu from './_Menu.svelte';
+	import { saveForm } from './utils';
 
 	let statusInterval: any;
 	let forceDelete = false;
@@ -96,12 +102,25 @@
 
 	async function handleDeploySubmit(forceRebuild = false) {
 		if (!$isDeploymentEnabled) return;
+		if (application.gitCommitHash && !application.settings.isPublicRepository) {
+			const sure = await confirm(
+				`Are you sure you want to deploy a specific commit (${application.gitCommitHash})? This will disable the "Automatic Deployment" feature to prevent accidental overwrites of incoming commits.`
+			);
+			if (!sure) {
+				return;
+			} else {
+				await post(`/applications/${id}/settings`, {
+					autodeploy: false
+				});
+			}
+		}
 		if (!statusInterval) {
 			statusInterval = setInterval(async () => {
 				await getStatus();
 			}, 2000);
 		}
 		try {
+			await saveForm(id, application);
 			const { buildId } = await post(`/applications/${id}/deploy`, {
 				...application,
 				forceRebuild
@@ -148,7 +167,8 @@
 		}
 	}
 	async function getStatus() {
-		if ($status.application.loading && stopping) return;
+		if (($status.application.loading && stopping) || $status.application.restarting === true)
+			return;
 		$status.application.loading = true;
 		const data = await get(`/applications/${id}/status`);
 
@@ -166,24 +186,20 @@
 		if ($status.application.statuses.length === 0) {
 			$status.application.overallStatus = 'stopped';
 		} else {
-			if ($status.application.statuses.length !== numberOfApplications) {
-				$status.application.overallStatus = 'degraded';
-			} else {
-				for (const oneStatus of $status.application.statuses) {
-					if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
-						$status.application.overallStatus = 'degraded';
-						break;
-					}
-					if (oneStatus.status.isRunning) {
-						$status.application.overallStatus = 'healthy';
-					}
-					if (
-						!oneStatus.status.isExited &&
-						!oneStatus.status.isRestarting &&
-						!oneStatus.status.isRunning
-					) {
-						$status.application.overallStatus = 'stopped';
-					}
+			for (const oneStatus of $status.application.statuses) {
+				if (oneStatus.status.isExited || oneStatus.status.isRestarting) {
+					$status.application.overallStatus = 'degraded';
+					break;
+				}
+				if (oneStatus.status.isRunning) {
+					$status.application.overallStatus = 'healthy';
+				}
+				if (
+					!oneStatus.status.isExited &&
+					!oneStatus.status.isRestarting &&
+					!oneStatus.status.isRunning
+				) {
+					$status.application.overallStatus = 'stopped';
 				}
 			}
 		}
@@ -244,14 +260,14 @@
 			{/if}
 		</div>
 		{#if $page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
-			<div class="px-2">
+			<div class="px-4">
 				{#if forceDelete}
 					<button
 						on:click={() => deleteApplication(application.name, true)}
 						disabled={!$appSession.isAdmin}
 						class:bg-red-600={$appSession.isAdmin}
 						class:hover:bg-red-500={$appSession.isAdmin}
-						class="btn btn-sm btn-error text-sm"
+						class="btn btn-sm btn-error hover:bg-red-700 text-sm w-64"
 					>
 						Force Delete Application
 					</button>
@@ -261,7 +277,7 @@
 						disabled={!$appSession.isAdmin}
 						class:bg-red-600={$appSession.isAdmin}
 						class:hover:bg-red-500={$appSession.isAdmin}
-						class="btn btn-sm btn-error text-sm"
+						class="btn btn-sm btn-error hover:bg-red-700 text-sm w-64"
 					>
 						Delete Application
 					</button>
@@ -438,7 +454,7 @@
 			<button
 				class="btn btn-sm gap-2"
 				disabled={!$isDeploymentEnabled}
-				on:click={() => handleDeploySubmit(false)}
+				on:click={() => handleDeploySubmit(true)}
 			>
 				{#if $status.application.overallStatus !== 'degraded'}
 					<svg

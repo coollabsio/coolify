@@ -1,18 +1,8 @@
 const dotEnvExtended = require('dotenv-extended');
 dotEnvExtended.load();
 const crypto = require('crypto');
-const generator = require('generate-password');
-const cuid = require('cuid');
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
-
-function generatePassword(length = 24) {
-	return generator.generate({
-		length,
-		numbers: true,
-		strict: true
-	});
-}
 const algorithm = 'aes-256-ctr';
 
 async function main() {
@@ -21,11 +11,8 @@ async function main() {
 	if (!settingsFound) {
 		await prisma.setting.create({
 			data: {
-				isRegistrationEnabled: true,
-				proxyPassword: encrypt(generatePassword()),
-				proxyUser: cuid(),
+				id: '0',
 				arch: process.arch,
-				DNSServers: '1.1.1.1,8.8.8.8'
 			}
 		});
 	} else {
@@ -34,11 +21,11 @@ async function main() {
 				id: settingsFound.id
 			},
 			data: {
-				isTraefikUsed: true,
-				proxyHash: null
+				id: '0'
 			}
 		});
 	}
+	// Create local docker engine
 	const localDocker = await prisma.destinationDocker.findFirst({
 		where: { engine: '/var/run/docker.sock' }
 	});
@@ -55,22 +42,17 @@ async function main() {
 
 	// Set auto-update based on env variable
 	const isAutoUpdateEnabled = process.env['COOLIFY_AUTO_UPDATE'] === 'true';
-	const settings = await prisma.setting.findFirst({});
-	if (settings) {
-		await prisma.setting.update({
-			where: {
-				id: settings.id
-			},
-			data: {
-				isAutoUpdateEnabled
-			}
-		});
-	}
+	await prisma.setting.update({
+		where: {
+			id: '0'
+		},
+		data: {
+			isAutoUpdateEnabled
+		}
+	});
+	// Create public github source
 	const github = await prisma.gitSource.findFirst({
 		where: { htmlUrl: 'https://github.com', forPublic: true }
-	});
-	const gitlab = await prisma.gitSource.findFirst({
-		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
 	});
 	if (!github) {
 		await prisma.gitSource.create({
@@ -83,6 +65,10 @@ async function main() {
 			}
 		});
 	}
+	// Create public gitlab source
+	const gitlab = await prisma.gitSource.findFirst({
+		where: { htmlUrl: 'https://gitlab.com', forPublic: true }
+	});
 	if (!gitlab) {
 		await prisma.gitSource.create({
 			data: {

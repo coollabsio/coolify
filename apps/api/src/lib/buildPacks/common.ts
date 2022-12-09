@@ -1,4 +1,4 @@
-import { base64Encode, encrypt, executeDockerCmd, generateTimestamp, getDomain, isDev, prisma, version } from "../common";
+import { base64Encode, decrypt, encrypt, executeCommand, generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
 import { promises as fs } from 'fs';
 import { day } from "../dayjs";
 
@@ -52,6 +52,14 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		{
 			value: 'webdevops/apache:alpine',
 			label: 'webdevops/apache:alpine'
+		},
+		{
+			value: 'nginx:alpine',
+			label: 'nginx:alpine'
+		},
+		{
+			value: 'httpd:alpine',
+			label: 'httpd:alpine (Apache)'
 		}
 	];
 	const rustVersions = [
@@ -214,8 +222,20 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 			label: 'webdevops/php-apache:7.1-alpine'
 		},
 		{
-			value: 'webdevops/php-nginx:7.1-alpine',
-			label: 'webdevops/php-nginx:7.1-alpine'
+			value: 'php:8.1-fpm',
+			label: 'php:8.1-fpm'
+		},
+		{
+			value: 'php:8.0-fpm',
+			label: 'php:8.0-fpm'
+		},
+		{
+			value: 'php:8.1-fpm-alpine',
+			label: 'php:8.1-fpm-alpine'
+		},
+		{
+			value: 'php:8.0-fpm-alpine',
+			label: 'php:8.0-fpm-alpine'
 		}
 	];
 	const pythonVersions = [
@@ -306,8 +326,8 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	};
 	if (nodeBased.includes(buildPack)) {
 		if (deploymentType === 'static') {
-			payload.baseImage = 'webdevops/nginx:alpine';
-			payload.baseImages = staticVersions;
+			payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
+			payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
 			payload.baseBuildImage = 'node:lts';
 			payload.baseBuildImages = nodeVersions;
 		} else {
@@ -318,8 +338,8 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		}
 	}
 	if (staticApps.includes(buildPack)) {
-		payload.baseImage = 'webdevops/nginx:alpine';
-		payload.baseImages = staticVersions;
+		payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
+		payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
 		payload.baseBuildImage = 'node:lts';
 		payload.baseBuildImages = nodeVersions;
 	}
@@ -337,12 +357,12 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		payload.baseImage = 'denoland/deno:latest';
 	}
 	if (buildPack === 'php') {
-		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = phpVersions;
+		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = phpVersions;
+		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
@@ -363,6 +383,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	} = data;
 	//@ts-ignore
@@ -392,6 +413,12 @@ export const setDefaultConfiguration = async (data: any) => {
 	} else {
 		dockerFileLocation = '/Dockerfile';
 	}
+	if (dockerComposeFileLocation) {
+		if (!dockerComposeFileLocation.startsWith('/')) dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
+		if (dockerComposeFileLocation.endsWith('/')) dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
+	} else {
+		dockerComposeFileLocation = '/Dockerfile';
+	}
 	if (!denoMainFile) {
 		denoMainFile = 'main.ts';
 	}
@@ -405,6 +432,7 @@ export const setDefaultConfiguration = async (data: any) => {
 		publishDirectory,
 		baseDirectory,
 		dockerFileLocation,
+		dockerComposeFileLocation,
 		denoMainFile
 	};
 };
@@ -461,10 +489,12 @@ export const saveBuildLog = async ({
 	buildId: string;
 	applicationId: string;
 }): Promise<any> => {
+	if (buildId === 'undefined' || buildId === 'null' || !buildId) return;
+	if (applicationId === 'undefined' || applicationId === 'null' || !applicationId) return;
 	const { default: got } = await import('got')
 	if (typeof line === 'object' && line) {
 		if (line.shortMessage) {
-			line = line.shortMessage + '\n' + line.stderr; 
+			line = line.shortMessage + '\n' + line.stderr;
 		} else {
 			line = JSON.stringify(line);
 		}
@@ -564,6 +594,7 @@ export async function copyBaseConfigurationFiles(
             `
 			);
 		}
+		// TODO: Add more configuration files for other buildpacks, like apache2, etc.
 	} catch (error) {
 		throw new Error(error);
 	}
@@ -577,6 +608,29 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 	);
 }
 
+export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
+	if (!username || !password) {
+		return null
+	}
+
+	let decryptedPassword = decrypt(password);
+	const location = `${workdir}/.docker`;
+
+	try {
+		await fs.mkdir(`${workdir}/.docker`);
+	} catch (error) {
+		console.log(error);
+	}
+	const payload = JSON.stringify({
+		"auths": {
+			[url]: {
+				"auth": Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
+			}
+		}
+	})
+	await fs.writeFile(`${location}/config.json`, payload)
+	return location
+}
 export async function buildImage({
 	applicationId,
 	tag,
@@ -589,33 +643,36 @@ export async function buildImage({
 	commit
 }) {
 	if (isCache) {
-		await saveBuildLog({ line: `Building cache image started.`, buildId, applicationId });
+		await saveBuildLog({ line: `Building cache image...`, buildId, applicationId });
 	} else {
-		await saveBuildLog({ line: `Building image started.`, buildId, applicationId });
-	}
-	if (!debug) {
-		await saveBuildLog({
-			line: `Debug logging is disabled. Enable it above if necessary!`,
-			buildId,
-			applicationId
-		});
+		await saveBuildLog({ line: `Building production image...`, buildId, applicationId });
 	}
 	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
 	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
 
-	await executeDockerCmd({ debug, buildId, applicationId, dockerId, command: `docker build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
+	let location = null
+
+	const { dockerRegistry } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
+	if (dockerRegistry) {
+		const { url, username, password } = dockerRegistry
+		location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+	}
+
+	await executeCommand({ stream: true, debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
 	if (status === 'canceled') {
-		throw new Error('Deployment canceled.')
-	}
-	if (isCache) {
-		await saveBuildLog({ line: `Building cache image successful.`, buildId, applicationId });
-	} else {
-		await saveBuildLog({ line: `Building image successful.`, buildId, applicationId });
+		throw new Error('Canceled.')
 	}
 }
-
+export function makeLabelForSimpleDockerfile({ applicationId, port, type }) {
+	return [
+		'coolify.managed=true',
+		`coolify.version=${version}`,
+		`coolify.applicationId=${applicationId}`,
+		`coolify.type=standalone-application`
+	];
+}
 export function makeLabelForStandaloneApplication({
 	applicationId,
 	fqdn,
@@ -644,6 +701,7 @@ export function makeLabelForStandaloneApplication({
 		`coolify.version=${version}`,
 		`coolify.applicationId=${applicationId}`,
 		`coolify.type=standalone-application`,
+		`coolify.name=${name}`,
 		`coolify.configuration=${base64Encode(
 			JSON.stringify({
 				applicationId,

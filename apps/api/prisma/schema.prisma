@@ -21,26 +21,27 @@ model Certificate {
 model Setting {
   id                                      String   @id @default(cuid())
   fqdn                                    String?  @unique
-  isAPIDebuggingEnabled                   Boolean? @default(false)
-  isRegistrationEnabled                   Boolean  @default(false)
   dualCerts                               Boolean  @default(false)
   minPort                                 Int      @default(9000)
   maxPort                                 Int      @default(9100)
-  proxyPassword                           String
-  proxyUser                               String
-  proxyHash                               String?
-  proxyDefaultRedirect                    String?
-  isAutoUpdateEnabled                     Boolean  @default(false)
-  isDNSCheckEnabled                       Boolean  @default(true)
-  DNSServers                              String?
-  isTraefikUsed                           Boolean  @default(true)
-  createdAt                               DateTime @default(now())
-  updatedAt                               DateTime @updatedAt
+  DNSServers                              String   @default("1.1.1.1,8.8.8.8")
   ipv4                                    String?
   ipv6                                    String?
   arch                                    String?
   concurrentBuilds                        Int      @default(1)
   applicationStoragePathMigrationFinished Boolean  @default(false)
+  numberOfDockerImagesKeptLocally         Int      @default(3)
+  proxyDefaultRedirect                    String?
+  doNotTrack                              Boolean  @default(false)
+  sentryDSN                               String?
+  previewSeparator                        String   @default(".")
+  isAPIDebuggingEnabled                   Boolean  @default(false)
+  isRegistrationEnabled                   Boolean  @default(true)
+  isAutoUpdateEnabled                     Boolean  @default(false)
+  isDNSCheckEnabled                       Boolean  @default(true)
+  isTraefikUsed                           Boolean  @default(true)
+  createdAt                               DateTime @default(now())
+  updatedAt                               DateTime @updatedAt
 }
 
 model User {
@@ -83,6 +84,7 @@ model Team {
   service           Service[]
   users             User[]
   certificate       Certificate[]
+  dockerRegistry    DockerRegistry[]
 }
 
 model TeamInvitation {
@@ -96,7 +98,7 @@ model TeamInvitation {
 }
 
 model Application {
-  id                         String                         @id @default(cuid())
+  id                         String               @id @default(cuid())
   name                       String
   fqdn                       String?
   repository                 String?
@@ -122,20 +124,26 @@ model Application {
   dockerComposeFile          String?
   dockerComposeFileLocation  String?
   dockerComposeConfiguration String?
-  createdAt                  DateTime                       @default(now())
-  updatedAt                  DateTime                       @updatedAt
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
   destinationDockerId        String?
   gitSourceId                String?
+  gitCommitHash              String?
   baseImage                  String?
   baseBuildImage             String?
-  gitSource                  GitSource?                     @relation(fields: [gitSourceId], references: [id])
-  destinationDocker          DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
-  persistentStorage          ApplicationPersistentStorage[]
   settings                   ApplicationSettings?
-  secrets                    Secret[]
-  teams                      Team[]
-  connectedDatabase          ApplicationConnectedDatabase?
-  previewApplication         PreviewApplication[]
+  dockerRegistryId           String?
+  dockerRegistryImageName    String?
+  simpleDockerfile           String?
+
+  persistentStorage  ApplicationPersistentStorage[]
+  secrets            Secret[]
+  teams              Team[]
+  connectedDatabase  ApplicationConnectedDatabase?
+  previewApplication PreviewApplication[]
+  gitSource          GitSource?                     @relation(fields: [gitSourceId], references: [id])
+  destinationDocker  DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  dockerRegistry     DockerRegistry?                @relation(fields: [dockerRegistryId], references: [id])
 }
 
 model PreviewApplication {
@@ -294,6 +302,19 @@ model SshKey {
   teamId            String?
   team              Team?               @relation(fields: [teamId], references: [id])
   destinationDocker DestinationDocker[]
+}
+
+model DockerRegistry {
+  id          String        @id @default(cuid())
+  name        String
+  url         String
+  username    String?
+  password    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  teamId      String?
+  team        Team?         @relation(fields: [teamId], references: [id])
+  application Application[]
 }
 
 model GitSource {
@@ -626,8 +647,8 @@ model GlitchTip {
   emailSmtpPort              Int?     @default(25)
   emailSmtpUser              String?
   emailSmtpPassword          String?
-  emailSmtpUseTls            Boolean? @default(false)
-  emailSmtpUseSsl            Boolean? @default(false)
+  emailSmtpUseTls            Boolean  @default(false)
+  emailSmtpUseSsl            Boolean  @default(false)
   emailBackend               String?
   mailgunApiKey              String?
   sendgridApiKey             String?

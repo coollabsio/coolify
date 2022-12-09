@@ -1,0 +1,24 @@
+{
+  "name": "backup",
+  "version": "0.0.1",
+  "description": "",
+  "author": "Andras Bacsai",
+  "license": "Apache-2.0",
+  "main": "index.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "NODE_ENV=production node src/index.mjs",
+    "dev": "pnpm cleanup && NODE_ENV=development node src/index.mjs",
+    "build": "docker build -t backup .",
+    "test": "pnpm build && docker run -ti --rm -v /var/run/docker.sock:/var/run/docker.sock -v /root/devel/coolify/apps/backup/backups:/app/backups -e CONTAINERS_TO_BACKUP='clatmhc6000008lvb5a5tnvsk:database:mysql:local' backup",
+    "cleanup": "rm -rf backups/*"
+  },
+  "keywords": [],
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.222.0",
+    "@aws-sdk/lib-storage": "^3.222.0",
+    "cuid": "2.1.8",
+    "dotenv": "16.0.3",
+    "zx": "7.1.1"
+  }
+}

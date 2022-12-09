@@ -37,9 +37,7 @@ export async function getSource(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const { teamId } = request.user
-
         const settings = await prisma.setting.findFirst({});
-        if (settings.proxyPassword) settings.proxyPassword = decrypt(settings.proxyPassword);
 
         if (id === 'new') {
             return {

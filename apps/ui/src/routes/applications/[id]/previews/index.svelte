@@ -55,7 +55,7 @@
 				branch: preview.sourceBranch
 			});
 			addToast({
-				message: 'Deployment queued',
+				message: 'Deployment queued.',
 				type: 'success'
 			});
 			if ($page.url.pathname.startsWith(`/applications/${id}/logs/build`)) {
@@ -183,9 +183,7 @@
 		<div class="flex justify-center py-4 text-center text-xl font-bold">Loading...</div>
 	</div>
 {:else if application.previewApplication.length > 0}
-	<div
-		class="grid grid-col gap-4 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-2 px-6"
-	>
+	<div class="grid grid-col gap-4 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-2 px-6">
 		{#each application.previewApplication as preview}
 			<div class="no-underline mb-5 w-full">
 				<div class="w-full rounded p-5 bg-coolgray-200 indicator">
@@ -216,7 +214,12 @@
 
 							<div class="flex justify-end items-end space-x-2 h-10">
 								{#if preview.customDomain}
-									<a id="openpreview" href={preview.customDomain} target="_blank noreferrer" class="icons">
+									<a
+										id="openpreview"
+										href={preview.customDomain}
+										target="_blank noreferrer"
+										class="icons"
+									>
 										<svg
 											xmlns="http://www.w3.org/2000/svg"
 											class="h-6 w-6"

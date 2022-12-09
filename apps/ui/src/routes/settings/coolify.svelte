@@ -35,6 +35,9 @@
 	let minPort = settings.minPort;
 	let maxPort = settings.maxPort;
 	let proxyDefaultRedirect = settings.proxyDefaultRedirect;
+	let doNotTrack = settings.doNotTrack;
+	let numberOfDockerImagesKeptLocally = settings.numberOfDockerImagesKeptLocally;
+	let previewSeparator = settings.previewSeparator;
 
 	let forceSave = false;
 	let fqdn = settings.fqdn;
@@ -117,6 +120,9 @@
 	async function changeSettings(name: any) {
 		try {
 			resetView();
+			if (name === 'doNotTrack') {
+				doNotTrack = !doNotTrack;
+			}
 			if (name === 'isRegistrationEnabled') {
 				isRegistrationEnabled = !isRegistrationEnabled;
 			}
@@ -133,6 +139,7 @@
 				isAPIDebuggingEnabled = !isAPIDebuggingEnabled;
 			}
 			await post(`/settings`, {
+				doNotTrack,
 				isAPIDebuggingEnabled,
 				isRegistrationEnabled,
 				dualCerts,
@@ -159,6 +166,15 @@
 			}
 			if (proxyDefaultRedirect !== settings.proxyDefaultRedirect) {
 				await post(`/settings`, { proxyDefaultRedirect });
+				settings.proxyDefaultRedirect = proxyDefaultRedirect;
+			}
+			if (numberOfDockerImagesKeptLocally !== settings.numberOfDockerImagesKeptLocally) {
+				await post(`/settings`, { numberOfDockerImagesKeptLocally });
+				settings.numberOfDockerImagesKeptLocally = numberOfDockerImagesKeptLocally;
+			}
+			if (previewSeparator !== settings.previewSeparator) {
+				await post(`/settings`, { previewSeparator });
+				settings.previewSeparator = previewSeparator;
 			}
 			if (minPort !== settings.minPort || maxPort !== settings.maxPort) {
 				await post(`/settings`, { minPort, maxPort });
@@ -367,7 +383,7 @@
 
 				<div class="grid grid-cols-4 items-center">
 					<div class="col-span-2">
-						Rollback to a specific version
+						Rollback Coolify to a specific version
 						<Explainer
 							position="dropdown-bottom"
 							explanation="You can rollback to a specific version of Coolify. This will not affect your current running resources.<br><br><a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
@@ -387,6 +403,44 @@
 						disabled={!rollbackVersion || loading.rollback}
 						on:click|preventDefault|stopPropagation={rollback}>Rollback</button
 					>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<div>
+						Number of Docker Images kept locally
+						<Explainer
+							position="dropdown-bottom"
+							explanation="The number of Docker images kept locally on the server for EACH application. The oldest images will be deleted when the limit is reached.<br><br>Useful to rollback to a specific version of your applications quickly, but it will use more storage locally."
+						/>
+					</div>
+					<input
+						type="number"
+						class="w-full"
+						bind:value={numberOfDockerImagesKeptLocally}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="numberOfDockerImagesKeptLocally"
+						id="numberOfDockerImagesKeptLocally"
+						placeholder="default: 3"
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<div>
+						Preview Domain Separator
+						<Explainer
+							position="dropdown-bottom"
+							explanation="The separator used in the PR/MR previews.<br><br>For example if you set it to: <span class='text-yellow-400 font-bold'>-</span><br> the preview domain will be like this: <br><br><span class='text-yellow-400 font-bold'>PRMRNumber-yourdomain.com</span><br><br>The default is: <span class='text-yellow-400 font-bold'>.</span><br>so the preview domain will be like this: <br><br><span class='text-yellow-400 font-bold'>PRMRNumber.yourdomain.com</span>"
+						/>
+					</div>
+					<input
+						class="w-full"
+						required
+						bind:value={previewSeparator}
+						readonly={!$appSession.isAdmin}
+						disabled={!$appSession.isAdmin}
+						name="previewSeparator"
+						id="previewSeparator"
+						placeholder="default: ."
+					/>
 				</div>
 				<div class="grid grid-cols-2 items-center">
 					<div>
@@ -456,6 +510,15 @@
 						title={$t('setting.auto_update_enabled')}
 						description={$t('setting.auto_update_enabled_explainer')}
 						on:click={() => changeSettings('isAutoUpdateEnabled')}
+					/>
+				</div>
+				<div class="grid grid-cols-2 items-center">
+					<Setting
+						id="doNotTrack"
+						bind:setting={doNotTrack}
+						title="Do Not Track"
+						description="Do not send error reports to Coolify developers or any telemetry."
+						on:click={() => changeSettings('doNotTrack')}
 					/>
 				</div>
 			</div>

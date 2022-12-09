@@ -20,7 +20,11 @@ export default async function (data) {
 		.toString()
 		.trim()
 		.split('\n');
-	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
+	Dockerfile.forEach((line, index) => {
+		if (line.startsWith('FROM')) {
+			Dockerfile.splice(index + 1, 0, `LABEL coolify.buildId=${buildId}`);
+		}
+	});
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
@@ -28,11 +32,9 @@ export default async function (data) {
 					(pullmergeRequestId && secret.isPRMRSecret) ||
 					(!pullmergeRequestId && !secret.isPRMRSecret)
 				) {
-					Dockerfile.unshift(`ARG ${secret.name}=${secret.value}`);
-
 					Dockerfile.forEach((line, index) => {
 						if (line.startsWith('FROM')) {
-							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}`);
+							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}=${secret.value}`);
 						}
 					});
 				}

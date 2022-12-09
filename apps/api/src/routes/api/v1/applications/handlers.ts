@@ -7,12 +7,12 @@ import yaml from 'js-yaml';
 import csv from 'csvtojson';
 
 import { day } from '../../../../lib/dayjs';
-import { setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
-import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeDockerCmd, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
+import { saveDockerRegistryCredentials, setDefaultBaseImage, setDefaultConfiguration } from '../../../../lib/buildPacks/common';
+import { checkDomainsIsValidInDNS, checkExposedPort, createDirectories, decrypt, defaultComposeConfiguration, encrypt, errorHandler, executeCommand, generateSshKeyPair, getContainerUsage, getDomain, isDev, isDomainConfigured, listSettings, prisma, stopBuild, uniqueName } from '../../../../lib/common';
 import { checkContainer, formatLabelsOnDocker, removeContainer } from '../../../../lib/docker';
 
 import type { FastifyRequest } from 'fastify';
-import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds } from './types';
+import type { GetImages, CancelDeployment, CheckDNS, CheckRepository, DeleteApplication, DeleteSecret, DeleteStorage, GetApplicationLogs, GetBuildIdLogs, SaveApplication, SaveApplicationSettings, SaveApplicationSource, SaveDeployKey, SaveDestination, SaveSecret, SaveStorage, DeployApplication, CheckDomain, StopPreviewApplication, RestartPreviewApplication, GetBuilds, RestartApplication } from './types';
 import { OnlyId } from '../../../../types';
 
 function filterObject(obj, callback) {
@@ -78,7 +78,7 @@ export async function cleanupUnconfiguredApplications(request: FastifyRequest<an
         for (const application of applications) {
             if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn)) {
                 if (application?.destinationDockerId && application.destinationDocker?.network) {
-                    const { stdout: containers } = await executeDockerCmd({
+                    const { stdout: containers } = await executeCommand({
                         dockerId: application.destinationDocker.id,
                         command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${application.id} --format '{{json .}}'`
                     })
@@ -113,7 +113,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
         const application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
             if (application.buildPack === 'compose') {
-                const { stdout: containers } = await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: application.destinationDocker.id,
                     command:
                         `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
@@ -241,7 +241,8 @@ export async function getApplicationFromDB(id: string, teamId: string) {
                 secrets: true,
                 persistentStorage: true,
                 connectedDatabase: true,
-                previewApplication: true
+                previewApplication: true,
+                dockerRegistry: true
             }
         });
         if (!application) {
@@ -280,7 +281,7 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
             }
         });
         if (applications.length === 0) {
-            throw { status: 500, message: 'Application not configured.' }
+            throw { status: 500, message: 'Application not configured.', type: 'webhook' }
         }
         applications = applications.map((application: any) => {
             application = decryptApplication(application);
@@ -302,8 +303,8 @@ export async function getApplicationFromDBWebhook(projectId: number, branch: str
 
         return applications;
 
-    } catch ({ status, message }) {
-        return errorHandler({ status, message })
+    } catch ({ status, message, type }) {
+        return errorHandler({ status, message, type })
     }
 }
 export async function saveApplication(request: FastifyRequest<SaveApplication>, reply: FastifyReply) {
@@ -326,13 +327,16 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             dockerFileLocation,
             denoMainFile,
             denoOptions,
+            gitCommitHash,
             baseImage,
             baseBuildImage,
             deploymentType,
             baseDatabaseBranch,
             dockerComposeFile,
             dockerComposeFileLocation,
-            dockerComposeConfiguration
+            dockerComposeConfiguration,
+            simpleDockerfile,
+            dockerRegistryImageName
         } = request.body
         if (port) port = Number(port);
         if (exposePort) {
@@ -350,6 +354,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
             publishDirectory,
             baseDirectory,
             dockerFileLocation,
+            dockerComposeFileLocation,
             denoMainFile
         });
         if (baseDatabaseBranch) {
@@ -364,11 +369,14 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     pythonVariable,
                     denoOptions,
                     baseImage,
+                    gitCommitHash,
                     baseBuildImage,
                     deploymentType,
                     dockerComposeFile,
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
+                    simpleDockerfile,
+                    dockerRegistryImageName,
                     ...defaultConfiguration,
                     connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
                 }
@@ -382,6 +390,7 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     exposePort,
                     pythonWSGI,
                     pythonModule,
+                    gitCommitHash,
                     pythonVariable,
                     denoOptions,
                     baseImage,
@@ -390,6 +399,8 @@ export async function saveApplication(request: FastifyRequest<SaveApplication>, 
                     dockerComposeFile,
                     dockerComposeFileLocation,
                     dockerComposeConfiguration,
+                    simpleDockerfile,
+                    dockerRegistryImageName,
                     ...defaultConfiguration
                 }
             });
@@ -438,16 +449,17 @@ export async function stopPreviewApplication(request: FastifyRequest<StopPreview
     }
 }
 
-export async function restartApplication(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+export async function restartApplication(request: FastifyRequest<RestartApplication>, reply: FastifyReply) {
     try {
         const { id } = request.params
+        const { imageId = null } = request.body
         const { teamId } = request.user
         let application: any = await getApplicationFromDB(id, teamId);
         if (application?.destinationDockerId) {
             const buildId = cuid();
             const { id: dockerId, network } = application.destinationDocker;
-            const { secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
-
+            const { dockerRegistry, secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
+            let location = null;
             const envs = [
                 `PORT=${port}`
             ];
@@ -470,28 +482,48 @@ export async function restartApplication(request: FastifyRequest<OnlyId>, reply:
             const { workdir } = await createDirectories({ repository, buildId });
             const labels = []
             let image = null
-            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
-            const containersArray = container.trim().split('\n');
-            for (const container of containersArray) {
-                const containerObj = formatLabelsOnDocker(container);
-                image = containerObj[0].Image
-                Object.keys(containerObj[0].Labels).forEach(function (key) {
-                    if (key.startsWith('coolify')) {
-                        labels.push(`${key}=${containerObj[0].Labels[key]}`)
-                    }
-                })
+            if (imageId) {
+                image = imageId
+            } else {
+                const { stdout: container } = await executeCommand({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}' --format '{{json .}}'` })
+                const containersArray = container.trim().split('\n');
+                for (const container of containersArray) {
+                    const containerObj = formatLabelsOnDocker(container);
+                    image = containerObj[0].Image
+                    Object.keys(containerObj[0].Labels).forEach(function (key) {
+                        if (key.startsWith('coolify')) {
+                            labels.push(`${key}=${containerObj[0].Labels[key]}`)
+                        }
+                    })
+                }
             }
-            let imageFound = false;
+            if (dockerRegistry) {
+                const { url, username, password } = dockerRegistry
+                location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+            }
+
+            let imageFoundLocally = false;
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId,
                     command: `docker image inspect ${image}`
                 })
-                imageFound = true;
+                imageFoundLocally = true;
             } catch (error) {
                 //
             }
-            if (!imageFound) {
+            let imageFoundRemotely = false;
+            try {
+                await executeCommand({
+                    dockerId,
+                    command: `docker ${location ? `--config ${location}` : ''} pull ${image}`
+                })
+                imageFoundRemotely = true;
+            } catch (error) {
+                //
+            }
+
+            if (!imageFoundLocally && !imageFoundRemotely) {
                 throw { status: 500, message: 'Image not found, cannot restart application.' }
             }
             await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
@@ -537,9 +569,14 @@ export async function restartApplication(request: FastifyRequest<OnlyId>, reply:
                 volumes: Object.assign({}, ...composeVolumes)
             };
             await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}` })
-            await executeDockerCmd({ dockerId, command: `docker rm ${id}` })
-            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            try {
+                await executeCommand({ dockerId, command: `docker stop -t 0 ${id}` })
+                await executeCommand({ dockerId, command: `docker rm ${id}` })
+            } catch (error) {
+                //
+            }
+
+            await executeCommand({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
             return reply.code(201).send();
         }
         throw { status: 500, message: 'Application cannot be restarted.' }
@@ -555,7 +592,7 @@ export async function stopApplication(request: FastifyRequest<OnlyId>, reply: Fa
         if (application?.destinationDockerId) {
             const { id: dockerId } = application.destinationDocker;
             if (application.buildPack === 'compose') {
-                const { stdout: containers } = await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: application.destinationDocker.id,
                     command:
                         `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
@@ -590,7 +627,7 @@ export async function deleteApplication(request: FastifyRequest<DeleteApplicatio
             include: { destinationDocker: true }
         });
         if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
-            const { stdout: containers } = await executeDockerCmd({
+            const { stdout: containers } = await executeCommand({
                 dockerId: application.destinationDocker.id,
                 command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
             })
@@ -676,6 +713,47 @@ export async function getUsage(request) {
         return errorHandler({ status, message })
     }
 }
+export async function getDockerImages(request) {
+    try {
+        const { id } = request.params
+        const teamId = request.user?.teamId;
+        const application: any = await getApplicationFromDB(id, teamId);
+        let imagesAvailables = [];
+        try {
+            const { stdout } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache`, shell: true });
+            const { stdout: runningImage } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}` });
+            const images = stdout.trim().split('\n');
+
+            for (const image of images) {
+                const [repository, tag, createdAt] = image.split('#');
+                if (tag.includes('-')) {
+                    continue;
+                }
+                const [year, time] = createdAt.split(' ');
+                imagesAvailables.push({
+                    repository,
+                    tag,
+                    createdAt: day(year + time).unix()
+                })
+            }
+
+            imagesAvailables = imagesAvailables.sort((a, b) => b.tag - a.tag);
+
+            return {
+                imagesAvailables,
+                runningImage
+            }
+        } catch (error) {
+            return {
+                imagesAvailables,
+            }
+        }
+
+    } catch ({ status, message }) {
+
+        return errorHandler({ status, message })
+    }
+}
 
 export async function getUsageByContainer(request) {
     try {
@@ -718,22 +796,37 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
                 await prisma.application.update({ where: { id }, data: { configHash } });
             }
             await prisma.application.update({ where: { id }, data: { updatedAt: new Date() } });
-            await prisma.build.create({
-                data: {
-                    id: buildId,
-                    applicationId: id,
-                    sourceBranch: branch,
-                    branch: application.branch,
-                    pullmergeRequestId: pullmergeRequestId?.toString(),
-                    forceRebuild,
-                    destinationDockerId: application.destinationDocker?.id,
-                    gitSourceId: application.gitSource?.id,
-                    githubAppId: application.gitSource?.githubApp?.id,
-                    gitlabAppId: application.gitSource?.gitlabApp?.id,
-                    status: 'queued',
-                    type: pullmergeRequestId ? application.gitSource?.githubApp?.id ? 'manual_pr' : 'manual_mr' : 'manual'
-                }
-            });
+            if (application.gitSourceId) {
+                await prisma.build.create({
+                    data: {
+                        id: buildId,
+                        applicationId: id,
+                        sourceBranch: branch,
+                        branch: application.branch,
+                        pullmergeRequestId: pullmergeRequestId?.toString(),
+                        forceRebuild,
+                        destinationDockerId: application.destinationDocker?.id,
+                        gitSourceId: application.gitSource?.id,
+                        githubAppId: application.gitSource?.githubApp?.id,
+                        gitlabAppId: application.gitSource?.gitlabApp?.id,
+                        status: 'queued',
+                        type: pullmergeRequestId ? application.gitSource?.githubApp?.id ? 'manual_pr' : 'manual_mr' : 'manual'
+                    }
+                });
+            } else {
+                await prisma.build.create({
+                    data: {
+                        id: buildId,
+                        applicationId: id,
+                        branch: 'latest',
+                        forceRebuild,
+                        destinationDockerId: application.destinationDocker?.id,
+                        status: 'queued',
+                        type: 'manual'
+                    }
+                });
+            }
+
             return {
                 buildId
             };
@@ -748,19 +841,27 @@ export async function deployApplication(request: FastifyRequest<DeployApplicatio
 export async function saveApplicationSource(request: FastifyRequest<SaveApplicationSource>, reply: FastifyReply) {
     try {
         const { id } = request.params
-        const { gitSourceId, forPublic, type } = request.body
+        const { gitSourceId, forPublic, type, simpleDockerfile } = request.body
         if (forPublic) {
             const publicGit = await prisma.gitSource.findFirst({ where: { type, forPublic } });
             await prisma.application.update({
                 where: { id },
                 data: { gitSource: { connect: { id: publicGit.id } } }
             });
-        } else {
+        }
+        if (simpleDockerfile) {
+            await prisma.application.update({
+                where: { id },
+                data: { simpleDockerfile, settings: { update: { autodeploy: false } } }
+            });
+        }
+        if (gitSourceId) {
             await prisma.application.update({
                 where: { id },
                 data: { gitSource: { connect: { id: gitSourceId } } }
             });
         }
+
 
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -819,7 +920,7 @@ export async function saveRepository(request, reply) {
         let { repository, branch, projectId, autodeploy, webhookToken, isPublicRepository = false } = request.body
 
         repository = repository.toLowerCase();
-        
+
         projectId = Number(projectId);
         if (webhookToken) {
             await prisma.application.update({
@@ -864,11 +965,11 @@ export async function getBuildPack(request) {
         const teamId = request.user?.teamId;
         const application: any = await getApplicationFromDB(id, teamId);
         return {
-            type: application.gitSource.type,
+            type: application.gitSource?.type || 'dockerRegistry',
             projectId: application.projectId,
             repository: application.repository,
             branch: application.branch,
-            apiUrl: application.gitSource.apiUrl,
+            apiUrl: application.gitSource?.apiUrl || null,
             isPublicRepository: application.settings.isPublicRepository
         }
     } catch ({ status, message }) {
@@ -876,6 +977,16 @@ export async function getBuildPack(request) {
     }
 }
 
+export async function saveRegistry(request, reply) {
+    try {
+        const { id } = request.params
+        const { registryId } = request.body
+        await prisma.application.update({ where: { id }, data: { dockerRegistry: { connect: { id: registryId } } } });
+        return reply.code(201).send()
+    } catch ({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function saveBuildPack(request, reply) {
     try {
         const { id } = request.params
@@ -1072,7 +1183,7 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
             const { workdir } = await createDirectories({ repository, buildId });
             const labels = []
             let image = null
-            const { stdout: container } = await executeDockerCmd({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}-${pullmergeRequestId}' --format '{{json .}}'` })
+            const { stdout: container } = await executeCommand({ dockerId, command: `docker container ls --filter 'label=com.docker.compose.service=${id}-${pullmergeRequestId}' --format '{{json .}}'` })
             const containersArray = container.trim().split('\n');
             for (const container of containersArray) {
                 const containerObj = formatLabelsOnDocker(container);
@@ -1085,7 +1196,7 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
             }
             let imageFound = false;
             try {
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId,
                     command: `docker image inspect ${image}`
                 })
@@ -1139,9 +1250,9 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
                 volumes: Object.assign({}, ...composeVolumes)
             };
             await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
-            await executeDockerCmd({ dockerId, command: `docker stop -t 0 ${id}-${pullmergeRequestId}` })
-            await executeDockerCmd({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` })
-            await executeDockerCmd({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
+            await executeCommand({ dockerId, command: `docker stop -t 0 ${id}-${pullmergeRequestId}` })
+            await executeCommand({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` })
+            await executeCommand({ dockerId, command: `docker compose --project-directory ${workdir} up -d` })
             return reply.code(201).send();
         }
         throw { status: 500, message: 'Application cannot be restarted.' }
@@ -1182,7 +1293,7 @@ export async function loadPreviews(request: FastifyRequest<OnlyId>) {
     try {
         const { id } = request.params
         const application = await prisma.application.findUnique({ where: { id }, include: { destinationDocker: true } });
-        const { stdout } = await executeDockerCmd({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
+        const { stdout } = await executeCommand({ dockerId: application.destinationDocker.id, command: `docker container ls --filter 'name=${id}-' --format "{{json .}}"` })
         if (stdout === '') {
             throw { status: 500, message: 'No previews found.' }
         }
@@ -1257,7 +1368,7 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
         if (destinationDockerId) {
             try {
                 const { default: ansi } = await import('strip-ansi')
-                const { stdout, stderr } = await executeDockerCmd({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
+                const { stdout, stderr } = await executeCommand({ dockerId, command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}` })
                 const stripLogsStdout = stdout.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const stripLogsStderr = stderr.toString().split('\n').map((l) => ansi(l)).filter((a) => a);
                 const logs = stripLogsStderr.concat(stripLogsStdout)
@@ -1448,19 +1559,19 @@ export async function createdBranchDatabase(database: any, baseDatabaseBranch: s
         if (destinationDockerId) {
             if (type === 'postgresql') {
                 const decryptedRootUserPassword = decrypt(rootUserPassword);
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} pg_dump -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/${baseDatabaseBranch}" --encoding=UTF8 --schema-only -f /tmp/${baseDatabaseBranch}.dump`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "CREATE DATABASE branch_${pullmergeRequestId}"`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql -d "postgresql://postgres:${decryptedRootUserPassword}@${id}:5432/branch_${pullmergeRequestId}" -f /tmp/${baseDatabaseBranch}.dump`
                 })
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "ALTER DATABASE branch_${pullmergeRequestId} OWNER TO ${dbUser}"`
                 })
@@ -1479,12 +1590,12 @@ export async function removeBranchDatabase(database: any, pullmergeRequestId: st
             if (type === 'postgresql') {
                 const decryptedRootUserPassword = decrypt(rootUserPassword);
                 // Terminate all connections to the database
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "SELECT pg_terminate_backend(pg_stat_activity.pid) FROM pg_stat_activity WHERE pg_stat_activity.datname = 'branch_${pullmergeRequestId}' AND pid <> pg_backend_pid();"`
                 })
 
-                await executeDockerCmd({
+                await executeCommand({
                     dockerId: destinationDockerId,
                     command: `docker exec ${id} psql postgresql://postgres:${decryptedRootUserPassword}@${id}:5432 -c "DROP DATABASE branch_${pullmergeRequestId}"`
                 })

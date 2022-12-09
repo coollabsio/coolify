@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import {
-	asyncExecShell,
 	asyncSleep,
 	cleanupDockerStorage,
 	errorHandler,
@@ -13,6 +12,8 @@ import {
 	prisma,
 	uniqueName,
 	version,
+	sentryDSN,
+	executeCommand,
 } from "../../../lib/common";
 import { scheduler } from "../../../lib/scheduler";
 import type { FastifyReply, FastifyRequest } from "fastify";
@@ -24,6 +25,35 @@ export async function hashPassword(password: string): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
+export async function backup(request: FastifyRequest) {
+	try {
+		const { backupData } = request.params;
+		let std = null;
+		const [id, backupType, type, zipped, storage] = backupData.split(':')
+		console.log(id, backupType, type, zipped, storage)
+		const database = await prisma.database.findUnique({ where: { id } })
+		if (database) {
+			// await executeDockerCmd({
+			// 	dockerId: database.destinationDockerId,
+			// 	command: `docker pull coollabsio/backup:latest`,
+			// })
+			std = await executeCommand({
+				dockerId: database.destinationDockerId,
+				command: `docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v coolify-local-backup:/app/backups -e CONTAINERS_TO_BACKUP="${backupData}" coollabsio/backup`
+			})
+
+		}
+		if (std.stdout) {
+			return std.stdout;
+		}
+		if (std.stderr) {
+			return std.stderr;
+		}
+		return 'nope';
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
 export async function cleanupManually(request: FastifyRequest) {
 	try {
 		const { serverId } = request.body;
@@ -110,14 +140,10 @@ export async function update(request: FastifyRequest<Update>) {
 	try {
 		if (!isDev) {
 			const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
-			await asyncExecShell(`docker pull coollabsio/coolify:${latestVersion}`);
-			await asyncExecShell(`env | grep COOLIFY > .env`);
-			await asyncExecShell(
-				`sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
-			);
-			await asyncExecShell(
-				`docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
-			);
+			await executeCommand({ command: `docker pull coollabsio/coolify:${latestVersion}` });
+			await executeCommand({ shell: true, command: `env | grep COOLIFY > .env` });
+			await executeCommand({ command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env` });
+			await executeCommand({ shell: true, command: `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"` });
 			return {};
 		} else {
 			await asyncSleep(2000);
@@ -146,7 +172,7 @@ export async function restartCoolify(request: FastifyRequest<any>) {
 		const teamId = request.user.teamId;
 		if (teamId === "0") {
 			if (!isDev) {
-				asyncExecShell(`docker restart coolify`);
+				await executeCommand({ command: `docker restart coolify` });
 				return {};
 			} else {
 				return {};
@@ -189,7 +215,7 @@ export async function showDashboard(request: FastifyRequest) {
 
 		let foundUnconfiguredApplication = false;
 		for (const application of applications) {
-			if (!application.buildPack || !application.destinationDockerId || !application.branch || (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== "compose") {
+			if (((!application.buildPack || !application.branch) && !application.simpleDockerfile) || !application.destinationDockerId || (!application.settings?.isBot && !application?.fqdn) && application.buildPack !== "compose") {
 				foundUnconfiguredApplication = true
 			}
 		}
@@ -398,7 +424,8 @@ export async function getCurrentUser(
 	}
 	const pendingInvitations = await prisma.teamInvitation.findMany({ where: { uid: request.user.userId } })
 	return {
-		settings: await prisma.setting.findFirst(),
+		settings: await prisma.setting.findUnique({ where: { id: "0" } }),
+		sentryDSN,
 		pendingInvitations,
 		token,
 		...request.user,

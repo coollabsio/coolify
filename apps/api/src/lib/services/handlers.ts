@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import fs from 'fs/promises';
 import yaml from 'js-yaml';
 import path from 'path';
-import { asyncSleep, ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, errorHandler, executeDockerCmd, getServiceFromDB, isARM, makeLabelForServices, persistentVolumes, prisma, stopTcpHttpProxy } from '../common';
+import { asyncSleep, ComposeFile, createDirectories, decrypt, defaultComposeConfiguration, errorHandler, executeCommand, getServiceFromDB, isARM, makeLabelForServices, persistentVolumes, prisma, stopTcpHttpProxy } from '../common';
 import { parseAndFindServiceTemplates } from '../../routes/api/v1/services/handlers';
 
 import { ServiceStartStop } from '../../routes/api/v1/services/types';
@@ -15,14 +15,19 @@ export async function stopService(request: FastifyRequest<ServiceStartStop>) {
         const teamId = request.user.teamId;
         const { destinationDockerId } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            await executeDockerCmd({
+            const { stdout: containers } = await executeCommand({
                 dockerId: destinationDockerId,
-                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -r -n 1 docker stop -t 0`
+                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}`
             })
-            await executeDockerCmd({
-                dockerId: destinationDockerId,
-                command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}|xargs -r -n 1 docker rm --force`
-            })
+            if (containers) {
+                const containerArray = containers.split('\n');
+                if (containerArray.length > 0) {
+                    for (const container of containerArray) {
+                        await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+                        await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+                    }
+                }
+            }
             return {}
         }
         throw { status: 500, message: 'Could not stop containers.' }
@@ -182,19 +187,36 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         // Workaround: Stop old minio proxies
         if (service.type === 'minio') {
             try {
-                await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: destinationDocker.id,
                     command:
-                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}|xargs -r -n 1 docker container stop -t 0`
+                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}`
                 });
-
+                if (containers) {
+                    const containerArray = containers.split('\n');
+                    if (containerArray.length > 0) {
+                        for (const container of containerArray) {
+                            await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+                            await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+                        }
+                    }
+                }
             } catch (error) { }
             try {
-                await executeDockerCmd({
+                const { stdout: containers } = await executeCommand({
                     dockerId: destinationDocker.id,
                     command:
-                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}|xargs -r -n 1 docker container rm -f`
+                        `docker container ls -a --filter 'name=${id}-' --format {{.ID}}`
                 });
+                if (containers) {
+                    const containerArray = containers.split('\n');
+                    if (containerArray.length > 0) {
+                        for (const container of containerArray) {
+                            await executeCommand({ dockerId: destinationDockerId, command: `docker stop -t 0 ${container}` })
+                            await executeCommand({ dockerId: destinationDockerId, command: `docker rm --force ${container}` })
+                        }
+                    }
+                }
             } catch (error) { }
         }
         return {}
@@ -205,16 +227,16 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
 async function startServiceContainers(fastify, id, teamId, dockerId, composeFileDestination) {
     try {
         fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Pulling images...' })
-        await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
+        await executeCommand({ dockerId, command: `docker compose -f ${composeFileDestination} pull` })
     } catch (error) { }
     fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Building images...' })
-    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} build --no-cache` })
+    await executeCommand({ dockerId, command: `docker compose -f ${composeFileDestination} build --no-cache` })
     fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Creating containers...' })
-    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
+    await executeCommand({ dockerId, command: `docker compose -f ${composeFileDestination} create` })
     fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 'Starting containers...' })
-    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
+    await executeCommand({ dockerId, command: `docker compose -f ${composeFileDestination} start` })
     await asyncSleep(1000);
-    await executeDockerCmd({ dockerId, command: `docker compose -f ${composeFileDestination} up -d` })
+    await executeCommand({ dockerId, command: `docker compose -f ${composeFileDestination} up -d` })
     fastify.io.to(teamId).emit(`start-service`, { serviceId: id, state: 0 })
 }
 export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
@@ -226,7 +248,7 @@ export async function migrateAppwriteDB(request: FastifyRequest<OnlyId>, reply: 
             destinationDocker,
         } = await getServiceFromDB({ id, teamId });
         if (destinationDockerId) {
-            await executeDockerCmd({
+            await executeCommand({
                 dockerId: destinationDocker.id,
                 command: `docker exec ${id} migrate`
             })
