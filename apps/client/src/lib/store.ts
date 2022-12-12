@@ -1,6 +1,6 @@
-import { writable, readable, type Writable, type Readable } from 'svelte/store';
+import { writable, readable, type Writable } from 'svelte/store';
 import superjson from 'superjson';
-import type { AppRouter, PrismaPermission } from 'server/src/trpc';
+import type { AppRouter } from 'server/src/trpc';
 import { createTRPCProxyClient, httpBatchLink } from '@trpc/client';
 import { browser, dev } from '$app/environment';
 import Cookies from 'js-cookie';

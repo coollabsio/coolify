@@ -2,6 +2,18 @@
 	import type { PageData } from './$types';
 
 	export let data: PageData;
+	import { dev } from '$app/environment';
+	import { onMount } from 'svelte';
+
+	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
+	import { appSession, search, t } from '$lib/store';
+
+	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
+	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
+	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
+	import NewResource from '$lib/components/NewResource.svelte';
+	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+
 	const {
 		applications,
 		foundUnconfiguredApplication,
@@ -14,17 +26,6 @@
 		settings
 	} = data;
 	let filtered: any = setInitials();
-	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
-	import { appSession, search, t } from '$lib/store';
-
-	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
-	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
-	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
-	import { dev } from '$app/environment';
-	import NewResource from '$lib/components/NewResource.svelte';
-	import { onMount } from 'svelte';
-	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
-
 	let numberOfGetStatus = 0;
 	let status: any = {};
 	let noInitialStatus: any = {
@@ -155,7 +156,7 @@
 			let isRunning = false;
 			let isDegraded = false;
 			if (buildPack || simpleDockerfile) {
-				const response = await t.applications.status.query({ id })
+				const response = await t.applications.status.query({ id });
 				if (response.length === 0) {
 					isRunning = false;
 				} else if (response.length === 1) {
@@ -177,7 +178,7 @@
 					}
 				}
 			} else if (typeof dualCerts !== 'undefined') {
-				const response = await t.services.status.query({ id })
+				const response = await t.services.status.query({ id });
 				if (Object.keys(response).length === 0) {
 					isRunning = false;
 				} else {
@@ -197,7 +198,7 @@
 					}
 				}
 			} else {
-				const response = await get(`/databases/${id}/status`);
+				const response = await t.databases.status.query({ id });
 				isRunning = response.isRunning;
 			}
 
@@ -381,7 +382,7 @@
 				'Are you sure? This will delete all UNCONFIGURED applications and their data.'
 			);
 			if (sure) {
-				// await post(`/applications/cleanup/unconfigured`, {});
+				await t.applications.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -394,7 +395,7 @@
 				'Are you sure? This will delete all UNCONFIGURED services and their data.'
 			);
 			if (sure) {
-				// await post(`/services/cleanup/unconfigured`, {});
+				await t.services.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -407,7 +408,7 @@
 				'Are you sure? This will delete all UNCONFIGURED databases and their data.'
 			);
 			if (sure) {
-				// await post(`/databases/cleanup/unconfigured`, {});
+				await t.databases.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -418,7 +419,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this application!');
 			if (sure) {
-				// await del(`/applications/${id}`, { force: true });
+				await t.applications.delete.mutate({ id, force: true });
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -429,6 +430,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this service!');
 			if (sure) {
+				await t.services.delete.mutate({ id });
 				// await del(`/services/${id}`, {});
 				return window.location.reload();
 			}
@@ -440,7 +442,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this database!');
 			if (sure) {
-				// await del(`/databases/${id}`, { force: true });
+				await t.databases.delete.mutate({ id, force: true });
 				return window.location.reload();
 			}
 		} catch (error) {

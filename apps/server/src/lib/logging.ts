@@ -2,15 +2,13 @@ import { prisma } from '../prisma';
 import { encrypt, generateTimestamp, isDev } from './common';
 import { day } from './dayjs';
 
-export const saveBuildLog = async ({
-	line,
-	buildId,
-	applicationId
-}: {
-	line: string;
-	buildId: string;
-	applicationId: string;
-}): Promise<any> => {
+export type Line = string | { shortMessage: string; stderr: string };
+export type BuildLog = {
+	line: Line;
+	buildId?: string;
+	applicationId?: string;
+};
+export const saveBuildLog = async ({ line, buildId, applicationId }: BuildLog): Promise<any> => {
 	if (buildId === 'undefined' || buildId === 'null' || !buildId) return;
 	if (applicationId === 'undefined' || applicationId === 'null' || !applicationId) return;
 	const { default: got } = await import('got');

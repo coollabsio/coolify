@@ -6,7 +6,7 @@ import sshConfig from 'ssh-config';
 
 import { getFreeSSHLocalPort } from './ssh';
 import { env } from '../env';
-import { saveBuildLog } from './logging';
+import { BuildLog, saveBuildLog } from './logging';
 import { decrypt } from './common';
 
 export async function executeCommand({
@@ -31,23 +31,26 @@ export async function executeCommand({
 	const { execa, execaCommand } = await import('execa');
 	const { parse } = await import('shell-quote');
 	const parsedCommand = parse(command);
-	const dockerCommand = parsedCommand[0];
-	const dockerArgs = parsedCommand.slice(1);
+	const dockerCommand = parsedCommand[0]?.toString();
+	const dockerArgs = parsedCommand.slice(1).toString();
 
-	if (dockerId) {
+	if (dockerId && dockerCommand && dockerArgs) {
 		const destinationDocker = await prisma.destinationDocker.findUnique({
 			where: { id: dockerId }
 		});
 		if (!destinationDocker) {
 			throw new Error('Destination docker not found');
 		}
-		let { remoteEngine, remoteIpAddress, engine } = destinationDocker;
+		let {
+			remoteEngine,
+			remoteIpAddress,
+			engine = 'unix:///var/run/docker.sock'
+		} = destinationDocker;
 		if (remoteEngine) {
 			await createRemoteEngineConfiguration(dockerId);
 			engine = `ssh://${remoteIpAddress}-remote`;
-		} else {
-			engine = 'unix:///var/run/docker.sock';
 		}
+
 		if (env.CODESANDBOX_HOST) {
 			if (command.startsWith('docker compose')) {
 				command = command.replace(/docker compose/gi, 'docker-compose');
@@ -73,12 +76,12 @@ export async function executeCommand({
 				}
 				const logs: any[] = [];
 				if (subprocess && subprocess.stdout && subprocess.stderr) {
-					subprocess.stdout.on('data', async (data) => {
+					subprocess.stdout.on('data', async (data: string) => {
 						const stdout = data.toString();
 						const array = stdout.split('\n');
 						for (const line of array) {
 							if (line !== '\n' && line !== '') {
-								const log = {
+								const log: BuildLog = {
 									line: `${line.replace('\n', '')}`,
 									buildId,
 									applicationId
@@ -90,7 +93,7 @@ export async function executeCommand({
 							}
 						}
 					});
-					subprocess.stderr.on('data', async (data) => {
+					subprocess.stderr.on('data', async (data: string) => {
 						const stderr = data.toString();
 						const array = stderr.split('\n');
 						for (const line of array) {
@@ -107,7 +110,7 @@ export async function executeCommand({
 							}
 						}
 					});
-					subprocess.on('exit', async (code) => {
+					subprocess.on('exit', async (code: number) => {
 						if (code === 0) {
 							resolve('success');
 						} else {

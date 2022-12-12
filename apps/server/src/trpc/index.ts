@@ -6,7 +6,8 @@ import {
 	authRouter,
 	dashboardRouter,
 	applicationsRouter,
-	servicesRouter
+	servicesRouter,
+	databasesRouter
 } from './routers';
 
 export const appRouter = router({
@@ -14,7 +15,8 @@ export const appRouter = router({
 	auth: authRouter,
 	dashboard: dashboardRouter,
 	applications: applicationsRouter,
-	services: servicesRouter
+	services: servicesRouter,
+	databases: databasesRouter
 });
 
 export type AppRouter = typeof appRouter;

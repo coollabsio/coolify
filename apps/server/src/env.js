@@ -1,5 +1,5 @@
 const dotenv = require('dotenv');
-const isDev = process.env.NODE_ENV === 'development';
+// const isDev = process.env.NODE_ENV === 'development';
 // dotenv.config({ path: isDev ? '../../.env' : '.env' });
 dotenv.config();
 const { z } = require('zod');

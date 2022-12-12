@@ -6,7 +6,7 @@
 	import { appSession } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { page } from '$app/stores';
-	import UpdateAvailable from '$lib/components/UpdateAvailable.svelte';
+	// import UpdateAvailable from '$lib/components/UpdateAvailable.svelte';
 	import Cookies from 'js-cookie';
 	import { errorNotification } from '$lib/common';
 	import Toasts from '$lib/components/Toasts.svelte';
@@ -346,7 +346,7 @@
 					</svg>
 					IAM {#if $appSession.pendingInvitations.length > 0}
 						<span class="indicator-item rounded-full badge badge-primary"
-							>{pendingInvitations.length}</span
+							>{$appSession.pendingInvitations.length}</span
 						>
 					{/if}
 				</a>

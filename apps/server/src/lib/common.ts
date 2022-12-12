@@ -68,8 +68,8 @@ export const decrypt = (hashString: string) => {
 	return false;
 };
 
-export function generateRangeArray(start, end) {
-	return Array.from({ length: end - start }, (v, k) => k + start);
+export function generateRangeArray(start: number, end: number) {
+	return Array.from({ length: end - start }, (_v, k) => k + start);
 }
 export function generateTimestamp(): string {
 	return `${day().format('HH:mm:ss.SSS')}`;
@@ -94,7 +94,7 @@ export async function getTemplates() {
 		let data = await open.readFile({ encoding: 'utf-8' });
 		let jsonData = JSON.parse(data);
 		if (isARM(process.arch)) {
-			jsonData = jsonData.filter((d) => d.arch !== 'amd64');
+			jsonData = jsonData.filter((d: { arch: string }) => d.arch !== 'amd64');
 		}
 		return jsonData;
 	} catch (error) {
@@ -108,4 +108,27 @@ export function isARM(arch: string) {
 		return true;
 	}
 	return false;
+}
+
+export async function removeService({ id }: { id: string }): Promise<void> {
+	await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
+	await prisma.serviceSetting.deleteMany({ where: { serviceId: id } });
+	await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });
+	await prisma.meiliSearch.deleteMany({ where: { serviceId: id } });
+	await prisma.fider.deleteMany({ where: { serviceId: id } });
+	await prisma.ghost.deleteMany({ where: { serviceId: id } });
+	await prisma.umami.deleteMany({ where: { serviceId: id } });
+	await prisma.hasura.deleteMany({ where: { serviceId: id } });
+	await prisma.plausibleAnalytics.deleteMany({ where: { serviceId: id } });
+	await prisma.minio.deleteMany({ where: { serviceId: id } });
+	await prisma.vscodeserver.deleteMany({ where: { serviceId: id } });
+	await prisma.wordpress.deleteMany({ where: { serviceId: id } });
+	await prisma.glitchTip.deleteMany({ where: { serviceId: id } });
+	await prisma.moodle.deleteMany({ where: { serviceId: id } });
+	await prisma.appwrite.deleteMany({ where: { serviceId: id } });
+	await prisma.searxng.deleteMany({ where: { serviceId: id } });
+	await prisma.weblate.deleteMany({ where: { serviceId: id } });
+	await prisma.taiga.deleteMany({ where: { serviceId: id } });
+
+	await prisma.service.delete({ where: { id } });
 }

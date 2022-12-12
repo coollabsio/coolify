@@ -1,5 +1,6 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
+	"exclude": ["node_modules/*", ".svelte-kit/*", "public/*"],
 	"compilerOptions": {
 		"allowJs": true,
 		"checkJs": true,
@@ -10,12 +11,8 @@
 		"sourceMap": true,
 		"strict": false,
 		"paths": {
-			"$lib": [
-				"src/lib"
-			],
-			"$lib/*": [
-				"src/lib/*"
-			],
+			"$lib": ["src/lib"],
+			"$lib/*": ["src/lib/*"]
 		}
 	}
 }
