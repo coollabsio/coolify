@@ -161,8 +161,6 @@
 			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
 				>Settings</Tooltip
 			>
-			<Tooltip triggeredBy="#documentation" placement="right" color="bg-info">Documentation</Tooltip
-			>
 			<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			<nav class="nav-main hidden lg:block z-20">
 				<div class="flex h-screen w-full flex-col items-center transition-all duration-100">
@@ -290,29 +288,6 @@
 									d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"
 								/>
 								<circle cx="12" cy="12" r="3" />
-							</svg>
-						</a>
-						<a
-							id="documentation"
-							sveltekit:prefetch
-							href="https://docs.coollabs.io/coolify/"
-							target="_blank"
-							rel="noopener noreferrer"
-							class="icons hover:text-info"
-						>
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								fill="none"
-								viewBox="0 0 24 24"
-								stroke-width="1.5"
-								stroke="currentColor"
-								class="w-9 h-9"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-								/>
 							</svg>
 						</a>
 
@@ -508,7 +483,7 @@
 					viewBox="0 0 24 24"
 					stroke-width="1.5"
 					stroke="currentColor"
-					class="w-8 h-8"
+					class="w-9 h-9"
 				>
 					<path
 						stroke-linecap="round"
