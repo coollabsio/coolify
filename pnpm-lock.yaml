@@ -163,9 +163,12 @@ importers:
       '@typescript-eslint/eslint-plugin': 5.44.0
       '@typescript-eslint/parser': 5.44.0
       autoprefixer: 10.4.13
+      cuid: 2.1.8
+      daisyui: 2.41.0
       eslint: 8.28.0
       eslint-config-prettier: 8.5.0
       eslint-plugin-svelte3: 4.0.0
+      flowbite-svelte: 0.28.0
       js-cookie: 3.0.1
       postcss: 8.4.19
       postcss-load-config: 4.0.1
@@ -183,6 +186,9 @@ importers:
     dependencies:
       '@trpc/client': 10.1.0_@trpc+server@10.1.0
       '@trpc/server': 10.1.0
+      cuid: 2.1.8
+      daisyui: 2.41.0_2lwn2upnx27dqeg6hqdu7sq75m
+      flowbite-svelte: 0.28.0
       js-cookie: 3.0.1
       server: link:../server
       superjson: 1.11.0
@@ -231,22 +237,34 @@ importers:
       '@prisma/client': 4.6.1
       '@trpc/client': 10.1.0
       '@trpc/server': 10.1.0
+      '@types/jsonwebtoken': ^8.5.9
       '@types/node': 18.11.9
       '@types/node-fetch': 2.6.2
+      '@types/shell-quote': ^1.7.1
       '@types/ws': 8.5.3
       abort-controller: 3.0.0
+      bcryptjs: 2.4.3
+      cuid: 2.1.8
+      dayjs: 1.11.6
+      dotenv: ^16.0.3
+      execa: 6.1.0
       fastify: 4.10.2
       fastify-plugin: 4.4.0
+      got: ^12.5.3
+      is-port-reachable: 4.0.0
       jsonwebtoken: 8.5.1
       node-fetch: 3.3.0
       npm-run-all: 4.1.5
       prisma: 4.6.1
       rimraf: 3.0.2
+      shell-quote: ^1.7.4
+      ssh-config: 4.1.6
       start-server-and-test: 1.14.0
       superjson: 1.11.0
       tslib: 2.4.1
       tsx: 3.12.1
       typescript: 4.9.3
+      unique-names-generator: 4.7.1
       wait-port: 1.0.4
       ws: 8.11.0
       zod: 3.19.1
@@ -261,18 +279,30 @@ importers:
       '@trpc/client': 10.1.0_@trpc+server@10.1.0
       '@trpc/server': 10.1.0
       abort-controller: 3.0.0
+      bcryptjs: 2.4.3
+      cuid: 2.1.8
+      dayjs: 1.11.6
+      dotenv: 16.0.3
+      execa: 6.1.0
       fastify: 4.10.2
       fastify-plugin: 4.4.0
+      got: 12.5.3
+      is-port-reachable: 4.0.0
       jsonwebtoken: 8.5.1
       node-fetch: 3.3.0
       prisma: 4.6.1
+      shell-quote: 1.7.4
+      ssh-config: 4.1.6
       superjson: 1.11.0
       tslib: 2.4.1
+      unique-names-generator: 4.7.1
       ws: 8.11.0
       zod: 3.19.1
     devDependencies:
+      '@types/jsonwebtoken': 8.5.9
       '@types/node': 18.11.9
       '@types/node-fetch': 2.6.2
+      '@types/shell-quote': 1.7.1
       '@types/ws': 8.5.3
       npm-run-all: 4.1.5
       rimraf: 3.0.2
@@ -1716,7 +1746,6 @@ packages:
 
   /@popperjs/core/2.11.6:
     resolution: {integrity: sha512-50/17A98tWUfQ176raKiOGXuYpLyyVMkxxG6oylzL3BPOlA6ADGdK7EYunSa4I064xerltq9TGXs8HmOk5E+vw==}
-    dev: true
 
   /@prisma/client/4.6.1_prisma@4.6.1:
     resolution: {integrity: sha512-M1+NNrMzqaOIxT7PBGcTs3IZo7d1EW/+gVQd4C4gUgWBDGgD9AcIeZnUSidgWClmpMSgVUdnVORjsWWGUameYA==}
@@ -2040,6 +2069,12 @@ packages:
     resolution: {integrity: sha512-wOuvG1SN4Us4rez+tylwwwCV1psiNVOkJeM3AUWUNWg/jDQY2+HE/444y5gc+jBmRqASOm2Oeh5c1axHobwRKQ==}
     dev: true
 
+  /@types/jsonwebtoken/8.5.9:
+    resolution: {integrity: sha512-272FMnFGzAVMGtu9tkr29hRL6bZj4Zs1KZNeHLnKqAvp06tAIcarTMwOh8/8bz4FmKRcMxZhZNeUAQsNLoiPhg==}
+    dependencies:
+      '@types/node': 18.11.9
+    dev: true
+
   /@types/keyv/3.1.4:
     resolution: {integrity: sha512-BQ5aZNSCpj7D6K2ksrRCTmKRLEpnPvWDiLPfoGyhZ++8YtiK9d/3DBKPJgry359X/P1PfruyYwvnvwFjuEiEIg==}
     dependencies:
@@ -2098,6 +2133,10 @@ packages:
 
   /@types/semver/7.3.12:
     resolution: {integrity: sha512-WwA1MW0++RfXmCr12xeYOOC5baSC9mSb0ZqCquFzKhcoF4TvHu5MKOuXsncgZcpVFhB1pXd5hZmM0ryAoCp12A==}
+    dev: true
+
+  /@types/shell-quote/1.7.1:
+    resolution: {integrity: sha512-SWZ2Nom1pkyXCDohRSrkSKvDh8QOG9RfAsrt5/NsPQC4UQJ55eG0qClA40I+Gkez4KTQ0uDUT8ELRXThf3J5jw==}
     dev: true
 
   /@types/which/2.0.1:
@@ -3454,7 +3493,6 @@ packages:
 
   /classnames/2.3.2:
     resolution: {integrity: sha512-CSbhY4cFEJRe6/GQzIk5qXZ4Jeg5pcsP7b5peFSDpffpe1cqjASH/n9UTjBwOp6XpMSTwQ8Za2K5V02ueA7Tmw==}
-    dev: true
 
   /clean-stack/4.2.0:
     resolution: {integrity: sha512-LYv6XPxoyODi36Dp976riBtSY27VmFo+MKqEU9QCCWyTrdEPDog+RWA7xQWHi6Vbp61j5c4cdzzX1NidnwtUWg==}
@@ -4801,14 +4839,12 @@ packages:
       '@popperjs/core': 2.11.6
       classnames: 2.3.2
       flowbite: 1.5.4
-    dev: true
 
   /flowbite/1.5.4:
     resolution: {integrity: sha512-A4VTeJE+aHSbwrMzWvpTADhNgX8Njpb3DqRL26pFkOupklPg8cmNstZK8cXrFnBPxomOiX/OazZnhQM1BIZADQ==}
     dependencies:
       '@popperjs/core': 2.11.6
       mini-svg-data-uri: 1.4.4
-    dev: true
 
   /follow-redirects/1.15.2_debug@4.3.2:
     resolution: {integrity: sha512-VQLG33o04KaQ8uYi2tVNbdrWp1QWxNNea+nmIB4EVM28v0hmP17z7aG1+wAkNzVq4KeXTq3221ye5qTJP91JwA==}
@@ -5997,7 +6033,6 @@ packages:
   /mini-svg-data-uri/1.4.4:
     resolution: {integrity: sha512-r9deDe9p5FJUPZAk3A59wGH7Ii9YrjjWw0jmw/liSbHl2CHiyXj6FcDXDu2K3TjVAXqiJdaw3xxwlZZr9E6nHg==}
     hasBin: true
-    dev: true
 
   /minimalistic-assert/1.0.1:
     resolution: {integrity: sha512-UtJcAD4yEaGtjPezWuO9wC4nwUnVH/8/Im3yEHQP4b67cXlD/Qr9hdITCU1xDbSEXg2XKNaP8jsReV7vQd00/A==}

@@ -37,9 +37,12 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"js-cookie": "3.0.1",
 		"@trpc/client": "10.1.0",
 		"@trpc/server": "10.1.0",
+		"cuid": "2.1.8",
+		"daisyui": "2.41.0",
+		"flowbite-svelte": "0.28.0",
+		"js-cookie": "3.0.1",
 		"server": "workspace:*",
 		"superjson": "1.11.0"
 	}

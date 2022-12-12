@@ -17,3 +17,7 @@ logs
 others/certificates
 backups/*
 !backups/.gitkeep
+
+# Trpc
+apps/server/db/*.db
+apps/server/db/*.db-journal
