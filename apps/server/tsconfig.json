@@ -1,0 +1,43 @@
+{
+  "include": ["src", "server/src/config.ts"],
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "module": "commonjs",
+    "target": "esnext",
+    "outDir": "dist",
+
+    // [ Basics ]
+    "strict": true,
+    "checkJs": true,
+    "sourceMap": true,
+    "importHelpers": true,
+    "removeComments": true,
+    // "rootDir": "./",
+    // "declaration": true,
+    // "declarationMap": true,
+    // "declarationDir": "types",
+
+    // [ Additional Checks ]
+    "noUnusedLocals": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    "noImplicitOverride": true,
+    "allowUnreachableCode": false,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+
+    // [ Module Resolution ]
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+
+    // [ Advanced ]
+    // "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // [ Build ]
+    "listFiles": false,
+    "listEmittedFiles": true
+  }
+}

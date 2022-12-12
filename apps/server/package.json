@@ -1,0 +1,56 @@
+{
+	"name": "server",
+	"description": "Coolify's Fastify API",
+	"license": "Apache-2.0",
+	"scripts": {
+		"build": "rimraf ../../build && tsc --outDir ../../build",
+		"dev": "tsx watch --clear-screen=false src",
+		"lint": "prettier --plugin-search-dir . --check . && eslint .",
+		"format": "prettier --plugin-search-dir . --write .",
+		"test-dev": "start-server-and-test 'tsx src/server' http-get://localhost:2022 'tsx src/client'",
+		"test-start": "start-server-and-test 'node dist/server' http-get://localhost:2022 'node dist/client'",
+		"db:generate": "prisma generate",
+		"db:push": "prisma db push && prisma generate",
+		"db:seed": "prisma db seed",
+		"db:studio": "prisma studio",
+		"db:migrate": "DATABASE_URL=file:../db/migration.db prisma migrate dev --skip-seed --name"
+	},
+	"dependencies": {
+		"jsonwebtoken": "8.5.1",
+		"@fastify/autoload": "5.6.0",
+		"@fastify/cors": "8.2.0",
+		"@fastify/env": "4.1.0",
+		"@fastify/jwt": "6.5.0",
+		"@fastify/static": "6.6.0",
+		"@fastify/websocket": "7.1.1",
+		"@prisma/client": "4.6.1",
+		"@trpc/client": "10.1.0",
+		"@trpc/server": "10.1.0",
+		"abort-controller": "3.0.0",
+		"fastify": "4.10.2",
+		"fastify-plugin": "4.4.0",
+		"node-fetch": "3.3.0",
+		"prisma": "4.6.1",
+		"superjson": "1.11.0",
+		"tslib": "2.4.1",
+		"ws": "8.11.0",
+		"zod": "3.19.1"
+	},
+	"devDependencies": {
+		"@types/node": "18.11.9",
+		"@types/node-fetch": "2.6.2",
+		"@types/ws": "8.5.3",
+		"npm-run-all": "4.1.5",
+		"rimraf": "3.0.2",
+		"start-server-and-test": "1.14.0",
+		"tsx": "3.12.1",
+		"typescript": "4.9.3",
+		"wait-port": "1.0.4"
+	},
+	"publishConfig": {
+		"access": "restricted"
+	},
+	"prisma": {
+		"seed": "tsx prisma/seed.ts"
+	}
+}
