@@ -157,6 +157,8 @@
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
 	<div class="drawer-content">
 		{#if $appSession.userId}
+			<Tooltip triggeredBy="#dashboard" placement="right" color="bg-pink-500">Dashboard</Tooltip>
+			<Tooltip triggeredBy="#servers" placement="right" color="bg-sky-500">Servers</Tooltip>
 			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
 			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
 				>Settings</Tooltip
@@ -229,8 +231,6 @@
 							</a>
 						{/if}
 					</div>
-					<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
-					<Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
 					<div class="flex-1" />
 					<div class="lg:block hidden">
 						<UpdateAvailable />
@@ -468,30 +468,6 @@
 						<circle cx="12" cy="12" r="3" />
 					</svg>
 					Settings
-				</a>
-			</li>
-			<li>
-				<a
-					class="no-underline icons hover:text-white hover:bg-info"
-					href="https://docs.coollabs.io/coolify/"
-					target="_blank"
-					rel="noopener noreferrer"
-				>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					fill="none"
-					viewBox="0 0 24 24"
-					stroke-width="1.5"
-					stroke="currentColor"
-					class="w-8 h-8"
-				>
-					<path
-						stroke-linecap="round"
-						stroke-linejoin="round"
-						d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
-					/>
-				</svg>
-					Documentation
 				</a>
 			</li>
 			<li class="flex-1 bg-transparent" />
