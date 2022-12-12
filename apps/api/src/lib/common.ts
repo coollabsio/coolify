@@ -686,6 +686,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			command: `docker run --restart always \
 			--add-host 'host.docker.internal:host-gateway' \
 			${ip ? `--add-host 'host.docker.internal:${ip}'` : ''} \
+			-v coolify-traefik-dynamic-config:/etc/traefik/dynamic \
 			-v coolify-traefik-letsencrypt:/etc/traefik/acme \
 			-v /var/run/docker.sock:/var/run/docker.sock \
 			--network coolify-infra \
@@ -701,6 +702,8 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--providers.docker.exposedbydefault=false \
 			--providers.http.endpoint=${traefikUrl} \
 			--providers.http.pollTimeout=5s \
+			--providers.file.directory=/etc/traefik/dynamic \
+			--providers.file.watch=true \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
