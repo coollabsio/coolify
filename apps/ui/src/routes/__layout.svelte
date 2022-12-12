@@ -135,6 +135,10 @@
 			});
 		}
 	});
+
+	let sidedrawerToggler: HTMLInputElement;
+
+	const closeDrawer = () => (sidedrawerToggler.checked = false);
 </script>
 
 <svelte:head>
@@ -154,7 +158,7 @@
 {/if}
 
 <div class="drawer">
-	<input id="main-drawer" type="checkbox" class="drawer-toggle" />
+	<input id="main-drawer" type="checkbox" class="drawer-toggle" bind:this={sidedrawerToggler} />
 	<div class="drawer-content">
 		{#if $appSession.userId}
 			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
@@ -368,6 +372,7 @@
 					sveltekit:prefetch
 					href="/"
 					class:bg-pink-500={$page.url.pathname === '/'}
+					on:click={closeDrawer}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -396,6 +401,7 @@
 					sveltekit:prefetch
 					href="/servers"
 					class:bg-sky-500={$page.url.pathname.startsWith('/servers')}
+					on:click={closeDrawer}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -421,6 +427,7 @@
 					class="no-underline icons hover:text-white hover:bg-iam"
 					href="/iam"
 					class:bg-iam={$page.url.pathname.startsWith('/iam')}
+					on:click={closeDrawer}
 					><svg
 						xmlns="http://www.w3.org/2000/svg"
 						viewBox="0 0 24 24"
@@ -450,6 +457,7 @@
 					href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/ssh'}
 					class:bg-settings={$page.url.pathname.startsWith('/settings')}
 					class:text-black={$page.url.pathname.startsWith('/settings')}
+					on:click={closeDrawer}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
