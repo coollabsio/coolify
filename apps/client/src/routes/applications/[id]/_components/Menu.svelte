@@ -2,9 +2,7 @@
 	export let application: any;
 	import { status } from '$lib/store';
 	import { page } from '$app/stores';
-	import GitlabIcon from '$lib/components/svg/sources/GitlabIcon.svelte';
-	import GithubIcon from '$lib/components/svg/sources/GithubIcon.svelte';
-	import RemoteLink from '$lib/components/svg/RemoteLink.svelte';
+	import * as Icons from '$lib/components/svg';
 </script>
 
 <ul class="menu border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4">
@@ -20,11 +18,11 @@
 				class="no-underline"
 			>
 				{#if application.gitSource?.type === 'gitlab'}
-					<GithubIcon small={true} />
+					<Icons.Sources.Github small={true} />
 				{:else if application.gitSource?.type === 'github'}
-					<GitlabIcon small={true} />
+					<Icons.Sources.Gitlab small={true} />
 				{/if}
-				Open on Git <RemoteLink />
+				Open on Git <Icons.RemoteLink />
 			</a>
 		</li>
 	{/if}

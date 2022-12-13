@@ -10,8 +10,9 @@
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
-	import NewResource from '$lib/components/NewResource.svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	
+	import NewResource from './_components/NewResource.svelte';
 
 	const {
 		applications,
