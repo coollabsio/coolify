@@ -1,157 +1,85 @@
-import { z } from 'zod';
-import { privateProcedure, router } from '../trpc';
-import { decrypt, isARM } from '../../lib/common';
-import { prisma } from '../../prisma';
-import { executeCommand } from '../../lib/executeCommand';
-import { checkContainer, removeContainer } from '../../lib/docker';
+import cuid from 'cuid';
+import crypto from 'node:crypto';
+import { decrypt, isARM } from '../../../lib/common';
 
-export const applicationsRouter = router({
-	status: privateProcedure.input(z.object({ id: z.string() })).query(async ({ ctx, input }) => {
-		const id: string = input.id;
-		const teamId = ctx.user?.teamId;
-		if (!teamId) {
-			throw { status: 400, message: 'Team not found.' };
+import { prisma } from '../../../prisma';
+
+export async function deployApplication(
+	id: string,
+	teamId: string,
+	forceRebuild: boolean = false
+): Promise<string | Error> {
+	const buildId = cuid();
+	const application = await getApplicationFromDB(id, teamId);
+	if (application) {
+		if (!application?.configHash) {
+			await generateConfigHash(
+				id,
+				application.buildPack,
+				application.port,
+				application.exposePort,
+				application.installCommand,
+				application.buildCommand,
+				application.startCommand
+			);
 		}
-		let payload = [];
-		const application: any = await getApplicationFromDB(id, teamId);
-		if (application?.destinationDockerId) {
-			if (application.buildPack === 'compose') {
-				const { stdout: containers } = await executeCommand({
-					dockerId: application.destinationDocker.id,
-					command: `docker ps -a --filter "label=coolify.applicationId=${id}" --format '{{json .}}'`
-				});
-				const containersArray = containers.trim().split('\n');
-				if (containersArray.length > 0 && containersArray[0] !== '') {
-					for (const container of containersArray) {
-						let isRunning = false;
-						let isExited = false;
-						let isRestarting = false;
-						const containerObj = JSON.parse(container);
-						const status = containerObj.State;
-						if (status === 'running') {
-							isRunning = true;
-						}
-						if (status === 'exited') {
-							isExited = true;
-						}
-						if (status === 'restarting') {
-							isRestarting = true;
-						}
-						payload.push({
-							name: containerObj.Names,
-							status: {
-								isRunning,
-								isExited,
-								isRestarting
-							}
-						});
-					}
+		await prisma.application.update({ where: { id }, data: { updatedAt: new Date() } });
+		if (application.gitSourceId) {
+			await prisma.build.create({
+				data: {
+					id: buildId,
+					applicationId: id,
+					branch: application.branch,
+					forceRebuild,
+					destinationDockerId: application.destinationDocker?.id,
+					gitSourceId: application.gitSource?.id,
+					githubAppId: application.gitSource?.githubApp?.id,
+					gitlabAppId: application.gitSource?.gitlabApp?.id,
+					status: 'queued',
+					type: 'manual'
 				}
-			} else {
-				let isRunning = false;
-				let isExited = false;
-				let isRestarting = false;
-				const status = await checkContainer({
-					dockerId: application.destinationDocker.id,
-					container: id
-				});
-				if (status?.found) {
-					isRunning = status.status.isRunning;
-					isExited = status.status.isExited;
-					isRestarting = status.status.isRestarting;
-					payload.push({
-						name: id,
-						status: {
-							isRunning,
-							isExited,
-							isRestarting
-						}
-					});
-				}
-			}
-		}
-		return payload;
-	}),
-	cleanup: privateProcedure.query(async ({ ctx }) => {
-		const teamId = ctx.user?.teamId;
-		let applications = await prisma.application.findMany({
-			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
-			include: { settings: true, destinationDocker: true, teams: true }
-		});
-		for (const application of applications) {
-			if (
-				!application.buildPack ||
-				!application.destinationDockerId ||
-				!application.branch ||
-				(!application.settings?.isBot && !application?.fqdn)
-			) {
-				if (application?.destinationDockerId && application.destinationDocker?.network) {
-					const { stdout: containers } = await executeCommand({
-						dockerId: application.destinationDocker.id,
-						command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${application.id} --format '{{json .}}'`
-					});
-					if (containers) {
-						const containersArray = containers.trim().split('\n');
-						for (const container of containersArray) {
-							const containerObj = JSON.parse(container);
-							const id = containerObj.ID;
-							await removeContainer({ id, dockerId: application.destinationDocker.id });
-						}
-					}
-				}
-				await prisma.applicationSettings.deleteMany({ where: { applicationId: application.id } });
-				await prisma.buildLog.deleteMany({ where: { applicationId: application.id } });
-				await prisma.build.deleteMany({ where: { applicationId: application.id } });
-				await prisma.secret.deleteMany({ where: { applicationId: application.id } });
-				await prisma.applicationPersistentStorage.deleteMany({
-					where: { applicationId: application.id }
-				});
-				await prisma.applicationConnectedDatabase.deleteMany({
-					where: { applicationId: application.id }
-				});
-				await prisma.application.deleteMany({ where: { id: application.id } });
-			}
-		}
-		return {};
-	}),
-	delete: privateProcedure
-		.input(z.object({ force: z.boolean(), id: z.string() }))
-		.mutation(async ({ ctx, input }) => {
-			const { id, force } = input;
-			const teamId = ctx.user?.teamId;
-			const application = await prisma.application.findUnique({
-				where: { id },
-				include: { destinationDocker: true }
 			});
-			if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
-				const { stdout: containers } = await executeCommand({
-					dockerId: application.destinationDocker.id,
-					command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`
-				});
-				if (containers) {
-					const containersArray = containers.trim().split('\n');
-					for (const container of containersArray) {
-						const containerObj = JSON.parse(container);
-						const id = containerObj.ID;
-						await removeContainer({ id, dockerId: application.destinationDocker.id });
-					}
+		} else {
+			await prisma.build.create({
+				data: {
+					id: buildId,
+					applicationId: id,
+					branch: 'latest',
+					forceRebuild,
+					destinationDockerId: application.destinationDocker?.id,
+					status: 'queued',
+					type: 'manual'
 				}
-			}
-			await prisma.applicationSettings.deleteMany({ where: { application: { id } } });
-			await prisma.buildLog.deleteMany({ where: { applicationId: id } });
-			await prisma.build.deleteMany({ where: { applicationId: id } });
-			await prisma.secret.deleteMany({ where: { applicationId: id } });
-			await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
-			await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
-			if (teamId === '0') {
-				await prisma.application.deleteMany({ where: { id } });
-			} else {
-				await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
-			}
-			return {};
-		})
-});
-
+			});
+		}
+		return buildId;
+	}
+	throw { status: 500, message: 'Application cannot be deployed.' };
+}
+export async function generateConfigHash(
+	id: string,
+	buildPack: string,
+	port: number,
+	exposePort: number,
+	installCommand: string,
+	buildCommand: string,
+	startCommand: string
+): Promise<any> {
+	const configHash = crypto
+		.createHash('sha256')
+		.update(
+			JSON.stringify({
+				buildPack,
+				port,
+				exposePort,
+				installCommand,
+				buildCommand,
+				startCommand
+			})
+		)
+		.digest('hex');
+	return await prisma.application.update({ where: { id }, data: { configHash } });
+}
 export async function getApplicationFromDB(id: string, teamId: string) {
 	let application = await prisma.application.findFirst({
 		where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },

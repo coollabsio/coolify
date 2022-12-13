@@ -23,7 +23,7 @@ export async function executeCommand({
 	sshCommand?: boolean;
 	shell?: boolean;
 	stream?: boolean;
-	dockerId?: string;
+	dockerId?: string | null;
 	buildId?: string;
 	applicationId?: string;
 	debug?: boolean;
@@ -31,8 +31,8 @@ export async function executeCommand({
 	const { execa, execaCommand } = await import('execa');
 	const { parse } = await import('shell-quote');
 	const parsedCommand = parse(command);
-	const dockerCommand = parsedCommand[0]?.toString();
-	const dockerArgs = parsedCommand.slice(1).toString();
+	const dockerCommand = parsedCommand[0];
+	const dockerArgs = parsedCommand.slice(1);
 
 	if (dockerId && dockerCommand && dockerArgs) {
 		const destinationDocker = await prisma.destinationDocker.findUnique({
@@ -41,14 +41,12 @@ export async function executeCommand({
 		if (!destinationDocker) {
 			throw new Error('Destination docker not found');
 		}
-		let {
-			remoteEngine,
-			remoteIpAddress,
-			engine = 'unix:///var/run/docker.sock'
-		} = destinationDocker;
+		let { remoteEngine, remoteIpAddress, engine } = destinationDocker;
 		if (remoteEngine) {
 			await createRemoteEngineConfiguration(dockerId);
 			engine = `ssh://${remoteIpAddress}-remote`;
+		} else {
+			engine = 'unix:///var/run/docker.sock';
 		}
 
 		if (env.CODESANDBOX_HOST) {
@@ -60,16 +58,19 @@ export async function executeCommand({
 			if (shell) {
 				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`);
 			}
+			//@ts-ignore
 			return await execa('ssh', [`${remoteIpAddress}-remote`, dockerCommand, ...dockerArgs]);
 		}
 		if (stream) {
 			return await new Promise(async (resolve, reject) => {
 				let subprocess = null;
 				if (shell) {
+					//@ts-ignore
 					subprocess = execaCommand(command, {
 						env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 					});
 				} else {
+					//@ts-ignore
 					subprocess = execa(dockerCommand, dockerArgs, {
 						env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 					});
@@ -112,7 +113,8 @@ export async function executeCommand({
 					});
 					subprocess.on('exit', async (code: number) => {
 						if (code === 0) {
-							resolve('success');
+							//@ts-ignore
+							resolve(code);
 						} else {
 							if (!debug) {
 								for (const log of logs) {
@@ -127,9 +129,11 @@ export async function executeCommand({
 		} else {
 			if (shell) {
 				return await execaCommand(command, {
+					//@ts-ignore
 					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
 			} else {
+				//@ts-ignore
 				return await execa(dockerCommand, dockerArgs, {
 					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
@@ -139,6 +143,7 @@ export async function executeCommand({
 		if (shell) {
 			return execaCommand(command, { shell: true });
 		}
+		//@ts-ignore
 		return await execa(dockerCommand, dockerArgs);
 	}
 }

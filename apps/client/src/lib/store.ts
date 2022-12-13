@@ -114,3 +114,28 @@ export const isUpdateAvailable: Writable<boolean> = writable(false);
 export const latestVersion: Writable<string> = writable('latest');
 export const loginEmail: Writable<string | undefined> = writable();
 export const search: any = writable('');
+
+export const isDeploymentEnabled: Writable<boolean> = writable(false);
+export const status: Writable<any> = writable({
+	application: {
+		statuses: [],
+		overallStatus: 'stopped',
+		loading: false,
+		restarting: false,
+		initialLoading: true
+	},
+	service: {
+		statuses: [],
+		overallStatus: 'stopped',
+		loading: false,
+		startup: {},
+		initialLoading: true
+	},
+	database: {
+		isRunning: false,
+		isExited: false,
+		loading: false,
+		initialLoading: true,
+		isPublic: false
+	}
+});

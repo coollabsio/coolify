@@ -122,3 +122,36 @@ export async function stopTcpHttpProxy(
 		return error;
 	}
 }
+
+export function formatLabelsOnDocker(data: any) {
+	return data
+		.trim()
+		.split('\n')
+		.map((a) => JSON.parse(a))
+		.map((container) => {
+			const labels = container.Labels.split(',');
+			let jsonLabels = {};
+			labels.forEach((l) => {
+				const name = l.split('=')[0];
+				const value = l.split('=')[1];
+				jsonLabels = { ...jsonLabels, ...{ [name]: value } };
+			});
+			container.Labels = jsonLabels;
+			return container;
+		});
+}
+
+export function defaultComposeConfiguration(network: string): any {
+	return {
+		networks: [network],
+		restart: 'on-failure',
+		deploy: {
+			restart_policy: {
+				condition: 'on-failure',
+				delay: '5s',
+				max_attempts: 10,
+				window: '120s'
+			}
+		}
+	};
+}

@@ -29,5 +29,5 @@ const isAdmin = t.middleware(async ({ ctx, next }) => {
 	});
 });
 export const router = t.router;
-export const privateProcedure = t.procedure.use(isAdmin).use(logger);
-export const publicProcedure = t.procedure.use(logger);
+export const privateProcedure = t.procedure.use(isAdmin);
+export const publicProcedure = t.procedure;

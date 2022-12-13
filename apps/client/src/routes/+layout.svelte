@@ -1,6 +1,6 @@
 <script lang="ts">
-	export let data: PageData;
-	import type { PageData } from './$types';
+	export let data: LayoutData;
+	import type { LayoutData } from './$types';
 
 	import '../app.postcss';
 	import { appSession } from '$lib/store';
@@ -12,11 +12,12 @@
 	import Toasts from '$lib/components/Toasts.svelte';
 
 	let sidedrawerToggler: HTMLInputElement;
-
-	$appSession = {
-		...$appSession,
-		...data.data
-	};
+	if (data.settings.success) {
+		$appSession = {
+			...$appSession,
+			...data.settings.data
+		};
+	}
 
 	const closeDrawer = () => (sidedrawerToggler.checked = false);
 	async function logout() {

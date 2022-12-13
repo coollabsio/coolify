@@ -240,6 +240,7 @@ importers:
       '@trpc/client': 10.1.0
       '@trpc/server': 10.1.0
       '@types/bcryptjs': ^2.4.2
+      '@types/js-yaml': ^4.0.5
       '@types/jsonwebtoken': ^8.5.9
       '@types/node': 18.11.9
       '@types/node-fetch': 2.6.2
@@ -255,6 +256,7 @@ importers:
       fastify-plugin: 4.4.0
       got: ^12.5.3
       is-port-reachable: 4.0.0
+      js-yaml: 4.1.0
       jsonwebtoken: 8.5.1
       node-fetch: 3.3.0
       npm-run-all: 4.1.5
@@ -291,6 +293,7 @@ importers:
       fastify-plugin: 4.4.0
       got: 12.5.3
       is-port-reachable: 4.0.0
+      js-yaml: 4.1.0
       jsonwebtoken: 8.5.1
       node-fetch: 3.3.0
       prisma: 4.6.1
@@ -303,6 +306,7 @@ importers:
       zod: 3.19.1
     devDependencies:
       '@types/bcryptjs': 2.4.2
+      '@types/js-yaml': 4.0.5
       '@types/jsonwebtoken': 8.5.9
       '@types/node': 18.11.9
       '@types/node-fetch': 2.6.2
@@ -2067,6 +2071,10 @@ packages:
 
   /@types/js-cookie/3.0.2:
     resolution: {integrity: sha512-6+0ekgfusHftJNYpihfkMu8BWdeHs9EOJuGcSofErjstGPfPGEu9yTu4t460lTzzAMl2cM5zngQJqPMHbbnvYA==}
+    dev: true
+
+  /@types/js-yaml/4.0.5:
+    resolution: {integrity: sha512-FhpRzf927MNQdRZP0J5DLIdTXhjLYzeUTmLAu69mnVksLH9CJY3IuSeEgbKUki7GQZm0WqDkGzyxju2EZGD2wA==}
     dev: true
 
   /@types/json-buffer/3.0.0:

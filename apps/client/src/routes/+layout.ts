@@ -7,11 +7,14 @@ export const ssr = false;
 
 export const load: LayoutLoad = async ({ url }) => {
 	const { pathname } = new URL(url);
-	const baseSettings = await t.settings.getBaseSettings.query();
+
 	try {
 		if (pathname === '/login' || pathname === '/register') {
+			const baseSettings = await t.settings.getBaseSettings.query();
 			return {
-				...baseSettings
+				settings: {
+					...baseSettings
+				}
 			};
 		}
 		const settings = await t.settings.getInstanceSettings.query();
@@ -19,8 +22,9 @@ export const load: LayoutLoad = async ({ url }) => {
 			Cookies.set('token', settings.data.token);
 		}
 		return {
-			...baseSettings,
-			...settings
+			settings: {
+				...settings
+			}
 		};
 	} catch (err) {
 		if (err?.data?.httpStatus == 401) {

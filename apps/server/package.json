@@ -35,6 +35,7 @@
 		"fastify-plugin": "4.4.0",
 		"got": "^12.5.3",
 		"is-port-reachable": "4.0.0",
+		"js-yaml": "4.1.0",
 		"jsonwebtoken": "8.5.1",
 		"node-fetch": "3.3.0",
 		"prisma": "4.6.1",
@@ -47,11 +48,12 @@
 		"zod": "3.19.1"
 	},
 	"devDependencies": {
+		"@types/bcryptjs": "^2.4.2",
+		"@types/js-yaml": "^4.0.5",
 		"@types/jsonwebtoken": "^8.5.9",
 		"@types/node": "18.11.9",
 		"@types/node-fetch": "2.6.2",
 		"@types/shell-quote": "^1.7.1",
-		"@types/bcryptjs": "^2.4.2",
 		"@types/ws": "8.5.3",
 		"npm-run-all": "4.1.5",
 		"rimraf": "3.0.2",

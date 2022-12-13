@@ -7,6 +7,7 @@ import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-
 import type { Config } from 'unique-names-generator';
 import { env } from '../env';
 import { day } from './dayjs';
+import { executeCommand } from './executeCommand';
 
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -131,4 +132,52 @@ export async function removeService({ id }: { id: string }): Promise<void> {
 	await prisma.taiga.deleteMany({ where: { serviceId: id } });
 
 	await prisma.service.delete({ where: { id } });
+}
+
+export const createDirectories = async ({
+	repository,
+	buildId
+}: {
+	repository: string;
+	buildId: string;
+}): Promise<{ workdir: string; repodir: string }> => {
+	if (repository) repository = repository.replaceAll(' ', '');
+	const repodir = `/tmp/build-sources/${repository}/`;
+	const workdir = `/tmp/build-sources/${repository}/${buildId}`;
+	let workdirFound = false;
+	try {
+		workdirFound = !!(await fs.stat(workdir));
+	} catch (error) {}
+	if (workdirFound) {
+		await executeCommand({ command: `rm -fr ${workdir}` });
+	}
+	await executeCommand({ command: `mkdir -p ${workdir}` });
+	return {
+		workdir,
+		repodir
+	};
+};
+
+export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
+	if (!username || !password) {
+		return null;
+	}
+
+	let decryptedPassword = decrypt(password);
+	const location = `${workdir}/.docker`;
+
+	try {
+		await fs.mkdir(`${workdir}/.docker`);
+	} catch (error) {
+		console.log(error);
+	}
+	const payload = JSON.stringify({
+		auths: {
+			[url]: {
+				auth: Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
+			}
+		}
+	});
+	await fs.writeFile(`${location}/config.json`, payload);
+	return location;
 }
