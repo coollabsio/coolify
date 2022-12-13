@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Icons from '$lib/components/svg/databases';
+	import * as Icons from '$lib/components/icons/databases';
 	export let type: any;
 	export let isAbsolute = false;
 </script>

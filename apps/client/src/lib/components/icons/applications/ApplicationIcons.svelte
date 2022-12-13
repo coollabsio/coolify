@@ -1,5 +1,5 @@
 <script lang="ts">
-	import * as Icons from '$lib/components/svg/applications';
+	import * as Icons from '$lib/components/icons/applications';
 	export let application: any;
 	export let isAbsolute = true;
 </script>

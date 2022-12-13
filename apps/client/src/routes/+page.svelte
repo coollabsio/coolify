@@ -7,11 +7,10 @@
 
 	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { appSession, search, trpc } from '$lib/store';
-	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
-	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
-	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
-	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
-	
+	import ApplicationsIcons from '$lib/components/icons/applications/ApplicationIcons.svelte';
+	import DatabaseIcons from '$lib/components/icons/databases/DatabaseIcons.svelte';
+	import ServiceIcons from '$lib/components/icons/services/ServiceIcons.svelte';
+	import * as Icons from '$lib/components/icons';
 	import NewResource from './_components/NewResource.svelte';
 
 	const {
@@ -769,7 +768,7 @@
 										<button
 											class="icons hover:bg-green-500"
 											on:click|stopPropagation|preventDefault={() =>
-												deleteApplication(application.id)}><DeleteIcon /></button
+												deleteApplication(application.id)}><Icons.Delete /></button
 										>
 									</div>
 								</div>
@@ -882,7 +881,7 @@
 									<button
 										class="icons hover:bg-green-500"
 										on:click|stopPropagation|preventDefault={() =>
-											deleteApplication(application.id)}><DeleteIcon /></button
+											deleteApplication(application.id)}><Icons.Delete /></button
 									>
 								</div>
 							</div>
@@ -977,7 +976,7 @@
 											<button
 												class="icons hover:bg-pink-500"
 												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
-												><DeleteIcon /></button
+												><Icons.Delete /></button
 											>
 										</div>
 									</div>
@@ -1063,7 +1062,7 @@
 										<button
 											class="icons hover:bg-pink-500"
 											on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
-											><DeleteIcon /></button
+											><Icons.Delete /></button
 										>
 									</div>
 								</div>
@@ -1159,7 +1158,7 @@
 											<button
 												class="icons hover:bg-databases-100"
 												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
-												><DeleteIcon /></button
+												><Icons.Delete /></button
 											>
 										</div>
 									</div>
@@ -1245,7 +1244,7 @@
 										<button
 											class="icons hover:bg-databases"
 											on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
-											><DeleteIcon /></button
+											><Icons.Delete /></button
 										>
 									</div>
 								</div>
