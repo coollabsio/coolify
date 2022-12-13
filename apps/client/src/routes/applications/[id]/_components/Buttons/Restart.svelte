@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { errorNotification } from '$lib/common';
 	export let id: string;
-	import { t } from '$lib/store';
+	import { trpc } from '$lib/store';
 
 	async function handleSubmit() {
 		try {
-			return await t.applications.restart.mutate({ id });
-		} catch(error) {
+			return await trpc.applications.restart.mutate({ id });
+		} catch (error) {
 			return errorNotification(error);
 		}
 	}

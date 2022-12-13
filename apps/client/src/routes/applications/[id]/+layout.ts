@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { t } from '$lib/store';
+import { trpc } from '$lib/store';
 import type { LayoutLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 
@@ -27,7 +27,7 @@ export const load: LayoutLoad = async ({ params, url }) => {
 	const { pathname } = new URL(url);
 	const { id } = params;
 	try {
-		const application = await t.applications.getApplicationById.query({ id });
+		const application = await trpc.applications.getApplicationById.query({ id });
 		if (!application) {
 			throw redirect(307, '/applications');
 		}

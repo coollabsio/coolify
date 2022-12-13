@@ -2,16 +2,16 @@
 	import { createEventDispatcher } from 'svelte';
 
 	import { errorNotification } from '$lib/common';
-	import { t } from '$lib/store';
+	import { trpc } from '$lib/store';
 
 	export let id: string;
 
 	const dispatch = createEventDispatcher();
-	
+
 	async function handleSubmit() {
 		try {
 			dispatch('stopping');
-			await t.applications.stop.mutate({ id });
+			await trpc.applications.stop.mutate({ id });
 			dispatch('stopped');
 		} catch (error) {
 			return errorNotification(error);

@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let data: LayoutData;
 	import type { LayoutData } from './$types';
-
+	export const ssr = false;
 	import '../app.postcss';
 	import { appSession } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';

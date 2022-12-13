@@ -2,7 +2,7 @@
 	export let userCount: number;
 	import { goto } from '$app/navigation';
 	import { errorNotification } from '$lib/common';
-	import { appSession, loginEmail, t } from '$lib/store';
+	import { appSession, loginEmail, trpc } from '$lib/store';
 	import { onMount } from 'svelte';
 	import Cookies from 'js-cookie';
 	if (!$appSession.isRegistrationEnabled) {
@@ -29,7 +29,7 @@
 		}
 		loading = true;
 		try {
-			const payload = await t.auth.register.mutate({ email, password });
+			const payload = await trpc.auth.register.mutate({ email, password });
 			Cookies.set('token', payload.token, {
 				path: '/'
 			});

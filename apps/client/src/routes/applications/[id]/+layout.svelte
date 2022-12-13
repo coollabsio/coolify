@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { appSession, status, t } from '$lib/store';
+	import { status, trpc } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import type { LayoutData } from './$types';
 	import * as Buttons from './_components/Buttons';
@@ -12,13 +12,11 @@
 	const id = $page.params.id;
 	const application = data.application.data;
 
-	let currentPage = 'main';
+	$: isConfigurationView = $page.url.pathname.startsWith(`/applications/${id}/configuration/`);
+
 	let stopping = false;
 	let statusInterval: NodeJS.Timeout;
 
-	if ($page.url.pathname.startsWith(`/applications/${id}/configuration/`)) {
-		currentPage = 'configuration';
-	}
 	onMount(async () => {
 		await getStatus();
 		statusInterval = setInterval(async () => {
@@ -36,8 +34,7 @@
 		if (($status.application.loading && stopping) || $status.application.restarting === true)
 			return;
 		$status.application.loading = true;
-		$status.application.statuses = await t.applications.status.query({ id });
-
+		$status.application.statuses = await trpc.applications.status.query({ id });
 		let numberOfApplications = 0;
 		if (application.dockerComposeConfiguration) {
 			numberOfApplications =
@@ -80,7 +77,7 @@
 				<div>Configurations</div>
 			</div>
 		</div>
-		{#if currentPage === 'configuration'}
+		{#if isConfigurationView}
 			<Buttons.Delete {id} name={application.name} />
 		{/if}
 	</nav>
@@ -100,9 +97,9 @@
 </div>
 <div
 	class="mx-auto max-w-screen-2xl px-0 lg:px-10 grid grid-cols-1"
-	class:lg:grid-cols-4={!$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+	class:lg:grid-cols-4={!isConfigurationView}
 >
-	{#if !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
+	{#if !isConfigurationView}
 		<nav class="header flex flex-col lg:pt-0 ">
 			<Menu {application} />
 		</nav>

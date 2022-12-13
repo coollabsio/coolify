@@ -8,7 +8,7 @@ import cuid from 'cuid';
 
 export const serverBaseUrl = dev ? `http://${browser && window.location.hostname}:2022` : '';
 export let token: string = Cookies.get('token') || '';
-export const t = createTRPCProxyClient<AppRouter>({
+export const trpc = createTRPCProxyClient<AppRouter>({
 	transformer: superjson,
 	links: [
 		httpBatchLink({

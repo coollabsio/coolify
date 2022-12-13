@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { t } from '$lib/store';
+import { trpc } from '$lib/store';
 import type { LayoutLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import Cookies from 'js-cookie';
@@ -10,14 +10,14 @@ export const load: LayoutLoad = async ({ url }) => {
 
 	try {
 		if (pathname === '/login' || pathname === '/register') {
-			const baseSettings = await t.settings.getBaseSettings.query();
+			const baseSettings = await trpc.settings.getBaseSettings.query();
 			return {
 				settings: {
 					...baseSettings
 				}
 			};
 		}
-		const settings = await t.settings.getInstanceSettings.query();
+		const settings = await trpc.settings.getInstanceSettings.query();
 		if (settings.data.token) {
 			Cookies.set('token', settings.data.token);
 		}

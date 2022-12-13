@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { errorNotification } from '$lib/common';
-	import { appSession, t } from '$lib/store';
+	import { appSession, trpc } from '$lib/store';
 
 	export let id: string;
 	export let name: string;
@@ -11,7 +11,7 @@
 		const sure = confirm(`Are you sure you want to delete ${name}?`);
 		if (sure) {
 			try {
-				await t.applications.delete.mutate({ id, force });
+				await trpc.applications.delete.mutate({ id, force });
 				return await goto('/');
 			} catch (error) {
 				return errorNotification(error);

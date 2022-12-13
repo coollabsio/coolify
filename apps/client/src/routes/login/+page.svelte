@@ -3,7 +3,7 @@
 	import Cookies from 'js-cookie';
 	import { goto } from '$app/navigation';
 	import { errorNotification } from '$lib/common';
-	import { appSession, loginEmail, t } from '$lib/store';
+	import { appSession, loginEmail, trpc } from '$lib/store';
 	import { onMount } from 'svelte';
 	let loading = false;
 	let emailEl: HTMLInputElement;
@@ -18,7 +18,7 @@
 	async function handleSubmit() {
 		loading = true;
 		try {
-			const { token } = await t.auth.login.mutate({ email, password });
+			const { token } = await trpc.auth.login.mutate({ email, password });
 			Cookies.set('token', token, {
 				path: '/'
 			});

@@ -6,8 +6,7 @@
 	import { onMount } from 'svelte';
 
 	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
-	import { appSession, search, t } from '$lib/store';
-
+	import { appSession, search, trpc } from '$lib/store';
 	import ApplicationsIcons from '$lib/components/svg/applications/ApplicationIcons.svelte';
 	import DatabaseIcons from '$lib/components/svg/databases/DatabaseIcons.svelte';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
@@ -156,7 +155,7 @@
 			let isRunning = false;
 			let isDegraded = false;
 			if (buildPack || simpleDockerfile) {
-				const response = await t.applications.status.query({ id });
+				const response = await trpc.applications.status.query({ id });
 				if (response.length === 0) {
 					isRunning = false;
 				} else if (response.length === 1) {
@@ -178,7 +177,7 @@
 					}
 				}
 			} else if (typeof dualCerts !== 'undefined') {
-				const response = await t.services.status.query({ id });
+				const response = await trpc.services.status.query({ id });
 				if (Object.keys(response).length === 0) {
 					isRunning = false;
 				} else {
@@ -198,7 +197,7 @@
 					}
 				}
 			} else {
-				const response = await t.databases.status.query({ id });
+				const response = await trpc.databases.status.query({ id });
 				isRunning = response.isRunning;
 			}
 
@@ -382,7 +381,7 @@
 				'Are you sure? This will delete all UNCONFIGURED applications and their data.'
 			);
 			if (sure) {
-				await t.applications.cleanup.query();
+				await trpc.applications.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -395,7 +394,7 @@
 				'Are you sure? This will delete all UNCONFIGURED services and their data.'
 			);
 			if (sure) {
-				await t.services.cleanup.query();
+				await trpc.services.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -408,7 +407,7 @@
 				'Are you sure? This will delete all UNCONFIGURED databases and their data.'
 			);
 			if (sure) {
-				await t.databases.cleanup.query();
+				await trpc.databases.cleanup.query();
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -419,7 +418,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this application!');
 			if (sure) {
-				await t.applications.delete.mutate({ id, force: true });
+				await trpc.applications.delete.mutate({ id, force: true });
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -430,7 +429,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this service!');
 			if (sure) {
-				await t.services.delete.mutate({ id });
+				await trpc.services.delete.mutate({ id });
 				// await del(`/services/${id}`, {});
 				return window.location.reload();
 			}
@@ -442,7 +441,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this database!');
 			if (sure) {
-				await t.databases.delete.mutate({ id, force: true });
+				await trpc.databases.delete.mutate({ id, force: true });
 				return window.location.reload();
 			}
 		} catch (error) {
