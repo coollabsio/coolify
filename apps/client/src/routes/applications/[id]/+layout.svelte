@@ -4,8 +4,8 @@
 	import { onDestroy, onMount } from 'svelte';
 	import type { LayoutData } from './$types';
 	import * as Buttons from './_components/Buttons';
-	import Degraded from './_components/States/Degraded.svelte';
-	import Healthy from './_components/States/Healthy.svelte';
+	import * as States from './_components/States';
+
 	import Menu from './_components/Menu.svelte';
 
 	export let data: LayoutData;
@@ -85,13 +85,17 @@
 		class="pt-4 flex flex-row items-start justify-center lg:justify-end space-x-2 order-1 lg:order-2"
 	>
 		{#if $status.application.initialLoading}
-			<Buttons.Loading />
+			<States.Loading />
 		{:else if $status.application.overallStatus === 'degraded'}
-			<Degraded {id} on:stopping={() => (stopping = true)} on:stopped={() => (stopping = false)} />
+			<States.Degraded
+				{id}
+				on:stopping={() => (stopping = true)}
+				on:stopped={() => (stopping = false)}
+			/>
 		{:else if $status.application.overallStatus === 'healthy'}
-			<Healthy {id} isComposeBuildPack={application.buildPack === 'compose'} />
+			<States.Healthy {id} isComposeBuildPack={application.buildPack === 'compose'} />
 		{:else if $status.application.overallStatus === 'stopped'}
-			<Buttons.Deploy {id} />
+			<States.Stopped {id} />
 		{/if}
 	</div>
 </div>

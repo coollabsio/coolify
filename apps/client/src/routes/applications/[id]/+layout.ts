@@ -32,6 +32,7 @@ export const load: LayoutLoad = async ({ params, url }) => {
 			throw redirect(307, '/applications');
 		}
 		const configurationPhase = checkConfiguration(application);
+		console.log({ configurationPhase });
 		// if (
 		// 	configurationPhase &&
 		// 	pathname !== `/applications/${params.id}/configuration/${configurationPhase}`
