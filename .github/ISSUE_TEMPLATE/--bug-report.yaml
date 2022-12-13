@@ -21,7 +21,7 @@ body:
   attributes:
     label: Example public repository
     description: "An example public git repository to reproduce the issue easily (if applicable)."
-    placeholder: "https://github.com/coollabsio/coolify"
+    placeholder: "ex: https://github.com/coollabsio/coolify"
   validations:
     required: false
 - type: textarea
