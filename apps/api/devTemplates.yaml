@@ -1,5 +1,5 @@
 - templateVersion: 1.0.0
-  defaultVersion: '0.8.0'
+  defaultVersion: "0.8.0"
   documentation: https://pocketbase.io/docs/
   type: pocketbase
   name: Pocketbase
@@ -646,6 +646,7 @@
         - "$$id-functions:/storage/functions"
         - "$$id-builds:/storage/builds"
         - "/var/run/docker.sock:/var/run/docker.sock"
+        - "/tmp:/tmp:rw"
       entrypoint: executor
     "$$id-influxdb":
       image: appwrite/influxdb:1.5.0
