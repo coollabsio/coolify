@@ -2,7 +2,7 @@
 	export let application: any;
 	import { status } from '$lib/store';
 	import { page } from '$app/stores';
-	import * as Icons from '$lib/components/svg';
+	import * as Icons from '$lib/components/icons';
 </script>
 
 <ul class="menu border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4">
