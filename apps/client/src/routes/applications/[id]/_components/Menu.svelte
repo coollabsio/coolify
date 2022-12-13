@@ -18,9 +18,9 @@
 				class="no-underline"
 			>
 				{#if application.gitSource?.type === 'gitlab'}
-					<Icons.Sources.Github small={true} />
+					<Icons.Sources.GitHub small={true} />
 				{:else if application.gitSource?.type === 'github'}
-					<Icons.Sources.Gitlab small={true} />
+					<Icons.Sources.GitLab small={true} />
 				{/if}
 				Open on Git <Icons.RemoteLink />
 			</a>
