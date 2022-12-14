@@ -106,7 +106,6 @@ import * as buildpacks from '../lib/buildPacks';
 											});
 										}
 										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
-
 										let envFound = false;
 										try {
 											envFound = !!(await fs.stat(`${workdir}/.env`));
@@ -437,6 +436,7 @@ import * as buildpacks from '../lib/buildPacks';
 										imageFound = `${imageName}:${customTag}`
 									}
 									await copyBaseConfigurationFiles(buildPack, workdir, buildId, applicationId, baseImage);
+                  console.log({secrets})
 									const labels = makeLabelForStandaloneApplication({
 										applicationId,
 										fqdn,
@@ -530,7 +530,6 @@ import * as buildpacks from '../lib/buildPacks';
 											//
 										}
 										try {
-											console.log({ debug })
 											await executeCommand({ debug, buildId, applicationId, dockerId: destinationDocker.id, command: `docker compose --project-directory ${workdir} up -d` })
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 											await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
@@ -589,6 +588,7 @@ import * as buildpacks from '../lib/buildPacks';
 												}
 											});
 										}
+                    console.log({envs})
 										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry
