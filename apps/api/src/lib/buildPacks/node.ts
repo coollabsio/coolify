@@ -23,15 +23,28 @@ const createDockerfile = async (data, image): Promise<void> => {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter((s) => s.name === secret.name && s.isPRMRSecret);
+					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
 					if (isSecretFound.length > 0) {
+                            if (isSecretFound[0].value.includes('\\n')) {
+						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
+                            } else {
+
 						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
+                            }
 					} else {
+                            if (secret.value.includes('\\n')) {
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+                            } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
+                            }
 					}
 				} else {
 					if (!secret.isPRMRSecret) {
+                            if (secret.value.includes('\\n')) {
+						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+                            } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
+                            }
 					}
 				}
 			}
