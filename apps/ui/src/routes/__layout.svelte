@@ -475,7 +475,7 @@
 					class="no-underline icons hover:text-white hover:bg-info"
 					href="https://docs.coollabs.io/coolify/"
 					target="_blank"
-					rel="noopener noreferrer"
+					rel="noreferrer external"
 				>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
