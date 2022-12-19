@@ -43,6 +43,7 @@ importers:
       dockerode: 3.3.4
       dotenv-extended: 2.9.0
       esbuild: 0.15.15
+      escape-string-regexp: 5.0.0
       eslint: 8.28.0
       eslint-config-prettier: 8.5.0
       eslint-plugin-prettier: 4.2.1
@@ -100,6 +101,7 @@ importers:
       dayjs: 1.11.6
       dockerode: 3.3.4
       dotenv-extended: 2.9.0
+      escape-string-regexp: 5.0.0
       execa: 6.1.0
       fastify: 4.10.2
       fastify-plugin: 4.3.0

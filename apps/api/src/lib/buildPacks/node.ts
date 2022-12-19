@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import { buildImage, checkPnpm } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
+	const { default: escapeStringRegexp } = await import('escape-string-regexp');
 	const {
 		workdir,
 		port,
@@ -23,15 +24,15 @@ const createDockerfile = async (data, image): Promise<void> => {
 		secrets.forEach((secret) => {
 			if (secret.isBuildSecret) {
 				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
+					const isSecretFound = secrets.filter((s) => s.name === secret.name && s.isPRMRSecret);
 					if (isSecretFound.length > 0) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
+						Dockerfile.push(`ARG ${secret.name}=${escapeStringRegexp(isSecretFound[0].value)}`);
 					} else {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+						Dockerfile.push(`ARG ${secret.name}=${escapeStringRegexp(secret.value)}`);
 					}
 				} else {
 					if (!secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
+						Dockerfile.push(`ARG ${secret.name}=${escapeStringRegexp(secret.value)}`);
 					}
 				}
 			}
