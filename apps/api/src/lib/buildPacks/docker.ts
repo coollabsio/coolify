@@ -21,7 +21,7 @@ export default async function (data) {
 				) {
 					Dockerfile.forEach((line, index) => {
 						if (line.startsWith('FROM')) {
-              if (secret.value.includes('\\n')) {
+              if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}=${secret.value}`);
               } else {
 							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}='${secret.value}'`);

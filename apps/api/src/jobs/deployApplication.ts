@@ -148,13 +148,13 @@ import * as buildpacks from '../lib/buildPacks';
 														(s) => s.name === secret.name && s.isPRMRSecret
 													);
 													if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')) {
+                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
 														envs.push(`${secret.name}=${isSecretFound[0].value}`);
                             } else {
 														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
                             }
 													} else {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 														envs.push(`${secret.name}=${secret.value}`);
                             } else {
 														envs.push(`${secret.name}='${secret.value}'`);
@@ -162,7 +162,7 @@ import * as buildpacks from '../lib/buildPacks';
 													}
 												} else {
 													if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 														envs.push(`${secret.name}=${secret.value}`);
                             } else {
 														envs.push(`${secret.name}='${secret.value}'`);
@@ -718,13 +718,13 @@ import * as buildpacks from '../lib/buildPacks';
 														(s) => s.name === secret.name && s.isPRMRSecret
 													);
 													if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')) {
+                            if (isSecretFound[0].value.includes('\\n') || isSecretFound[0].value.includes("'")) {
 														envs.push(`${secret.name}=${isSecretFound[0].value}`);
                             } else {
 														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
                             }
 													} else {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 														envs.push(`${secret.name}=${secret.value}`);
                             } else {
 														envs.push(`${secret.name}='${secret.value}'`);
@@ -732,7 +732,7 @@ import * as buildpacks from '../lib/buildPacks';
 													}
 												} else {
 													if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 														envs.push(`${secret.name}=${secret.value}`);
                             } else {
 														envs.push(`${secret.name}='${secret.value}'`);

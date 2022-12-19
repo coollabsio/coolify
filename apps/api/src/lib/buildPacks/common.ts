@@ -792,13 +792,13 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 				if (pullmergeRequestId) {
 					const isSecretFound = secrets.filter((s) => s.name === secret.name && s.isPRMRSecret);
 					if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')) {
+                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
                             } else {
 						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
                             }
 					} else {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
                             } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
@@ -806,7 +806,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 					}
 				} else {
 					if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
                             } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
@@ -842,14 +842,14 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 				if (pullmergeRequestId) {
 					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
 					if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')) {
+                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
                             } else {
 
 						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
                             }
 					} else {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
                             } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
@@ -857,7 +857,7 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 					}
 				} else {
 					if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')) {
+                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
 						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
                             } else {
 						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
