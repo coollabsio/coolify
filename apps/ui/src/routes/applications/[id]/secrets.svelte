@@ -48,10 +48,9 @@
 			.map((secret) => {
 				const [name, ...rest] = secret.split('=');
 				const value = rest.join('=');
-				const cleanValue = (value?.replaceAll('"', '') || '').trim();
 				return {
 					name: name.trim(),
-					value: cleanValue.trim(),
+					value: value.trim(),
 					createSecret: !secrets.find((secret: any) => name === secret.name)
 				};
 			});

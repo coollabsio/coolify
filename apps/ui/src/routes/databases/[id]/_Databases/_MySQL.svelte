@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let database: any;
-	import { status } from '$lib/store';
+	import { status, appSession } from '$lib/store';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
@@ -56,7 +56,7 @@
 			placeholder={$t('forms.generated_automatically_after_start')}
 			id="rootUser"
 			name="rootUser"
-			value={database.rootUser}
+			value={$appSession.isARM ? 'root' : database.rootUser}
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">

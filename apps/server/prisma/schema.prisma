@@ -1,0 +1,705 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("COOLIFY_DATABASE_URL")
+}
+
+model Certificate {
+  id        String   @id @default(cuid())
+  key       String
+  cert      String
+  team      Team?    @relation(fields: [teamId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teamId    String?
+}
+
+model Setting {
+  id                                      String   @id @default(cuid())
+  fqdn                                    String?  @unique
+  dualCerts                               Boolean  @default(false)
+  minPort                                 Int      @default(9000)
+  maxPort                                 Int      @default(9100)
+  DNSServers                              String   @default("1.1.1.1,8.8.8.8")
+  ipv4                                    String?
+  ipv6                                    String?
+  arch                                    String?
+  concurrentBuilds                        Int      @default(1)
+  applicationStoragePathMigrationFinished Boolean  @default(false)
+  numberOfDockerImagesKeptLocally         Int      @default(3)
+  proxyDefaultRedirect                    String?
+  doNotTrack                              Boolean  @default(false)
+  sentryDSN                               String?
+  previewSeparator                        String   @default(".")
+  isAPIDebuggingEnabled                   Boolean  @default(false)
+  isRegistrationEnabled                   Boolean  @default(true)
+  isAutoUpdateEnabled                     Boolean  @default(false)
+  isDNSCheckEnabled                       Boolean  @default(true)
+  isTraefikUsed                           Boolean  @default(true)
+  createdAt                               DateTime @default(now())
+  updatedAt                               DateTime @updatedAt
+}
+
+model User {
+  id         String       @id @unique @default(cuid())
+  email      String       @unique
+  type       String
+  password   String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  permission Permission[]
+  teams      Team[]
+}
+
+model Permission {
+  id         String   @id @default(cuid())
+  userId     String
+  teamId     String
+  permission String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  team       Team     @relation(fields: [teamId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Team {
+  id                String              @id @default(cuid())
+  name              String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  databaseId        String?
+  serviceId         String?
+  permissions       Permission[]
+  sshKey            SshKey[]
+  applications      Application[]
+  database          Database[]
+  destinationDocker DestinationDocker[]
+  gitSources        GitSource[]
+  gitHubApps        GithubApp[]
+  gitLabApps        GitlabApp[]
+  service           Service[]
+  users             User[]
+  certificate       Certificate[]
+  dockerRegistry    DockerRegistry[]
+}
+
+model TeamInvitation {
+  id         String   @id @default(cuid())
+  uid        String
+  email      String
+  teamId     String
+  teamName   String
+  permission String
+  createdAt  DateTime @default(now())
+}
+
+model Application {
+  id                         String               @id @default(cuid())
+  name                       String
+  fqdn                       String?
+  repository                 String?
+  configHash                 String?
+  branch                     String?
+  buildPack                  String?
+  projectId                  Int?
+  port                       Int?
+  exposePort                 Int?
+  installCommand             String?
+  buildCommand               String?
+  startCommand               String?
+  baseDirectory              String?
+  publishDirectory           String?
+  deploymentType             String?
+  phpModules                 String?
+  pythonWSGI                 String?
+  pythonModule               String?
+  pythonVariable             String?
+  dockerFileLocation         String?
+  denoMainFile               String?
+  denoOptions                String?
+  dockerComposeFile          String?
+  dockerComposeFileLocation  String?
+  dockerComposeConfiguration String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  destinationDockerId        String?
+  gitSourceId                String?
+  gitCommitHash              String?
+  baseImage                  String?
+  baseBuildImage             String?
+  settings                   ApplicationSettings?
+  dockerRegistryId           String?
+  dockerRegistryImageName    String?
+  simpleDockerfile           String?
+
+  persistentStorage  ApplicationPersistentStorage[]
+  secrets            Secret[]
+  teams              Team[]
+  connectedDatabase  ApplicationConnectedDatabase?
+  previewApplication PreviewApplication[]
+  gitSource          GitSource?                     @relation(fields: [gitSourceId], references: [id])
+  destinationDocker  DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  dockerRegistry     DockerRegistry?                @relation(fields: [dockerRegistryId], references: [id])
+}
+
+model PreviewApplication {
+  id                 String      @id @default(cuid())
+  pullmergeRequestId String
+  sourceBranch       String
+  isRandomDomain     Boolean     @default(false)
+  customDomain       String?
+  applicationId      String
+  application        Application @relation(fields: [applicationId], references: [id])
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model ApplicationConnectedDatabase {
+  id                     String      @id @default(cuid())
+  applicationId          String      @unique
+  databaseId             String?
+  hostedDatabaseType     String?
+  hostedDatabaseHost     String?
+  hostedDatabasePort     Int?
+  hostedDatabaseName     String?
+  hostedDatabaseUser     String?
+  hostedDatabasePassword String?
+  hostedDatabaseDBName   String?
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  database               Database?   @relation(fields: [databaseId], references: [id])
+  application            Application @relation(fields: [applicationId], references: [id])
+}
+
+model ApplicationSettings {
+  id                 String      @id @default(cuid())
+  applicationId      String      @unique
+  dualCerts          Boolean     @default(false)
+  debug              Boolean     @default(false)
+  previews           Boolean     @default(false)
+  autodeploy         Boolean     @default(true)
+  isBot              Boolean     @default(false)
+  isPublicRepository Boolean     @default(false)
+  isDBBranching      Boolean     @default(false)
+  isCustomSSL        Boolean     @default(false)
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  application        Application @relation(fields: [applicationId], references: [id])
+}
+
+model ApplicationPersistentStorage {
+  id            String      @id @default(cuid())
+  applicationId String
+  path          String
+  oldPath       Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  @@unique([applicationId, path])
+}
+
+model ServicePersistentStorage {
+  id          String   @id @default(cuid())
+  serviceId   String
+  path        String
+  volumeName  String?
+  predefined  Boolean  @default(false)
+  containerId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  service     Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([serviceId, containerId, path])
+}
+
+model Secret {
+  id            String      @id @default(cuid())
+  name          String
+  value         String
+  isPRMRSecret  Boolean     @default(false)
+  isBuildSecret Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  applicationId String
+  application   Application @relation(fields: [applicationId], references: [id])
+
+  @@unique([name, applicationId, isPRMRSecret])
+}
+
+model ServiceSecret {
+  id        String   @id @default(cuid())
+  name      String
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([name, serviceId])
+}
+
+model BuildLog {
+  id            String  @id @default(cuid())
+  applicationId String?
+  buildId       String
+  line          String
+  time          BigInt
+}
+
+model Build {
+  id                   String   @id @default(cuid())
+  type                 String
+  applicationId        String?
+  destinationDockerId  String?
+  gitSourceId          String?
+  githubAppId          String?
+  gitlabAppId          String?
+  commit               String?
+  pullmergeRequestId   String?
+  previewApplicationId String?
+  forceRebuild         Boolean  @default(false)
+  sourceBranch         String?
+  sourceRepository     String?
+  branch               String?
+  status               String?  @default("queued")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+model DestinationDocker {
+  id                 String        @id @default(cuid())
+  network            String        @unique
+  name               String
+  engine             String?
+  remoteEngine       Boolean       @default(false)
+  remoteIpAddress    String?
+  remoteUser         String?
+  remotePort         Int?
+  remoteVerified     Boolean       @default(false)
+  isCoolifyProxyUsed Boolean?      @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  sshKeyId           String?
+  sshKey             SshKey?       @relation(fields: [sshKeyId], references: [id])
+  sshLocalPort       Int?
+  application        Application[]
+  database           Database[]
+  service            Service[]
+  teams              Team[]
+}
+
+model SshKey {
+  id                String              @id @default(cuid())
+  name              String
+  privateKey        String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  teamId            String?
+  team              Team?               @relation(fields: [teamId], references: [id])
+  destinationDocker DestinationDocker[]
+}
+
+model DockerRegistry {
+  id          String        @id @default(cuid())
+  name        String
+  url         String
+  username    String?
+  password    String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  teamId      String?
+  team        Team?         @relation(fields: [teamId], references: [id])
+  application Application[]
+}
+
+model GitSource {
+  id           String        @id @default(cuid())
+  name         String
+  forPublic    Boolean       @default(false)
+  type         String?
+  apiUrl       String?
+  htmlUrl      String?
+  customPort   Int           @default(22)
+  organization String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  githubAppId  String?       @unique
+  gitlabAppId  String?       @unique
+  isSystemWide Boolean       @default(false)
+  gitlabApp    GitlabApp?    @relation(fields: [gitlabAppId], references: [id])
+  githubApp    GithubApp?    @relation(fields: [githubAppId], references: [id])
+  application  Application[]
+  teams        Team[]
+}
+
+model GithubApp {
+  id             String     @id @default(cuid())
+  name           String?    @unique
+  appId          Int?
+  installationId Int?
+  clientId       String?
+  clientSecret   String?
+  webhookSecret  String?
+  privateKey     String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  gitSource      GitSource?
+  teams          Team[]
+}
+
+model GitlabApp {
+  id            String     @id @default(cuid())
+  oauthId       Int        @unique
+  groupName     String?    @unique
+  deployKeyId   Int?
+  privateSshKey String?
+  publicSshKey  String?
+  webhookToken  String?
+  appId         String?
+  appSecret     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  gitSource     GitSource?
+  teams         Team[]
+}
+
+model Database {
+  id                           String                         @id @default(cuid())
+  name                         String
+  publicPort                   Int?
+  defaultDatabase              String?
+  type                         String?
+  version                      String?
+  dbUser                       String?
+  dbUserPassword               String?
+  rootUser                     String?
+  rootUserPassword             String?
+  destinationDockerId          String?
+  createdAt                    DateTime                       @default(now())
+  updatedAt                    DateTime                       @updatedAt
+  destinationDocker            DestinationDocker?             @relation(fields: [destinationDockerId], references: [id])
+  settings                     DatabaseSettings?
+  teams                        Team[]
+  applicationConnectedDatabase ApplicationConnectedDatabase[]
+  databaseSecret               DatabaseSecret[]
+}
+
+model DatabaseSecret {
+  id         String   @id @default(cuid())
+  name       String
+  value      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  databaseId String
+  database   Database @relation(fields: [databaseId], references: [id])
+
+  @@unique([name, databaseId])
+}
+
+model DatabaseSettings {
+  id         String   @id @default(cuid())
+  databaseId String   @unique
+  isPublic   Boolean  @default(false)
+  appendOnly Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  database   Database @relation(fields: [databaseId], references: [id])
+}
+
+model Service {
+  id                  String                     @id @default(cuid())
+  name                String
+  fqdn                String?
+  exposePort          Int?
+  dualCerts           Boolean                    @default(false)
+  type                String?
+  version             String?
+  templateVersion     String                     @default("0.0.0")
+  destinationDockerId String?
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
+  destinationDocker   DestinationDocker?         @relation(fields: [destinationDockerId], references: [id])
+  persistentStorage   ServicePersistentStorage[]
+  serviceSecret       ServiceSecret[]
+  serviceSetting      ServiceSetting[]
+  teams               Team[]
+
+  fider              Fider?
+  ghost              Ghost?
+  glitchTip          GlitchTip?
+  hasura             Hasura?
+  meiliSearch        MeiliSearch?
+  minio              Minio?
+  moodle             Moodle?
+  plausibleAnalytics PlausibleAnalytics?
+  umami              Umami?
+  vscodeserver       Vscodeserver?
+  wordpress          Wordpress?
+  appwrite           Appwrite?
+  searxng            Searxng?
+  weblate            Weblate?
+  taiga              Taiga?
+}
+
+model ServiceSetting {
+  id           String   @id @default(cuid())
+  serviceId    String
+  name         String
+  value        String
+  variableName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  service      Service  @relation(fields: [serviceId], references: [id])
+
+  @@unique([serviceId, name])
+}
+
+model PlausibleAnalytics {
+  id                   String   @id @default(cuid())
+  email                String?
+  username             String?
+  password             String
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  secretKeyBase        String?
+  scriptName           String   @default("plausible.js")
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Minio {
+  id               String   @id @default(cuid())
+  rootUser         String
+  rootUserPassword String
+  publicPort       Int?
+  apiFqdn          String?
+  serviceId        String   @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  service          Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Vscodeserver {
+  id        String   @id @default(cuid())
+  password  String
+  serviceId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Wordpress {
+  id                    String   @id @default(cuid())
+  extraConfig           String?
+  tablePrefix           String?
+  ownMysql              Boolean  @default(false)
+  mysqlHost             String?
+  mysqlPort             Int?
+  mysqlUser             String?
+  mysqlPassword         String?
+  mysqlRootUser         String?
+  mysqlRootUserPassword String?
+  mysqlDatabase         String?
+  mysqlPublicPort       Int?
+  ftpEnabled            Boolean  @default(false)
+  ftpUser               String?
+  ftpPassword           String?
+  ftpPublicPort         Int?
+  ftpHostKey            String?
+  ftpHostKeyPrivate     String?
+  serviceId             String   @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  service               Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Ghost {
+  id                      String   @id @default(cuid())
+  defaultEmail            String
+  defaultPassword         String
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String?
+  mariadbPublicPort       Int?
+  serviceId               String   @unique
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model MeiliSearch {
+  id        String   @id @default(cuid())
+  masterKey String
+  serviceId String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  service   Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Umami {
+  id                   String   @id @default(cuid())
+  serviceId            String   @unique
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  umamiAdminPassword   String
+  hashSalt             String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Hasura {
+  id                   String   @id @default(cuid())
+  serviceId            String   @unique
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  graphQLAdminPassword String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Fider {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  postgresqlUser          String
+  postgresqlPassword      String
+  postgresqlDatabase      String
+  postgresqlPublicPort    Int?
+  jwtSecret               String
+  emailNoreply            String?
+  emailMailgunApiKey      String?
+  emailMailgunDomain      String?
+  emailMailgunRegion      String   @default("EU")
+  emailSmtpHost           String?
+  emailSmtpPort           Int?
+  emailSmtpUser           String?
+  emailSmtpPassword       String?
+  emailSmtpEnableStartTls Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Moodle {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  defaultUsername         String
+  defaultPassword         String
+  defaultEmail            String
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Appwrite {
+  id                      String   @id @default(cuid())
+  serviceId               String   @unique
+  opensslKeyV1            String
+  executorSecret          String
+  redisPassword           String
+  mariadbHost             String?
+  mariadbPort             Int      @default(3306)
+  mariadbUser             String
+  mariadbPassword         String
+  mariadbRootUser         String
+  mariadbRootUserPassword String
+  mariadbDatabase         String
+  mariadbPublicPort       Int?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  service                 Service  @relation(fields: [serviceId], references: [id])
+}
+
+model GlitchTip {
+  id                         String   @id @default(cuid())
+  postgresqlUser             String
+  postgresqlPassword         String
+  postgresqlDatabase         String
+  postgresqlPublicPort       Int?
+  secretKeyBase              String?
+  defaultEmail               String
+  defaultUsername            String
+  defaultPassword            String
+  defaultEmailFrom           String   @default("glitchtip@domain.tdl")
+  emailSmtpHost              String?  @default("domain.tdl")
+  emailSmtpPort              Int?     @default(25)
+  emailSmtpUser              String?
+  emailSmtpPassword          String?
+  emailSmtpUseTls            Boolean  @default(false)
+  emailSmtpUseSsl            Boolean  @default(false)
+  emailBackend               String?
+  mailgunApiKey              String?
+  sendgridApiKey             String?
+  enableOpenUserRegistration Boolean  @default(true)
+  serviceId                  String   @unique
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+  service                    Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Searxng {
+  id            String   @id @default(cuid())
+  secretKey     String
+  redisPassword String
+  serviceId     String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  service       Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Weblate {
+  id                   String   @id @default(cuid())
+  adminPassword        String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}
+
+model Taiga {
+  id                   String   @id @default(cuid())
+  secretKey            String
+  erlangSecret         String
+  djangoAdminPassword  String
+  djangoAdminUser      String
+  rabbitMQUser         String
+  rabbitMQPassword     String
+  postgresqlHost       String
+  postgresqlPort       Int
+  postgresqlUser       String
+  postgresqlPassword   String
+  postgresqlDatabase   String
+  postgresqlPublicPort Int?
+  serviceId            String   @unique
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  service              Service  @relation(fields: [serviceId], references: [id])
+}

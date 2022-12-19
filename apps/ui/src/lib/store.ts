@@ -23,7 +23,8 @@ interface AppSession {
         github: string | null,
         gitlab: string | null,
     },
-    pendingInvitations: Array<any>
+    pendingInvitations: Array<any>,
+    isARM: boolean
 }
 interface AddToast {
     type?: "info" | "success" | "error",
@@ -52,7 +53,8 @@ export const appSession: Writable<AppSession> = writable({
         github: null,
         gitlab: null
     },
-    pendingInvitations: []
+    pendingInvitations: [],
+    isARM: false
 });
 export const disabledButton: Writable<boolean> = writable(false);
 export const isDeploymentEnabled: Writable<boolean> = writable(false);
