@@ -75,6 +75,7 @@
 	$appSession.version = baseSettings.version;
 	$appSession.whiteLabeled = baseSettings.whiteLabeled;
 	$appSession.whiteLabeledDetails.icon = baseSettings.whiteLabeledIcon;
+	$appSession.isARM = baseSettings.isARM;
 
 	$appSession.pendingInvitations = pendingInvitations;
 
