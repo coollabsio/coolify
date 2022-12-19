@@ -34,7 +34,7 @@ export default async function (data) {
 				) {
 					Dockerfile.forEach((line, index) => {
 						if (line.startsWith('FROM')) {
-							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}=${secret.value}`);
+							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}='${secret.value}'`);
 						}
 					});
 				}

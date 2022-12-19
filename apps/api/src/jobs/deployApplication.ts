@@ -56,7 +56,6 @@ import * as buildpacks from '../lib/buildPacks';
 
 					for (const queueBuild of queuedBuilds) {
 						actions.push(async () => {
-							const { default: escapeStringRegexp } = await import('escape-string-regexp');
 							let application = await prisma.application.findUnique({
 								where: { id: queueBuild.applicationId },
 								include: {
@@ -141,7 +140,7 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT=${port}`];
+										const envs = [`PORT='${port}'`];
 										if (secrets.length > 0) {
 											secrets.forEach((secret) => {
 												if (pullmergeRequestId) {
@@ -149,25 +148,13 @@ import * as buildpacks from '../lib/buildPacks';
 														(s) => s.name === secret.name && s.isPRMRSecret
 													);
 													if (isSecretFound.length > 0) {
-														envs.push(
-															`${secret.name}="${escapeStringRegexp(
-																isSecretFound[0].value.replace(/[\\$'"]/g, '\\$&')
-															)}"`
-														);
+														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
 													} else {
-														envs.push(
-															`${secret.name}="${escapeStringRegexp(
-																secret.value.replace(/[\\$'"]/g, '\\$&')
-															)}"`
-														);
+														envs.push(`${secret.name}='${secret.value}'`);
 													}
 												} else {
 													if (!secret.isPRMRSecret) {
-														envs.push(
-															`${secret.name}="${escapeStringRegexp(
-																secret.value.replace(/[\\$'"]/g, '\\$&')
-															)}"`
-														);
+														envs.push(`${secret.name}='${secret.value}'`);
 													}
 												}
 											});
@@ -544,7 +531,6 @@ import * as buildpacks from '../lib/buildPacks';
 										applicationId,
 										baseImage
 									);
-									console.log({ secrets });
 									const labels = makeLabelForStandaloneApplication({
 										applicationId,
 										fqdn,
@@ -711,7 +697,7 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT=${port}`];
+										const envs = [`PORT='${port}'`];
 										if (secrets.length > 0) {
 											secrets.forEach((secret) => {
 												if (pullmergeRequestId) {
@@ -719,18 +705,18 @@ import * as buildpacks from '../lib/buildPacks';
 														(s) => s.name === secret.name && s.isPRMRSecret
 													);
 													if (isSecretFound.length > 0) {
-														envs.push(`${secret.name}=${isSecretFound[0].value}`);
+														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
 													} else {
-														envs.push(`${secret.name}=${secret.value}`);
+														envs.push(`${secret.name}='${secret.value}'`);
 													}
 												} else {
 													if (!secret.isPRMRSecret) {
-														envs.push(`${secret.name}=${secret.value}`);
+														envs.push(`${secret.name}='${secret.value}'`);
 													}
 												}
 											});
 										}
-										console.log({ envs });
+										console.log('hello');
 										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry;

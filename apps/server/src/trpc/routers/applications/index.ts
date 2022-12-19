@@ -210,13 +210,13 @@ export const applicationsRouter = router({
 					if (pullmergeRequestId) {
 						const isSecretFound = secrets.filter((s) => s.name === secret.name && s.isPRMRSecret);
 						if (isSecretFound.length > 0) {
-							envs.push(`${secret.name}=${isSecretFound[0].value}`);
+							envs.push(`${secret.name}='${isSecretFound[0].value}'`);
 						} else {
-							envs.push(`${secret.name}=${secret.value}`);
+							envs.push(`${secret.name}='${secret.value}'`);
 						}
 					} else {
 						if (!secret.isPRMRSecret) {
-							envs.push(`${secret.name}=${secret.value}`);
+							envs.push(`${secret.name}='${secret.value}'`);
 						}
 					}
 				});

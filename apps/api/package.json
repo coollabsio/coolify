@@ -39,7 +39,6 @@
 		"dayjs": "1.11.6",
 		"dockerode": "3.3.4",
 		"dotenv-extended": "2.9.0",
-		"escape-string-regexp": "5.0.0",
 		"execa": "6.1.0",
 		"fastify": "4.10.2",
 		"fastify-plugin": "4.3.0",
