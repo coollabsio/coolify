@@ -727,6 +727,7 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
 			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
 			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
+			--label=traefik.http.middlewares.autodetect.contenttype.autodetect=false
 			--log.level=error`
 		});
 		await prisma.destinationDocker.update({
