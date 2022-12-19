@@ -461,7 +461,8 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
             const { dockerRegistry, secrets, pullmergeRequestId, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
             let location = null;
             const envs = [
-                `PORT=${port}`
+                `PORT=${port}`,
+                'NODE_ENV=production'
             ];
             if (secrets.length > 0) {
                 secrets.forEach((secret) => {
@@ -484,7 +485,7 @@ export async function restartApplication(request: FastifyRequest<RestartApplicat
                     } else {
                         if (!secret.isPRMRSecret) {
                             if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-                            envs.push(`${secret.name}=${secret.value}`);
+														envs.push(`${secret.name}=${secret.value}`);
                             } else {
                             envs.push(`${secret.name}='${secret.value}'`);
                             }
@@ -1175,7 +1176,8 @@ export async function restartPreview(request: FastifyRequest<RestartPreviewAppli
             const { secrets, port, repository, persistentStorage, id: applicationId, buildPack, exposePort } = application;
 
             const envs = [
-                `PORT=${port}`
+                `PORT=${port}`,
+                'NODE_ENV=production'
             ];
             if (secrets.length > 0) {
                 secrets.forEach((secret) => {

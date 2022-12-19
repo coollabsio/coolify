@@ -203,7 +203,7 @@ export const applicationsRouter = router({
 			let location = null;
 			const labels = [];
 			let image = null;
-			const envs = [`PORT=${port}`];
+			const envs = [`PORT=${port}`, 'NODE_ENV=production'];
 
 			if (secrets.length > 0) {
 				secrets.forEach((secret) => {

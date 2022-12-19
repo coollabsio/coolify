@@ -25,7 +25,7 @@ export default async function (data) {
 	if (!dockerComposeYaml.services) {
 		throw 'No Services found in docker-compose file.';
 	}
-	const envs = [];
+	const envs = ['NODE_ENV=production'];
 	if (secrets.length > 0) {
 		secrets.forEach((secret) => {
 			if (pullmergeRequestId) {
