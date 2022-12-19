@@ -140,7 +140,7 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT='${port}'`];
+										const envs = [`PORT='${port}'`, 'NODE_ENV=production'];
 										if (secrets.length > 0) {
 											secrets.forEach((secret) => {
 												if (pullmergeRequestId) {
@@ -710,7 +710,7 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT='${port}'`];
+										const envs = [`PORT='${port}'`, 'NODE_ENV=production'];
 										if (secrets.length > 0) {
 											secrets.forEach((secret) => {
 												if (pullmergeRequestId) {
