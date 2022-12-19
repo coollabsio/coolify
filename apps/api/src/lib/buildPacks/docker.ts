@@ -2,24 +2,11 @@ import { promises as fs } from 'fs';
 import { buildImage } from './common';
 
 export default async function (data) {
-	let {
-		applicationId,
-		debug,
-		tag,
-		workdir,
-		buildId,
-		baseDirectory,
-		secrets,
-		pullmergeRequestId,
-		dockerFileLocation
-	} = data
+	let { workdir, buildId, baseDirectory, secrets, pullmergeRequestId, dockerFileLocation } = data;
 	const file = `${workdir}${baseDirectory}${dockerFileLocation}`;
 	data.workdir = `${workdir}${baseDirectory}`;
-	const DockerfileRaw = await fs.readFile(`${file}`, 'utf8')
-	const Dockerfile: Array<string> = DockerfileRaw
-		.toString()
-		.trim()
-		.split('\n');
+	const DockerfileRaw = await fs.readFile(`${file}`, 'utf8');
+	const Dockerfile: Array<string> = DockerfileRaw.toString().trim().split('\n');
 	Dockerfile.forEach((line, index) => {
 		if (line.startsWith('FROM')) {
 			Dockerfile.splice(index + 1, 0, `LABEL coolify.buildId=${buildId}`);
@@ -41,7 +28,6 @@ export default async function (data) {
 			}
 		});
 	}
-
-	await fs.writeFile(`${workdir}${dockerFileLocation}`, Dockerfile.join('\n'));
+	await fs.writeFile(`${data.workdir}${dockerFileLocation}`, Dockerfile.join('\n'));
 	await buildImage(data);
 }

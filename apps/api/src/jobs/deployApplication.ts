@@ -589,7 +589,8 @@ import * as buildpacks from '../lib/buildPacks';
 												denoOptions,
 												baseImage,
 												baseBuildImage,
-												deploymentType
+												deploymentType,
+												forceRebuild
 											});
 										else {
 											await saveBuildLog({
@@ -716,7 +717,6 @@ import * as buildpacks from '../lib/buildPacks';
 												}
 											});
 										}
-										console.log('hello');
 										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry;
