@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { generateSecrets } from '../common';
 import { buildImage } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
@@ -18,34 +19,8 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-					if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
-                            } else {
-
-						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
-                            }
-					} else {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	if (pythonWSGI?.toLowerCase() === 'gunicorn') {

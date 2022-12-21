@@ -3,6 +3,7 @@ import {
 	decrypt,
 	encrypt,
 	executeCommand,
+	generateSecrets,
 	generateTimestamp,
 	getDomain,
 	isARM,
@@ -653,7 +654,7 @@ export async function saveDockerRegistryCredentials({ url, username, password, w
 	try {
 		await fs.mkdir(`${workdir}/.docker`);
 	} catch (error) {
-		console.log(error);
+		// console.log(error);
 	}
 	const payload = JSON.stringify({
 		auths: {
@@ -787,33 +788,8 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter((s) => s.name === secret.name && s.isPRMRSecret);
-					if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
-                            }
-					} else {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	if (isPnpm) {
@@ -823,7 +799,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (installCommand) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
-	// Dockerfile.push(`ARG CACHEBUST=1`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
@@ -831,40 +806,13 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 
 export async function buildCacheImageForLaravel(data, imageForBuild) {
 	const { workdir, buildId, secrets, pullmergeRequestId } = data;
-
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-					if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
-                            } else {
-
-						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
-                            }
-					} else {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-                            } else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-                            }
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	Dockerfile.push(`COPY *.json *.mix.js /app/`);

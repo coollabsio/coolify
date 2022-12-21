@@ -20,7 +20,8 @@ import {
 	decryptApplication,
 	isDev,
 	pushToRegistry,
-	executeCommand
+	executeCommand,
+	generateSecrets
 } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
@@ -140,45 +141,10 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT='${port}'`, 'NODE_ENV=production'];
+										let envs = ['NODE_ENV=production', `PORT=${port}`];
 										if (secrets.length > 0) {
-											secrets.forEach((secret) => {
-												if (pullmergeRequestId) {
-													const isSecretFound = secrets.filter(
-														(s) => s.name === secret.name && s.isPRMRSecret
-													);
-													if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n')|| isSecretFound[0].value.includes("'")) {
-														envs.push(`${secret.name}=${isSecretFound[0].value}`);
-                            } else {
-														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
-                            }
-													} else {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-														envs.push(`${secret.name}=${secret.value}`);
-                            } else {
-														envs.push(`${secret.name}='${secret.value}'`);
-                            }
-													}
-												} else {
-													if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-														envs.push(`${secret.name}=${secret.value}`);
-                            } else {
-														envs.push(`${secret.name}='${secret.value}'`);
-                            }
-                          }
-                        }
-											});
+											envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
 										}
-										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
-										let envFound = false;
-										try {
-											envFound = !!(await fs.stat(`${workdir}/.env`));
-										} catch (error) {
-											//
-										}
-
 										await fs.writeFile(`${workdir}/Dockerfile`, simpleDockerfile);
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry;
@@ -209,7 +175,7 @@ import * as buildpacks from '../lib/buildPacks';
 														container_name: applicationId,
 														volumes,
 														labels,
-														env_file: envFound ? [`${workdir}/.env`] : [],
+														environment: envs,
 														depends_on: [],
 														expose: [port],
 														...(exposePort ? { ports: [`${exposePort}:${port}`] } : {}),
@@ -710,48 +676,13 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										const envs = [`PORT='${port}'`, 'NODE_ENV=production'];
+										let envs = ['NODE_ENV=production', `PORT=${port}`];
 										if (secrets.length > 0) {
-											secrets.forEach((secret) => {
-												if (pullmergeRequestId) {
-													const isSecretFound = secrets.filter(
-														(s) => s.name === secret.name && s.isPRMRSecret
-													);
-													if (isSecretFound.length > 0) {
-                            if (isSecretFound[0].value.includes('\\n') || isSecretFound[0].value.includes("'")) {
-														envs.push(`${secret.name}=${isSecretFound[0].value}`);
-                            } else {
-														envs.push(`${secret.name}='${isSecretFound[0].value}'`);
-                            }
-													} else {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-														envs.push(`${secret.name}=${secret.value}`);
-                            } else {
-														envs.push(`${secret.name}='${secret.value}'`);
-                            }
-													}
-												} else {
-													if (!secret.isPRMRSecret) {
-                            if (secret.value.includes('\\n')|| secret.value.includes("'")) {
-														envs.push(`${secret.name}=${secret.value}`);
-                            } else {
-														envs.push(`${secret.name}='${secret.value}'`);
-                            }
-													}
-												}
-											});
+											envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
 										}
-										await fs.writeFile(`${workdir}/.env`, envs.join('\n'));
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry;
 											await saveDockerRegistryCredentials({ url, username, password, workdir });
-										}
-
-										let envFound = false;
-										try {
-											envFound = !!(await fs.stat(`${workdir}/.env`));
-										} catch (error) {
-											//
 										}
 										try {
 											const composeVolumes = volumes.map((volume) => {
@@ -768,7 +699,7 @@ import * as buildpacks from '../lib/buildPacks';
 														image: imageFound,
 														container_name: imageId,
 														volumes,
-														env_file: envFound ? [`${workdir}/.env`] : [],
+														environment: envs,
 														labels,
 														depends_on: [],
 														expose: [port],

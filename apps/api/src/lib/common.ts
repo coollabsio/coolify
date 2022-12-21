@@ -1875,3 +1875,40 @@ export async function pushToRegistry(
 		command: pushCommand
 	});
 }
+
+export function generateSecrets(
+	secrets: Array<any>,
+	pullmergeRequestId: string,
+	isBuild = false
+): Array<string> {
+	const envs = [];
+	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
+	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
+	if (pullmergeRequestId && isPRMRSecret.length > 0) {
+		isPRMRSecret.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			if (secret.value.includes('\n') || secret.value.includes(' ')) {
+				envs.push(`${build ? 'ARG ' : ''}${secret.name}='${secret.value}'`);
+			} else {
+				envs.push(`${build ? 'ARG ' : ''}${secret.name}=${secret.value}`);
+			}
+		});
+	}
+	if (!pullmergeRequestId && normalSecrets.length > 0) {
+		normalSecrets.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			if (secret.value.includes('\n') || secret.value.includes(' ')) {
+				envs.push(`${build ? 'ARG ' : ''}${secret.name}='${secret.value}'`);
+			} else {
+				envs.push(`${build ? 'ARG ' : ''}${secret.name}=${secret.value}`);
+			}
+		});
+	}
+	return envs;
+}
