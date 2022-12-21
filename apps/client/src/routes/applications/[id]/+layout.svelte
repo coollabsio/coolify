@@ -3,10 +3,10 @@
 	import { status, trpc } from '$lib/store';
 	import { onDestroy, onMount } from 'svelte';
 	import type { LayoutData } from './$types';
-	import * as Buttons from './_components/Buttons';
-	import * as States from './_components/States';
+	import * as Buttons from './components/Buttons';
+	import * as States from './components/States';
 
-	import Menu from './_components/Menu.svelte';
+	import Menu from './components/Menu.svelte';
 
 	export let data: LayoutData;
 	const id = $page.params.id;

@@ -20,6 +20,7 @@ import cuid from 'cuid';
 import {
 	checkDomainsIsValidInDNS,
 	checkExposedPort,
+	cleanupDB,
 	createDirectories,
 	decrypt,
 	encrypt,
@@ -29,8 +30,220 @@ import {
 	saveDockerRegistryCredentials,
 	setDefaultConfiguration
 } from '../../../lib/common';
+import { day } from '../../../lib/dayjs';
+import csv from 'csvtojson';
 
 export const applicationsRouter = router({
+	resetQueue: privateProcedure.mutation(async ({ ctx }) => {
+		const teamId = ctx.user.teamId;
+		if (teamId === '0') {
+			await prisma.build.updateMany({
+				where: { status: { in: ['queued', 'running'] } },
+				data: { status: 'canceled' }
+			});
+			// scheduler.workers.get("deployApplication").postMessage("cancel");
+		}
+	}),
+	cancelBuild: privateProcedure
+		.input(
+			z.object({
+				buildId: z.string(),
+				applicationId: z.string()
+			})
+		)
+		.mutation(async ({ input }) => {
+			const { buildId, applicationId } = input;
+			let count = 0;
+			await new Promise<void>(async (resolve, reject) => {
+				const { destinationDockerId, status } = await prisma.build.findFirst({
+					where: { id: buildId }
+				});
+				const { id: dockerId } = await prisma.destinationDocker.findFirst({
+					where: { id: destinationDockerId }
+				});
+				const interval = setInterval(async () => {
+					try {
+						if (status === 'failed' || status === 'canceled') {
+							clearInterval(interval);
+							return resolve();
+						}
+						if (count > 15) {
+							clearInterval(interval);
+							// if (scheduler.workers.has('deployApplication')) {
+							// 	scheduler.workers.get('deployApplication').postMessage('cancel');
+							// }
+							await cleanupDB(buildId, applicationId);
+							return reject(new Error('Canceled.'));
+						}
+						const { stdout: buildContainers } = await executeCommand({
+							dockerId,
+							command: `docker container ls --filter "label=coolify.buildId=${buildId}" --format '{{json .}}'`
+						});
+						if (buildContainers) {
+							const containersArray = buildContainers.trim().split('\n');
+							for (const container of containersArray) {
+								const containerObj = JSON.parse(container);
+								const id = containerObj.ID;
+								if (!containerObj.Names.startsWith(`${applicationId} `)) {
+									await removeContainer({ id, dockerId });
+									clearInterval(interval);
+									// if (scheduler.workers.has('deployApplication')) {
+									// 	scheduler.workers.get('deployApplication').postMessage('cancel');
+									// }
+									await cleanupDB(buildId, applicationId);
+									return resolve();
+								}
+							}
+						}
+						count++;
+					} catch (error) {}
+				}, 100);
+			});
+		}),
+	getBuildLogs: privateProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				buildId: z.string(),
+				sequence: z.number()
+			})
+		)
+		.query(async ({ input }) => {
+			let { id, buildId, sequence } = input;
+			let file = `/app/logs/${id}_buildlog_${buildId}.csv`;
+			if (isDev) {
+				file = `${process.cwd()}/../../logs/${id}_buildlog_${buildId}.csv`;
+			}
+			const data = await prisma.build.findFirst({ where: { id: buildId } });
+			const createdAt = day(data.createdAt).utc();
+			try {
+				await fs.stat(file);
+			} catch (error) {
+				let logs = await prisma.buildLog.findMany({
+					where: { buildId, time: { gt: sequence } },
+					orderBy: { time: 'asc' }
+				});
+				const data = await prisma.build.findFirst({ where: { id: buildId } });
+				const createdAt = day(data.createdAt).utc();
+				return {
+					logs: logs.map((log) => {
+						log.time = Number(log.time);
+						return log;
+					}),
+					fromDb: true,
+					took: day().diff(createdAt) / 1000,
+					status: data?.status || 'queued'
+				};
+			}
+			let fileLogs = (await fs.readFile(file)).toString();
+			let decryptedLogs = await csv({ noheader: true }).fromString(fileLogs);
+			let logs = decryptedLogs
+				.map((log) => {
+					const parsed = {
+						time: log['field1'],
+						line: decrypt(log['field2'] + '","' + log['field3'])
+					};
+					return parsed;
+				})
+				.filter((log) => log.time > sequence);
+			return {
+				logs,
+				fromDb: false,
+				took: day().diff(createdAt) / 1000,
+				status: data?.status || 'queued'
+			};
+		}),
+	getBuilds: privateProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				buildId: z.string().optional(),
+				skip: z.number()
+			})
+		)
+		.query(async ({ input }) => {
+			let { id, buildId, skip } = input;
+			let builds = [];
+			const buildCount = await prisma.build.count({ where: { applicationId: id } });
+			if (buildId) {
+				builds = await prisma.build.findMany({ where: { applicationId: id, id: buildId } });
+			} else {
+				builds = await prisma.build.findMany({
+					where: { applicationId: id },
+					orderBy: { createdAt: 'desc' },
+					take: 5 + skip
+				});
+			}
+			builds = builds.map((build) => {
+				if (build.status === 'running') {
+					build.elapsed = (day().utc().diff(day(build.createdAt)) / 1000).toFixed(0);
+				}
+				return build;
+			});
+			return {
+				builds,
+				buildCount
+			};
+		}),
+	loadLogs: privateProcedure
+		.input(
+			z.object({
+				id: z.string(),
+				containerId: z.string(),
+				since: z.number()
+			})
+		)
+		.query(async ({ input }) => {
+			let { id, containerId, since } = input;
+			if (since !== 0) {
+				since = day(since).unix();
+			}
+			const {
+				destinationDockerId,
+				destinationDocker: { id: dockerId }
+			} = await prisma.application.findUnique({
+				where: { id },
+				include: { destinationDocker: true }
+			});
+			if (destinationDockerId) {
+				try {
+					const { default: ansi } = await import('strip-ansi');
+					const { stdout, stderr } = await executeCommand({
+						dockerId,
+						command: `docker logs --since ${since} --tail 5000 --timestamps ${containerId}`
+					});
+					const stripLogsStdout = stdout
+						.toString()
+						.split('\n')
+						.map((l) => ansi(l))
+						.filter((a) => a);
+					const stripLogsStderr = stderr
+						.toString()
+						.split('\n')
+						.map((l) => ansi(l))
+						.filter((a) => a);
+					const logs = stripLogsStderr.concat(stripLogsStdout);
+					const sortedLogs = logs.sort((a, b) =>
+						day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1
+					);
+					return { logs: sortedLogs };
+					// }
+				} catch (error) {
+					const { statusCode, stderr } = error;
+					if (stderr.startsWith('Error: No such container')) {
+						return { logs: [], noContainer: true };
+					}
+					if (statusCode === 404) {
+						return {
+							logs: []
+						};
+					}
+				}
+			}
+			return {
+				message: 'No logs found.'
+			};
+		}),
 	getStorages: privateProcedure
 		.input(
 			z.object({

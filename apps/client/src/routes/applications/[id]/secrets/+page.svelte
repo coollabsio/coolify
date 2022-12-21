@@ -9,8 +9,8 @@
 	import pLimit from 'p-limit';
 	import { page } from '$app/stores';
 	import { addToast, trpc } from '$lib/store';
-	import Secret from './_components/Secret.svelte';
-	import PreviewSecret from './_components/PreviewSecret.svelte';
+	import Secret from './components/Secret.svelte';
+	import PreviewSecret from './components/PreviewSecret.svelte';
 	import { errorNotification } from '$lib/common';
 	import Explainer from '$lib/components/Explainer.svelte';
 

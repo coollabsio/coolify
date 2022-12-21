@@ -42,6 +42,7 @@
 		"@trpc/server": "10.1.0",
 		"cuid": "2.1.8",
 		"daisyui": "2.41.0",
+		"dayjs": "1.11.6",
 		"flowbite-svelte": "0.28.0",
 		"js-cookie": "3.0.1",
 		"js-yaml": "4.1.0",

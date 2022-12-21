@@ -183,3 +183,19 @@ export function put(
 ): Promise<Record<string, any>> {
 	return send({ method: 'PUT', path, data, headers });
 }
+export function changeQueryParams(buildId: string) {
+	const queryParams = new URLSearchParams(window.location.search);
+	queryParams.set('buildId', buildId);
+	// @ts-ignore
+	return history.pushState(null, null, '?' + queryParams.toString());
+}
+
+export const dateOptions: any = {
+	year: 'numeric',
+	month: 'short',
+	day: '2-digit',
+	hour: 'numeric',
+	minute: 'numeric',
+	second: 'numeric',
+	hour12: false
+};

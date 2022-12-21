@@ -170,3 +170,4 @@ export const setLocation = (resource: any, settings?: any) => {
 		disabledButton.set(false);
 	}
 };
+export const selectedBuildId: any = writable(null)
