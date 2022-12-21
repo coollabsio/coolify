@@ -7,3 +7,6 @@ declare namespace App {
 	// interface Error {}
 	// interface Platform {}
 }
+
+declare const GITPOD_WORKSPACE_URL: string;
+declare const CODESANDBOX_HOST: string;

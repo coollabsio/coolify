@@ -44,7 +44,10 @@
 		"daisyui": "2.41.0",
 		"flowbite-svelte": "0.28.0",
 		"js-cookie": "3.0.1",
+		"js-yaml": "4.1.0",
+		"p-limit": "4.0.0",
 		"server": "workspace:*",
-		"superjson": "1.11.0"
+		"superjson": "1.11.0",
+		"svelte-select": "4.4.7"
 	}
 }

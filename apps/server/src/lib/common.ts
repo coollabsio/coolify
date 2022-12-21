@@ -2,6 +2,7 @@ import type { Permission, Setting, Team, TeamInvitation, User } from '@prisma/cl
 import { prisma } from '../prisma';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { promises as dns } from 'dns';
 import fs from 'fs/promises';
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
 import type { Config } from 'unique-names-generator';
@@ -181,3 +182,347 @@ export async function saveDockerRegistryCredentials({ url, username, password, w
 	await fs.writeFile(`${location}/config.json`, payload);
 	return location;
 }
+export function getDomain(domain: string): string {
+	if (domain) {
+		return domain?.replace('https://', '').replace('http://', '');
+	} else {
+		return '';
+	}
+}
+
+export async function isDomainConfigured({
+	id,
+	fqdn,
+	checkOwn = false,
+	remoteIpAddress = undefined
+}: {
+	id: string;
+	fqdn: string;
+	checkOwn?: boolean;
+	remoteIpAddress?: string;
+}): Promise<boolean> {
+	const domain = getDomain(fqdn);
+	const nakedDomain = domain.replace('www.', '');
+	const foundApp = await prisma.application.findFirst({
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } },
+				{ dockerComposeConfiguration: { contains: `//${nakedDomain}` } },
+				{ dockerComposeConfiguration: { contains: `//www.${nakedDomain}` } }
+			],
+			id: { not: id },
+			destinationDocker: {
+				remoteIpAddress
+			}
+		},
+		select: { fqdn: true }
+	});
+	const foundService = await prisma.service.findFirst({
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+			],
+			id: { not: checkOwn ? undefined : id },
+			destinationDocker: {
+				remoteIpAddress
+			}
+		},
+		select: { fqdn: true }
+	});
+
+	const coolifyFqdn = await prisma.setting.findFirst({
+		where: {
+			OR: [
+				{ fqdn: { endsWith: `//${nakedDomain}` } },
+				{ fqdn: { endsWith: `//www.${nakedDomain}` } }
+			],
+			id: { not: id }
+		},
+		select: { fqdn: true }
+	});
+	return !!(foundApp || foundService || coolifyFqdn);
+}
+
+export async function checkExposedPort({
+	id,
+	configuredPort,
+	exposePort,
+	engine,
+	remoteEngine,
+	remoteIpAddress
+}: {
+	id: string;
+	configuredPort?: number;
+	exposePort: number;
+	engine: string;
+	remoteEngine: boolean;
+	remoteIpAddress?: string;
+}) {
+	if (exposePort < 1024 || exposePort > 65535) {
+		throw { status: 500, message: `Exposed Port needs to be between 1024 and 65535.` };
+	}
+	if (configuredPort) {
+		if (configuredPort !== exposePort) {
+			const availablePort = await getFreeExposedPort(
+				id,
+				exposePort,
+				engine,
+				remoteEngine,
+				remoteIpAddress
+			);
+			if (availablePort.toString() !== exposePort.toString()) {
+				throw { status: 500, message: `Port ${exposePort} is already in use.` };
+			}
+		}
+	} else {
+		const availablePort = await getFreeExposedPort(
+			id,
+			exposePort,
+			engine,
+			remoteEngine,
+			remoteIpAddress
+		);
+		if (availablePort.toString() !== exposePort.toString()) {
+			throw { status: 500, message: `Port ${exposePort} is already in use.` };
+		}
+	}
+}
+export async function getFreeExposedPort(id, exposePort, engine, remoteEngine, remoteIpAddress) {
+	const { default: checkPort } = await import('is-port-reachable');
+	if (remoteEngine) {
+		const applicationUsed = await (
+			await prisma.application.findMany({
+				where: {
+					exposePort: { not: null },
+					id: { not: id },
+					destinationDocker: { remoteIpAddress }
+				},
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const serviceUsed = await (
+			await prisma.service.findMany({
+				where: {
+					exposePort: { not: null },
+					id: { not: id },
+					destinationDocker: { remoteIpAddress }
+				},
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const usedPorts = [...applicationUsed, ...serviceUsed];
+		if (usedPorts.includes(exposePort)) {
+			return false;
+		}
+		const found = await checkPort(exposePort, { host: remoteIpAddress });
+		if (!found) {
+			return exposePort;
+		}
+		return false;
+	} else {
+		const applicationUsed = await (
+			await prisma.application.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { engine } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const serviceUsed = await (
+			await prisma.service.findMany({
+				where: { exposePort: { not: null }, id: { not: id }, destinationDocker: { engine } },
+				select: { exposePort: true }
+			})
+		).map((a) => a.exposePort);
+		const usedPorts = [...applicationUsed, ...serviceUsed];
+		if (usedPorts.includes(exposePort)) {
+			return false;
+		}
+		const found = await checkPort(exposePort, { host: 'localhost' });
+		if (!found) {
+			return exposePort;
+		}
+		return false;
+	}
+}
+
+export async function checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts }): Promise<any> {
+	const { isIP } = await import('is-ip');
+	const domain = getDomain(fqdn);
+	const domainDualCert = domain.includes('www.') ? domain.replace('www.', '') : `www.${domain}`;
+
+	const { DNSServers } = await listSettings();
+	if (DNSServers) {
+		dns.setServers([...DNSServers.split(',')]);
+	}
+
+	let resolves = [];
+	try {
+		if (isIP(hostname)) {
+			resolves = [hostname];
+		} else {
+			resolves = await dns.resolve4(hostname);
+		}
+	} catch (error) {
+		throw { status: 500, message: `Could not determine IP address for ${hostname}.` };
+	}
+
+	if (dualCerts) {
+		try {
+			const ipDomain = await dns.resolve4(domain);
+			const ipDomainDualCert = await dns.resolve4(domainDualCert);
+
+			let ipDomainFound = false;
+			let ipDomainDualCertFound = false;
+
+			for (const ip of ipDomain) {
+				if (resolves.includes(ip)) {
+					ipDomainFound = true;
+				}
+			}
+			for (const ip of ipDomainDualCert) {
+				if (resolves.includes(ip)) {
+					ipDomainDualCertFound = true;
+				}
+			}
+			if (ipDomainFound && ipDomainDualCertFound) return { status: 200 };
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
+		} catch (error) {
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
+		}
+	} else {
+		try {
+			const ipDomain = await dns.resolve4(domain);
+			let ipDomainFound = false;
+			for (const ip of ipDomain) {
+				if (resolves.includes(ip)) {
+					ipDomainFound = true;
+				}
+			}
+			if (ipDomainFound) return { status: 200 };
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
+		} catch (error) {
+			throw {
+				status: 500,
+				message: `DNS not set correctly or propogated.<br>Please check your DNS settings.`
+			};
+		}
+	}
+}
+export const setDefaultConfiguration = async (data: any) => {
+	let {
+		buildPack,
+		port,
+		installCommand,
+		startCommand,
+		buildCommand,
+		publishDirectory,
+		baseDirectory,
+		dockerFileLocation,
+		dockerComposeFileLocation,
+		denoMainFile
+	} = data;
+	//@ts-ignore
+	const template = scanningTemplates[buildPack];
+	if (!port) {
+		port = template?.port || 3000;
+
+		if (buildPack === 'static') port = 80;
+		else if (buildPack === 'node') port = 3000;
+		else if (buildPack === 'php') port = 80;
+		else if (buildPack === 'python') port = 8000;
+	}
+	if (!installCommand && buildPack !== 'static' && buildPack !== 'laravel')
+		installCommand = template?.installCommand || 'yarn install';
+	if (!startCommand && buildPack !== 'static' && buildPack !== 'laravel')
+		startCommand = template?.startCommand || 'yarn start';
+	if (!buildCommand && buildPack !== 'static' && buildPack !== 'laravel')
+		buildCommand = template?.buildCommand || null;
+	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
+	if (baseDirectory) {
+		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
+		if (baseDirectory.endsWith('/') && baseDirectory !== '/')
+			baseDirectory = baseDirectory.slice(0, -1);
+	}
+	if (dockerFileLocation) {
+		if (!dockerFileLocation.startsWith('/')) dockerFileLocation = `/${dockerFileLocation}`;
+		if (dockerFileLocation.endsWith('/')) dockerFileLocation = dockerFileLocation.slice(0, -1);
+	} else {
+		dockerFileLocation = '/Dockerfile';
+	}
+	if (dockerComposeFileLocation) {
+		if (!dockerComposeFileLocation.startsWith('/'))
+			dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
+		if (dockerComposeFileLocation.endsWith('/'))
+			dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
+	} else {
+		dockerComposeFileLocation = '/Dockerfile';
+	}
+	if (!denoMainFile) {
+		denoMainFile = 'main.ts';
+	}
+
+	return {
+		buildPack,
+		port,
+		installCommand,
+		startCommand,
+		buildCommand,
+		publishDirectory,
+		baseDirectory,
+		dockerFileLocation,
+		dockerComposeFileLocation,
+		denoMainFile
+	};
+};
+
+export const scanningTemplates = {
+	'@sveltejs/kit': {
+		buildPack: 'nodejs'
+	},
+	astro: {
+		buildPack: 'astro'
+	},
+	'@11ty/eleventy': {
+		buildPack: 'eleventy'
+	},
+	svelte: {
+		buildPack: 'svelte'
+	},
+	'@nestjs/core': {
+		buildPack: 'nestjs'
+	},
+	next: {
+		buildPack: 'nextjs'
+	},
+	nuxt: {
+		buildPack: 'nuxtjs'
+	},
+	'react-scripts': {
+		buildPack: 'react'
+	},
+	'parcel-bundler': {
+		buildPack: 'static'
+	},
+	'@vue/cli-service': {
+		buildPack: 'vuejs'
+	},
+	vuejs: {
+		buildPack: 'vuejs'
+	},
+	gatsby: {
+		buildPack: 'gatsby'
+	},
+	'preact-cli': {
+		buildPack: 'react'
+	}
+};

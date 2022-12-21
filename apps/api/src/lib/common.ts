@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.3';
+export const version = '3.12.4';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1879,7 +1879,8 @@ export async function pushToRegistry(
 export function generateSecrets(
 	secrets: Array<any>,
 	pullmergeRequestId: string,
-	isBuild = false
+	isBuild = false,
+	port = null
 ): Array<string> {
 	const envs = [];
 	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
@@ -1917,6 +1918,14 @@ export function generateSecrets(
 				envs.push(`${secret.name}=${secret.value}`);
 			}
 		});
+	}
+	const portFound = envs.filter((env) => env.startsWith('PORT'));
+	if (portFound.length === 0 && port && !isBuild) {
+		envs.push(`PORT=${port}`);
+	}
+	const nodeEnv = envs.filter((env) => env.startsWith('NODE_ENV'));
+	if (nodeEnv.length === 0 && !isBuild) {
+		envs.push(`NODE_ENV=production`);
 	}
 	return envs;
 }

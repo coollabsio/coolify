@@ -104,7 +104,9 @@ jobs:
       - name: Create & publish manifest
         run: |
           docker manifest create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64
+          docker manifest create coollabsio/coolify:latest --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64
           docker manifest push coollabsio/coolify:${{steps.package-version.outputs.current-version}}
+           docker manifest push coollabsio/coolify:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:

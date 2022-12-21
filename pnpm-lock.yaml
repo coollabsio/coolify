@@ -171,6 +171,8 @@ importers:
       eslint-plugin-svelte3: 4.0.0
       flowbite-svelte: 0.28.0
       js-cookie: 3.0.1
+      js-yaml: 4.1.0
+      p-limit: 4.0.0
       postcss: 8.4.19
       postcss-load-config: 4.0.1
       prettier: 2.8.0
@@ -180,6 +182,7 @@ importers:
       svelte: 3.53.1
       svelte-check: 2.9.2
       svelte-preprocess: ^4.10.7
+      svelte-select: 4.4.7
       tailwindcss: 3.2.4
       tslib: 2.4.1
       typescript: 4.9.3
@@ -191,8 +194,11 @@ importers:
       daisyui: 2.41.0_2lwn2upnx27dqeg6hqdu7sq75m
       flowbite-svelte: 0.28.0
       js-cookie: 3.0.1
+      js-yaml: 4.1.0
+      p-limit: 4.0.0
       server: link:../server
       superjson: 1.11.0
+      svelte-select: 4.4.7
     devDependencies:
       '@playwright/test': 1.28.1
       '@sveltejs/adapter-static': 1.0.0-next.48
@@ -255,6 +261,7 @@ importers:
       fastify: 4.10.2
       fastify-plugin: 4.4.0
       got: ^12.5.3
+      is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
       jsonwebtoken: 8.5.1
@@ -292,6 +299,7 @@ importers:
       fastify: 4.10.2
       fastify-plugin: 4.4.0
       got: 12.5.3
+      is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
       jsonwebtoken: 8.5.1

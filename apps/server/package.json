@@ -34,6 +34,7 @@
 		"fastify": "4.10.2",
 		"fastify-plugin": "4.4.0",
 		"got": "^12.5.3",
+		"is-ip": "5.0.0",
 		"is-port-reachable": "4.0.0",
 		"js-yaml": "4.1.0",
 		"jsonwebtoken": "8.5.1",

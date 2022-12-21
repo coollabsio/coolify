@@ -21,7 +21,8 @@ export const trpc = createTRPCProxyClient<AppRouter>({
 		})
 	]
 });
-
+export const disabledButton: Writable<boolean> = writable(false);
+export const location: Writable<null | string> = writable(null)
 interface AppSession {
 	isRegistrationEnabled: boolean;
 	token?: string;
@@ -139,3 +140,33 @@ export const status: Writable<any> = writable({
 		isPublic: false
 	}
 });
+
+export function checkIfDeploymentEnabledApplications(isAdmin: boolean, application: any) {
+	return !!(
+		(isAdmin && application.buildPack === 'compose') ||
+		((application.fqdn || application.settings.isBot) &&
+			((application.gitSource && application.repository && application.buildPack) ||
+				application.simpleDockerfile) &&
+			application.destinationDocker)
+	);
+}
+export const setLocation = (resource: any, settings?: any) => {
+	if (resource.settings.isBot && resource.exposePort) {
+		disabledButton.set(false);
+		return location.set(`http://${dev ? 'localhost' : settings.ipv4}:${resource.exposePort}`);
+	}
+	if (GITPOD_WORKSPACE_URL && resource.exposePort) {
+		const { href } = new URL(GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', `https://${resource.exposePort}-`).replace(/\/$/, '');
+		return location.set(newURL);
+	} else if (CODESANDBOX_HOST) {
+		const newURL = `https://${CODESANDBOX_HOST.replace(/\$PORT/, resource.exposePort)}`;
+		return location.set(newURL);
+	}
+	if (resource.fqdn) {
+		return location.set(resource.fqdn);
+	} else {
+		location.set(null);
+		disabledButton.set(false);
+	}
+};
