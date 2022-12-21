@@ -57,7 +57,8 @@ import type {
 	StopPreviewApplication,
 	RestartPreviewApplication,
 	GetBuilds,
-	RestartApplication
+	RestartApplication,
+    SaveManySecrets
 } from './types';
 import { OnlyId } from '../../../../types';
 
@@ -117,7 +118,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
 export async function cleanupUnconfiguredApplications(request: FastifyRequest<any>) {
 	try {
 		const teamId = request.user.teamId;
-		let applications = await prisma.application.findMany({
+		const applications = await prisma.application.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 			include: { settings: true, destinationDocker: true, teams: true }
 		});
@@ -164,7 +165,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
 	try {
 		const { id } = request.params;
 		const { teamId } = request.user;
-		let payload = [];
+		const payload = [];
 		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			if (application.buildPack === 'compose') {
@@ -552,7 +553,7 @@ export async function restartApplication(
 		const { id } = request.params;
 		const { imageId = null } = request.body;
 		const { teamId } = request.user;
-		let application: any = await getApplicationFromDB(id, teamId);
+		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			const buildId = cuid();
 			const { id: dockerId, network } = application.destinationDocker;
@@ -1292,6 +1293,45 @@ export async function saveSecret(request: FastifyRequest<SaveSecret>, reply: Fas
 		return errorHandler({ status, message });
 	}
 }
+export async function saveManySecrets(request: FastifyRequest<SaveManySecrets>, reply: FastifyReply) {
+    try {
+        const { id } = request.params
+        const { secrets, forceAlreadyExist = true } = request.body
+
+        if (forceAlreadyExist) {
+            await prisma.secret.deleteMany({ where: { applicationId: id, name: { in: secrets.map(secret => secret.name) } } });
+        }
+        
+        await prisma.secret.createMany({
+            data: secrets.map(secret => {
+                return {
+                    name: secret.name,
+                    value: encrypt(secret.value.trim()),
+                    isBuildSecret: secret.isBuildSecret,
+                    isPRMRSecret: false,
+                    application: { connect: { id } }
+                }
+            }),
+            skipDuplicates: true,
+        });
+        await prisma.secret.createMany({
+            data: secrets.map(secret => {
+                return {
+                    name: secret.name,
+                    value: encrypt(secret.value.trim()),
+                    isBuildSecret: secret.isBuildSecret,
+                    isPRMRSecret: true,
+                    application: { connect: { id } }
+                }
+            }),
+            skipDuplicates: true,
+        });
+
+        return reply.code(201).send()
+    } catch({ status, message }) {
+        return errorHandler({ status, message })
+    }
+}
 export async function deleteSecret(request: FastifyRequest<DeleteSecret>) {
 	try {
 		const { id } = request.params;
@@ -1356,7 +1396,7 @@ export async function restartPreview(
 	try {
 		const { id, pullmergeRequestId } = request.params;
 		const { teamId } = request.user;
-		let application: any = await getApplicationFromDB(id, teamId);
+		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			const buildId = cuid();
 			const { id: dockerId, network } = application.destinationDocker;
@@ -1676,7 +1716,7 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
 		try {
 			await fs.stat(file);
 		} catch (error) {
-			let logs = await prisma.buildLog.findMany({
+			const logs = await prisma.buildLog.findMany({
 				where: { buildId, time: { gt: sequence } },
 				orderBy: { time: 'asc' }
 			});
@@ -1692,9 +1732,9 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
 				status: data?.status || 'queued'
 			};
 		}
-		let fileLogs = (await fs.readFile(file)).toString();
-		let decryptedLogs = await csv({ noheader: true }).fromString(fileLogs);
-		let logs = decryptedLogs
+		const fileLogs = (await fs.readFile(file)).toString();
+		const decryptedLogs = await csv({ noheader: true }).fromString(fileLogs);
+		const logs = decryptedLogs
 			.map((log) => {
 				const parsed = {
 					time: log['field1'],

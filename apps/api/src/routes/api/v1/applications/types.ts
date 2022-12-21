@@ -75,6 +75,18 @@ export interface SaveSecret extends OnlyId {
         isNew: boolean
     }
 }
+export interface SaveManySecrets extends OnlyId {
+    Body: {
+        forceAlreadyExist: boolean,
+        secrets: {
+            name: string,
+            value: string,
+            isBuildSecret: boolean,
+            previewSecret: boolean,
+            isNew: boolean
+        }[]
+    }
+}
 export interface DeleteSecret extends OnlyId {
     Body: { name: string }
 }
