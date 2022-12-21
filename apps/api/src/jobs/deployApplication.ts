@@ -141,9 +141,12 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										let envs = ['NODE_ENV=production', `PORT=${port}`];
+										let envs = [];
 										if (secrets.length > 0) {
-											envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
+											envs = [
+												...envs,
+												...generateSecrets(secrets, pullmergeRequestId, false, port)
+											];
 										}
 										await fs.writeFile(`${workdir}/Dockerfile`, simpleDockerfile);
 										if (dockerRegistry) {
@@ -676,9 +679,12 @@ import * as buildpacks from '../lib/buildPacks';
 										} catch (error) {
 											//
 										}
-										let envs = ['NODE_ENV=production', `PORT=${port}`];
+										let envs = [];
 										if (secrets.length > 0) {
-											envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
+											envs = [
+												...envs,
+												...generateSecrets(secrets, pullmergeRequestId, false, port)
+											];
 										}
 										if (dockerRegistry) {
 											const { url, username, password } = dockerRegistry;

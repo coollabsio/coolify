@@ -569,10 +569,12 @@ export async function restartApplication(
 			} = application;
 			let location = null;
 
-			let envs = ['NODE_ENV=production', `PORT=${port}`];
+			let envs = [];
 			if (secrets.length > 0) {
-				envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
+				envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, port)];
 			}
+			console.log(envs);
+
 			const { workdir } = await createDirectories({ repository, buildId });
 			const labels = [];
 			let image = null;
@@ -659,6 +661,7 @@ export async function restartApplication(
 				},
 				volumes: Object.assign({}, ...composeVolumes)
 			};
+			console.log(yaml.dump(composeFile));
 			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 			try {
 				await executeCommand({ dockerId, command: `docker stop -t 0 ${id}` });
@@ -1370,9 +1373,9 @@ export async function restartPreview(
 				exposePort
 			} = application;
 
-			let envs = ['NODE_ENV=production', `PORT=${port}`];
+			let envs = [];
 			if (secrets.length > 0) {
-				envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId)];
+				envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, port)];
 			}
 			const { workdir } = await createDirectories({ repository, buildId });
 			const labels = [];
