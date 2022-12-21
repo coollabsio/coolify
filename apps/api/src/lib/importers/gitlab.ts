@@ -12,7 +12,8 @@ export default async function ({
 	buildId,
 	privateSshKey,
 	customPort,
-	forPublic
+	forPublic,
+	customUser,
 }: {
 	applicationId: string;
 	workdir: string;
@@ -25,6 +26,7 @@ export default async function ({
 	privateSshKey: string;
 	customPort: number;
 	forPublic: boolean;
+	customUser: string;
 }): Promise<string> {
 	const url = htmlUrl.replace('https://', '').replace('http://', '').replace(/\/$/, '');
 	if (!forPublic) {
@@ -53,7 +55,7 @@ export default async function ({
 	} else {
 		await executeCommand({
 			command:
-				`git clone -q -b ${branch} git@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `, shell: true
+				`git clone -q -b ${branch} ${customUser}@${url}:${repository}.git --config core.sshCommand="ssh -p ${customPort} -q -i ${repodir}id.rsa -o StrictHostKeyChecking=no" ${workdir}/ && cd ${workdir}/ && git checkout ${gitCommitHash || ""} && git submodule update --init --recursive && git lfs pull && cd .. `, shell: true
 		}
 		);
 	}

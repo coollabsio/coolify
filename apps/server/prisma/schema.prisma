@@ -325,6 +325,7 @@ model GitSource {
   apiUrl       String?
   htmlUrl      String?
   customPort   Int           @default(22)
+  customUser   String        @default("git")
   organization String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
