@@ -16,7 +16,7 @@ export function createContext({ req }: CreateFastifyContextOptions) {
 	if (token) {
 		user = jwt.verify(token, env.COOLIFY_SECRET_KEY) as User;
 	}
-	return { user };
+	return { user, hostname: req.hostname };
 }
 
 export type Context = inferAsyncReturnType<typeof createContext>;
