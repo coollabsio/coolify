@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { generateSecrets } from '../common';
 import { buildImage } from './common';
 
 export default async function (data) {
@@ -13,19 +14,12 @@ export default async function (data) {
 		}
 	});
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (
-					(pullmergeRequestId && secret.isPRMRSecret) ||
-					(!pullmergeRequestId && !secret.isPRMRSecret)
-				) {
-					Dockerfile.forEach((line, index) => {
-						if (line.startsWith('FROM')) {
-							Dockerfile.splice(index + 1, 0, `ARG ${secret.name}='${secret.value}'`);
-						}
-					});
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.forEach((line, index) => {
+				if (line.startsWith('FROM')) {
+					Dockerfile.splice(index + 1, 0, env);
 				}
-			}
+			});
 		});
 	}
 	await fs.writeFile(`${data.workdir}${dockerFileLocation}`, Dockerfile.join('\n'));

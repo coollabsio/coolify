@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.2';
+export const version = '3.12.3';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1874,4 +1874,49 @@ export async function pushToRegistry(
 		dockerId: application.destinationDockerId,
 		command: pushCommand
 	});
+}
+
+export function generateSecrets(
+	secrets: Array<any>,
+	pullmergeRequestId: string,
+	isBuild = false
+): Array<string> {
+	const envs = [];
+	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
+	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
+	if (pullmergeRequestId && isPRMRSecret.length > 0) {
+		isPRMRSecret.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			if (build) {
+				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+					envs.push(`ARG ${secret.name}='${secret.value}'`);
+				} else {
+					envs.push(`ARG ${secret.name}=${secret.value}`);
+				}
+			} else {
+				envs.push(`${secret.name}=${secret.value}`);
+			}
+		});
+	}
+	if (!pullmergeRequestId && normalSecrets.length > 0) {
+		normalSecrets.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			if (build) {
+				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+					envs.push(`ARG ${secret.name}='${secret.value}'`);
+				} else {
+					envs.push(`ARG ${secret.name}=${secret.value}`);
+				}
+			} else {
+				envs.push(`${secret.name}=${secret.value}`);
+			}
+		});
+	}
+	return envs;
 }

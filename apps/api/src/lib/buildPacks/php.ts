@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { generateSecrets } from '../common';
 import { buildImage } from './common';
 
 const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
@@ -13,21 +14,8 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-					if (isSecretFound.length > 0) {
-						Dockerfile.push(`ARG ${secret.name}='${isSecretFound[0].value}'`);
-					} else {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name}='${secret.value}'`);
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	Dockerfile.push('WORKDIR /app');
