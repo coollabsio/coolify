@@ -2,6 +2,8 @@ import { promises as fs } from 'fs';
 import { defaultComposeConfiguration, executeCommand, generateSecrets } from '../common';
 import { saveBuildLog } from './common';
 import yaml from 'js-yaml';
+import { exit } from 'process';
+import fastify from 'fastify';
 
 export default async function (data) {
 	let {
@@ -43,7 +45,8 @@ export default async function (data) {
 	let networks = {};
 	for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
 		value['container_name'] = `${applicationId}-${key}`;
-		value['environment'] = [...value['environment'], ...envs];
+		let environment = typeof value['environment'] === 'undefined' ? []  : value['environment']
+		value['environment'] = [...environment, ...envs];
 		value['labels'] = labels;
 		// TODO: If we support separated volume for each service, we need to add it here
 		if (value['volumes']?.length > 0) {
