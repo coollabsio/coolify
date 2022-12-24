@@ -2,8 +2,6 @@ import { promises as fs } from 'fs';
 import { defaultComposeConfiguration, executeCommand, generateSecrets } from '../common';
 import { saveBuildLog } from './common';
 import yaml from 'js-yaml';
-import { exit } from 'process';
-import fastify from 'fastify';
 
 export default async function (data) {
 	let {
