@@ -9,6 +9,7 @@ import type { Config } from 'unique-names-generator';
 import { env } from '../env';
 import { day } from './dayjs';
 import { executeCommand } from './executeCommand';
+import { saveBuildLog } from './logging';
 
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -526,3 +527,11 @@ export const scanningTemplates = {
 		buildPack: 'react'
 	}
 };
+
+export async function cleanupDB(buildId: string, applicationId: string) {
+	const data = await prisma.build.findUnique({ where: { id: buildId } });
+	if (data?.status === 'queued' || data?.status === 'running') {
+		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
+	}
+	await saveBuildLog({ line: 'Canceled.', buildId, applicationId });
+}

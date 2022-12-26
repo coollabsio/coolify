@@ -573,7 +573,6 @@ export async function restartApplication(
 			if (secrets.length > 0) {
 				envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, port)];
 			}
-			console.log(envs);
 
 			const { workdir } = await createDirectories({ repository, buildId });
 			const labels = [];
@@ -661,7 +660,6 @@ export async function restartApplication(
 				},
 				volumes: Object.assign({}, ...composeVolumes)
 			};
-			console.log(yaml.dump(composeFile));
 			await fs.writeFile(`${workdir}/docker-compose.yml`, yaml.dump(composeFile));
 			try {
 				await executeCommand({ dockerId, command: `docker stop -t 0 ${id}` });

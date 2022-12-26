@@ -7,6 +7,8 @@ import * as path from 'node:path';
 import serve from '@fastify/static';
 import autoLoad from '@fastify/autoload';
 // import { prisma } from './prisma';
+import Graceful from '@ladjs/graceful';
+import { scheduler } from './scheduler';
 
 const isDev = process.env['NODE_ENV'] === 'development';
 
@@ -60,6 +62,9 @@ export function createServer(opts: ServerOptions) {
 		try {
 			await server.listen({ host: '0.0.0.0', port });
 			console.log('Coolify server is listening on port', port, 'at 0.0.0.0 🚀');
+			const graceful = new Graceful({ brees: [scheduler] });
+			graceful.listen();
+			scheduler.run('worker');
 		} catch (err) {
 			server.log.error(err);
 			process.exit(1);

@@ -149,9 +149,9 @@
 	</li>
 	<li
 		class="rounded"
-		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/logs/build`}
+		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/builds`}
 	>
-		<a href={`/applications/${$page.params.id}/logs/build`} class="no-underline w-full"
+		<a href={`/applications/${$page.params.id}/builds`} class="no-underline w-full"
 			><svg
 				xmlns="http://www.w3.org/2000/svg"
 				class="h-6 w-6"

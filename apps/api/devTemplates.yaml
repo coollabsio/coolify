@@ -1,5 +1,5 @@
 - templateVersion: 1.0.0
-  defaultVersion: "0.8.0"
+  defaultVersion: "0.10.2"
   documentation: https://pocketbase.io/docs/
   type: pocketbase
   name: Pocketbase

@@ -11,7 +11,7 @@
 	import DatabaseIcons from '$lib/components/icons/databases/DatabaseIcons.svelte';
 	import ServiceIcons from '$lib/components/icons/services/ServiceIcons.svelte';
 	import * as Icons from '$lib/components/icons';
-	import NewResource from './_components/NewResource.svelte';
+	import NewResource from './components/NewResource.svelte';
 
 	const {
 		applications,
