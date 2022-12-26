@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.4';
+export const version = '3.12.5';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -584,7 +584,7 @@ export async function executeCommand({
 		}
 		if (sshCommand) {
 			if (shell) {
-				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`);
+				return execaCommand(`ssh ${remoteIpAddress}-remote ${command}`, { shell: true });
 			}
 			return await execa('ssh', [`${remoteIpAddress}-remote`, dockerCommand, ...dockerArgs]);
 		}
@@ -651,11 +651,13 @@ export async function executeCommand({
 		} else {
 			if (shell) {
 				return await execaCommand(command, {
-					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine },
+					shell: true
 				});
 			} else {
 				return await execa(dockerCommand, dockerArgs, {
-					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine },
+					shell: false
 				});
 			}
 		}
@@ -1751,6 +1753,10 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 			let keepImage = [];
 			for (const image2 of imagesArray) {
 				if (image2.startsWith(image)) {
+					if (force) {
+						deleteImage.push(image2);
+						continue;
+					}
 					if (keepImage.length >= numberOfDockerImagesKeptLocally) {
 						deleteImage.push(image2);
 					} else {
@@ -1760,7 +1766,11 @@ export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
 			}
 		}
 		for (const image of deleteImage) {
-			await executeCommand({ dockerId, command: `docker image rm -f ${image}` });
+			try {
+				await executeCommand({ dockerId, command: `docker image rm -f ${image}` });
+			} catch (error) {
+				console.log(error);
+			}
 		}
 
 		// Prune coolify managed containers
