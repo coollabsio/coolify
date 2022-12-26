@@ -159,7 +159,7 @@ const host = '0.0.0.0';
 			if (!scheduler.workers.has('deployApplication')) {
 				scheduler.run('deployApplication');
 			}
-		}, 2000);
+		}, 60000 * 15);
 
 		// autoUpdater
 		setInterval(async () => {
