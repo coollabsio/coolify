@@ -574,7 +574,6 @@ async function cleanupStorage() {
 				const { capacity } = data[0];
 				if (capacity > 0.8) {
 					lowDiskSpace = true;
-					force = true;
 				}
 			}
 		} catch (error) {}
