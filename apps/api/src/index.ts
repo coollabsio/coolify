@@ -169,7 +169,7 @@ const host = '0.0.0.0';
 		// cleanupStorage
 		setInterval(async () => {
 			await cleanupStorage();
-		}, 2000);
+		}, 60000 * 15);
 
 		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
