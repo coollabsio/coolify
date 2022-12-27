@@ -651,13 +651,11 @@ export async function executeCommand({
 		} else {
 			if (shell) {
 				return await execaCommand(command, {
-					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine },
-					shell: true
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
 			} else {
 				return await execa(dockerCommand, dockerArgs, {
-					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine },
-					shell: false
+					env: { DOCKER_BUILDKIT: '1', DOCKER_HOST: engine }
 				});
 			}
 		}
