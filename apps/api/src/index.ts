@@ -156,10 +156,10 @@ const host = '0.0.0.0';
 		graceful.listen();
 
 		setInterval(async () => {
-			if (!scheduler.workers.has('deployApplication')) {
+      if (!scheduler.workers.has('deployApplication')) {
 				scheduler.run('deployApplication');
 			}
-		}, 60000 * 15);
+		}, 2000);
 
 		// autoUpdater
 		setInterval(async () => {
