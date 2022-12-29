@@ -12,6 +12,7 @@ dist
 apps/api/db/*.db
 apps/api/db/migration.db-journal
 apps/api/core*
+apps/server/build
 apps/backup/backups/*
 !apps/backup/backups/.gitkeep
 /logs
