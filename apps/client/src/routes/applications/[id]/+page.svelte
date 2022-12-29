@@ -352,11 +352,12 @@
 	async function reloadCompose() {
 		if (loading.reloadCompose) return;
 		loading.reloadCompose = true;
-		const composeLocation = application.dockerComposeFileLocation.startsWith('/')
-			? application.dockerComposeFileLocation
-			: `/${application.dockerComposeFileLocation}`;
 		try {
 			if (application.gitSource.type === 'github') {
+				const composeLocation = application.dockerComposeFileLocation.startsWith('/')
+				? application.dockerComposeFileLocation
+				: `/${application.dockerComposeFileLocation}`;
+				
 				const headers = isPublicRepository
 					? {}
 					: {
@@ -383,6 +384,17 @@
 				if (!$appSession.tokens.gitlab) {
 					await getGitlabToken();
 				}
+				
+				const composeLocation = application.dockerComposeFileLocation.startsWith('/')
+				? application.dockerComposeFileLocation.substring(1) // Remove the '/' from the start
+				: application.dockerComposeFileLocation;
+				
+				// If the file is in a subdirectory, lastIndex will be > 0
+				// Otherwise it will be -1 and path will be an empty string
+				const lastIndex = composeLocation.lastIndexOf('/') + 1
+				const path = composeLocation.substring(0, lastIndex)
+				const fileName = composeLocation.substring(lastIndex)
+				
 				const headers = isPublicRepository
 					? {}
 					: {
@@ -390,13 +402,13 @@
 					  };
 				const url = isPublicRepository
 					? ``
-					: `/v4/projects/${application.projectId}/repository/tree`;
+					: `/v4/projects/${application.projectId}/repository/tree?path=${path}`; // Use path param to find file in a subdirectory
 				const files = await get(`${apiUrl}${url}`, {
 					...headers
 				});
 				const dockerComposeFileYml = files.find(
 					(file: { name: string; type: string }) =>
-						file.name === composeLocation && file.type === 'blob'
+						file.name === fileName && file.type === 'blob'
 				);
 				const id = dockerComposeFileYml.id;
 
