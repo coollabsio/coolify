@@ -764,7 +764,9 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
 			fqdn,
 			settings: { dualCerts }
 		} = await prisma.application.findUnique({ where: { id }, include: { settings: true } });
-		return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+		// TODO: Disabled this because it is having problems with remote docker engines.
+		// return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
 	}
@@ -805,11 +807,12 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
 				remoteEngine,
 				remoteIpAddress
 			});
-		if (isDNSCheckEnabled && !isDev && !forceSave) {
-			let hostname = request.hostname.split(':')[0];
-			if (remoteEngine) hostname = remoteIpAddress;
-			return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
-		}
+		// TODO: Disabled this because it is having problems with remote docker engines.
+		// if (isDNSCheckEnabled && !isDev && !forceSave) {
+		// 	let hostname = request.hostname.split(':')[0];
+		// 	if (remoteEngine) hostname = remoteIpAddress;
+		// 	return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
+		// }
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });

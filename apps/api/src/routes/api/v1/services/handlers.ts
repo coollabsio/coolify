@@ -505,7 +505,9 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
         const { id } = request.params
         const { domain } = request.query
         const { fqdn, dualCerts } = await prisma.service.findUnique({ where: { id } })
-        return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+        // TODO: Disabled this because it is having problems with remote docker engines.
+        // return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+        return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -531,11 +533,12 @@ export async function checkService(request: FastifyRequest<CheckService>) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
-        if (isDNSCheckEnabled && !isDev && !forceSave) {
-            let hostname = request.hostname.split(':')[0];
-            if (remoteEngine) hostname = remoteIpAddress;
-            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
-        }
+        // TODO: Disabled this because it is having problems with remote docker engines.
+        // if (isDNSCheckEnabled && !isDev && !forceSave) {
+        //     let hostname = request.hostname.split(':')[0];
+        //     if (remoteEngine) hostname = remoteIpAddress;
+        //     return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
+        // }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
