@@ -72,7 +72,7 @@
 					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 					apiUrl: source.apiUrl.replace(/\/$/, ''),
 					customPort: source.customPort,
-					customuser: source.customuser
+					customUser: source.customUser
 				});
 				return addToast({
 					message: 'Configuration saved.',
