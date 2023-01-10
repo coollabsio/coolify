@@ -1899,14 +1899,21 @@ export function generateSecrets(
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			if (build) {
-				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+			if (secret.value.includes('$')) {
+				secret.value = secret.value.replaceAll('$', '$$$$');
+			}
+			if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+				if (build) {
 					envs.push(`ARG ${secret.name}='${secret.value}'`);
 				} else {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
+					envs.push(`${secret.name}='${secret.value}'`);
 				}
 			} else {
-				envs.push(`${secret.name}=${secret.value}`);
+				if (build) {
+					envs.push(`ARG ${secret.name}=${secret.value}`);
+				} else {
+					envs.push(`${secret.name}=${secret.value}`);
+				}
 			}
 		});
 	}
@@ -1915,15 +1922,22 @@ export function generateSecrets(
 			if (isBuild && !secret.isBuildSecret) {
 				return;
 			}
+			if (secret.value.includes('$')) {
+				secret.value = secret.value.replaceAll('$', '$$$$');
+			}
 			const build = isBuild && secret.isBuildSecret;
-			if (build) {
-				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+			if (secret.value.includes(' ') || secret.value.includes('\\n')) {
+				if (build) {
 					envs.push(`ARG ${secret.name}='${secret.value}'`);
 				} else {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
+					envs.push(`${secret.name}='${secret.value}'`);
 				}
 			} else {
-				envs.push(`${secret.name}=${secret.value}`);
+				if (build) {
+					envs.push(`ARG ${secret.name}=${secret.value}`);
+				} else {
+					envs.push(`${secret.name}=${secret.value}`);
+				}
 			}
 		});
 	}
