@@ -9,7 +9,7 @@
 	import { del, post, put } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { createEventDispatcher } from 'svelte';
 
@@ -120,6 +120,7 @@
 			<label for="name" class="pb-5 uppercase lg:block hidden font-bold" />
 		{/if}
 
+		{#if $appSession.isAdmin}
 		<div class="flex justify-center h-full items-center pt-3">
 			<div class="flex flex-row justify-center space-x-2">
 				<div class="flex items-center justify-center">
@@ -127,5 +128,6 @@
 				</div>
 			</div>
 		</div>
+		{/if}
 	</div>
 </div>

@@ -669,7 +669,7 @@
 			<button class="btn btn-sm btn-primary" on:click={refreshStatusApplications}
 				>{noInitialStatus.applications ? 'Load Status' : 'Refresh Status'}</button
 			>
-			{#if foundUnconfiguredApplication}
+			{#if foundUnconfiguredApplication && $appSession.isAdmin}
 				<button
 					class="btn btn-sm"
 					class:loading={loading.applications}
@@ -783,11 +783,13 @@
 												</svg>
 											</a>
 										{/if}
+										{#if $appSession.isAdmin}
 										<button
 											class="icons hover:bg-green-500"
 											on:click|stopPropagation|preventDefault={() =>
 												deleteApplication(application.id)}><DeleteIcon /></button
 										>
+										{/if}
 									</div>
 								</div>
 							</div>
@@ -896,11 +898,13 @@
 											</svg>
 										</a>
 									{/if}
+									{#if $appSession.isAdmin}
 									<button
 										class="icons hover:bg-green-500"
 										on:click|stopPropagation|preventDefault={() =>
 											deleteApplication(application.id)}><DeleteIcon /></button
 									>
+									{/if}
 								</div>
 							</div>
 						</div>
@@ -991,11 +995,13 @@
 													</svg>
 												</a>
 											{/if}
+											{#if $appSession.isAdmin}
 											<button
 												class="icons hover:bg-pink-500"
 												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
 												><DeleteIcon /></button
 											>
+											{/if}
 										</div>
 									</div>
 								</div>
@@ -1077,11 +1083,13 @@
 												</svg>
 											</a>
 										{/if}
+										{#if $appSession.isAdmin}
 										<button
 											class="icons hover:bg-pink-500"
 											on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
 											><DeleteIcon /></button
 										>
+										{/if}
 									</div>
 								</div>
 							</div>
@@ -1173,11 +1181,13 @@
 													</svg>
 												</div>
 											{/if}
+											{#if $appSession.isAdmin}
 											<button
 												class="icons hover:bg-databases-100"
 												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
 												><DeleteIcon /></button
 											>
+											{/if}
 										</div>
 									</div>
 								</div>
@@ -1259,11 +1269,13 @@
 												</svg>
 											</div>
 										{/if}
+										{#if $appSession.isAdmin}
 										<button
 											class="icons hover:bg-databases"
 											on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
 											><DeleteIcon /></button
 										>
+										{/if}
 									</div>
 								</div>
 							</div>

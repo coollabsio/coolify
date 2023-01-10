@@ -8,7 +8,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { createEventDispatcher } from 'svelte';
 
 	const dispatch = createEventDispatcher();
@@ -77,6 +77,7 @@
 	/>
 </td>
 
+{#if $appSession.isAdmin}
 <td>
 	{#if isNewSecret}
 		<div class="flex items-center justify-center">
@@ -93,3 +94,4 @@
 		</div>
 	{/if}
 </td>
+{/if}

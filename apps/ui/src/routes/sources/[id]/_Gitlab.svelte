@@ -51,7 +51,8 @@
 					appId: source.gitlabApp.appId,
 					appSecret: source.gitlabApp.appSecret,
 					groupName: source.gitlabApp.groupName,
-					customPort: source.customPort
+					customPort: source.customPort,
+					customUser: source.customUser,
 				});
 				const from = $page.url.searchParams.get('from');
 				if (from) {
@@ -70,7 +71,8 @@
 					name: source.name,
 					htmlUrl: source.htmlUrl.replace(/\/$/, ''),
 					apiUrl: source.apiUrl.replace(/\/$/, ''),
-					customPort: source.customPort
+					customPort: source.customPort,
+					customUser: source.customUser
 				});
 				return addToast({
 					message: 'Configuration saved.',
@@ -244,6 +246,22 @@
 				/>
 			</div>
 			{#if selfHosted}
+				<div class="grid grid-cols-2 items-center">
+					<label for="customPort" class="text-base font-bold text-stone-100"
+						>Custom SSH User <Explainer
+							explanation={'If you use a self-hosted version of Git, you can provide a custom SSH user for all the Git related actions.'}
+						/></label
+					>
+					<input
+						class="w-full"
+						name="customUser"
+						id="customUser"
+						disabled={!selfHosted}
+						readonly={!selfHosted}
+						required
+						bind:value={source.customUser}
+					/>
+				</div>
 				<div class="grid grid-cols-2 items-center">
 					<label for="customPort" class="text-base font-bold text-stone-100"
 						>Custom SSH Port <Explainer

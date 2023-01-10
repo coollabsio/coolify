@@ -26,6 +26,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import { appSession } from '$lib/store';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
@@ -81,10 +82,11 @@
 				{/key}
 			{/each}
 		{/if}
-
-		<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
-			Add New Volume
-		</div>
-		<Storage on:refresh={refreshStorage} isNew {services} />
+		{#if $appSession.isAdmin}
+			<div class="title" class:pt-10={persistentStorages.filter((s) => s.predefined).length > 0}>
+				Add New Volume
+			</div>
+			<Storage on:refresh={refreshStorage} isNew {services} />
+		{/if}
 	</div>
 </div>

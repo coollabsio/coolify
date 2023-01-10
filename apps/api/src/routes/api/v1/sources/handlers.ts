@@ -22,11 +22,11 @@ export async function listSources(request: FastifyRequest) {
 export async function saveSource(request, reply) {
     try {
         const { id } = request.params
-        let { name, htmlUrl, apiUrl, customPort, isSystemWide } = request.body
+        let { name, htmlUrl, apiUrl, customPort, customUser, isSystemWide } = request.body
         if (customPort) customPort = Number(customPort)
         await prisma.gitSource.update({
             where: { id },
-            data: { name, htmlUrl, apiUrl, customPort, isSystemWide }
+            data: { name, htmlUrl, apiUrl, customPort, customUser, isSystemWide }
         });
         return reply.code(201).send()
     } catch ({ status, message }) {
@@ -48,6 +48,7 @@ export async function getSource(request: FastifyRequest<OnlyId>) {
                     apiUrl: null,
                     organization: null,
                     customPort: 22,
+                    customUser: 'git',
                 },
                 settings
             }
@@ -133,7 +134,7 @@ export async function saveGitLabSource(request: FastifyRequest<SaveGitLabSource>
     try {
         const { id } = request.params
         const { teamId } = request.user
-        let { type, name, htmlUrl, apiUrl, oauthId, appId, appSecret, groupName, customPort } =
+        let { type, name, htmlUrl, apiUrl, oauthId, appId, appSecret, groupName, customPort, customUser } =
             request.body
 
         if (oauthId) oauthId = Number(oauthId);
@@ -142,7 +143,7 @@ export async function saveGitLabSource(request: FastifyRequest<SaveGitLabSource>
 
         if (id === 'new') {
             const newId = cuid()
-            await prisma.gitSource.create({ data: { id: newId, type, apiUrl, htmlUrl, name, customPort, teams: { connect: { id: teamId } } } });
+            await prisma.gitSource.create({ data: { id: newId, type, apiUrl, htmlUrl, name, customPort, customUser, teams: { connect: { id: teamId } } } });
             await prisma.gitlabApp.create({
                 data: {
                     teams: { connect: { id: teamId } },
@@ -158,7 +159,7 @@ export async function saveGitLabSource(request: FastifyRequest<SaveGitLabSource>
                 id: newId
             }
         } else {
-            await prisma.gitSource.update({ where: { id }, data: { type, apiUrl, htmlUrl, name, customPort } });
+            await prisma.gitSource.update({ where: { id }, data: { type, apiUrl, htmlUrl, name, customPort, customUser } });
             await prisma.gitlabApp.update({
                 where: { id },
                 data: {

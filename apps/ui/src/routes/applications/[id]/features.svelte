@@ -51,6 +51,7 @@
 	let isDBBranching = application.settings.isDBBranching;
 
 	async function changeSettings(name: any) {
+		if (!$appSession.isAdmin) return
 		if (name === 'previews') {
 			previews = !previews;
 		}
@@ -102,7 +103,7 @@
 			}
 			return errorNotification(error);
 		} finally {
-			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 		}
 	}
 </script>
@@ -119,6 +120,7 @@
 						id="autodeploy"
 						isCenter={false}
 						bind:setting={autodeploy}
+						disabled={!$appSession.isAdmin}
 						on:click={() => changeSettings('autodeploy')}
 						title={$t('application.enable_automatic_deployment')}
 						description={$t('application.enable_auto_deploy_webhooks')}
@@ -130,6 +132,7 @@
 							id="previews"
 							isCenter={false}
 							bind:setting={previews}
+							disabled={!$appSession.isAdmin}
 							on:click={() => changeSettings('previews')}
 							title={$t('application.enable_mr_pr_previews')}
 							description={$t('application.enable_preview_deploy_mr_pr_requests')}

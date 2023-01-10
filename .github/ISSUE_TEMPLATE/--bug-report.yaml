@@ -9,13 +9,21 @@ body:
 - type: markdown
   attributes:
     value: |
-      Thanks for taking the time to fill out this bug report! Please fill the form in English
+      Thanks for taking the time to fill out this bug report! Please fill the form in English.
 - type: checkboxes
   attributes:
     label: Is there an existing issue for this?
     options:
     - label: I have searched the existing issues
       required: true
+- type: input
+  id: repository
+  attributes:
+    label: Example public repository
+    description: "An example public git repository to reproduce the issue easily (if applicable)."
+    placeholder: "ex: https://github.com/coollabsio/coolify"
+  validations:
+    required: false
 - type: textarea
   attributes:
     label: Description

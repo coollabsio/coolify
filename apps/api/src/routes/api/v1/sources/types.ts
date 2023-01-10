@@ -21,6 +21,7 @@ export interface SaveGitLabSource extends OnlyId {
         appSecret: string,
         groupName: string,
         customPort: number,
+        customUser: string,
     }
 }
 export interface CheckGitLabOAuthId extends OnlyId {

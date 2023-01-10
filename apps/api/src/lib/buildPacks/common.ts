@@ -1,6 +1,18 @@
-import { base64Encode, decrypt, encrypt, executeCommand, generateTimestamp, getDomain, isARM, isDev, prisma, version } from "../common";
+import {
+	base64Encode,
+	decrypt,
+	encrypt,
+	executeCommand,
+	generateSecrets,
+	generateTimestamp,
+	getDomain,
+	isARM,
+	isDev,
+	prisma,
+	version
+} from '../common';
 import { promises as fs } from 'fs';
-import { day } from "../dayjs";
+import { day } from '../dayjs';
 
 const staticApps = ['static', 'react', 'vuejs', 'svelte', 'gatsby', 'astro', 'eleventy'];
 const nodeBased = [
@@ -17,7 +29,10 @@ const nodeBased = [
 	'nextjs'
 ];
 
-export function setDefaultBaseImage(buildPack: string | null, deploymentType: string | null = null) {
+export function setDefaultBaseImage(
+	buildPack: string | null,
+	deploymentType: string | null = null
+) {
 	const nodeVersions = [
 		{
 			value: 'node:lts',
@@ -316,8 +331,8 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		{
 			value: 'heroku/builder-classic:22',
 			label: 'heroku/builder-classic:22'
-		},
-	]
+		}
+	];
 	let payload: any = {
 		baseImage: null,
 		baseBuildImage: null,
@@ -327,7 +342,9 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	if (nodeBased.includes(buildPack)) {
 		if (deploymentType === 'static') {
 			payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
-			payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
+			payload.baseImages = isARM(process.arch)
+				? staticVersions.filter((version) => !version.value.includes('webdevops'))
+				: staticVersions;
 			payload.baseBuildImage = 'node:lts';
 			payload.baseBuildImages = nodeVersions;
 		} else {
@@ -339,7 +356,9 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 	}
 	if (staticApps.includes(buildPack)) {
 		payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
-		payload.baseImages = isARM(process.arch) ? staticVersions.filter((version) => !version.value.includes('webdevops')) : staticVersions;
+		payload.baseImages = isARM(process.arch)
+			? staticVersions.filter((version) => !version.value.includes('webdevops'))
+			: staticVersions;
 		payload.baseBuildImage = 'node:lts';
 		payload.baseBuildImages = nodeVersions;
 	}
@@ -357,12 +376,20 @@ export function setDefaultBaseImage(buildPack: string | null, deploymentType: st
 		payload.baseImage = 'denoland/deno:latest';
 	}
 	if (buildPack === 'php') {
-		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
+		payload.baseImage = isARM(process.arch)
+			? 'php:8.1-fpm-alpine'
+			: 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = isARM(process.arch)
+			? phpVersions.filter((version) => !version.value.includes('webdevops'))
+			: phpVersions;
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = isARM(process.arch) ? 'php:8.1-fpm-alpine' : 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = isARM(process.arch) ? phpVersions.filter((version) => !version.value.includes('webdevops')) : phpVersions
+		payload.baseImage = isARM(process.arch)
+			? 'php:8.1-fpm-alpine'
+			: 'webdevops/php-apache:8.2-alpine';
+		payload.baseImages = isARM(process.arch)
+			? phpVersions.filter((version) => !version.value.includes('webdevops'))
+			: phpVersions;
 		payload.baseBuildImage = 'node:18';
 		payload.baseBuildImages = nodeVersions;
 	}
@@ -405,7 +432,8 @@ export const setDefaultConfiguration = async (data: any) => {
 	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
-		if (baseDirectory.endsWith('/') && baseDirectory !== '/') baseDirectory = baseDirectory.slice(0, -1);
+		if (baseDirectory.endsWith('/') && baseDirectory !== '/')
+			baseDirectory = baseDirectory.slice(0, -1);
 	}
 	if (dockerFileLocation) {
 		if (!dockerFileLocation.startsWith('/')) dockerFileLocation = `/${dockerFileLocation}`;
@@ -414,8 +442,10 @@ export const setDefaultConfiguration = async (data: any) => {
 		dockerFileLocation = '/Dockerfile';
 	}
 	if (dockerComposeFileLocation) {
-		if (!dockerComposeFileLocation.startsWith('/')) dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
-		if (dockerComposeFileLocation.endsWith('/')) dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
+		if (!dockerComposeFileLocation.startsWith('/'))
+			dockerComposeFileLocation = `/${dockerComposeFileLocation}`;
+		if (dockerComposeFileLocation.endsWith('/'))
+			dockerComposeFileLocation = dockerComposeFileLocation.slice(0, -1);
 	} else {
 		dockerComposeFileLocation = '/Dockerfile';
 	}
@@ -479,7 +509,6 @@ export const scanningTemplates = {
 	}
 };
 
-
 export const saveBuildLog = async ({
 	line,
 	buildId,
@@ -491,7 +520,7 @@ export const saveBuildLog = async ({
 }): Promise<any> => {
 	if (buildId === 'undefined' || buildId === 'null' || !buildId) return;
 	if (applicationId === 'undefined' || applicationId === 'null' || !applicationId) return;
-	const { default: got } = await import('got')
+	const { default: got } = await import('got');
 	if (typeof line === 'object' && line) {
 		if (line.shortMessage) {
 			line = line.shortMessage + '\n' + line.stderr;
@@ -504,7 +533,11 @@ export const saveBuildLog = async ({
 		line = line.replace(regex, '<SENSITIVE_DATA_DELETED>@');
 	}
 	const addTimestamp = `[${generateTimestamp()}] ${line}`;
-	const fluentBitUrl = isDev ? process.env.COOLIFY_CONTAINER_DEV === 'true' ? 'http://coolify-fluentbit:24224' : 'http://localhost:24224' : 'http://coolify-fluentbit:24224';
+	const fluentBitUrl = isDev
+		? process.env.COOLIFY_CONTAINER_DEV === 'true'
+			? 'http://coolify-fluentbit:24224'
+			: 'http://localhost:24224'
+		: 'http://coolify-fluentbit:24224';
 
 	if (isDev && !process.env.COOLIFY_CONTAINER_DEV) {
 		console.debug(`[${applicationId}] ${addTimestamp}`);
@@ -514,15 +547,17 @@ export const saveBuildLog = async ({
 			json: {
 				line: encrypt(line)
 			}
-		})
+		});
 	} catch (error) {
 		return await prisma.buildLog.create({
 			data: {
-				line: addTimestamp, buildId, time: Number(day().valueOf()), applicationId
+				line: addTimestamp,
+				buildId,
+				time: Number(day().valueOf()),
+				applicationId
 			}
 		});
 	}
-
 };
 
 export async function copyBaseConfigurationFiles(
@@ -610,7 +645,7 @@ export function checkPnpm(installCommand = null, buildCommand = null, startComma
 
 export async function saveDockerRegistryCredentials({ url, username, password, workdir }) {
 	if (!username || !password) {
-		return null
+		return null;
 	}
 
 	let decryptedPassword = decrypt(password);
@@ -619,17 +654,17 @@ export async function saveDockerRegistryCredentials({ url, username, password, w
 	try {
 		await fs.mkdir(`${workdir}/.docker`);
 	} catch (error) {
-		console.log(error);
+		// console.log(error);
 	}
 	const payload = JSON.stringify({
-		"auths": {
+		auths: {
 			[url]: {
-				"auth": Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
+				auth: Buffer.from(`${username}:${decryptedPassword}`).toString('base64')
 			}
 		}
-	})
-	await fs.writeFile(`${location}/config.json`, payload)
-	return location
+	});
+	await fs.writeFile(`${location}/config.json`, payload);
+	return location;
 }
 export async function buildImage({
 	applicationId,
@@ -640,29 +675,41 @@ export async function buildImage({
 	isCache = false,
 	debug = false,
 	dockerFileLocation = '/Dockerfile',
-	commit
+	commit,
+	forceRebuild = false
 }) {
 	if (isCache) {
 		await saveBuildLog({ line: `Building cache image...`, buildId, applicationId });
 	} else {
 		await saveBuildLog({ line: `Building production image...`, buildId, applicationId });
 	}
-	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`
-	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`
+	const dockerFile = isCache ? `${dockerFileLocation}-cache` : `${dockerFileLocation}`;
+	const cache = `${applicationId}:${tag}${isCache ? '-cache' : ''}`;
+	let location = null;
 
-	let location = null
-
-	const { dockerRegistry } = await prisma.application.findUnique({ where: { id: applicationId }, select: { dockerRegistry: true } })
+	const { dockerRegistry } = await prisma.application.findUnique({
+		where: { id: applicationId },
+		select: { dockerRegistry: true }
+	});
 	if (dockerRegistry) {
-		const { url, username, password } = dockerRegistry
-		location = await saveDockerRegistryCredentials({ url, username, password, workdir })
+		const { url, username, password } = dockerRegistry;
+		location = await saveDockerRegistryCredentials({ url, username, password, workdir });
 	}
 
-	await executeCommand({ stream: true, debug, buildId, applicationId, dockerId, command: `docker ${location ? `--config ${location}` : ''} build --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}` })
+	await executeCommand({
+		stream: true,
+		debug,
+		buildId,
+		applicationId,
+		dockerId,
+		command: `docker ${location ? `--config ${location}` : ''} build ${
+			forceRebuild ? '--no-cache' : ''
+		} --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}`
+	});
 
-	const { status } = await prisma.build.findUnique({ where: { id: buildId } })
+	const { status } = await prisma.build.findUnique({ where: { id: buildId } });
 	if (status === 'canceled') {
-		throw new Error('Canceled.')
+		throw new Error('Canceled.');
 	}
 }
 export function makeLabelForSimpleDockerfile({ applicationId, port, type }) {
@@ -741,21 +788,8 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-					if (isSecretFound.length > 0) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
-					} else {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	if (isPnpm) {
@@ -765,7 +799,6 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 	if (installCommand) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
-	// Dockerfile.push(`ARG CACHEBUST=1`);
 	Dockerfile.push(`RUN ${buildCommand}`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
@@ -773,27 +806,13 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 
 export async function buildCacheImageForLaravel(data, imageForBuild) {
 	const { workdir, buildId, secrets, pullmergeRequestId } = data;
-
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	if (secrets.length > 0) {
-		secrets.forEach((secret) => {
-			if (secret.isBuildSecret) {
-				if (pullmergeRequestId) {
-					const isSecretFound = secrets.filter(s => s.name === secret.name && s.isPRMRSecret)
-					if (isSecretFound.length > 0) {
-						Dockerfile.push(`ARG ${secret.name}=${isSecretFound[0].value}`);
-					} else {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-					}
-				} else {
-					if (!secret.isPRMRSecret) {
-						Dockerfile.push(`ARG ${secret.name}=${secret.value}`);
-					}
-				}
-			}
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
 		});
 	}
 	Dockerfile.push(`COPY *.json *.mix.js /app/`);
@@ -804,11 +823,7 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 }
 
 export async function buildCacheImageWithCargo(data, imageForBuild) {
-	const {
-		applicationId,
-		workdir,
-		buildId,
-	} = data;
+	const { applicationId, workdir, buildId } = data;
 
 	const Dockerfile: Array<string> = [];
 	Dockerfile.push(`FROM ${imageForBuild} as planner-${applicationId}`);

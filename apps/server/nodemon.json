@@ -1,0 +1,7 @@
+{
+	"watch": ["src"],
+	"ignore": ["src/**/*.test.ts"],
+	"ext": "ts,mjs,json,graphql",
+	"exec": "rimraf build && esbuild `find src \\( -name '*.ts' -o -name '*.js' \\)` --platform=node --outdir=build --format=cjs && node build",
+	"legacyWatch": true
+}

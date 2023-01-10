@@ -1,6 +1,6 @@
 <script lang="ts">
 	export let application: any;
-	import { status } from '$lib/store';
+	import { appSession, status } from '$lib/store';
 	import { page } from '$app/stores';
 </script>
 
@@ -220,7 +220,7 @@
 	<li class="menu-title">
 		<span>Advanced</span>
 	</li>
-	{#if application.gitSourceId}
+	{#if application.gitSourceId && $appSession.isAdmin}
 		<li
 			class="rounded"
 			class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/revert`}
@@ -295,6 +295,7 @@
 			>
 		</li>
 	{/if}
+	{#if $appSession.isAdmin}
 	<li
 		class="rounded"
 		class:bg-coollabs={$page.url.pathname === `/applications/${$page.params.id}/danger`}
@@ -318,4 +319,5 @@
 			</svg>Danger Zone</a
 		>
 	</li>
+	{/if}
 </ul>

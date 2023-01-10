@@ -1,0 +1,284 @@
+/* Write your global styles here, in PostCSS syntax */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 400;
+	src: local(''), url('/poppins-v19-latin-ext_latin_devanagari-regular.woff2') format('woff2'),
+		url('/poppins-v19-latin-ext_latin_devanagari-regular.woff') format('woff');
+}
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 500;
+	src: local(''), url('/poppins-v19-latin-ext_latin_devanagari-500.woff2') format('woff2'),
+		url('/poppins-v19-latin-ext_latin_devanagari-500.woff') format('woff');
+}
+
+button {
+	@apply text-sm !important;
+}
+html {
+	@apply h-full min-h-full overflow-y-scroll;
+}
+body {
+	@apply min-h-screen overflow-x-hidden bg-coolblack text-sm text-white scrollbar-w-1 scrollbar-thumb-coollabs scrollbar-track-coolgray-200;
+}
+
+input,
+.input {
+	@apply h-12 w-96 rounded border border-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-200 disabled:bg-transparent disabled:bg-coolblack md:text-sm;
+}
+textarea {
+	@apply min-w-[14rem] rounded border border-transparent bg-coolgray-200 p-2 text-xs tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:border disabled:border-dashed disabled:border-coolgray-200 disabled:bg-transparent md:text-sm;
+}
+
+#svelte .custom-select-wrapper .selectContainer.disabled input {
+	@apply placeholder:text-stone-600;
+}
+
+#svelte .custom-select-wrapper .selectContainer input {
+	@apply text-white;
+}
+
+#svelte .custom-select-wrapper .selectContainer {
+	@apply h-12 rounded bg-coolgray-200 p-2 px-0 text-xs tracking-tight outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 md:text-sm;
+}
+
+#svelte .listContainer {
+	@apply bg-coolgray-400 text-white scrollbar-w-2 scrollbar-thumb-green-500 scrollbar-track-coolgray-200;
+}
+#svelte .selectedItem {
+	@apply pl-2;
+}
+
+#svelte .item.hover {
+	@apply bg-coollabs text-white !important;
+}
+#svelte .item.active {
+	@apply bg-coolgray-100 text-white;
+}
+
+select {
+	@apply h-12 w-96 rounded bg-coolgray-200 p-2 text-xs font-bold tracking-tight text-white placeholder-stone-600 outline-none transition duration-150 hover:bg-coolgray-500 focus:bg-coolgray-500 disabled:text-stone-600 md:text-sm;
+}
+.custom-select-wrapper {
+	--background: rgb(32 32 32);
+	--inputColor: white;
+	--multiItemPadding: 0;
+	--multiSelectPadding: 0 0.5rem 0 0.5rem;
+	--border: none;
+	--placeholderColor: rgb(87 83 78);
+	--listBackground: rgb(32 32 32);
+	--itemColor: white;
+	--itemHoverBG: rgb(107 22 237);
+	--multiItemBG: rgb(32 32 32);
+	--multiClearHoverBG: transparent;
+	--multiClearHoverFill: rgb(239 68 68);
+	--multiItemActiveBG: transparent;
+	--multiClearBG: transparent;
+	--clearSelectFocusColor: white;
+	--clearSelectHoverColor: rgb(239 68 68);
+	--multiItemBorderRadius: 0.25rem;
+	--listShadow: none;
+}
+
+label {
+	@apply inline-block;
+}
+.btn {
+	@apply text-white text-base min-w-fit no-animation;
+}
+
+a {
+	@apply underline hover:text-white;
+}
+
+.content {
+	@apply p-2 px-4;
+}
+
+.title {
+	@apply text-lg lg:text-2xl font-bold;
+}
+.subtitle {
+	@apply text-lg lg:text-xl font-bold text-indigo-300;
+}
+.label {
+	@apply text-sm leading-6 font-semibold text-sky-500 dark:text-sky-400;
+}
+.card {
+	@apply border bg-coolgray-100 border-coolgray-200 rounded p-2 space-y-2 sticky top-4 mb-2 items-center;
+}
+.icon-holder {
+	overflow: hidden;
+	height: 30px;
+	border-radius: 5px;
+	margin-right: 8px;
+	background: linear-gradient(0deg, #999, #ddd);
+}
+.instance-status-running {
+	box-shadow: 1px 4px 5px #3df721;
+}
+.instance-status-stopped {
+	box-shadow: 1px 4px 5px rgb(110, 191, 225);
+}
+.instance-status-error {
+	box-shadow: 1px 4px 5px #fb00ff;
+}
+.instance-status-degraded {
+	box-shadow: 1px 4px 5px #f7b121;
+}
+.badge-status-healthy,
+.badge-status-running {
+	@apply text-green-500;
+}
+.badge-status-degraded {
+	@apply text-green-500;
+}
+.badge-status-stopped {
+	@apply text-sky-500;
+}
+.delete-button {
+	@apply bg-red-600;
+}
+.delete-button:hover {
+	@apply bg-red-500;
+}
+/* Interchange menu position */
+.menu-left {
+	display: flex;
+	flex-direction: row;
+}
+.menu-left .menu-bar {
+	display: flex;
+	flex-direction: column;
+}
+.menu-left .menu-bar > * {
+	display: flex;
+	flex-direction: column;
+}
+.menu-top {
+	display: flex;
+	flex-direction: column;
+}
+.menu-top .menu-bar {
+	display: flex;
+	flex-direction: row;
+}
+.menu-top .menu-bar > * {
+	display: flex;
+	flex-direction: row;
+}
+
+.nav-main {
+	@apply fixed top-0 left-0 min-h-screen w-16 min-w-[4rem] overflow-hidden border-r border-stone-800 bg-coolgray-200 scrollbar-w-1  scrollbar-thumb-coollabs scrollbar-track-coolgray-200 xl:overflow-visible;
+}
+
+.nav-side {
+	@apply absolute right-0 top-0 z-50 m-5 flex flex-wrap items-center justify-end space-x-2 bg-coolblack/40 text-white;
+}
+
+.add-icon {
+	@apply rounded p-1 transition duration-200;
+}
+
+.icons {
+	@apply rounded p-2 transition duration-200 hover:bg-coolgray-500 disabled:bg-coolblack disabled:text-coolgray-500 !important;
+}
+
+.arrow-right-applications {
+	@apply -ml-6 px-2 font-bold text-green-500;
+}
+
+.border-gradient {
+	border-bottom: 2px solid transparent;
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image-slice: 1;
+}
+.border-gradient-full {
+	border: 4px solid transparent;
+	-o-border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image: linear-gradient(
+		0.25turn,
+		rgba(255, 249, 34),
+		rgba(255, 0, 128),
+		rgba(56, 2, 155, 0)
+	);
+	border-image-slice: 1;
+}
+
+.box-selection {
+	@apply min-w-[16rem]  justify-center rounded border-transparent bg-coolgray-200 p-6 hover:border-transparent hover:bg-coolgray-400;
+}
+
+.lds-heart {
+	animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+@keyframes lds-heart {
+	0% {
+		transform: scale(1);
+	}
+	5% {
+		transform: scale(1.2);
+	}
+	39% {
+		transform: scale(0.85);
+	}
+	45% {
+		transform: scale(1);
+	}
+	60% {
+		transform: scale(0.95);
+	}
+	100% {
+		transform: scale(0.9);
+	}
+}
+
+.sub-menu {
+	@apply w-48 text-base font-bold hover:bg-coolgray-500 rounded p-2 hover:text-white text-stone-200 cursor-pointer;
+}
+
+.sub-menu-active {
+	@apply bg-coolgray-500  text-white;
+}
+
+.table tbody td,
+.table tbody th,
+.table thead th {
+	background-color: transparent;
+}
+.table * {
+	border: none;
+}
+
+.header {
+	@apply flex flex-row  z-10 w-full py-5 px-5;
+}
+.burger {
+	@apply block m-[2px] h-[3px] w-5 rounded;
+}
+
+.bg-coollabs-gradient {
+	@apply bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
+}

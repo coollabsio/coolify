@@ -76,10 +76,9 @@
 	import { dev } from '$app/env';
 	const { id } = $page.params;
 
-	$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
+	$isDeploymentEnabled = checkIfDeploymentEnabledServices(service);
 
 	let statusInterval: any;
-	
 
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
@@ -291,7 +290,7 @@
 			</button>
 		{:else if $status.service.overallStatus === 'healthy'}
 			<button
-				disabled={!$isDeploymentEnabled}
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 				class="btn btn-sm gap-2"
 				on:click={() => restartService()}
 			>
@@ -317,7 +316,7 @@
 			<button
 				on:click={() => stopService(false)}
 				type="submit"
-				disabled={!$isDeploymentEnabled}
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 				class="btn btn-sm gap-2"
 			>
 				<svg
@@ -338,10 +337,10 @@
 			</button>
 		{:else if $status.service.overallStatus === 'degraded'}
 			<button
-				on:click={stopService}
+				on:click={() => stopService()}
 				type="submit"
-				disabled={!$isDeploymentEnabled}
-				class="btn btn-sm  gap-2"
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
+				class="btn btn-sm gap-2"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -362,7 +361,7 @@
 			{#if $status.service.overallStatus === 'degraded'}
 				<button
 					class="btn btn-sm gap-2"
-					disabled={!$isDeploymentEnabled}
+					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 					on:click={() => restartService()}
 				>
 					<svg
@@ -386,7 +385,7 @@
 			{:else if $status.service.overallStatus === 'stopped'}
 				<button
 					class="btn btn-sm gap-2"
-					disabled={!$isDeploymentEnabled}
+					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 					on:click={() => startService()}
 				>
 					<svg
