@@ -225,10 +225,16 @@ async function getTagsTemplates() {
 	const { default: got } = await import('got');
 	try {
 		if (isDev) {
+			const remoteTags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text();
 			const templates = await fs.readFile('./devTemplates.yaml', 'utf8');
 			const tags = await fs.readFile('./devTags.json', 'utf8');
+			if (tags !== remoteTags) {
+				await fs.writeFile('./tags.json', remoteTags);
+				await fs.writeFile('./devTags.json', remoteTags);
+			} else {
+				await fs.writeFile('./tags.json', tags);
+			}
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)));
-			await fs.writeFile('./tags.json', tags);
 			console.log('[004] Tags and templates loaded in dev mode...');
 		} else {
 			const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text();
