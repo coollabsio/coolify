@@ -44,7 +44,7 @@
 		"is-ip": "5.0.0",
 		"is-port-reachable": "4.0.0",
 		"js-yaml": "4.1.0",
-		"jsonwebtoken": "8.5.1",
+		"jsonwebtoken": "9.0.0",
 		"node-fetch": "3.3.0",
 		"p-all": "4.0.0",
 		"p-throttle": "5.0.0",
