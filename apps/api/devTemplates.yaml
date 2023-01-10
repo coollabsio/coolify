@@ -124,12 +124,12 @@
       description: ""
     - id: $$config_disable_auth
       name: DISABLE_AUTH
-      label: Disable Authentication
+      label: Authentication
       defaultValue: "false"
       description: ""
     - id: $$config_disable_registration
       name: DISABLE_REGISTRATION
-      label: Disable Registration
+      label: Registration
       defaultValue: "true"
       description: ""
     - id: $$config_postgres_user
@@ -3250,12 +3250,12 @@
       description: ""
     - id: $$config_disable_auth
       name: DISABLE_AUTH
-      label: Disable Authentication
+      label: Authentication
       defaultValue: "false"
       description: ""
     - id: $$config_disable_registration
       name: DISABLE_REGISTRATION
-      label: Disable Registration
+      label: Registration
       defaultValue: "true"
       description: ""
     - id: $$config_postgresql_username
