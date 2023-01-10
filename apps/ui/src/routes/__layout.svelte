@@ -295,7 +295,7 @@
 							id="documentation"
 							href="https://docs.coollabs.io/coolify/"
 							target="_blank"
-							rel="noopener noreferrer"
+							rel="noreferrer external"
 							class="icons hover:text-info"
 						>
 							<svg
