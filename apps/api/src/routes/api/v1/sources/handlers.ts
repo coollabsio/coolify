@@ -103,7 +103,7 @@ export async function saveGitHubSource(request: FastifyRequest<SaveGitHubSource>
         const { teamId } = request.user
 
         const { id } = request.params
-        let { name, htmlUrl, apiUrl, organization, customPort, customUser, isSystemWide } = request.body
+        let { name, htmlUrl, apiUrl, organization, customPort, isSystemWide } = request.body
 
         if (customPort) customPort = Number(customPort)
         if (id === 'new') {
@@ -116,7 +116,6 @@ export async function saveGitHubSource(request: FastifyRequest<SaveGitHubSource>
                     apiUrl,
                     organization,
                     customPort,
-                    customUser,
                     isSystemWide,
                     type: 'github',
                     teams: { connect: { id: teamId } }
