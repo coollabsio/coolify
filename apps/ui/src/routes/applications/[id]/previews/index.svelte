@@ -23,7 +23,7 @@
 	import { goto } from '$app/navigation';
 	import { asyncSleep, errorNotification, getRndInteger } from '$lib/common';
 	import { onDestroy, onMount } from 'svelte';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
 
@@ -264,6 +264,7 @@
 								{:else}
 									<button
 										id="restart"
+										disabled={!$appSession.isAdmin}
 										on:click={() => restartPreview(preview)}
 										type="submit"
 										class="icons bg-transparent text-sm flex items-center space-x-2"
@@ -286,7 +287,12 @@
 								{/if}
 
 								<Tooltip triggeredBy="#restart">Restart (useful to change secrets)</Tooltip>
-								<button id="forceredeploypreview" class="icons" on:click={() => redeploy(preview)}>
+								<button
+									id="forceredeploypreview"
+									class="icons"
+									disabled={!$appSession.isAdmin}
+									on:click={() => redeploy(preview)}
+								>
 									<svg
 										xmlns="http://www.w3.org/2000/svg"
 										class="w-6 h-6"
@@ -310,7 +316,7 @@
 									id="deletepreview"
 									class="icons"
 									class:hover:text-error={!loading.removing}
-									disabled={loading.removing}
+									disabled={loading.removing || !$appSession.isAdmin}
 									on:click={() => removeApplication(preview)}
 									><DeleteIcon />
 								</button>

@@ -190,7 +190,7 @@
 					id="name"
 					required
 					bind:value={source.name}
-					disabled={$appSession.teamId !== '0'}
+					disabled={!$appSession.isAdmin}
 				/>
 				<label for="htmlUrl">HTML URL</label>
 				<input
@@ -236,16 +236,18 @@
 					placeholder="eg: coollabsio"
 					bind:value={source.organization}
 				/>
-				<Setting
-					customClass="pt-4"
-					id="autodeploy"
-					isCenter={false}
-					disabled={$appSession.teamId !== '0'}
-					bind:setting={source.isSystemWide}
-					on:click={() => changeSettings('isSystemWide', true)}
-					title="System Wide Git Source"
-					description="System Wide Git Sources are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
-				/>
+				{#if $appSession.isAdmin}
+					<Setting
+						customClass="pt-4"
+						id="autodeploy"
+						isCenter={false}
+						disabled={$appSession.teamId !== '0'}
+						bind:setting={source.isSystemWide}
+						on:click={() => changeSettings('isSystemWide', true)}
+						title="System Wide Git Source"
+						description="System Wide Git Sources are available to all the users in your Coolify instance. <br><br> <span class='font-bold text-warning'>Use with caution, as it can be a security risk.</span>"
+					/>
+				{/if}
 			</div>
 		</form>
 	{:else}

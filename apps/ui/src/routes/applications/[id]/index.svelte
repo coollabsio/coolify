@@ -490,7 +490,7 @@
 			<div class="grid grid-flow-row gap-2 px-4">
 				<div class="mt-2 grid grid-cols-2 items-center">
 					<label for="name">{$t('forms.name')}</label>
-					<input name="name" id="name" class="w-full" bind:value={application.name} required />
+					<input name="name" id="name" class="w-full" bind:value={application.name} disabled={!$appSession.isAdmin} required />
 				</div>
 				{#if !isSimpleDockerfile}
 					<div class="grid grid-cols-2 items-center">

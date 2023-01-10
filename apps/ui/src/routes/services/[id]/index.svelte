@@ -165,6 +165,7 @@
 		}
 	}
 	async function changeSettings(name: any) {
+		if (!$appSession.isAdmin) return
 		try {
 			if (name === 'dualCerts') {
 				dualCerts = !dualCerts;
@@ -277,7 +278,7 @@
 		<div class="grid grid-flow-row gap-2 px-4">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name">{$t('forms.name')}</label>
-				<input name="name" id="name" class="w-full" bind:value={service.name} required />
+				<input name="name" id="name" class="w-full" disabled={!$appSession.isAdmin} bind:value={service.name} required />
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
@@ -386,7 +387,7 @@
 			<div class="grid grid-cols-2 items-center">
 				<Setting
 					id="dualCerts"
-					disabled={$status.service.isRunning}
+					disabled={$status.service.isRunning || !$appSession.isAdmin}
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}

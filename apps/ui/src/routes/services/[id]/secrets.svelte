@@ -25,7 +25,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import pLimit from 'p-limit';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { saveSecret } from './utils';
 	const limit = pLimit(1);
 
@@ -83,7 +83,12 @@
 				{#each secrets as secret}
 					{#key secret.id}
 						<tr>
-							<Secret name={secret.name} value={secret.value} readonly={secret.readOnly} on:refresh={refreshSecrets} />
+							<Secret
+								name={secret.name}
+								value={secret.value}
+								readonly={secret.readOnly}
+								on:refresh={refreshSecrets}
+							/>
 						</tr>
 					{/key}
 				{/each}
@@ -93,18 +98,20 @@
 			</tbody>
 		</table>
 	</div>
-	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
-			<div class="flex flex-row space-x-2">
-				<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
-				<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+	{#if $appSession.isAdmin}
+		<form on:submit|preventDefault={getValues} class="mb-12 w-full">
+			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
+				<div class="flex flex-row space-x-2">
+					<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
+					<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+				</div>
 			</div>
-		</div>
 
-		<textarea
-			placeholder={`PORT=1337\nPASSWORD=supersecret`}
-			bind:value={batchSecrets}
-			class="mb-2 min-h-[200px] w-full"
-		/>
-	</form>
+			<textarea
+				placeholder={`PORT=1337\nPASSWORD=supersecret`}
+				bind:value={batchSecrets}
+				class="mb-2 min-h-[200px] w-full"
+			/>
+		</form>
+	{/if}
 </div>

@@ -2,6 +2,7 @@
 	export let service: any;
 	export let template: any;
 	import { page } from '$app/stores';
+	import { appSession } from '$lib/store';
 	import ServiceLinks from './_ServiceLinks.svelte';
 </script>
 
@@ -106,6 +107,7 @@
 			</svg>Service</a
 		>
 	</li>
+	{#if $appSession.isAdmin}
 	<li class="menu-title">
 		<span>Advanced</span>
 	</li>
@@ -132,4 +134,5 @@
 			</svg>Danger Zone</a
 		>
 	</li>
+	{/if}
 </ul>

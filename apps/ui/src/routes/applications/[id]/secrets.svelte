@@ -25,7 +25,7 @@
 	import pLimit from 'p-limit';
 	import { page } from '$app/stores';
 	import { get, post, put } from '$lib/api';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import Secret from './_Secret.svelte';
 	import PreviewSecret from './_PreviewSecret.svelte';
 	import { errorNotification } from '$lib/common';
@@ -106,46 +106,50 @@
 			/>
 		{/key}
 	{/each}
-	<div class="lg:pt-0 pt-10">
-		<Secret on:refresh={refreshSecrets} length={secrets.length} isNewSecret />
-	</div>
-	{#if !application.settings.isBot && !application.simpleDockerfile}
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3 pt-8">
-			Preview Secrets <Explainer
-				explanation="These values overwrite application secrets in PR/MR deployments. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
-			/>
+	{#if $appSession.isAdmin}
+		<div class="lg:pt-0 pt-10">
+			<Secret on:refresh={refreshSecrets} length={secrets.length} isNewSecret />
 		</div>
-	</div>
-	{#if previewSecrets.length !== 0}
-		{#each previewSecrets as secret, index}
-			{#key index}
-				<PreviewSecret
-					{index}
-					length={secrets.length}
-					name={secret.name}
-					value={secret.value}
-					isBuildSecret={secret.isBuildSecret}
-					on:refresh={refreshSecrets}
-				/>
-			{/key}
-		{/each}
-	{:else}
-		Add secrets first to see Preview Secrets.
 	{/if}
+	{#if !application.settings.isBot && !application.simpleDockerfile}
+		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
+			<div class="title font-bold pb-3 pt-8">
+				Preview Secrets <Explainer
+					explanation="These values overwrite application secrets in PR/MR deployments. <br>Useful for creating <span class='text-green-500 font-bold'>staging</span> environments."
+				/>
+			</div>
+		</div>
+		{#if previewSecrets.length !== 0}
+			{#each previewSecrets as secret, index}
+				{#key index}
+					<PreviewSecret
+						{index}
+						length={secrets.length}
+						name={secret.name}
+						value={secret.value}
+						isBuildSecret={secret.isBuildSecret}
+						on:refresh={refreshSecrets}
+					/>
+				{/key}
+			{/each}
+		{:else}
+			Add secrets first to see Preview Secrets.
+		{/if}
 	{/if}
 </div>
-<form on:submit|preventDefault={getValues} class="mb-12 w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
-		<div class="flex flex-row space-x-2">
-			<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
-			<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+{#if $appSession.isAdmin}
+	<form on:submit|preventDefault={getValues} class="mb-12 w-full">
+		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
+			<div class="flex flex-row space-x-2">
+				<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
+				<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+			</div>
 		</div>
-	</div>
 
-	<textarea
-		placeholder={`PORT=1337\nPASSWORD=supersecret`}
-		bind:value={batchSecrets}
-		class="mb-2 min-h-[200px] w-full"
-	/>
-</form>
+		<textarea
+			placeholder={`PORT=1337\nPASSWORD=supersecret`}
+			bind:value={batchSecrets}
+			class="mb-2 min-h-[200px] w-full"
+		/>
+	</form>
+{/if}
