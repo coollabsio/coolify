@@ -176,7 +176,6 @@
 						id="exited"
 						href={!$status.database.isRunning ? `/databases/${id}/logs` : null}
 						class="icons bg-transparent text-red-500 tooltip-error"
-						sveltekit:prefetch
 					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
@@ -271,7 +270,6 @@
 			<a
 				id="configuration"
 				href="/databases/{id}"
-				sveltekit:prefetch
 				class="hover:text-yellow-500 rounded"
 				class:text-yellow-500={$page.url.pathname === `/databases/${id}`}
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}`}
@@ -305,7 +303,6 @@
 			<a
 				id="databaselogs"
 				href={$status.database.isRunning ? `/databases/${id}/logs` : null}
-				sveltekit:prefetch
 				class="hover:text-pink-500 rounded"
 				class:text-pink-500={$page.url.pathname === `/databases/${id}/logs`}
 				class:bg-coolgray-500={$page.url.pathname === `/databases/${id}/logs`}

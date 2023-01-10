@@ -57,11 +57,7 @@
 			<div class="flex-col">
 				<div class="pb-2 text-center font-bold">No SSH key found</div>
 				<div class="flex justify-center">
-					<a
-						href="/settings/ssh"
-						sveltekit:prefetch
-						class="add-icon bg-sky-600 hover:bg-sky-500"
-					>
+					<a href="/settings/ssh" class="add-icon bg-sky-600 hover:bg-sky-500">
 						<svg
 							class="w-6"
 							xmlns="http://www.w3.org/2000/svg"

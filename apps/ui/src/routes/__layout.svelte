@@ -183,7 +183,6 @@
 					<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
 						<a
 							id="dashboard"
-							sveltekit:prefetch
 							href="/"
 							class="icons hover:text-pink-500"
 							class:text-pink-500={$page.url.pathname === '/'}
@@ -210,7 +209,6 @@
 						{#if $appSession.teamId === '0'}
 							<a
 								id="servers"
-								sveltekit:prefetch
 								href="/servers"
 								class="icons hover:text-sky-500"
 								class:text-sky-500={$page.url.pathname === '/servers'}
@@ -243,7 +241,6 @@
 					<div class="flex flex-col space-y-2 py-2">
 						<a
 							id="iam"
-							sveltekit:prefetch
 							href={$appSession.pendingInvitations.length > 0 ? '/iam/pending' : '/iam'}
 							class="icons hover:text-iam indicator"
 							class:text-iam={$page.url.pathname.startsWith('/iam')}
@@ -272,7 +269,6 @@
 						</a>
 						<a
 							id="settings"
-							sveltekit:prefetch
 							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/docker'}
 							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
@@ -297,7 +293,6 @@
 						</a>
 						<a
 							id="documentation"
-							sveltekit:prefetch
 							href="https://docs.coollabs.io/coolify/"
 							target="_blank"
 							rel="noopener noreferrer"
@@ -393,7 +388,6 @@
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-pink-500"
-					sveltekit:prefetch
 					href="/"
 					class:bg-pink-500={$page.url.pathname === '/'}
 					on:click={closeDrawer}
@@ -422,7 +416,6 @@
 				<a
 					id="servers"
 					class="no-underline icons hover:text-white hover:bg-sky-500"
-					sveltekit:prefetch
 					href="/servers"
 					class:bg-sky-500={$page.url.pathname.startsWith('/servers')}
 					on:click={closeDrawer}
