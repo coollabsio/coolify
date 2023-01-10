@@ -265,7 +265,6 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
                 name = name.toLowerCase()
                 const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}`, 'gi')
                 const regex = new RegExp(`\\$\\$secret_${name}`, 'gi')
-                console.log({value, name, regex, regexHashed})
                 if (value) {
                     strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
                     strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
