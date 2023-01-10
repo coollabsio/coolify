@@ -845,15 +845,16 @@ export async function getDockerImages(request) {
 		try {
 			const { stdout } = await executeCommand({
 				dockerId: application.destinationDocker.id,
-				command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache`,
-				shell: true
+				command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'`
 			});
 			const { stdout: runningImage } = await executeCommand({
 				dockerId: application.destinationDocker.id,
 				command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}`
 			});
-			const images = stdout.trim().split('\n');
-
+			const images = stdout
+				.trim()
+				.split('\n')
+				.filter((image) => image.includes(id) && !image.includes('-cache'));
 			for (const image of images) {
 				const [repository, tag, createdAt] = image.split('#');
 				if (tag.includes('-')) {
@@ -874,6 +875,7 @@ export async function getDockerImages(request) {
 				runningImage
 			};
 		} catch (error) {
+			console.log(error);
 			return {
 				imagesAvailables
 			};
