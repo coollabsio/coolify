@@ -96,7 +96,6 @@
 		</div>
 	
 		<Storage on:refresh={refreshStorage} isNew />
-		{}
 		{/if}
 	</div>
 </div>

@@ -103,7 +103,7 @@
 			}
 			return errorNotification(error);
 		} finally {
-			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 		}
 	}
 </script>

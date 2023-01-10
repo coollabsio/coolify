@@ -58,7 +58,7 @@
 		$status.application.overallStatus === 'degraded' ||
 		$status.application.overallStatus === 'healthy' ||
 		$status.application.initialLoading;
-	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+	$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 	let statues: any = {};
 	let loading = {
 		save: false,
@@ -235,7 +235,7 @@
 			}
 			return errorNotification(error);
 		} finally {
-			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 		}
 	}
 	async function handleSubmit(toast: boolean = true) {
@@ -269,7 +269,7 @@
 			}
 			await saveForm(id, application, baseDatabaseBranch, dockerComposeConfiguration);
 			setLocation(application, settings);
-			$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+			$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 
 			forceSave = false;
 			if (toast) {

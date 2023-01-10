@@ -110,7 +110,7 @@
 			if (formData) service = await saveForm(formData, service);
 			setLocation(service);
 			forceSave = false;
-			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
+			$isDeploymentEnabled = checkIfDeploymentEnabledServices(service);
 			return addToast({
 				message: 'Configuration saved.',
 				type: 'success'
