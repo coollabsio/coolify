@@ -162,6 +162,8 @@
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" bind:this={sidedrawerToggler} />
 	<div class="drawer-content">
 		{#if $appSession.userId}
+			<Tooltip triggeredBy="#dashboard" placement="right" color="bg-pink-500">Dashboard</Tooltip>
+			<Tooltip triggeredBy="#servers" placement="right" color="bg-sky-500">Servers</Tooltip>
 			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
 			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
 				>Settings</Tooltip
@@ -234,8 +236,6 @@
 							</a>
 						{/if}
 					</div>
-					<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
-					<Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
 					<div class="flex-1" />
 					<div class="lg:block hidden">
 						<UpdateAvailable />
