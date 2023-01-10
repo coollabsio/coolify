@@ -263,14 +263,15 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
             for (const secret of service.serviceSecret) {
                 let { name, value } = secret
                 name = name.toLowerCase()
-                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\"`, 'gi')
-                const regex = new RegExp(`\\$\\$secret_${name}\"`, 'gi')
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}`, 'gi')
+                console.log({value, name, regex, regexHashed})
                 if (value) {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + '"')
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '' + '"')
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '' + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '')
                 }
             }
         }
