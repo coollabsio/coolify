@@ -1884,6 +1884,30 @@ export async function pushToRegistry(
 	});
 }
 
+function parseSecret(secret, isBuild) {
+	if (secret.value.includes('$')) {
+		secret.value = secret.value.replaceAll('$', '$$$$');
+	}
+	if (secret.value.includes('\\n')) {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	} else if (secret.value.includes(' ')) {
+		if (isBuild) {
+			return `ARG ${secret.name}='${secret.value}'`;
+		} else {
+			return `${secret.name}='${secret.value}'`;
+		}
+	} else {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	}
+}
 export function generateSecrets(
 	secrets: Array<any>,
 	pullmergeRequestId: string,
@@ -1899,22 +1923,7 @@ export function generateSecrets(
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			if (secret.value.includes('$')) {
-				secret.value = secret.value.replaceAll('$', '$$$$');
-			}
-			if (secret.value.includes(' ') || secret.value.includes('\\n')) {
-				if (build) {
-					envs.push(`ARG ${secret.name}='${secret.value}'`);
-				} else {
-					envs.push(`${secret.name}='${secret.value}'`);
-				}
-			} else {
-				if (build) {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
-				} else {
-					envs.push(`${secret.name}=${secret.value}`);
-				}
-			}
+			envs.push(parseSecret(secret, build));
 		});
 	}
 	if (!pullmergeRequestId && normalSecrets.length > 0) {
@@ -1922,25 +1931,11 @@ export function generateSecrets(
 			if (isBuild && !secret.isBuildSecret) {
 				return;
 			}
-			if (secret.value.includes('$')) {
-				secret.value = secret.value.replaceAll('$', '$$$$');
-			}
 			const build = isBuild && secret.isBuildSecret;
-			if (secret.value.includes(' ') || secret.value.includes('\\n')) {
-				if (build) {
-					envs.push(`ARG ${secret.name}='${secret.value}'`);
-				} else {
-					envs.push(`${secret.name}='${secret.value}'`);
-				}
-			} else {
-				if (build) {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
-				} else {
-					envs.push(`${secret.name}=${secret.value}`);
-				}
-			}
+			envs.push(parseSecret(secret, build));
 		});
 	}
+	console.log(envs);
 	const portFound = envs.filter((env) => env.startsWith('PORT'));
 	if (portFound.length === 0 && port && !isBuild) {
 		envs.push(`PORT=${port}`);
