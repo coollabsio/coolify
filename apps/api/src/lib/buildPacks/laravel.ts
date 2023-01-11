@@ -3,7 +3,7 @@ import { generateSecrets } from '../common';
 import { buildCacheImageForLaravel, buildImage } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { workdir, applicationId, tag, buildId, port } = data;
+	const { workdir, applicationId, tag, buildId, port, secrets, pullmergeRequestId } = data;
 	const Dockerfile: Array<string> = [];
 
 	Dockerfile.push(`FROM ${image}`);
