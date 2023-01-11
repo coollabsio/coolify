@@ -1935,7 +1935,6 @@ export function generateSecrets(
 			envs.push(parseSecret(secret, build));
 		});
 	}
-	console.log(envs);
 	const portFound = envs.filter((env) => env.startsWith('PORT'));
 	if (portFound.length === 0 && port && !isBuild) {
 		envs.push(`PORT=${port}`);
