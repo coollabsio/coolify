@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import { generateSecrets } from '../common';
 import { buildCacheImageForLaravel, buildImage } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
@@ -7,6 +8,11 @@ const createDockerfile = async (data, image): Promise<void> => {
 
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
+	if (secrets.length > 0) {
+		generateSecrets(secrets, pullmergeRequestId, true).forEach((env) => {
+			Dockerfile.push(env);
+		});
+	}
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`ENV WEB_DOCUMENT_ROOT /app/public`);
 	Dockerfile.push(`COPY --chown=application:application composer.* ./`);
