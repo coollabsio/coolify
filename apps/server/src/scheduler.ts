@@ -1,6 +1,6 @@
 import Bree from 'bree';
 import path from 'path';
-import Cabin from 'cabin';
+// import Cabin from 'cabin';
 import TSBree from '@breejs/ts-worker';
 
 export const isDev = process.env['NODE_ENV'] === 'development';
@@ -9,7 +9,7 @@ Bree.extend(TSBree);
 
 const options: any = {
 	defaultExtension: 'js',
-	logger: new Cabin(),
+	logger: false,
 	// logger: false,
 	// workerMessageHandler: async ({ name, message }) => {
 	// 	if (name === 'deployApplication' && message?.deploying) {
@@ -18,9 +18,8 @@ const options: any = {
 	// 		}
 	// 	}
 	// },
-	// jobs: [{ name: 'deployApplication' }]
-	jobs: [{ name: 'worker' }]
+	jobs: [{ name: 'deployApplication' }, { name: 'worker' }]
 };
-if (isDev) options.root = path.join(__dirname, '../jobs');
+if (isDev) options.root = path.join(__dirname, './jobs');
 
 export const scheduler = new Bree(options);

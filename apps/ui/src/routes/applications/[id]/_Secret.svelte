@@ -10,7 +10,7 @@
 	import { del, post, put } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
-	import { addToast } from '$lib/store';
+	import { addToast, appSession } from '$lib/store';
 	import { t } from '$lib/translations';
 	import { createEventDispatcher } from 'svelte';
 
@@ -124,8 +124,9 @@
 		<div class="flex justify-center h-full items-center pt-0 lg:pt-0 pl-4 lg:pl-0">
 			<button
 				on:click={() => updateSecret({ changeIsBuildSecret: true })}
+				disabled={!$appSession.isAdmin}
 				aria-pressed="false"
-				class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out "
+				class="relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out"
 				class:bg-green-600={isBuildSecret}
 				class:bg-stone-700={!isBuildSecret}
 			>
@@ -177,7 +178,7 @@
 				<div class="flex items-center justify-center">
 					<button class="btn btn-sm btn-primary" on:click={addNewSecret}>Add</button>
 				</div>
-			{:else}
+			{:else if $appSession.isAdmin}
 				<div class="flex flex-row justify-center space-x-2">
 					<div class="flex items-center justify-center">
 						<button class="btn btn-sm btn-primary" on:click={() => updateSecret()}>Set</button>

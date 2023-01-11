@@ -27,6 +27,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import { appSession } from '$lib/store';
 
 	let composeJson = JSON.parse(application?.dockerComposeFile || '{}');
 	let predefinedVolumes: any[] = [];
@@ -86,12 +87,15 @@
 				<Storage on:refresh={refreshStorage} {storage} />
 			{/key}
 		{/each}
-		<div class="Preview Secrets" class:pt-10={predefinedVolumes.length > 0}>
+		{#if $appSession.isAdmin}
+		<div class:pt-10={predefinedVolumes.length > 0}>
 			Add New Volume <Explainer
 				position="dropdown-bottom"
 				explanation={$t('application.storage.persistent_storage_explainer')}
 			/>
 		</div>
+	
 		<Storage on:refresh={refreshStorage} isNew />
+		{/if}
 	</div>
 </div>

@@ -156,7 +156,7 @@ const host = '0.0.0.0';
 		graceful.listen();
 
 		setInterval(async () => {
-      if (!scheduler.workers.has('deployApplication')) {
+			if (!scheduler.workers.has('deployApplication')) {
 				scheduler.run('deployApplication');
 			}
 		}, 2000);

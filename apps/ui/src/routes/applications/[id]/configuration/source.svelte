@@ -255,7 +255,7 @@
 	{/if}
 	<div class="flex flex-row items-center">
 		<div class="title py-4 pr-4">Public Repository from Git</div>
-		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository" />
+		<DocLink url="https://docs.coollabs.io/coolify/applications/#public-repository-from-git" />
 	</div>
 	<PublicRepository />
 	<div class="flex flex-row items-center pt-10">

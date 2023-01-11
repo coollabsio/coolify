@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.8';
+export const version = '3.12.9';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1884,6 +1884,30 @@ export async function pushToRegistry(
 	});
 }
 
+function parseSecret(secret, isBuild) {
+	if (secret.value.includes('$')) {
+		secret.value = secret.value.replaceAll('$', '$$$$');
+	}
+	if (secret.value.includes('\\n')) {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	} else if (secret.value.includes(' ')) {
+		if (isBuild) {
+			return `ARG ${secret.name}='${secret.value}'`;
+		} else {
+			return `${secret.name}='${secret.value}'`;
+		}
+	} else {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	}
+}
 export function generateSecrets(
 	secrets: Array<any>,
 	pullmergeRequestId: string,
@@ -1899,15 +1923,7 @@ export function generateSecrets(
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			if (build) {
-				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
-					envs.push(`ARG ${secret.name}='${secret.value}'`);
-				} else {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
-				}
-			} else {
-				envs.push(`${secret.name}=${secret.value}`);
-			}
+			envs.push(parseSecret(secret, build));
 		});
 	}
 	if (!pullmergeRequestId && normalSecrets.length > 0) {
@@ -1916,15 +1932,7 @@ export function generateSecrets(
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			if (build) {
-				if (secret.value.includes(' ') || secret.value.includes('\\n')) {
-					envs.push(`ARG ${secret.name}='${secret.value}'`);
-				} else {
-					envs.push(`ARG ${secret.name}=${secret.value}`);
-				}
-			} else {
-				envs.push(`${secret.name}=${secret.value}`);
-			}
+			envs.push(parseSecret(secret, build));
 		});
 	}
 	const portFound = envs.filter((env) => env.startsWith('PORT'));

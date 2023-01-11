@@ -764,7 +764,9 @@ export async function checkDomain(request: FastifyRequest<CheckDomain>) {
 			fqdn,
 			settings: { dualCerts }
 		} = await prisma.application.findUnique({ where: { id }, include: { settings: true } });
-		return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+		// TODO: Disabled this because it is having problems with remote docker engines.
+		// return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
 	}
@@ -805,11 +807,12 @@ export async function checkDNS(request: FastifyRequest<CheckDNS>) {
 				remoteEngine,
 				remoteIpAddress
 			});
-		if (isDNSCheckEnabled && !isDev && !forceSave) {
-			let hostname = request.hostname.split(':')[0];
-			if (remoteEngine) hostname = remoteIpAddress;
-			return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
-		}
+		// TODO: Disabled this because it is having problems with remote docker engines.
+		// if (isDNSCheckEnabled && !isDev && !forceSave) {
+		// 	let hostname = request.hostname.split(':')[0];
+		// 	if (remoteEngine) hostname = remoteIpAddress;
+		// 	return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
+		// }
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
@@ -842,15 +845,16 @@ export async function getDockerImages(request) {
 		try {
 			const { stdout } = await executeCommand({
 				dockerId: application.destinationDocker.id,
-				command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}' | grep -i ${id} | grep -v cache`,
-				shell: true
+				command: `docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'`
 			});
 			const { stdout: runningImage } = await executeCommand({
 				dockerId: application.destinationDocker.id,
 				command: `docker ps -a --filter 'label=com.docker.compose.service=${id}' --format {{.Image}}`
 			});
-			const images = stdout.trim().split('\n');
-
+			const images = stdout
+				.trim()
+				.split('\n')
+				.filter((image) => image.includes(id) && !image.includes('-cache'));
 			for (const image of images) {
 				const [repository, tag, createdAt] = image.split('#');
 				if (tag.includes('-')) {
@@ -871,6 +875,7 @@ export async function getDockerImages(request) {
 				runningImage
 			};
 		} catch (error) {
+			console.log(error);
 			return {
 				imagesAvailables
 			};

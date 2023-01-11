@@ -55,7 +55,7 @@ importers:
       is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
-      jsonwebtoken: 8.5.1
+      jsonwebtoken: 9.0.0
       minimist: ^1.2.7
       node-forge: 1.3.1
       node-os-utils: 1.3.7
@@ -109,7 +109,7 @@ importers:
       is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
-      jsonwebtoken: 8.5.1
+      jsonwebtoken: 9.0.0
       minimist: 1.2.7
       node-forge: 1.3.1
       node-os-utils: 1.3.7
@@ -265,6 +265,7 @@ importers:
       cuid: 2.1.8
       dayjs: 1.11.6
       dotenv: ^16.0.3
+      esbuild: 0.15.15
       execa: 6.1.0
       fastify: 4.10.2
       fastify-plugin: 4.4.0
@@ -272,8 +273,9 @@ importers:
       is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
-      jsonwebtoken: 8.5.1
+      jsonwebtoken: 9.0.0
       node-fetch: 3.3.0
+      nodemon: 2.0.20
       npm-run-all: 4.1.5
       p-all: 4.0.0
       p-throttle: 5.0.0
@@ -319,7 +321,7 @@ importers:
       is-ip: 5.0.0
       is-port-reachable: 4.0.0
       js-yaml: 4.1.0
-      jsonwebtoken: 8.5.1
+      jsonwebtoken: 9.0.0
       node-fetch: 3.3.0
       p-all: 4.0.0
       p-throttle: 5.0.0
@@ -340,6 +342,8 @@ importers:
       '@types/node-fetch': 2.6.2
       '@types/shell-quote': 1.7.1
       '@types/ws': 8.5.3
+      esbuild: 0.15.15
+      nodemon: 2.0.20
       npm-run-all: 4.1.5
       rimraf: 3.0.2
       start-server-and-test: 1.14.0
@@ -1449,6 +1453,7 @@ packages:
     engines: {node: '>= 12.11'}
     peerDependencies:
       bree: '>=9.0.0'
+      tsconfig-paths: '>= 4'
     dependencies:
       bree: 9.1.2
       ts-node: 10.8.2_wup25etrarvlqkprac7h35hj7u
@@ -5733,20 +5738,14 @@ packages:
       graceful-fs: 4.2.10
     dev: false
 
-  /jsonwebtoken/8.5.1:
-    resolution: {integrity: sha512-XjwVfRS6jTMsqYs0EsuJ4LGxXV14zQybNd4L2r0UvbVnSF9Af8x7p5MzbJ90Ioz/9TI41/hTCvznF/loiSzn8w==}
-    engines: {node: '>=4', npm: '>=1.4.28'}
+  /jsonwebtoken/9.0.0:
+    resolution: {integrity: sha512-tuGfYXxkQGDPnLJ7SibiQgVgeDgfbPq2k2ICcbgqW8WxWLBAxKQM/ZCu/IT8SOSwmaYl4dpTFCW5xZv7YbbWUw==}
+    engines: {node: '>=12', npm: '>=6'}
     dependencies:
       jws: 3.2.2
-      lodash.includes: 4.3.0
-      lodash.isboolean: 3.0.3
-      lodash.isinteger: 4.0.4
-      lodash.isnumber: 3.0.3
-      lodash.isplainobject: 4.0.6
-      lodash.isstring: 4.0.1
-      lodash.once: 4.1.1
+      lodash: 4.17.21
       ms: 2.1.3
-      semver: 5.7.1
+      semver: 7.3.8
     dev: false
 
   /jwa/1.4.1:
@@ -5902,36 +5901,12 @@ packages:
     resolution: {integrity: sha512-z+Uw/vLuy6gQe8cfaFWD7p0wVv8fJl3mbzXh33RS+0oW2wvUqiRXiQ69gLWSLpgB5/6sU+r6BlQR0MBILadqTQ==}
     dev: false
 
-  /lodash.includes/4.3.0:
-    resolution: {integrity: sha512-W3Bx6mdkRTGtlJISOvVD/lbqjTlPPUDTMnlXZFnVwi9NKJ6tiAk6LVdlhZMm17VZisqhKcgzpO5Wz91PCt5b0w==}
-    dev: false
-
-  /lodash.isboolean/3.0.3:
-    resolution: {integrity: sha512-Bz5mupy2SVbPHURB98VAcw+aHh4vRV5IPNhILUCsOzRmsTmSQ17jIuqopAentWoehktxGd9e/hbIXq980/1QJg==}
-    dev: false
-
-  /lodash.isinteger/4.0.4:
-    resolution: {integrity: sha512-DBwtEWN2caHQ9/imiNeEA5ys1JoRtRfY3d7V9wkqtbycnAmTvRRmbHKDV4a0EYc678/dia0jrte4tjYwVBaZUA==}
-    dev: false
-
-  /lodash.isnumber/3.0.3:
-    resolution: {integrity: sha512-QYqzpfwO3/CWf3XP+Z+tkQsfaLL/EnUlXWVkIk5FUPc4sBdTehEqZONuyRt2P67PXAk+NXmTBcc97zw9t1FQrw==}
-    dev: false
-
   /lodash.isplainobject/4.0.6:
     resolution: {integrity: sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==}
     dev: false
 
-  /lodash.isstring/4.0.1:
-    resolution: {integrity: sha512-0wJxfxH1wgO3GrbuP+dTTk7op+6L41QCXbGINEmD+ny/G/eCqGzxyCsh7159S+mgDDcoarnBw6PC1PS5+wUGgw==}
-    dev: false
-
   /lodash.merge/4.6.2:
     resolution: {integrity: sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ==}
-
-  /lodash.once/4.1.1:
-    resolution: {integrity: sha512-Sb487aTOCr9drQVL8pIxOzVhafOjZN9UU54hiN8PU3uAiSV7lx1yYNpbNmex2PK6dSJoNTSJUUswT651yww3Mg==}
-    dev: false
 
   /lodash.uniqby/4.5.0:
     resolution: {integrity: sha512-IRt7cfTtHy6f1aRVA5n7kT8rgN3N1nH6MOWLcHfpWG2SH19E3JksLK38MktLxZDhlAjCP9jpIXkOnRXlu6oByQ==}

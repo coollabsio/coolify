@@ -110,7 +110,7 @@
 			if (formData) service = await saveForm(formData, service);
 			setLocation(service);
 			forceSave = false;
-			$isDeploymentEnabled = checkIfDeploymentEnabledServices($appSession.isAdmin, service);
+			$isDeploymentEnabled = checkIfDeploymentEnabledServices(service);
 			return addToast({
 				message: 'Configuration saved.',
 				type: 'success'
@@ -165,6 +165,7 @@
 		}
 	}
 	async function changeSettings(name: any) {
+		if (!$appSession.isAdmin) return;
 		try {
 			if (name === 'dualCerts') {
 				dualCerts = !dualCerts;
@@ -277,7 +278,14 @@
 		<div class="grid grid-flow-row gap-2 px-4">
 			<div class="mt-2 grid grid-cols-2 items-center">
 				<label for="name">{$t('forms.name')}</label>
-				<input name="name" id="name" class="w-full" bind:value={service.name} required />
+				<input
+					name="name"
+					id="name"
+					class="w-full"
+					disabled={!$appSession.isAdmin}
+					bind:value={service.name}
+					required
+				/>
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
@@ -386,7 +394,7 @@
 			<div class="grid grid-cols-2 items-center">
 				<Setting
 					id="dualCerts"
-					disabled={$status.service.isRunning}
+					disabled={$status.service.isRunning || !$appSession.isAdmin}
 					dataTooltip={$t('forms.must_be_stopped_to_modify')}
 					bind:setting={dualCerts}
 					title={$t('application.ssl_www_and_non_www')}
@@ -482,7 +490,7 @@
 											required={variable?.required}
 										/>
 									{:else if variable.defaultValue === 'true' || variable.defaultValue === 'false'}
-										{#if variable.value === 'true' || variable.value === 'false'}
+										{#if variable.value === 'true' || variable.value === 'false' || variable.value === 'invite_only'}
 											<select
 												class="w-full font-normal"
 												readonly={isDisabled}
@@ -496,6 +504,9 @@
 											>
 												<option value="true">enabled</option>
 												<option value="false">disabled</option>
+												{#if service.type.startsWith('plausibleanalytics') && variable.id == 'config_disable_registration'}
+													<option value="invite_only">invite_only</option>
+												{/if}
 											</select>
 										{:else}
 											<select
@@ -510,7 +521,7 @@
 												required={variable?.required}
 											>
 												<option value="true">true</option>
-												<option value="false"> false</option>
+												<option value="false">false</option>
 											</select>
 										{/if}
 									{:else if variable.defaultValue === '$$generate_password'}

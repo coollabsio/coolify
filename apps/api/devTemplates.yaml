@@ -1,4 +1,228 @@
 - templateVersion: 1.0.0
+  defaultVersion: "9.22"
+  documentation: https://docs.directus.io/getting-started/introduction.html
+  type: directus-postgresql
+  name: Directus
+  subname: (PostgreSQL)
+  description: >-
+    Directus is a free and open-source headless CMS framework for managing custom SQL-based databases.
+  labels:
+    - CMS
+    - headless
+  services:
+    $$id:
+      name: Directus
+      depends_on:
+        - $$id-postgresql
+        - $$id-redis
+      image: directus/directus:$$core_version
+      volumes:
+        - $$id-uploads:/directus/uploads
+        - $$id-database:/directus/database
+        - $$id-extensions:/directus/extensions
+      environment:
+        - KEY=$$secret_key
+        - SECRET=$$secret_secret
+        - DB_CLIENT=pg
+        - DB_CONNECTION_STRING=$$secret_db_connection_string
+        - CACHE_ENABLED=true
+        - CACHE_STORE=redis
+        - CACHE_REDIS=$$secret_cache_redis
+        - ADMIN_EMAIL=$$config_admin_email
+        - ADMIN_PASSWORD=$$secret_admin_password
+        - CACHE_AUTO_PURGE=true
+        - PUBLIC_URL=$$config_public_url
+      ports:
+        - "8055"
+    $$id-postgresql:
+      name: Directus PostgreSQL
+      depends_on: []
+      image: postgres:14-alpine
+      volumes:
+        - $$id-postgresql-data:/var/lib/postgresql/data
+      environment:
+        - POSTGRES_USER=$$config_postgres_user
+        - POSTGRES_PASSWORD=$$secret_postgres_password
+        - POSTGRES_DB=$$config_postgres_db
+      ports: []
+    $$id-redis:
+      name: Directus Redis
+      depends_on: []
+      image: redis:7.0.4-alpine
+      command: "--maxmemory 512mb --maxmemory-policy allkeys-lru --maxmemory-samples 5"
+      volumes:
+        - "$$id-redis:/data"
+      environment: []
+  variables:
+    - id: $$config_public_url
+      name: PUBLIC_URL
+      label: Public URL
+      defaultValue: $$generate_fqdn
+      description: ""
+    - id: $$secret_db_connection_string
+      name: DB_CONNECTION_STRING
+      label: Directus Database Url
+      defaultValue: postgresql://$$config_postgres_user:$$secret_postgres_password@$$id-postgresql:5432/$$config_postgres_db
+      description: ""
+    - id: $$config_postgres_db
+      main: $$id-postgresql
+      name: POSTGRES_DB
+      label: Database
+      defaultValue: directus
+      description: ""
+    - id: $$config_postgres_user
+      main: $$id-postgresql
+      name: POSTGRES_USER
+      label: User
+      defaultValue: $$generate_username
+      description: ""
+    - id: $$secret_postgres_password
+      main: $$id-postgresql
+      name: POSTGRES_PASSWORD
+      label: Password
+      defaultValue: $$generate_password
+      description: ""
+      showOnConfiguration: true
+    - id: $$secret_cache_redis
+      name: CACHE_REDIS
+      label: Redis Url
+      defaultValue: redis://$$id-redis:6379
+      description: ""
+    - id: $$config_admin_email
+      name: ADMIN_EMAIL
+      label: Initial Admin Email
+      defaultValue: "admin@example.com"
+      description: "The email address of the first user that is automatically created. You can change it later in Directus."
+    - id: $$secret_admin_password
+      name: ADMIN_PASSWORD
+      label: Initial Admin Password
+      defaultValue: $$generate_password
+      description: "The password of the first user that is automatically created."
+      showOnConfiguration: true
+    - id: $$secret_key
+      name: KEY
+      label: Key
+      defaultValue: $$generate_password
+      description: "Unique identifier for the project."
+      showOnConfiguration: true
+    - id: $$secret_secret
+      name: SECRET
+      label: Secret
+      defaultValue: $$generate_password
+      description: "Secret string for the project."
+      showOnConfiguration: true
+  
+- templateVersion: 1.0.0
+  defaultVersion: v1.3.8
+  documentation: https://github.com/LibreTranslate/LibreTranslate
+  description: Free and Open Source Machine Translation API. 100% self-hosted, offline capable and easy to setup.
+  type: libretranslate
+  name: Libretranslate
+  labels:
+    - translator
+    - argos
+    - python
+    - libretranslate
+  services:
+    $$id:
+      name: Libretranslate
+      image: libretranslate/libretranslate:$$core_version
+      environment:
+        - LT_HOST=0.0.0.0
+        - LT_SUGGESTIONS=true
+        - LT_CHAR_LIMIT=$$config_lt_char_limit
+        - LT_REQ_LIMIT=$$config_lt_req_limit
+        - LT_BATCH_LIMIT=$$config_lt_batch_limit
+        - LT_GA_ID=$$config_lt_ga_id
+        - LT_DISABLE_WEB_UI=$$config_lt_web_ui
+      volumes:
+        - $$id-libretranslate:/libretranslate
+      ports:
+        - "5000"
+  variables:
+    - id: $$config_lt_char_limit
+      name: LT_CHAR_LIMIT
+      label: Char limit
+      defaultValue: "5000"
+      description: "Set character limit."
+    - id: $$config_lt_req_limit
+      name: LT_REQ_LIMIT
+      label: Request limit
+      defaultValue: "5000"
+      description: "Set maximum number of requests per minute per client."
+    - id: $$config_lt_batch_limit
+      name: LT_BATCH_LIMIT
+      label: Batch Limit
+      defaultValue: "5000"
+      description: "Set maximum number of texts to translate in a batch request."
+    - id: $$config_lt_ga_id
+      name: LT_GA_ID
+      label: Google Analytics ID
+      defaultValue: ""
+      description: "Enable Google Analytics on the API client page by providing an ID"
+    - id: $$config_lt_web_ui
+      name: LT_DISABLE_WEB_UI
+      label: Web UI
+      defaultValue: "false"
+      description: "Disable or enable web ui. True or false."
+- templateVersion: 1.0.0
+  defaultVersion: 0.8.1
+  documentation: https://github.com/benbusby/whoogle-search
+  type: whoogle
+  name: Whoogle Search
+  description: A self-hosted, ad-free, privacy-respecting metasearch engine
+  labels:
+    - search
+    - google
+  services:
+    $$id:
+      name: Whoogle Search
+      documentation: https://github.com/benbusby/whoogle-search
+      depends_on: []
+      image: benbusby/whoogle-search:$$core_version
+      cap_drop:
+        - ALL
+      environment:
+        - WHOOGLE_USER=$$config_whoogle_username
+        - WHOOGLE_PASS=$$secret_whoogle_password
+        - WHOOGLE_CONFIG_PREFERENCES_KEY=$$secret_whoogle_preferences_key
+      ulimits:
+        nofile:
+          soft: 262144
+          hard: 262144
+      ports:
+        - "5000"
+  variables:
+    - id: $$config_whoogle_username
+      name: WHOOGLE_USER
+      label: Whoogle User
+      defaultValue: $$generate_username
+      description: "Username to log into Whoogle"
+    - id: $$secret_whoogle_password
+      name: WHOOGLE_PASSWORD
+      label: Whoogle Password
+      defaultValue: $$generate_password
+      description: "Password to log into Whoogle"
+      showOnConfiguration: true
+    - id: $$secret_whoogle_preferences_key
+      name: WHOOGLE_CONFIG_PREFERENCES_KEY
+      label: Whoogle preferences key
+      defaultValue: $$generate_password
+      description: "password to encrypt preferences"
+- templateVersion: 1.0.0
+  defaultVersion: 1.1.3
+  documentation: https://docs.openblocks.dev/
+  type: openblocks
+  name: Openblocks
+  description: The Open Source Retool Alternative
+  services:
+    $$id:
+      image: openblocksdev/openblocks-ce:$$core_version
+      volumes:
+        - $$id-stacks-data:/openblocks-stacks
+      ports:
+        - "3000"
+- templateVersion: 1.0.0
   defaultVersion: "0.10.2"
   documentation: https://pocketbase.io/docs/
   type: pocketbase
@@ -124,12 +348,12 @@
       description: ""
     - id: $$config_disable_auth
       name: DISABLE_AUTH
-      label: Disable Authentication
+      label: Authentication
       defaultValue: "false"
       description: ""
     - id: $$config_disable_registration
       name: DISABLE_REGISTRATION
-      label: Disable Registration
+      label: Registration
       defaultValue: "true"
       description: ""
     - id: $$config_postgres_user
@@ -332,12 +556,12 @@
       volumes:
         - $$id-lavalink:/lavalink
       ports:
-        - "2333"
+        - $$config_port
       files:
         - location: /opt/Lavalink/application.yml
           content: >-
             server:
-              port: $$config_port
+              port: 2333
               address: 0.0.0.0
             lavalink:
               server:
@@ -364,11 +588,6 @@
                   max-file-size: 1GB
                   max-history: 30
   variables:
-    - id: $$config_port
-      name: PORT
-      label: Port
-      defaultValue: "2333"
-      required: true
     - id: $$secret_password
       name: PASSWORD
       label: Password
@@ -3250,12 +3469,12 @@
       description: ""
     - id: $$config_disable_auth
       name: DISABLE_AUTH
-      label: Disable Authentication
+      label: Authentication
       defaultValue: "false"
       description: ""
     - id: $$config_disable_registration
       name: DISABLE_REGISTRATION
-      label: Disable Registration
+      label: Registration
       defaultValue: "true"
       description: ""
     - id: $$config_postgresql_username

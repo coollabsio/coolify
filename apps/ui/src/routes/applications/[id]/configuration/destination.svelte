@@ -72,7 +72,6 @@
 			<div class="flex justify-center">
 				<a
 					href={`/destinations/new?from=/applications/${id}/configuration/destination`}
-					sveltekit:prefetch
 					class="add-icon bg-sky-600 hover:bg-sky-500"
 				>
 					<svg

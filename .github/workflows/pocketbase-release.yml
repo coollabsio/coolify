@@ -27,7 +27,7 @@ jobs:
           context: others/pocketbase/
           platforms: linux/arm64
           push: true
-          tags: coollabsio/pocketbase:0.10.2-arm64
+          tags: coollabsio/pocketbase:0.11.0-arm64
   amd64:
     runs-on: ubuntu-latest
     steps:
@@ -48,7 +48,7 @@ jobs:
           context: others/pocketbase/
           platforms: linux/amd64
           push: true
-          tags: coollabsio/pocketbase:0.10.2-amd64
+          tags: coollabsio/pocketbase:0.11.0-amd64
   aarch64:
     runs-on: [self-hosted, arm64]
     steps:
@@ -69,7 +69,7 @@ jobs:
           context: others/pocketbase/
           platforms: linux/aarch64
           push: true
-          tags: coollabsio/pocketbase:0.10.2-aarch64
+          tags: coollabsio/pocketbase:0.11.0-aarch64
   merge-manifest:
     runs-on: ubuntu-latest
     needs: [amd64, arm64, aarch64]
@@ -87,5 +87,5 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Create & publish manifest
         run: |
-          docker manifest create coollabsio/pocketbase:0.10.2 --amend coollabsio/pocketbase:0.10.2-amd64 --amend coollabsio/pocketbase:0.10.2-arm64 --amend coollabsio/pocketbase:0.10.2-aarch64
-          docker manifest push coollabsio/pocketbase:0.10.2
+          docker manifest create coollabsio/pocketbase:0.11.0 --amend coollabsio/pocketbase:0.11.0-amd64 --amend coollabsio/pocketbase:0.11.0-arm64 --amend coollabsio/pocketbase:0.11.0-aarch64
+          docker manifest push coollabsio/pocketbase:0.11.0

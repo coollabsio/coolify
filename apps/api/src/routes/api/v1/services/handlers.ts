@@ -263,14 +263,14 @@ export async function parseAndFindServiceTemplates(service: any, workdir?: strin
             for (const secret of service.serviceSecret) {
                 let { name, value } = secret
                 name = name.toLowerCase()
-                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}\"`, 'gi')
-                const regex = new RegExp(`\\$\\$secret_${name}\"`, 'gi')
+                const regexHashed = new RegExp(`\\$\\$hashed\\$\\$secret_${name}`, 'gi')
+                const regex = new RegExp(`\\$\\$secret_${name}`, 'gi')
                 if (value) {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10) + '"')
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\"") + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, bcrypt.hashSync(value.replaceAll("\"", "\\\""), 10))
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, value.replaceAll("\"", "\\\""))
                 } else {
-                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '' + '"')
-                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '' + '"')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regexHashed, '')
+                    strParsedTemplate = strParsedTemplate.replaceAll(regex, '')
                 }
             }
         }
@@ -504,7 +504,9 @@ export async function checkServiceDomain(request: FastifyRequest<CheckServiceDom
         const { id } = request.params
         const { domain } = request.query
         const { fqdn, dualCerts } = await prisma.service.findUnique({ where: { id } })
-        return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+        // TODO: Disabled this because it is having problems with remote docker engines.
+        // return await checkDomainsIsValidInDNS({ hostname: domain, fqdn, dualCerts });
+        return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })
     }
@@ -530,11 +532,12 @@ export async function checkService(request: FastifyRequest<CheckService>) {
             throw { status: 500, message: `Domain ${getDomain(fqdn).replace('www.', '')} is already in use!` }
         }
         if (exposePort) await checkExposedPort({ id, configuredPort, exposePort, engine, remoteEngine, remoteIpAddress })
-        if (isDNSCheckEnabled && !isDev && !forceSave) {
-            let hostname = request.hostname.split(':')[0];
-            if (remoteEngine) hostname = remoteIpAddress;
-            return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
-        }
+        // TODO: Disabled this because it is having problems with remote docker engines.
+        // if (isDNSCheckEnabled && !isDev && !forceSave) {
+        //     let hostname = request.hostname.split(':')[0];
+        //     if (remoteEngine) hostname = remoteIpAddress;
+        //     return await checkDomainsIsValidInDNS({ hostname, fqdn, dualCerts });
+        // }
         return {}
     } catch ({ status, message }) {
         return errorHandler({ status, message })

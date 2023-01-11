@@ -83,7 +83,7 @@
 	let forceDelete = false;
 	let stopping = false;
 	const { id } = $page.params;
-	$isDeploymentEnabled = checkIfDeploymentEnabledApplications($appSession.isAdmin, application);
+	$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
 
 	async function deleteApplication(name: string, force: boolean) {
 		const sure = confirm($t('application.confirm_to_delete', { name }));
@@ -292,7 +292,6 @@
 			<a
 				href={$isDeploymentEnabled ? `/applications/${id}/logs` : null}
 				class="btn btn-sm text-sm gap-2"
-				sveltekit:prefetch
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -363,7 +362,7 @@
 				<button
 					on:click={restartApplication}
 					type="submit"
-					disabled={!$isDeploymentEnabled}
+					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 					class="btn btn-sm gap-2"
 				>
 					<svg
@@ -383,7 +382,7 @@
 				</button>
 			{/if}
 			<button
-				disabled={!$isDeploymentEnabled}
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 				class="btn btn-sm gap-2"
 				on:click={() => handleDeploySubmit(true)}
 			>
@@ -409,7 +408,7 @@
 			<button
 				on:click={stopApplication}
 				type="submit"
-				disabled={!$isDeploymentEnabled}
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 				class="btn btn-sm  gap-2"
 			>
 				<svg
@@ -432,7 +431,7 @@
 				<button
 					on:click={stopApplication}
 					type="submit"
-					disabled={!$isDeploymentEnabled}
+					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 					class="btn btn-sm gap-2"
 				>
 					<svg
@@ -453,7 +452,7 @@
 			{/if}
 			<button
 				class="btn btn-sm gap-2"
-				disabled={!$isDeploymentEnabled}
+				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
 				on:click={() => handleDeploySubmit(true)}
 			>
 				{#if $status.application.overallStatus !== 'degraded'}

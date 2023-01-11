@@ -162,11 +162,11 @@
 	<input id="main-drawer" type="checkbox" class="drawer-toggle" bind:this={sidedrawerToggler} />
 	<div class="drawer-content">
 		{#if $appSession.userId}
+			<Tooltip triggeredBy="#dashboard" placement="right" color="bg-pink-500">Dashboard</Tooltip>
+			<Tooltip triggeredBy="#servers" placement="right" color="bg-sky-500">Servers</Tooltip>
 			<Tooltip triggeredBy="#iam" placement="right" color="bg-iam">IAM</Tooltip>
 			<Tooltip triggeredBy="#settings" placement="right" color="bg-settings text-black"
 				>Settings</Tooltip
-			>
-			<Tooltip triggeredBy="#documentation" placement="right" color="bg-info">Documentation</Tooltip
 			>
 			<Tooltip triggeredBy="#logout" placement="right" color="bg-red-600">Logout</Tooltip>
 			<nav class="nav-main hidden lg:block z-20">
@@ -183,7 +183,6 @@
 					<div class="flex flex-col space-y-2 py-2" class:mt-2={$appSession.whiteLabeled}>
 						<a
 							id="dashboard"
-							sveltekit:prefetch
 							href="/"
 							class="icons hover:text-pink-500"
 							class:text-pink-500={$page.url.pathname === '/'}
@@ -210,7 +209,6 @@
 						{#if $appSession.teamId === '0'}
 							<a
 								id="servers"
-								sveltekit:prefetch
 								href="/servers"
 								class="icons hover:text-sky-500"
 								class:text-sky-500={$page.url.pathname === '/servers'}
@@ -236,8 +234,6 @@
 							</a>
 						{/if}
 					</div>
-					<Tooltip triggeredBy="#dashboard" placement="right">Dashboard</Tooltip>
-					<Tooltip triggeredBy="#servers" placement="right">Servers</Tooltip>
 					<div class="flex-1" />
 					<div class="lg:block hidden">
 						<UpdateAvailable />
@@ -245,7 +241,6 @@
 					<div class="flex flex-col space-y-2 py-2">
 						<a
 							id="iam"
-							sveltekit:prefetch
 							href={$appSession.pendingInvitations.length > 0 ? '/iam/pending' : '/iam'}
 							class="icons hover:text-iam indicator"
 							class:text-iam={$page.url.pathname.startsWith('/iam')}
@@ -274,7 +269,6 @@
 						</a>
 						<a
 							id="settings"
-							sveltekit:prefetch
 							href={$appSession.teamId === '0' ? '/settings/coolify' : '/settings/docker'}
 							class="icons hover:text-settings"
 							class:text-settings={$page.url.pathname.startsWith('/settings')}
@@ -299,10 +293,9 @@
 						</a>
 						<a
 							id="documentation"
-							sveltekit:prefetch
 							href="https://docs.coollabs.io/coolify/"
 							target="_blank"
-							rel="noopener noreferrer"
+							rel="noreferrer external"
 							class="icons hover:text-info"
 						>
 							<svg
@@ -395,7 +388,6 @@
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-pink-500"
-					sveltekit:prefetch
 					href="/"
 					class:bg-pink-500={$page.url.pathname === '/'}
 					on:click={closeDrawer}
@@ -424,7 +416,6 @@
 				<a
 					id="servers"
 					class="no-underline icons hover:text-white hover:bg-sky-500"
-					sveltekit:prefetch
 					href="/servers"
 					class:bg-sky-500={$page.url.pathname.startsWith('/servers')}
 					on:click={closeDrawer}
@@ -502,6 +493,30 @@
 						<circle cx="12" cy="12" r="3" />
 					</svg>
 					Settings
+				</a>
+			</li>
+			<li>
+				<a
+					class="no-underline icons hover:text-white hover:bg-info"
+					href="https://docs.coollabs.io/coolify/"
+					target="_blank"
+					rel="noreferrer external"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						fill="none"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						class="w-8 h-8"
+					>
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25"
+						/>
+					</svg>
+					Documentation
 				</a>
 			</li>
 			<li class="flex-1 bg-transparent" />
