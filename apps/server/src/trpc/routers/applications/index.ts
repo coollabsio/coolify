@@ -76,7 +76,7 @@ export const applicationsRouter = router({
 			} else {
 				await prisma.application.deleteMany({ where: { id, teams: { some: { id: teamId } } } });
 			}
-			return {}
+			return {};
 		}),
 	restartPreview: privateProcedure
 		.input(
@@ -101,7 +101,7 @@ export const applicationsRouter = router({
 					buildPack,
 					exposePort
 				} = application;
-	
+
 				let envs = [];
 				if (secrets.length > 0) {
 					envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, port)];
@@ -136,7 +136,7 @@ export const applicationsRouter = router({
 				if (!imageFound) {
 					throw { status: 500, message: 'Image not found, cannot restart application.' };
 				}
-	
+
 				const volumes =
 					persistentStorage?.map((storage) => {
 						return `${applicationId}${storage.path.replace(/\//gi, '-')}:${
@@ -1321,8 +1321,8 @@ export const applicationsRouter = router({
 			z.object({
 				id: z.string(),
 				forceRebuild: z.boolean().default(false),
-				pullmergeRequestId: z.string().nullable(),
-				branch: z.string().nullable()
+				pullmergeRequestId: z.string().nullable().optional(),
+				branch: z.string().nullable().optional()
 			})
 		)
 		.mutation(async ({ ctx, input }) => {

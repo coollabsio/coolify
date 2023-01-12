@@ -572,8 +572,7 @@ import { defaultComposeConfiguration } from '../lib/docker';
 												deploymentType,
 												forceRebuild
 											});
-										}
-										if (buildpacks[buildPack])
+										} else if (buildpacks[buildPack])
 											await buildpacks[buildPack]({
 												dockerId: destinationDocker.id,
 												network: destinationDocker.network,
