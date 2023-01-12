@@ -24,6 +24,7 @@
 		"@fastify/jwt": "6.5.0",
 		"@fastify/static": "6.6.0",
 		"@fastify/websocket": "7.1.1",
+		"@iarna/toml": "2.2.5",
 		"@ladjs/graceful": "3.0.2",
 		"@prisma/client": "4.6.1",
 		"@trpc/client": "10.1.0",

@@ -535,3 +535,134 @@ export async function cleanupDB(buildId: string, applicationId: string) {
 	}
 	await saveBuildLog({ line: 'Canceled.', buildId, applicationId });
 }
+
+export const base64Encode = (text: string): string => {
+	return Buffer.from(text).toString('base64');
+};
+export const base64Decode = (text: string): string => {
+	return Buffer.from(text, 'base64').toString('ascii');
+};
+function parseSecret(secret, isBuild) {
+	if (secret.value.includes('$')) {
+		secret.value = secret.value.replaceAll('$', '$$$$');
+	}
+	if (secret.value.includes('\\n')) {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	} else if (secret.value.includes(' ')) {
+		if (isBuild) {
+			return `ARG ${secret.name}='${secret.value}'`;
+		} else {
+			return `${secret.name}='${secret.value}'`;
+		}
+	} else {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	}
+}
+export function generateSecrets(
+	secrets: Array<any>,
+	pullmergeRequestId: string,
+	isBuild = false,
+	port = null
+): Array<string> {
+	const envs = [];
+	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
+	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
+	if (pullmergeRequestId && isPRMRSecret.length > 0) {
+		isPRMRSecret.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			envs.push(parseSecret(secret, build));
+		});
+	}
+	if (!pullmergeRequestId && normalSecrets.length > 0) {
+		normalSecrets.forEach((secret) => {
+			if (isBuild && !secret.isBuildSecret) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			envs.push(parseSecret(secret, build));
+		});
+	}
+	const portFound = envs.filter((env) => env.startsWith('PORT'));
+	if (portFound.length === 0 && port && !isBuild) {
+		envs.push(`PORT=${port}`);
+	}
+	const nodeEnv = envs.filter((env) => env.startsWith('NODE_ENV'));
+	if (nodeEnv.length === 0 && !isBuild) {
+		envs.push(`NODE_ENV=production`);
+	}
+	return envs;
+}
+export function decryptApplication(application: any) {
+	if (application) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret =
+				decrypt(application.gitSource.githubApp.clientSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret =
+				decrypt(application.gitSource.githubApp.webhookSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey =
+				decrypt(application.gitSource.githubApp.privateKey) || null;
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret =
+				decrypt(application.gitSource.gitlabApp.appSecret) || null;
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s: any) => {
+				s.value = decrypt(s.value) || null;
+				return s;
+			});
+		}
+
+		return application;
+	}
+}
+export async function pushToRegistry(
+	application: any,
+	workdir: string,
+	tag: string,
+	imageName: string,
+	customTag: string
+) {
+	const location = `${workdir}/.docker`;
+	const tagCommand = `docker tag ${application.id}:${tag} ${imageName}:${customTag}`;
+	const pushCommand = `docker --config ${location} push ${imageName}:${customTag}`;
+	await executeCommand({
+		dockerId: application.destinationDockerId,
+		command: tagCommand
+	});
+	await executeCommand({
+		dockerId: application.destinationDockerId,
+		command: pushCommand
+	});
+}
+
+export async function getContainerUsage(dockerId: string, container: string): Promise<any> {
+	try {
+		const { stdout } = await executeCommand({
+			dockerId,
+			command: `docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"`
+		});
+		return JSON.parse(stdout);
+	} catch (err) {
+		return {
+			MemUsage: 0,
+			CPUPerc: 0,
+			NetIO: 0
+		};
+	}
+}

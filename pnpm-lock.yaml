@@ -245,6 +245,7 @@ importers:
       '@fastify/jwt': 6.5.0
       '@fastify/static': 6.6.0
       '@fastify/websocket': 7.1.1
+      '@iarna/toml': 2.2.5
       '@ladjs/graceful': 3.0.2
       '@prisma/client': 4.6.1
       '@trpc/client': 10.1.0
@@ -301,6 +302,7 @@ importers:
       '@fastify/jwt': 6.5.0
       '@fastify/static': 6.6.0
       '@fastify/websocket': 7.1.1
+      '@iarna/toml': 2.2.5
       '@ladjs/graceful': 3.0.2
       '@prisma/client': 4.6.1_prisma@4.6.1
       '@trpc/client': 10.1.0_@trpc+server@10.1.0
@@ -1453,11 +1455,10 @@ packages:
     engines: {node: '>= 12.11'}
     peerDependencies:
       bree: '>=9.0.0'
-      tsconfig-paths: '>= 4'
     dependencies:
       bree: 9.1.2
       ts-node: 10.8.2_wup25etrarvlqkprac7h35hj7u
-      tsconfig-paths: 4.1.0
+      tsconfig-paths: 4.1.2
     transitivePeerDependencies:
       - '@swc/core'
       - '@swc/wasm'
@@ -6305,12 +6306,6 @@ packages:
     hasBin: true
     dev: true
 
-  /json5/2.2.1:
-    resolution: {integrity: sha512-1hqLFMSrGHRHxav9q9gNjJ5EXznIxGVO09xQRrwplcS8qs28pZ8s8hupZAmqDwZUmVZ2Qb2jnyPOWcDH8m8dlA==}
-    engines: {node: '>=6'}
-    hasBin: true
-    dev: false
-
   /json5/2.2.3:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
@@ -8769,15 +8764,6 @@ packages:
       typescript: 4.9.3
       v8-compile-cache-lib: 3.0.1
       yn: 3.1.1
-    dev: false
-
-  /tsconfig-paths/4.1.0:
-    resolution: {integrity: sha512-AHx4Euop/dXFC+Vx589alFba8QItjF+8hf8LtmuiCwHyI4rHXQtOOENaM8kvYf5fR0dRChy3wzWIZ9WbB7FWow==}
-    engines: {node: '>=6'}
-    dependencies:
-      json5: 2.2.1
-      minimist: 1.2.7
-      strip-bom: 3.0.0
     dev: false
 
   /tsconfig-paths/4.1.2:

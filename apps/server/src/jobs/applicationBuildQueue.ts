@@ -14,17 +14,16 @@ import {
 import {
 	createDirectories,
 	decrypt,
-	defaultComposeConfiguration,
 	getDomain,
-	prisma,
+	generateSecrets,
 	decryptApplication,
-	isDev,
-	pushToRegistry,
-	executeCommand,
-	generateSecrets
+	pushToRegistry
 } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
+import { prisma } from '../prisma';
+import { executeCommand } from '../lib/executeCommand';
+import { defaultComposeConfiguration } from '../lib/docker';
 
 (async () => {
 	if (parentPort) {
@@ -532,6 +531,48 @@ import * as buildpacks from '../lib/buildPacks';
 									});
 									if (forceRebuild) deployNeeded = true;
 									if ((!imageFoundLocally && !imageFoundRemotely) || deployNeeded) {
+										if (buildPack === 'static') {
+											await buildpacks.staticApp({
+												dockerId: destinationDocker.id,
+												network: destinationDocker.network,
+												buildId,
+												applicationId,
+												domain,
+												name,
+												type,
+												volumes,
+												labels,
+												pullmergeRequestId,
+												buildPack,
+												repository,
+												branch,
+												projectId,
+												publishDirectory,
+												debug,
+												commit,
+												tag,
+												workdir,
+												port: exposePort ? `${exposePort}:${port}` : port,
+												installCommand,
+												buildCommand,
+												startCommand,
+												baseDirectory,
+												secrets,
+												phpModules,
+												pythonWSGI,
+												pythonModule,
+												pythonVariable,
+												dockerFileLocation,
+												dockerComposeConfiguration,
+												dockerComposeFileLocation,
+												denoMainFile,
+												denoOptions,
+												baseImage,
+												baseBuildImage,
+												deploymentType,
+												forceRebuild
+											});
+										}
 										if (buildpacks[buildPack])
 											await buildpacks[buildPack]({
 												dockerId: destinationDocker.id,
@@ -803,5 +844,8 @@ import * as buildpacks from '../lib/buildPacks';
 		while (true) {
 			await th();
 		}
-	} else process.exit(0);
+	} else {
+		console.log('hello');
+		process.exit(0);
+	}
 })();

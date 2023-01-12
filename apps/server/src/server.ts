@@ -64,7 +64,11 @@ export function createServer(opts: ServerOptions) {
 			console.log('Coolify server is listening on port', port, 'at 0.0.0.0 🚀');
 			const graceful = new Graceful({ brees: [scheduler] });
 			graceful.listen();
-			scheduler.run('worker');
+			setInterval(async () => {
+				if (!scheduler.workers.has('applicationBuildQueue')) {
+					scheduler.run('applicationBuildQueue');
+				}
+			}, 2000);
 		} catch (err) {
 			server.log.error(err);
 			process.exit(1);
