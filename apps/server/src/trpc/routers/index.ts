@@ -4,3 +4,4 @@ export * from './settings';
 export * from './applications';
 export * from './services';
 export * from './databases';
+export * from './sources';

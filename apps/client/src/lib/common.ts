@@ -3,6 +3,15 @@ import { addToast } from './store';
 import Cookies from 'js-cookie';
 export const asyncSleep = (delay: number) => new Promise((resolve) => setTimeout(resolve, delay));
 
+export function dashify(str: string, options?: any): string {
+	if (typeof str !== 'string') return str;
+	return str
+		.trim()
+		.replace(/\W/g, (m) => (/[À-ž]/.test(m) ? m : '-'))
+		.replace(/^-+|-+$/g, '')
+		.replace(/-{2,}/g, (m) => (options && options.condense ? '-' : m))
+		.toLowerCase();
+}
 export function errorNotification(error: any | { message: string }): void {
 	if (error instanceof Error) {
 		console.error(error.message)
