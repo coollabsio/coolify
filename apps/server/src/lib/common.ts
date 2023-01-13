@@ -666,3 +666,45 @@ export async function getContainerUsage(dockerId: string, container: string): Pr
 		};
 	}
 }
+export function fixType(type) {
+	return type?.replaceAll(' ', '').toLowerCase() || null;
+}
+const compareSemanticVersions = (a: string, b: string) => {
+	const a1 = a.split('.');
+	const b1 = b.split('.');
+	const len = Math.min(a1.length, b1.length);
+	for (let i = 0; i < len; i++) {
+		const a2 = +a1[i] || 0;
+		const b2 = +b1[i] || 0;
+		if (a2 !== b2) {
+			return a2 > b2 ? 1 : -1;
+		}
+	}
+	return b1.length - a1.length;
+};
+export async function getTags(type: string) {
+	try {
+		if (type) {
+			const tagsPath = isDev ? './tags.json' : '/app/tags.json';
+			const data = await fs.readFile(tagsPath, 'utf8');
+			let tags = JSON.parse(data);
+			if (tags) {
+				tags = tags.find((tag: any) => tag.name.includes(type));
+				tags.tags = tags.tags.sort(compareSemanticVersions).reverse();
+				return tags;
+			}
+		}
+	} catch (error) {
+		return [];
+	}
+}
+export function makeLabelForServices(type) {
+	return [
+		'coolify.managed=true',
+		`coolify.version=${version}`,
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
+	];
+}
+export const asyncSleep = (delay: number): Promise<unknown> =>
+	new Promise((resolve) => setTimeout(resolve, delay));

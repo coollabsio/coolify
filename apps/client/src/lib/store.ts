@@ -171,3 +171,11 @@ export const setLocation = (resource: any, settings?: any) => {
 	}
 };
 export const selectedBuildId: any = writable(null)
+export function checkIfDeploymentEnabledServices( service: any) {
+    return (
+        service.fqdn &&
+        service.destinationDocker &&
+        service.version &&
+        service.type
+    );
+}

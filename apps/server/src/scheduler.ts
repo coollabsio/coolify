@@ -9,7 +9,7 @@ Bree.extend(TSBree);
 
 const options: any = {
 	defaultExtension: 'js',
-	logger: new Cabin({}),
+	logger: false,
 	jobs: [{ name: 'applicationBuildQueue' }]
 };
 if (isDev) options.root = path.join(__dirname, './jobs');
