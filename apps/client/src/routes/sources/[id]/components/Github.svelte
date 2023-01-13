@@ -177,7 +177,7 @@
 							class="btn btn-sm"
 							href={`${source.htmlUrl}/${
 								source.htmlUrl === 'https://github.com' ? 'apps' : 'github-apps'
-							}/${source.githubApp.name}/installations/new`}>"Change GitHub App Settings"</a
+							}/${source.githubApp.name}/installations/new`}>Change GitHub App Settings</a
 						>
 					</div>
 				{/if}

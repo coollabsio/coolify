@@ -2,8 +2,7 @@
 	import type { LayoutData } from './$types';
 
 	export let data: LayoutData;
-	let source = data.source.data;
-	console.log(source)
+	let source = data.source.data.source;
 	import { page } from '$app/stores';
 	import { errorNotification } from '$lib/common';
 	import { appSession, trpc } from '$lib/store';

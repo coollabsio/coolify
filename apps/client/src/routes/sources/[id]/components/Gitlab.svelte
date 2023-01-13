@@ -158,7 +158,7 @@
 					>
 					{#if source.gitlabAppId}
 						<button class="btn btn-sm" on:click|preventDefault={changeSettings}
-							>"Change GitLab App Settings"</button
+							>Change GitLab App Settings</button
 						>
 					{:else}
 						<button class="btn btn-sm" on:click|preventDefault|stopPropagation={newApp}
