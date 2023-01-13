@@ -42,6 +42,7 @@ interface AppSession {
 		gitlab: string | null;
 	};
 	pendingInvitations: Array<any>;
+	isARM: boolean
 }
 
 export const appSession: Writable<AppSession> = writable({
@@ -61,7 +62,8 @@ export const appSession: Writable<AppSession> = writable({
 		github: null,
 		gitlab: null
 	},
-	pendingInvitations: []
+	pendingInvitations: [],
+	isARM: false
 });
 
 interface AddToast {

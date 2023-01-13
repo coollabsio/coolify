@@ -10,6 +10,8 @@ import { env } from '../env';
 import { day } from './dayjs';
 import { executeCommand } from './executeCommand';
 import { saveBuildLog } from './logging';
+import { checkContainer } from './docker';
+import yaml from 'js-yaml';
 
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -22,6 +24,37 @@ export const isDev = env.NODE_ENV === 'development';
 export const version = '3.13.0';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
+export const defaultTraefikImage = `traefik:v2.8`;
+export function getAPIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '');
+		return newURL;
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
+	}
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
+}
+
+export function getUIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '');
+		return newURL;
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3000')}`;
+	}
+	return 'http://localhost:3000';
+}
+const mainTraefikEndpoint = isDev
+	? `${getAPIUrl()}/webhooks/traefik/main.json`
+	: 'http://coolify:3000/webhooks/traefik/main.json';
+
+const otherTraefikEndpoint = isDev
+	? `${getAPIUrl()}/webhooks/traefik/other.json`
+	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 export async function listSettings(): Promise<Setting | null> {
 	return await prisma.setting.findUnique({ where: { id: '0' } });
@@ -708,3 +741,85 @@ export function makeLabelForServices(type) {
 }
 export const asyncSleep = (delay: number): Promise<unknown> =>
 	new Promise((resolve) => setTimeout(resolve, delay));
+
+export async function startTraefikTCPProxy(
+	destinationDocker: any,
+	id: string,
+	publicPort: number,
+	privatePort: number,
+	type?: string
+): Promise<{ stdout: string; stderr: string }> {
+	const { network, id: dockerId, remoteEngine } = destinationDocker;
+	const container = `${id}-${publicPort}`;
+	const { found } = await checkContainer({ dockerId, container, remove: true });
+	const { ipv4, ipv6 } = await listSettings();
+
+	let dependentId = id;
+	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
+	const { found: foundDependentContainer } = await checkContainer({
+		dockerId,
+		container: dependentId,
+		remove: true
+	});
+	if (foundDependentContainer && !found) {
+		const { stdout: Config } = await executeCommand({
+			dockerId,
+			command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
+		});
+
+		const ip = JSON.parse(Config)[0].Gateway;
+		let traefikUrl = otherTraefikEndpoint;
+		if (remoteEngine) {
+			let ip = null;
+			if (isDev) {
+				ip = getAPIUrl();
+			} else {
+				ip = `http://${ipv4 || ipv6}:3000`;
+			}
+			traefikUrl = `${ip}/webhooks/traefik/other.json`;
+		}
+		const tcpProxy = {
+			version: '3.8',
+			services: {
+				[`${id}-${publicPort}`]: {
+					container_name: container,
+					image: defaultTraefikImage,
+					command: [
+						`--entrypoints.tcp.address=:${publicPort}`,
+						`--entryPoints.tcp.forwardedHeaders.insecure=true`,
+						`--providers.http.endpoint=${traefikUrl}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
+						'--providers.http.pollTimeout=10s',
+						'--log.level=error'
+					],
+					ports: [`${publicPort}:${publicPort}`],
+					extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal: ${ip}`],
+					volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
+					networks: ['coolify-infra', network]
+				}
+			},
+			networks: {
+				[network]: {
+					external: false,
+					name: network
+				},
+				'coolify-infra': {
+					external: false,
+					name: 'coolify-infra'
+				}
+			}
+		};
+		await fs.writeFile(`/tmp/docker-compose-${id}.yaml`, yaml.dump(tcpProxy));
+		await executeCommand({
+			dockerId,
+			command: `docker compose -f /tmp/docker-compose-${id}.yaml up -d`
+		});
+		await fs.rm(`/tmp/docker-compose-${id}.yaml`);
+	}
+	if (!foundDependentContainer && found) {
+		await executeCommand({
+			dockerId,
+			command: `docker stop -t 0 ${container} && docker rm ${container}`,
+			shell: true
+		});
+	}
+}
