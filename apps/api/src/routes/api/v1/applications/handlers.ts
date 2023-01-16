@@ -1605,12 +1605,7 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
 					.split('\n')
 					.map((l) => ansi(l))
 					.filter((a) => a);
-				const logs = stripLogsStderr.concat(stripLogsStdout);
-				const sortedLogs = logs.sort((a, b) =>
-					day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1
-				);
-				return { logs: sortedLogs };
-				// }
+				return { logs: stripLogsStderr.concat(stripLogsStdout) };
 			} catch (error) {
 				const { statusCode, stderr } = error;
 				if (stderr.startsWith('Error: No such container')) {
