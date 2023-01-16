@@ -196,7 +196,7 @@ import * as buildpacks from '../lib/buildPacks';
 											await executeCommand({
 												debug: true,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 										} catch (error) {
@@ -726,7 +726,7 @@ import * as buildpacks from '../lib/buildPacks';
 											await executeCommand({
 												debug,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 										} catch (error) {

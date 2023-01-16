@@ -177,7 +177,7 @@ export const applicationsRouter = router({
 				await executeCommand({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` });
 				await executeCommand({
 					dockerId,
-					command: `docker compose --project-directory ${workdir} up -d`
+					command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 				});
 			}
 		}),
@@ -1311,7 +1311,7 @@ export const applicationsRouter = router({
 
 				await executeCommand({
 					dockerId,
-					command: `docker compose --project-directory ${workdir} up -d`
+					command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 				});
 			}
 			return {};

@@ -670,7 +670,7 @@ export async function restartApplication(
 
 			await executeCommand({
 				dockerId,
-				command: `docker compose --project-directory ${workdir} up -d`
+				command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 			});
 			return reply.code(201).send();
 		}
@@ -1451,7 +1451,7 @@ export async function restartPreview(
 			await executeCommand({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` });
 			await executeCommand({
 				dockerId,
-				command: `docker compose --project-directory ${workdir} up -d`
+				command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 			});
 			return reply.code(201).send();
 		}
