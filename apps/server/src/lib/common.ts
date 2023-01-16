@@ -603,27 +603,28 @@ export function generateSecrets(
 	secrets: Array<any>,
 	pullmergeRequestId: string,
 	isBuild = false,
-	port = null
+	port = null,
+	compose = false
 ): Array<string> {
 	const envs = [];
 	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
 	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
 	if (pullmergeRequestId && isPRMRSecret.length > 0) {
 		isPRMRSecret.forEach((secret) => {
-			if (isBuild && !secret.isBuildSecret) {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			envs.push(parseSecret(secret, build));
+			envs.push(parseSecret(secret, compose ? false : build));
 		});
 	}
 	if (!pullmergeRequestId && normalSecrets.length > 0) {
 		normalSecrets.forEach((secret) => {
-			if (isBuild && !secret.isBuildSecret) {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			envs.push(parseSecret(secret, build));
+			envs.push(parseSecret(secret, compose ? false : build));
 		});
 	}
 	const portFound = envs.filter((env) => env.startsWith('PORT'));
