@@ -43,7 +43,10 @@ export default async function (data) {
 	let networks = {};
 	for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
 		value['container_name'] = `${applicationId}-${key}`;
-		let environment = typeof value['environment'] === 'undefined' ? []  : value['environment']
+		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
+		if (Object.keys(environment).length > 0) {
+			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
+		}
 		value['environment'] = [...environment, ...envs];
 		value['labels'] = labels;
 		// TODO: If we support separated volume for each service, we need to add it here
@@ -95,7 +98,7 @@ export default async function (data) {
 		buildId,
 		applicationId,
 		dockerId,
-		command: `docker compose --project-directory ${workdir} pull`
+		command: `docker compose --project-directory ${workdir} -f ${fileYaml} pull`
 	});
 	await saveBuildLog({ line: 'Pulling images from Compose file...', buildId, applicationId });
 	await executeCommand({
@@ -103,7 +106,7 @@ export default async function (data) {
 		buildId,
 		applicationId,
 		dockerId,
-		command: `docker compose --project-directory ${workdir} build --progress plain`
+		command: `docker compose --project-directory ${workdir} -f ${fileYaml} build --progress plain`
 	});
 	await saveBuildLog({ line: 'Building images from Compose file...', buildId, applicationId });
 }

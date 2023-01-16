@@ -21,7 +21,7 @@
 	onMount(async () => {
 		const { data } = await trpc.applications.getApplicationById.query({ id });
 		application = data;
-		if (data.dockerComposeFile) {
+		if (application.dockerComposeFile && application.buildPack === 'compose') {
 			services = normalizeDockerServices(JSON.parse(data.dockerComposeFile).services);
 		} else {
 			services = [

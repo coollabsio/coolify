@@ -28,12 +28,15 @@
 			delete tempBuildPack.fancyName;
 			delete tempBuildPack.color;
 			delete tempBuildPack.hoverColor;
-			let composeConfiguration: any = {}
-			if (!dockerComposeConfiguration && dockerComposeFile) {
-				for (const [name, _] of Object.entries(JSON.parse(dockerComposeFile).services)) {
+			let composeConfiguration: any = {};
+			if (!dockerComposeConfiguration && dockerComposeFile && buildPack.name === 'compose') {
+				const parsed = JSON.parse(dockerComposeFile);
+				if (!parsed?.services) {
+					throw new Error('No services found in docker-compose file. <br>Choose a different buildpack.');
+				}
+				for (const [name, _] of Object.entries(parsed.services)) {
 					composeConfiguration[name] = {};
 				}
-				
 			}
 			await post(`/applications/${id}`, {
 				...tempBuildPack,

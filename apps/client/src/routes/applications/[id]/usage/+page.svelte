@@ -55,7 +55,7 @@
 		clearInterval(usageInterval);
 	});
 	onMount(async () => {
-		if (application.dockerComposeFile) {
+		if (application.dockerComposeFile && application.buildPack === 'compose') {
 			services = normalizeDockerServices(JSON.parse(application.dockerComposeFile).services);
 		} else {
 			services = [

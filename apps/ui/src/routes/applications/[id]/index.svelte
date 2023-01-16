@@ -366,6 +366,10 @@
 	async function reloadCompose() {
 		if (loading.reloadCompose) return;
 		loading.reloadCompose = true;
+		if (!$appSession.tokens.github) {
+			const { token } = await get(`/applications/${id}/configuration/githubToken`);
+			$appSession.tokens.github = token;
+		}
 		try {
 			if (application.gitSource.type === 'github') {
 				const composeLocation = application.dockerComposeFileLocation.startsWith('/')

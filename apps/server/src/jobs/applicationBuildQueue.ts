@@ -640,6 +640,7 @@ import { defaultComposeConfiguration } from '../lib/docker';
 									}
 
 									if (buildPack === 'compose') {
+										const fileYaml = `${workdir}${baseDirectory}${dockerComposeFileLocation}`;
 										try {
 											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
@@ -669,7 +670,7 @@ import { defaultComposeConfiguration } from '../lib/docker';
 												buildId,
 												applicationId,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${fileYaml} up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 											await prisma.build.update({

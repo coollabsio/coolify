@@ -21,7 +21,7 @@
 	onMount(async () => {
 		const response = await get(`/applications/${id}`);
 		application = response.application;
-		if (response.application.dockerComposeFile) {
+		if (response.application.dockerComposeFile && application.buildPack === 'compose') {
 			services = normalizeDockerServices(
 				JSON.parse(response.application.dockerComposeFile).services
 			);
