@@ -1083,6 +1083,9 @@ export const applicationsRouter = router({
 			include: { settings: true, destinationDocker: true, teams: true }
 		});
 		for (const application of applications) {
+			if (application?.buildPack === 'compose') {
+				continue;
+			}
 			if (
 				!application.buildPack ||
 				!application.destinationDockerId ||
