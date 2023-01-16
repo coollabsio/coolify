@@ -225,8 +225,22 @@ async function getTagsTemplates() {
 	const { default: got } = await import('got');
 	try {
 		if (isDev) {
-			const templates = await fs.readFile('./devTemplates.yaml', 'utf8');
-			const tags = await fs.readFile('./devTags.json', 'utf8');
+			let templates = await fs.readFile('./devTemplates.yaml', 'utf8');
+			let tags = await fs.readFile('./devTags.json', 'utf8');
+			try {
+				if (await fs.stat('./testTemplate.yaml')) {
+					templates = templates + (await fs.readFile('./testTemplate.yaml', 'utf8'));
+				}
+			} catch (error) {}
+			try {
+				if (await fs.stat('./testTags.json')) {
+					const testTags = await fs.readFile('./testTags.json', 'utf8');
+					if (testTags.length > 0) {
+						tags = JSON.stringify(JSON.parse(tags).concat(JSON.parse(testTags)));
+					}
+				}
+			} catch (error) {}
+
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)));
 			await fs.writeFile('./tags.json', tags);
 			console.log('[004] Tags and templates loaded in dev mode...');
