@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.10';
+export const version = '3.12.11';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1912,27 +1912,28 @@ export function generateSecrets(
 	secrets: Array<any>,
 	pullmergeRequestId: string,
 	isBuild = false,
-	port = null
+	port = null,
+	compose = false
 ): Array<string> {
 	const envs = [];
 	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
 	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
 	if (pullmergeRequestId && isPRMRSecret.length > 0) {
 		isPRMRSecret.forEach((secret) => {
-			if (isBuild && !secret.isBuildSecret) {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			envs.push(parseSecret(secret, build));
+			envs.push(parseSecret(secret, compose ? false : build));
 		});
 	}
 	if (!pullmergeRequestId && normalSecrets.length > 0) {
 		normalSecrets.forEach((secret) => {
-			if (isBuild && !secret.isBuildSecret) {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
-			envs.push(parseSecret(secret, build));
+			envs.push(parseSecret(secret, compose ? false : build));
 		});
 	}
 	const portFound = envs.filter((env) => env.startsWith('PORT'));

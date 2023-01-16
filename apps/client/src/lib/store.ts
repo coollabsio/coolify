@@ -42,6 +42,7 @@ interface AppSession {
 		gitlab: string | null;
 	};
 	pendingInvitations: Array<any>;
+	isARM: boolean
 }
 
 export const appSession: Writable<AppSession> = writable({
@@ -61,7 +62,8 @@ export const appSession: Writable<AppSession> = writable({
 		github: null,
 		gitlab: null
 	},
-	pendingInvitations: []
+	pendingInvitations: [],
+	isARM: false
 });
 
 interface AddToast {
@@ -171,3 +173,11 @@ export const setLocation = (resource: any, settings?: any) => {
 	}
 };
 export const selectedBuildId: any = writable(null)
+export function checkIfDeploymentEnabledServices( service: any) {
+    return (
+        service.fqdn &&
+        service.destinationDocker &&
+        service.version &&
+        service.type
+    );
+}

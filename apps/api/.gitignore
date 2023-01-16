@@ -9,3 +9,5 @@ package
 dist
 dev.db
 client
+testTemplate.yaml
+testTags.json

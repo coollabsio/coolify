@@ -14,17 +14,16 @@ import {
 import {
 	createDirectories,
 	decrypt,
-	defaultComposeConfiguration,
 	getDomain,
-	prisma,
+	generateSecrets,
 	decryptApplication,
-	isDev,
-	pushToRegistry,
-	executeCommand,
-	generateSecrets
+	pushToRegistry
 } from '../lib/common';
 import * as importers from '../lib/importers';
 import * as buildpacks from '../lib/buildPacks';
+import { prisma } from '../prisma';
+import { executeCommand } from '../lib/executeCommand';
+import { defaultComposeConfiguration } from '../lib/docker';
 
 (async () => {
 	if (parentPort) {
@@ -196,7 +195,7 @@ import * as buildpacks from '../lib/buildPacks';
 											await executeCommand({
 												debug: true,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 										} catch (error) {
@@ -532,7 +531,48 @@ import * as buildpacks from '../lib/buildPacks';
 									});
 									if (forceRebuild) deployNeeded = true;
 									if ((!imageFoundLocally && !imageFoundRemotely) || deployNeeded) {
-										if (buildpacks[buildPack])
+										if (buildPack === 'static') {
+											await buildpacks.staticApp({
+												dockerId: destinationDocker.id,
+												network: destinationDocker.network,
+												buildId,
+												applicationId,
+												domain,
+												name,
+												type,
+												volumes,
+												labels,
+												pullmergeRequestId,
+												buildPack,
+												repository,
+												branch,
+												projectId,
+												publishDirectory,
+												debug,
+												commit,
+												tag,
+												workdir,
+												port: exposePort ? `${exposePort}:${port}` : port,
+												installCommand,
+												buildCommand,
+												startCommand,
+												baseDirectory,
+												secrets,
+												phpModules,
+												pythonWSGI,
+												pythonModule,
+												pythonVariable,
+												dockerFileLocation,
+												dockerComposeConfiguration,
+												dockerComposeFileLocation,
+												denoMainFile,
+												denoOptions,
+												baseImage,
+												baseBuildImage,
+												deploymentType,
+												forceRebuild
+											});
+										} else if (buildpacks[buildPack])
 											await buildpacks[buildPack]({
 												dockerId: destinationDocker.id,
 												network: destinationDocker.network,
@@ -600,6 +640,7 @@ import * as buildpacks from '../lib/buildPacks';
 									}
 
 									if (buildPack === 'compose') {
+										const fileYaml = `${workdir}${baseDirectory}${dockerComposeFileLocation}`;
 										try {
 											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
@@ -629,7 +670,7 @@ import * as buildpacks from '../lib/buildPacks';
 												buildId,
 												applicationId,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${fileYaml} up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 											await prisma.build.update({
@@ -724,7 +765,7 @@ import * as buildpacks from '../lib/buildPacks';
 											await executeCommand({
 												debug,
 												dockerId: destinationDocker.id,
-												command: `docker compose --project-directory ${workdir} up -d`
+												command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 											});
 											await saveBuildLog({ line: 'Deployed 🎉', buildId, applicationId });
 										} catch (error) {
@@ -803,5 +844,8 @@ import * as buildpacks from '../lib/buildPacks';
 		while (true) {
 			await th();
 		}
-	} else process.exit(0);
+	} else {
+		console.log('hello');
+		process.exit(0);
+	}
 })();

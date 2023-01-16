@@ -122,6 +122,9 @@ export async function cleanupUnconfiguredApplications(request: FastifyRequest<an
 			include: { settings: true, destinationDocker: true, teams: true }
 		});
 		for (const application of applications) {
+			if (application?.buildPack === 'compose') {
+				continue;
+			}
 			if (
 				!application.buildPack ||
 				!application.destinationDockerId ||
@@ -670,7 +673,7 @@ export async function restartApplication(
 
 			await executeCommand({
 				dockerId,
-				command: `docker compose --project-directory ${workdir} up -d`
+				command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 			});
 			return reply.code(201).send();
 		}
@@ -746,6 +749,7 @@ export async function deleteApplication(
 		await prisma.secret.deleteMany({ where: { applicationId: id } });
 		await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
 		await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
+		await prisma.previewApplication.deleteMany({ where: { applicationId: id } });
 		if (teamId === '0') {
 			await prisma.application.deleteMany({ where: { id } });
 		} else {
@@ -1451,7 +1455,7 @@ export async function restartPreview(
 			await executeCommand({ dockerId, command: `docker rm ${id}-${pullmergeRequestId}` });
 			await executeCommand({
 				dockerId,
-				command: `docker compose --project-directory ${workdir} up -d`
+				command: `docker compose --project-directory ${workdir} -f ${workdir}/docker-compose.yml up -d`
 			});
 			return reply.code(201).send();
 		}
@@ -1605,12 +1609,7 @@ export async function getApplicationLogs(request: FastifyRequest<GetApplicationL
 					.split('\n')
 					.map((l) => ansi(l))
 					.filter((a) => a);
-				const logs = stripLogsStderr.concat(stripLogsStdout);
-				const sortedLogs = logs.sort((a, b) =>
-					day(a.split(' ')[0]).isAfter(day(b.split(' ')[0])) ? 1 : -1
-				);
-				return { logs: sortedLogs };
-				// }
+				return { logs: stripLogsStderr.concat(stripLogsStdout) };
 			} catch (error) {
 				const { statusCode, stderr } = error;
 				if (stderr.startsWith('Error: No such container')) {

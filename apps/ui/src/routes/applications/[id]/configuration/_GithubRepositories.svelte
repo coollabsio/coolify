@@ -125,6 +125,7 @@
 		}
 	}
 </script>
+
 {#if repositories.length === 0 && loading.repositories === false}
 	<div class="flex-col text-center">
 		<div class="pb-4">{$t('application.configuration.no_repositories_configured')}</div>
@@ -134,43 +135,45 @@
 	</div>
 {:else}
 	<form on:submit|preventDefault={handleSubmit} class="px-10">
-		<div class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center">
-				<div class="custom-select-wrapper w-full"><label for="repository" class="pb-1">Repository</label>
-					<Select
-						placeholder={loading.repositories
-							? $t('application.configuration.loading_repositories')
-							: $t('application.configuration.select_a_repository')}
-						id="repository"
-						showIndicator={!loading.repositories}
-						isWaiting={loading.repositories}
-						on:select={loadBranches}
-						items={reposSelectOptions}
-						isDisabled={loading.repositories}
-						isClearable={false}
-					/>
-				</div>
-				<input class="hidden" bind:value={selected.projectId} name="projectId" />
-				<div class="custom-select-wrapper w-full"><label for="repository" class="pb-1">Branch</label>
-					<Select
-						placeholder={loading.branches
-							? $t('application.configuration.loading_branches')
-							: !selected.repository
-							? $t('application.configuration.select_a_repository_first')
-							: $t('application.configuration.select_a_branch')}
-						isWaiting={loading.branches}
-						showIndicator={selected.repository && !loading.branches}
-						id="branches"
-						on:select={selectBranch}
-						items={branchSelectOptions}
-						isDisabled={loading.branches || !selected.repository}
-						isClearable={false}
-					/>
-				</div></div>
+		<div
+			class="flex lg:flex-row flex-col lg:space-y-0 space-y-2 space-x-0 lg:space-x-2 items-center lg:justify-center"
+		>
+			<div class="custom-select-wrapper w-full">
+				<label for="repository" class="pb-1">Repository</label>
+				<Select
+					placeholder={loading.repositories
+						? $t('application.configuration.loading_repositories')
+						: $t('application.configuration.select_a_repository')}
+					id="repository"
+					showIndicator={!loading.repositories}
+					isWaiting={loading.repositories}
+					on:select={loadBranches}
+					items={reposSelectOptions}
+					isDisabled={loading.repositories}
+					isClearable={false}
+				/>
+			</div>
+			<input class="hidden" bind:value={selected.projectId} name="projectId" />
+			<div class="custom-select-wrapper w-full">
+				<label for="repository" class="pb-1">Branch</label>
+				<Select
+					placeholder={loading.branches
+						? $t('application.configuration.loading_branches')
+						: !selected.repository
+						? $t('application.configuration.select_a_repository_first')
+						: $t('application.configuration.select_a_branch')}
+					isWaiting={loading.branches}
+					showIndicator={selected.repository && !loading.branches}
+					id="branches"
+					on:select={selectBranch}
+					items={branchSelectOptions}
+					isDisabled={loading.branches || !selected.repository}
+					isClearable={false}
+				/>
+			</div>
+		</div>
 		<div class="pt-5 flex-col flex justify-center items-center space-y-4">
-			<button
-				class="btn btn-wide btn-primary"
-				type="submit"
-				disabled={!showSave}
+			<button class="btn btn-wide btn-primary" type="submit" disabled={!showSave}
 				>{$t('forms.save')}</button
 			>
 		</div>

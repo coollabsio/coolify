@@ -26,8 +26,10 @@ export default async function (data) {
 		throw 'No Services found in docker-compose file.';
 	}
 	let envs = [];
+	let buildEnvs = [];
 	if (secrets.length > 0) {
 		envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, null)];
+		buildEnvs = [...buildEnvs, ...generateSecrets(secrets, pullmergeRequestId, true, null, true)];
 	}
 
 	const composeVolumes = [];
@@ -43,8 +45,22 @@ export default async function (data) {
 	let networks = {};
 	for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
 		value['container_name'] = `${applicationId}-${key}`;
-		let environment = typeof value['environment'] === 'undefined' ? []  : value['environment']
+
+		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
+		if (Object.keys(environment).length > 0) {
+			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
+		}
 		value['environment'] = [...environment, ...envs];
+
+		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
+		if (Object.keys(build).length > 0) {
+			build = Object.entries(build).map(([key, value]) => `${key}=${value}`);
+		}
+		value['build'] = {
+			...build,
+			args: [...(build?.args || []), ...buildEnvs]
+		};
+
 		value['labels'] = labels;
 		// TODO: If we support separated volume for each service, we need to add it here
 		if (value['volumes']?.length > 0) {
@@ -90,12 +106,13 @@ export default async function (data) {
 	dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } });
 
 	await fs.writeFile(fileYaml, yaml.dump(dockerComposeYaml));
+	console.log(yaml.dump(dockerComposeYaml));
 	await executeCommand({
 		debug,
 		buildId,
 		applicationId,
 		dockerId,
-		command: `docker compose --project-directory ${workdir} pull`
+		command: `docker compose --project-directory ${workdir} -f ${fileYaml} pull`
 	});
 	await saveBuildLog({ line: 'Pulling images from Compose file...', buildId, applicationId });
 	await executeCommand({
@@ -103,7 +120,7 @@ export default async function (data) {
 		buildId,
 		applicationId,
 		dockerId,
-		command: `docker compose --project-directory ${workdir} build --progress plain`
+		command: `docker compose --project-directory ${workdir} -f ${fileYaml} build --progress plain`
 	});
 	await saveBuildLog({ line: 'Building images from Compose file...', buildId, applicationId });
 }

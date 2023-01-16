@@ -10,6 +10,8 @@ import { env } from '../env';
 import { day } from './dayjs';
 import { executeCommand } from './executeCommand';
 import { saveBuildLog } from './logging';
+import { checkContainer } from './docker';
+import yaml from 'js-yaml';
 
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -22,6 +24,37 @@ export const isDev = env.NODE_ENV === 'development';
 export const version = '3.13.0';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
+export const defaultTraefikImage = `traefik:v2.8`;
+export function getAPIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3001-').replace(/\/$/, '');
+		return newURL;
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3001')}`;
+	}
+	return isDev ? 'http://host.docker.internal:3001' : 'http://localhost:3000';
+}
+
+export function getUIUrl() {
+	if (process.env.GITPOD_WORKSPACE_URL) {
+		const { href } = new URL(process.env.GITPOD_WORKSPACE_URL);
+		const newURL = href.replace('https://', 'https://3000-').replace(/\/$/, '');
+		return newURL;
+	}
+	if (process.env.CODESANDBOX_HOST) {
+		return `https://${process.env.CODESANDBOX_HOST.replace(/\$PORT/, '3000')}`;
+	}
+	return 'http://localhost:3000';
+}
+const mainTraefikEndpoint = isDev
+	? `${getAPIUrl()}/webhooks/traefik/main.json`
+	: 'http://coolify:3000/webhooks/traefik/main.json';
+
+const otherTraefikEndpoint = isDev
+	? `${getAPIUrl()}/webhooks/traefik/other.json`
+	: 'http://coolify:3000/webhooks/traefik/other.json';
 
 export async function listSettings(): Promise<Setting | null> {
 	return await prisma.setting.findUnique({ where: { id: '0' } });
@@ -534,4 +567,373 @@ export async function cleanupDB(buildId: string, applicationId: string) {
 		await prisma.build.update({ where: { id: buildId }, data: { status: 'canceled' } });
 	}
 	await saveBuildLog({ line: 'Canceled.', buildId, applicationId });
+}
+
+export const base64Encode = (text: string): string => {
+	return Buffer.from(text).toString('base64');
+};
+export const base64Decode = (text: string): string => {
+	return Buffer.from(text, 'base64').toString('ascii');
+};
+function parseSecret(secret, isBuild) {
+	if (secret.value.includes('$')) {
+		secret.value = secret.value.replaceAll('$', '$$$$');
+	}
+	if (secret.value.includes('\\n')) {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	} else if (secret.value.includes(' ')) {
+		if (isBuild) {
+			return `ARG ${secret.name}='${secret.value}'`;
+		} else {
+			return `${secret.name}='${secret.value}'`;
+		}
+	} else {
+		if (isBuild) {
+			return `ARG ${secret.name}=${secret.value}`;
+		} else {
+			return `${secret.name}=${secret.value}`;
+		}
+	}
+}
+export function generateSecrets(
+	secrets: Array<any>,
+	pullmergeRequestId: string,
+	isBuild = false,
+	port = null,
+	compose = false
+): Array<string> {
+	const envs = [];
+	const isPRMRSecret = secrets.filter((s) => s.isPRMRSecret);
+	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
+	if (pullmergeRequestId && isPRMRSecret.length > 0) {
+		isPRMRSecret.forEach((secret) => {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			envs.push(parseSecret(secret, compose ? false : build));
+		});
+	}
+	if (!pullmergeRequestId && normalSecrets.length > 0) {
+		normalSecrets.forEach((secret) => {
+			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
+				return;
+			}
+			const build = isBuild && secret.isBuildSecret;
+			envs.push(parseSecret(secret, compose ? false : build));
+		});
+	}
+	const portFound = envs.filter((env) => env.startsWith('PORT'));
+	if (portFound.length === 0 && port && !isBuild) {
+		envs.push(`PORT=${port}`);
+	}
+	const nodeEnv = envs.filter((env) => env.startsWith('NODE_ENV'));
+	if (nodeEnv.length === 0 && !isBuild) {
+		envs.push(`NODE_ENV=production`);
+	}
+	return envs;
+}
+export function decryptApplication(application: any) {
+	if (application) {
+		if (application?.gitSource?.githubApp?.clientSecret) {
+			application.gitSource.githubApp.clientSecret =
+				decrypt(application.gitSource.githubApp.clientSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.webhookSecret) {
+			application.gitSource.githubApp.webhookSecret =
+				decrypt(application.gitSource.githubApp.webhookSecret) || null;
+		}
+		if (application?.gitSource?.githubApp?.privateKey) {
+			application.gitSource.githubApp.privateKey =
+				decrypt(application.gitSource.githubApp.privateKey) || null;
+		}
+		if (application?.gitSource?.gitlabApp?.appSecret) {
+			application.gitSource.gitlabApp.appSecret =
+				decrypt(application.gitSource.gitlabApp.appSecret) || null;
+		}
+		if (application?.secrets.length > 0) {
+			application.secrets = application.secrets.map((s: any) => {
+				s.value = decrypt(s.value) || null;
+				return s;
+			});
+		}
+
+		return application;
+	}
+}
+export async function pushToRegistry(
+	application: any,
+	workdir: string,
+	tag: string,
+	imageName: string,
+	customTag: string
+) {
+	const location = `${workdir}/.docker`;
+	const tagCommand = `docker tag ${application.id}:${tag} ${imageName}:${customTag}`;
+	const pushCommand = `docker --config ${location} push ${imageName}:${customTag}`;
+	await executeCommand({
+		dockerId: application.destinationDockerId,
+		command: tagCommand
+	});
+	await executeCommand({
+		dockerId: application.destinationDockerId,
+		command: pushCommand
+	});
+}
+
+export async function getContainerUsage(dockerId: string, container: string): Promise<any> {
+	try {
+		const { stdout } = await executeCommand({
+			dockerId,
+			command: `docker container stats ${container} --no-stream --no-trunc --format "{{json .}}"`
+		});
+		return JSON.parse(stdout);
+	} catch (err) {
+		return {
+			MemUsage: 0,
+			CPUPerc: 0,
+			NetIO: 0
+		};
+	}
+}
+export function fixType(type) {
+	return type?.replaceAll(' ', '').toLowerCase() || null;
+}
+const compareSemanticVersions = (a: string, b: string) => {
+	const a1 = a.split('.');
+	const b1 = b.split('.');
+	const len = Math.min(a1.length, b1.length);
+	for (let i = 0; i < len; i++) {
+		const a2 = +a1[i] || 0;
+		const b2 = +b1[i] || 0;
+		if (a2 !== b2) {
+			return a2 > b2 ? 1 : -1;
+		}
+	}
+	return b1.length - a1.length;
+};
+export async function getTags(type: string) {
+	try {
+		if (type) {
+			const tagsPath = isDev ? './tags.json' : '/app/tags.json';
+			const data = await fs.readFile(tagsPath, 'utf8');
+			let tags = JSON.parse(data);
+			if (tags) {
+				tags = tags.find((tag: any) => tag.name.includes(type));
+				tags.tags = tags.tags.sort(compareSemanticVersions).reverse();
+				return tags;
+			}
+		}
+	} catch (error) {
+		return [];
+	}
+}
+export function makeLabelForServices(type) {
+	return [
+		'coolify.managed=true',
+		`coolify.version=${version}`,
+		`coolify.type=service`,
+		`coolify.service.type=${type}`
+	];
+}
+export const asyncSleep = (delay: number): Promise<unknown> =>
+	new Promise((resolve) => setTimeout(resolve, delay));
+
+export async function startTraefikTCPProxy(
+	destinationDocker: any,
+	id: string,
+	publicPort: number,
+	privatePort: number,
+	type?: string
+): Promise<{ stdout: string; stderr: string }> {
+	const { network, id: dockerId, remoteEngine } = destinationDocker;
+	const container = `${id}-${publicPort}`;
+	const { found } = await checkContainer({ dockerId, container, remove: true });
+	const { ipv4, ipv6 } = await listSettings();
+
+	let dependentId = id;
+	if (type === 'wordpressftp') dependentId = `${id}-ftp`;
+	const { found: foundDependentContainer } = await checkContainer({
+		dockerId,
+		container: dependentId,
+		remove: true
+	});
+	if (foundDependentContainer && !found) {
+		const { stdout: Config } = await executeCommand({
+			dockerId,
+			command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
+		});
+
+		const ip = JSON.parse(Config)[0].Gateway;
+		let traefikUrl = otherTraefikEndpoint;
+		if (remoteEngine) {
+			let ip = null;
+			if (isDev) {
+				ip = getAPIUrl();
+			} else {
+				ip = `http://${ipv4 || ipv6}:3000`;
+			}
+			traefikUrl = `${ip}/webhooks/traefik/other.json`;
+		}
+		const tcpProxy = {
+			version: '3.8',
+			services: {
+				[`${id}-${publicPort}`]: {
+					container_name: container,
+					image: defaultTraefikImage,
+					command: [
+						`--entrypoints.tcp.address=:${publicPort}`,
+						`--entryPoints.tcp.forwardedHeaders.insecure=true`,
+						`--providers.http.endpoint=${traefikUrl}?id=${id}&privatePort=${privatePort}&publicPort=${publicPort}&type=tcp&address=${dependentId}`,
+						'--providers.http.pollTimeout=10s',
+						'--log.level=error'
+					],
+					ports: [`${publicPort}:${publicPort}`],
+					extra_hosts: ['host.docker.internal:host-gateway', `host.docker.internal: ${ip}`],
+					volumes: ['/var/run/docker.sock:/var/run/docker.sock'],
+					networks: ['coolify-infra', network]
+				}
+			},
+			networks: {
+				[network]: {
+					external: false,
+					name: network
+				},
+				'coolify-infra': {
+					external: false,
+					name: 'coolify-infra'
+				}
+			}
+		};
+		await fs.writeFile(`/tmp/docker-compose-${id}.yaml`, yaml.dump(tcpProxy));
+		await executeCommand({
+			dockerId,
+			command: `docker compose -f /tmp/docker-compose-${id}.yaml up -d`
+		});
+		await fs.rm(`/tmp/docker-compose-${id}.yaml`);
+	}
+	if (!foundDependentContainer && found) {
+		await executeCommand({
+			dockerId,
+			command: `docker stop -t 0 ${container} && docker rm ${container}`,
+			shell: true
+		});
+	}
+}
+export async function startTraefikProxy(id: string): Promise<void> {
+	const { engine, network, remoteEngine, remoteIpAddress } =
+		await prisma.destinationDocker.findUnique({ where: { id } });
+	const { found } = await checkContainer({
+		dockerId: id,
+		container: 'coolify-proxy',
+		remove: true
+	});
+	const { id: settingsId, ipv4, ipv6 } = await listSettings();
+
+	if (!found) {
+		const { stdout: coolifyNetwork } = await executeCommand({
+			dockerId: id,
+			command: `docker network ls --filter 'name=coolify-infra' --no-trunc --format "{{json .}}"`
+		});
+
+		if (!coolifyNetwork) {
+			await executeCommand({
+				dockerId: id,
+				command: `docker network create --attachable coolify-infra`
+			});
+		}
+		const { stdout: Config } = await executeCommand({
+			dockerId: id,
+			command: `docker network inspect ${network} --format '{{json .IPAM.Config }}'`
+		});
+		const ip = JSON.parse(Config)[0].Gateway;
+		let traefikUrl = mainTraefikEndpoint;
+		if (remoteEngine) {
+			let ip = null;
+			if (isDev) {
+				ip = getAPIUrl();
+			} else {
+				ip = `http://${ipv4 || ipv6}:3000`;
+			}
+			traefikUrl = `${ip}/webhooks/traefik/remote/${id}`;
+		}
+		await executeCommand({
+			dockerId: id,
+			command: `docker run --restart always \
+			--add-host 'host.docker.internal:host-gateway' \
+			${ip ? `--add-host 'host.docker.internal:${ip}'` : ''} \
+			-v coolify-traefik-letsencrypt:/etc/traefik/acme \
+			-v /var/run/docker.sock:/var/run/docker.sock \
+			--network coolify-infra \
+			-p "80:80" \
+			-p "443:443" \
+			--name coolify-proxy \
+			-d ${defaultTraefikImage} \
+			--entrypoints.web.address=:80 \
+			--entrypoints.web.forwardedHeaders.insecure=true \
+			--entrypoints.websecure.address=:443 \
+			--entrypoints.websecure.forwardedHeaders.insecure=true \
+			--providers.docker=true \
+			--providers.docker.exposedbydefault=false \
+			--providers.http.endpoint=${traefikUrl} \
+			--providers.http.pollTimeout=5s \
+			--certificatesresolvers.letsencrypt.acme.httpchallenge=true \
+			--certificatesresolvers.letsencrypt.acme.storage=/etc/traefik/acme/acme.json \
+			--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web \
+			--log.level=error`
+		});
+		await prisma.destinationDocker.update({
+			where: { id },
+			data: { isCoolifyProxyUsed: true }
+		});
+	}
+	// Configure networks for local docker engine
+	if (engine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { engine } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
+		}
+	}
+	// Configure networks for remote docker engine
+	if (remoteEngine) {
+		const destinations = await prisma.destinationDocker.findMany({ where: { remoteIpAddress } });
+		for (const destination of destinations) {
+			await configureNetworkTraefikProxy(destination);
+		}
+	}
+}
+
+export async function configureNetworkTraefikProxy(destination: any): Promise<void> {
+	const { id } = destination;
+	const { stdout: networks } = await executeCommand({
+		dockerId: id,
+		command: `docker ps -a --filter name=coolify-proxy --format '{{json .Networks}}'`
+	});
+	const configuredNetworks = networks.replace(/"/g, '').replace('\n', '').split(',');
+	if (!configuredNetworks.includes(destination.network)) {
+		await executeCommand({
+			dockerId: destination.id,
+			command: `docker network connect ${destination.network} coolify-proxy`
+		});
+	}
+}
+
+export async function stopTraefikProxy(id: string): Promise<{ stdout: string; stderr: string }> {
+	const { found } = await checkContainer({ dockerId: id, container: 'coolify-proxy' });
+	await prisma.destinationDocker.update({
+		where: { id },
+		data: { isCoolifyProxyUsed: false }
+	});
+	if (found) {
+		return await executeCommand({
+			dockerId: id,
+			command: `docker stop -t 0 coolify-proxy && docker rm coolify-proxy`,
+			shell: true
+		});
+	}
+	return { stdout: '', stderr: '' };
 }

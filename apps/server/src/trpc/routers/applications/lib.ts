@@ -7,7 +7,9 @@ import { prisma } from '../../../prisma';
 export async function deployApplication(
 	id: string,
 	teamId: string,
-	forceRebuild: boolean = false
+	forceRebuild: boolean,
+	pullmergeRequestId: string | null = null,
+	branch: string | null = null
 ): Promise<string | Error> {
 	const buildId = cuid();
 	const application = await getApplicationFromDB(id, teamId);
@@ -29,14 +31,20 @@ export async function deployApplication(
 				data: {
 					id: buildId,
 					applicationId: id,
+					sourceBranch: branch,
 					branch: application.branch,
+					pullmergeRequestId: pullmergeRequestId?.toString(),
 					forceRebuild,
 					destinationDockerId: application.destinationDocker?.id,
 					gitSourceId: application.gitSource?.id,
 					githubAppId: application.gitSource?.githubApp?.id,
 					gitlabAppId: application.gitSource?.gitlabApp?.id,
 					status: 'queued',
-					type: 'manual'
+					type: pullmergeRequestId
+						? application.gitSource?.githubApp?.id
+							? 'manual_pr'
+							: 'manual_mr'
+						: 'manual'
 				}
 			});
 		} else {
