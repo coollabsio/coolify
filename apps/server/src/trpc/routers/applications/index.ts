@@ -71,6 +71,7 @@ export const applicationsRouter = router({
 			await prisma.secret.deleteMany({ where: { applicationId: id } });
 			await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
 			await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
+			await prisma.previewApplication.deleteMany({ where: { applicationId: id } });
 			if (teamId === '0') {
 				await prisma.application.deleteMany({ where: { id } });
 			} else {
@@ -1106,6 +1107,7 @@ export const applicationsRouter = router({
 				await prisma.buildLog.deleteMany({ where: { applicationId: application.id } });
 				await prisma.build.deleteMany({ where: { applicationId: application.id } });
 				await prisma.secret.deleteMany({ where: { applicationId: application.id } });
+				await prisma.previewApplication.deleteMany({ where: { applicationId: id } });
 				await prisma.applicationPersistentStorage.deleteMany({
 					where: { applicationId: application.id }
 				});
@@ -1371,6 +1373,7 @@ export const applicationsRouter = router({
 			await prisma.secret.deleteMany({ where: { applicationId: id } });
 			await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
 			await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
+			await prisma.previewApplication.deleteMany({ where: { applicationId: id } });
 			if (teamId === '0') {
 				await prisma.application.deleteMany({ where: { id } });
 			} else {

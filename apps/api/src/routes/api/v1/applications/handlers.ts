@@ -746,6 +746,7 @@ export async function deleteApplication(
 		await prisma.secret.deleteMany({ where: { applicationId: id } });
 		await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: id } });
 		await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: id } });
+		await prisma.previewApplication.deleteMany({ where: { applicationId: id } });
 		if (teamId === '0') {
 			await prisma.application.deleteMany({ where: { id } });
 		} else {
