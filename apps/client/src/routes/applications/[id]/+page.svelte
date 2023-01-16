@@ -351,7 +351,7 @@
 	}
 	async function reloadCompose() {
 		if (loading.reloadCompose) return;
-		if (!$appSession.tokens.github) {
+		if (!$appSession.tokens.github && !isPublicRepository) {
 			const { token } = await get(`/applications/${id}/configuration/githubToken`);
 			$appSession.tokens.github = token;
 		}
@@ -385,7 +385,7 @@
 				}
 			}
 			if (application.gitSource.type === 'gitlab') {
-				if (!$appSession.tokens.gitlab) {
+				if (!$appSession.tokens.gitlab && !isPublicRepository) {
 					await getGitlabToken();
 				}
 
