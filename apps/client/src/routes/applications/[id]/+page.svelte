@@ -717,7 +717,7 @@
 							{/if}
 						</div>
 					</div>
-					<div class="grid grid-cols-2 items-center pb-4">
+					<div class="grid grid-cols-2 items-center">
 						<Setting
 							id="dualCerts"
 							dataTooltip="Must be stopped to modify."
@@ -727,16 +727,6 @@
 							title="Generate Dual Certificates"
 							description="Generate certificates for both www and non-www. <br>You need to have <span class='font-bold text-settings'>both DNS entries</span> set in advance.<br><br>Useful if you expect to have visitors on both."
 							on:click={() => !isDisabled && changeSettings('dualCerts')}
-						/>
-					</div>
-					<div class="grid grid-cols-2 items-center pb-4">
-						<Setting
-							id="isHttp2"
-							isCenter={false}
-							bind:setting={isHttp2}
-							title="Enable h2c (HTTP/2 without TLS)"
-							description="Enable h2c protocol. <br><br>HTTP/2 is a major revision of the HTTP network protocol used by the World Wide Web that allows faster web page loading by reducing the number of requests needed to load a web page. <br><br>Useful for gRPC and other HTTP/2 based services."
-							on:click={() => changeSettings('isHttp2')}
 						/>
 					</div>
 					{#if isHttps && application.buildPack !== 'compose'}
@@ -751,6 +741,16 @@
 							/>
 						</div>
 					{/if}
+					<div class="grid grid-cols-2 items-center pb-4">
+						<Setting
+							id="isHttp2"
+							isCenter={false}
+							bind:setting={isHttp2}
+							title="Enable HTTP/2 protocol?"
+							description="Enable HTTP/2 protocol. <br><br>HTTP/2 is a major revision of the HTTP network protocol used by the World Wide Web that allows faster web page loading by reducing the number of requests needed to load a web page.<br><br>Useful for gRPC and other HTTP/2 based services."
+							on:click={() => changeSettings('isHttp2')}
+						/>
+					</div>
 				{/if}
 			</div>
 			{#if isSimpleDockerfile}

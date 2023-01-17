@@ -3,8 +3,30 @@ import { errorHandler, getDomain, isDev, prisma, executeCommand } from '../../..
 import { getTemplates } from '../../../lib/services';
 import { OnlyId } from '../../../types';
 
-function generateServices(serviceId, containerId, port, isHttp2 = false) {
-	const payload = {
+function generateServices(serviceId, containerId, port, isHttp2 = false, isHttps = false) {
+	if (isHttp2) {
+		return {
+			[serviceId]: {
+				loadbalancer: {
+					servers: [
+						{
+							url: `${isHttps ? 'https' : 'http'}://${containerId}:${port}`
+						}
+					]
+				}
+			},
+			[`${serviceId}-http2`]: {
+				loadbalancer: {
+					servers: [
+						{
+							url: `h2c://${containerId}:${port}`
+						}
+					]
+				}
+			}
+		};
+	}
+	return {
 		[serviceId]: {
 			loadbalancer: {
 				servers: [
@@ -15,18 +37,6 @@ function generateServices(serviceId, containerId, port, isHttp2 = false) {
 			}
 		}
 	};
-	if (isHttp2) {
-		payload[`${serviceId}-http2`] = {
-			loadbalancer: {
-				servers: [
-					{
-						url: `h2c://${containerId}:${port}`
-					}
-				]
-			}
-		};
-	}
-	return payload;
 }
 function generateRouters(
 	serviceId,
@@ -167,6 +177,7 @@ function generateRouters(
 			service: `${serviceId}-http2`,
 			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
 		};
+
 		let https2WWW = {
 			...httpsWWW,
 			service: `${serviceId}-http2`,
@@ -436,7 +447,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					};
 					traefik.http.services = {
 						...traefik.http.services,
-						...generateServices(serviceId, id, port, isHttp2)
+						...generateServices(serviceId, id, port, isHttp2, isHttps)
 					};
 					if (previews) {
 						const { stdout } = await executeCommand({

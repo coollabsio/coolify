@@ -739,7 +739,7 @@
 							{/if}
 						</div>
 					</div>
-					<div class="grid grid-cols-2 items-center pb-4">
+					<div class="grid grid-cols-2 items-center">
 						<Setting
 							id="dualCerts"
 							dataTooltip={$t('forms.must_be_stopped_to_modify')}
@@ -751,16 +751,7 @@
 							on:click={() => !isDisabled && changeSettings('dualCerts')}
 						/>
 					</div>
-					<div class="grid grid-cols-2 items-center pb-4">
-						<Setting
-							id="isHttp2"
-							isCenter={false}
-							bind:setting={isHttp2}
-							title="Enable h2c (HTTP/2 without TLS)"
-							description="Enable h2c protocol. <br><br>HTTP/2 is a major revision of the HTTP network protocol used by the World Wide Web that allows faster web page loading by reducing the number of requests needed to load a web page.<br><br>Useful for gRPC and other HTTP/2 based services."
-							on:click={() => changeSettings('isHttp2')}
-						/>
-					</div>
+				
 					{#if isHttps && application.buildPack !== 'compose'}
 						<div class="grid grid-cols-2 items-center pb-4">
 							<Setting
@@ -773,6 +764,16 @@
 							/>
 						</div>
 					{/if}
+					<div class="grid grid-cols-2 items-center pb-4">
+						<Setting
+							id="isHttp2"
+							isCenter={false}
+							bind:setting={isHttp2}
+							title="Enable HTTP/2 protocol?"
+							description="Enable HTTP/2 protocol. <br><br>HTTP/2 is a major revision of the HTTP network protocol used by the World Wide Web that allows faster web page loading by reducing the number of requests needed to load a web page.<br><br>Useful for gRPC and other HTTP/2 based services."
+							on:click={() => changeSettings('isHttp2')}
+						/>
+					</div>
 				{/if}
 			</div>
 			{#if isSimpleDockerfile}
