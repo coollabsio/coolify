@@ -52,17 +52,23 @@ export default async function (data) {
 		}
 		value['environment'] = [...environment, ...envs];
 
-		let build = typeof value['build'] === 'undefined' ? {} : value['build'];
+		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
 		if (typeof build === 'string') {
-			build = { context: build }
+			build = { context: build };
 		}
-		let buildArgs = typeof build['args'] === 'undefined' ? [] : value['args'];
+		const buildArgs = typeof build['args'] === 'undefined' ? [] : build['args'];
+		let finalArgs = [...buildEnvs];
 		if (Object.keys(buildArgs).length > 0) {
-			buildArgs = Object.entries(buildArgs).map(([key, value]) => `${key}=${value}`);
+			for (const arg of buildArgs) {
+				const [key, _] = arg.split('=');
+				if (finalArgs.filter((env) => env.startsWith(key)).length === 0) {
+					finalArgs.push(arg);
+				}
+			}
 		}
 		value['build'] = {
 			...build,
-			args: [...buildArgs, ...buildEnvs]
+			args: finalArgs
 		};
 
 		value['labels'] = labels;
