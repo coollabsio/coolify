@@ -1,154 +1,170 @@
-import type { OnlyId } from "../../../../types";
+import type { OnlyId } from '../../../../types';
 
 export interface SaveApplication extends OnlyId {
-    Body: {
-        name: string,
-        buildPack: string,
-        fqdn: string,
-        port: number,
-        exposePort: number,
-        installCommand: string,
-        buildCommand: string,
-        startCommand: string,
-        baseDirectory: string,
-        publishDirectory: string,
-        pythonWSGI: string,
-        pythonModule: string,
-        pythonVariable: string,
-        dockerFileLocation: string,
-        denoMainFile: string,
-        denoOptions: string,
-        baseImage: string,
-        gitCommitHash: string,
-        baseBuildImage: string,
-        deploymentType: string,
-        baseDatabaseBranch: string,
-        dockerComposeFile: string,
-        dockerComposeFileLocation: string,
-        dockerComposeConfiguration: string,
-        simpleDockerfile: string,
-        dockerRegistryImageName: string
-    }
+	Body: {
+		name: string;
+		buildPack: string;
+		fqdn: string;
+		port: number;
+		exposePort: number;
+		installCommand: string;
+		buildCommand: string;
+		startCommand: string;
+		baseDirectory: string;
+		publishDirectory: string;
+		pythonWSGI: string;
+		pythonModule: string;
+		pythonVariable: string;
+		dockerFileLocation: string;
+		denoMainFile: string;
+		denoOptions: string;
+		baseImage: string;
+		gitCommitHash: string;
+		baseBuildImage: string;
+		deploymentType: string;
+		baseDatabaseBranch: string;
+		dockerComposeFile: string;
+		dockerComposeFileLocation: string;
+		dockerComposeConfiguration: string;
+		simpleDockerfile: string;
+		dockerRegistryImageName: string;
+	};
 }
 export interface SaveApplicationSettings extends OnlyId {
-    Querystring: { domain: string; };
-    Body: { debug: boolean; previews: boolean; dualCerts: boolean; autodeploy: boolean; branch: string; projectId: number; isBot: boolean; isDBBranching: boolean, isCustomSSL: boolean };
+	Querystring: { domain: string };
+	Body: {
+		debug: boolean;
+		previews: boolean;
+		dualCerts: boolean;
+		autodeploy: boolean;
+		branch: string;
+		projectId: number;
+		isBot: boolean;
+		isDBBranching: boolean;
+		isCustomSSL: boolean;
+		isHttp2: boolean;
+	};
 }
 export interface DeleteApplication extends OnlyId {
-    Querystring: { domain: string; };
-    Body: { force: boolean }
+	Querystring: { domain: string };
+	Body: { force: boolean };
 }
 export interface CheckDomain extends OnlyId {
-    Querystring: { domain: string; };
+	Querystring: { domain: string };
 }
 export interface CheckDNS extends OnlyId {
-    Querystring: { domain: string; };
-    Body: {
-        exposePort: number,
-        fqdn: string,
-        forceSave: boolean,
-        dualCerts: boolean
-    }
+	Querystring: { domain: string };
+	Body: {
+		exposePort: number;
+		fqdn: string;
+		forceSave: boolean;
+		dualCerts: boolean;
+	};
 }
 export interface DeployApplication {
-    Querystring: { domain: string }
-    Body: { pullmergeRequestId: string | null, branch: string, forceRebuild?: boolean }
+	Querystring: { domain: string };
+	Body: { pullmergeRequestId: string | null; branch: string; forceRebuild?: boolean };
 }
 export interface GetImages {
-    Body: { buildPack: string, deploymentType: string }
+	Body: { buildPack: string; deploymentType: string };
 }
 export interface SaveApplicationSource extends OnlyId {
-    Body: { gitSourceId?: string | null, forPublic?: boolean, type?: string, simpleDockerfile?: string }
+	Body: {
+		gitSourceId?: string | null;
+		forPublic?: boolean;
+		type?: string;
+		simpleDockerfile?: string;
+	};
 }
 export interface CheckRepository extends OnlyId {
-    Querystring: { repository: string, branch: string }
+	Querystring: { repository: string; branch: string };
 }
 export interface SaveDestination extends OnlyId {
-    Body: { destinationId: string }
+	Body: { destinationId: string };
 }
 export interface SaveSecret extends OnlyId {
-    Body: {
-        name: string,
-        value: string,
-        isBuildSecret: boolean,
-        previewSecret: boolean,
-        isNew: boolean
-    }
+	Body: {
+		name: string;
+		value: string;
+		isBuildSecret: boolean;
+		previewSecret: boolean;
+		isNew: boolean;
+	};
 }
 export interface DeleteSecret extends OnlyId {
-    Body: { name: string }
+	Body: { name: string };
 }
 export interface SaveStorage extends OnlyId {
-    Body: {
-        path: string,
-        newStorage: boolean,
-        storageId: string
-    }
+	Body: {
+		path: string;
+		newStorage: boolean;
+		storageId: string;
+	};
 }
 export interface DeleteStorage extends OnlyId {
-    Body: {
-        path: string,
-    }
+	Body: {
+		path: string;
+	};
 }
 export interface GetApplicationLogs {
-    Params: {
-        id: string,
-        containerId: string
-    }
-    Querystring: {
-        since: number,
-    }
+	Params: {
+		id: string;
+		containerId: string;
+	};
+	Querystring: {
+		since: number;
+	};
 }
 export interface GetBuilds extends OnlyId {
-    Querystring: {
-        buildId: string
-        skip: number,
-    }
+	Querystring: {
+		buildId: string;
+		skip: number;
+	};
 }
 export interface GetBuildIdLogs {
-    Params: {
-        id: string,
-        buildId: string
-    },
-    Querystring: {
-        sequence: number
-    }
+	Params: {
+		id: string;
+		buildId: string;
+	};
+	Querystring: {
+		sequence: number;
+	};
 }
 export interface SaveDeployKey extends OnlyId {
-    Body: {
-        deployKeyId: number
-    }
+	Body: {
+		deployKeyId: number;
+	};
 }
 export interface CancelDeployment {
-    Body: {
-        buildId: string,
-        applicationId: string
-    }
+	Body: {
+		buildId: string;
+		applicationId: string;
+	};
 }
 export interface DeployApplication extends OnlyId {
-    Body: {
-        pullmergeRequestId: string | null,
-        branch: string,
-        forceRebuild?: boolean
-    }
+	Body: {
+		pullmergeRequestId: string | null;
+		branch: string;
+		forceRebuild?: boolean;
+	};
 }
 
 export interface StopPreviewApplication extends OnlyId {
-    Body: {
-        pullmergeRequestId: string | null,
-    }
+	Body: {
+		pullmergeRequestId: string | null;
+	};
 }
 export interface RestartPreviewApplication {
-    Params: {
-        id: string,
-        pullmergeRequestId: string | null,
-    }
+	Params: {
+		id: string;
+		pullmergeRequestId: string | null;
+	};
 }
 export interface RestartApplication {
-    Params: {
-        id: string,
-    },
-    Body: {
-        imageId: string | null,
-    }
+	Params: {
+		id: string;
+	};
+	Body: {
+		imageId: string | null;
+	};
 }

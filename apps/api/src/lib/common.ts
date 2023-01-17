@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.11';
+export const version = '3.12.12';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -714,8 +714,10 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--network coolify-infra \
 			-p "80:80" \
 			-p "443:443" \
+			${isDev ? '-p "8080:8080"' : ''} \
 			--name coolify-proxy \
 			-d ${defaultTraefikImage} \
+			${isDev ? '--api.insecure=true' : ''} \
 			--entrypoints.web.address=:80 \
 			--entrypoints.web.forwardedHeaders.insecure=true \
 			--entrypoints.websecure.address=:443 \

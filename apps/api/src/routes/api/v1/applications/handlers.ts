@@ -503,14 +503,24 @@ export async function saveApplicationSettings(
 			projectId,
 			isBot,
 			isDBBranching,
-			isCustomSSL
+			isCustomSSL,
+			isHttp2
 		} = request.body;
 		await prisma.application.update({
 			where: { id },
 			data: {
 				fqdn: isBot ? null : undefined,
 				settings: {
-					update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL }
+					update: {
+						debug,
+						previews,
+						dualCerts,
+						autodeploy,
+						isBot,
+						isDBBranching,
+						isCustomSSL,
+						isHttp2
+					}
 				}
 			},
 			include: { destinationDocker: true }

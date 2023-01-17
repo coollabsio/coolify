@@ -186,6 +186,7 @@ model ApplicationSettings {
   isPublicRepository Boolean     @default(false)
   isDBBranching      Boolean     @default(false)
   isCustomSSL        Boolean     @default(false)
+  isHttp2            Boolean     @default(false)
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   application        Application @relation(fields: [applicationId], references: [id])

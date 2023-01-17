@@ -808,18 +808,19 @@ export const applicationsRouter = router({
 				isBot: z.boolean().optional(),
 				autodeploy: z.boolean().optional(),
 				isDBBranching: z.boolean().optional(),
-				isCustomSSL: z.boolean().optional()
+				isCustomSSL: z.boolean().optional(),
+				isHttp2: z.boolean().optional()
 			})
 		)
 		.mutation(async ({ ctx, input }) => {
-			const { id, debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL } =
+			const { id, debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL, isHttp2 } =
 				input;
 			await prisma.application.update({
 				where: { id },
 				data: {
 					fqdn: isBot ? null : undefined,
 					settings: {
-						update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL }
+						update: { debug, previews, dualCerts, autodeploy, isBot, isDBBranching, isCustomSSL, isHttp2 }
 					}
 				},
 				include: { destinationDocker: true }
