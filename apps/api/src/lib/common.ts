@@ -714,8 +714,10 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			--network coolify-infra \
 			-p "80:80" \
 			-p "443:443" \
+			${isDev ? '-p "8080:8080"' : ''} \
 			--name coolify-proxy \
 			-d ${defaultTraefikImage} \
+			${isDev ? '--api.insecure=true' : ''} \
 			--entrypoints.web.address=:80 \
 			--entrypoints.web.forwardedHeaders.insecure=true \
 			--entrypoints.websecure.address=:443 \
