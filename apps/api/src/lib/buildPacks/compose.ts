@@ -52,13 +52,14 @@ export default async function (data) {
 		}
 		value['environment'] = [...environment, ...envs];
 
-		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
-		if (Object.keys(build).length > 0) {
-			build = Object.entries(build).map(([key, value]) => `${key}=${value}`);
+		let build = typeof value['build'] === 'undefined' ? {} : value['build'];
+		let buildArgs = typeof build['args'] === 'undefined' ? [] : value['args'];
+		if (Object.keys(buildArgs).length > 0) {
+			buildArgs = Object.entries(buildArgs).map(([key, value]) => `${key}=${value}`);
 		}
 		value['build'] = {
 			...build,
-			args: [...(build?.args || []), ...buildEnvs]
+			args: [...buildArgs, ...buildEnvs]
 		};
 
 		value['labels'] = labels;
