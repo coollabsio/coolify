@@ -4,17 +4,29 @@ import { getTemplates } from '../../../lib/services';
 import { OnlyId } from '../../../types';
 
 function generateServices(serviceId, containerId, port, isHttp2 = false) {
-	return {
+	const payload = {
 		[serviceId]: {
 			loadbalancer: {
 				servers: [
 					{
-						url: `${isHttp2 ? 'h2c' : 'http'}://${containerId}:${port}`
+						url: `http://${containerId}:${port}`
 					}
 				]
 			}
 		}
 	};
+	if (isHttp2) {
+		payload[`${serviceId}-http2`] = {
+			loadbalancer: {
+				servers: [
+					{
+						url: `h2c://${containerId}:${port}`
+					}
+				]
+			}
+		};
+	}
+	return payload;
 }
 function generateRouters(
 	serviceId,
@@ -24,18 +36,20 @@ function generateRouters(
 	isHttps,
 	isWWW,
 	isDualCerts,
-	isCustomSSL
+	isCustomSSL,
+	isHttp2 = false
 ) {
+	let rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
 	let http: any = {
 		entrypoints: ['web'],
-		rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+		rule,
 		service: `${serviceId}`,
 		priority: 2,
 		middlewares: []
 	};
 	let https: any = {
 		entrypoints: ['websecure'],
-		rule: `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+		rule,
 		service: `${serviceId}`,
 		priority: 2,
 		tls: {
@@ -45,14 +59,14 @@ function generateRouters(
 	};
 	let httpWWW: any = {
 		entrypoints: ['web'],
-		rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+		rule,
 		service: `${serviceId}`,
 		priority: 2,
 		middlewares: []
 	};
 	let httpsWWW: any = {
 		entrypoints: ['websecure'],
-		rule: `Host(\`www.${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`,
+		rule,
 		service: `${serviceId}`,
 		priority: 2,
 		tls: {
@@ -136,6 +150,38 @@ function generateRouters(
 				};
 			}
 		}
+	}
+	if (isHttp2) {
+		let http2 = {
+			...http,
+			service: `${serviceId}-http2`,
+			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
+		};
+		let http2WWW = {
+			...httpWWW,
+			service: `${serviceId}-http2`,
+			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
+		};
+		let https2 = {
+			...https,
+			service: `${serviceId}-http2`,
+			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
+		};
+		let https2WWW = {
+			...httpsWWW,
+			service: `${serviceId}-http2`,
+			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
+		};
+		return {
+			[`${serviceId}-${pathPrefix}`]: { ...http },
+			[`${serviceId}-${pathPrefix}-http2`]: { ...http2 },
+			[`${serviceId}-${pathPrefix}-secure`]: { ...https },
+			[`${serviceId}-${pathPrefix}-secure-http2`]: { ...https2 },
+			[`${serviceId}-${pathPrefix}-www`]: { ...httpWWW },
+			[`${serviceId}-${pathPrefix}-www-http2`]: { ...http2WWW },
+			[`${serviceId}-${pathPrefix}-secure-www`]: { ...httpsWWW },
+			[`${serviceId}-${pathPrefix}-secure-www-http2`]: { ...https2WWW }
+		};
 	}
 	return {
 		[`${serviceId}-${pathPrefix}`]: { ...http },
@@ -384,7 +430,8 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							isHttps,
 							isWWW,
 							dualCerts,
-							isCustomSSL
+							isCustomSSL,
+							isHttp2
 						)
 					};
 					traefik.http.services = {
