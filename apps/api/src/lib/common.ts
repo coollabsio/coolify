@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.12';
+export const version = '3.12.13';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1922,7 +1922,7 @@ export function generateSecrets(
 	const normalSecrets = secrets.filter((s) => !s.isPRMRSecret);
 	if (pullmergeRequestId && isPRMRSecret.length > 0) {
 		isPRMRSecret.forEach((secret) => {
-			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
+			if (isBuild && !secret.isBuildSecret) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
@@ -1931,7 +1931,7 @@ export function generateSecrets(
 	}
 	if (!pullmergeRequestId && normalSecrets.length > 0) {
 		normalSecrets.forEach((secret) => {
-			if ((isBuild && !secret.isBuildSecret) || (!isBuild && secret.isBuildSecret)) {
+			if (isBuild && !secret.isBuildSecret) {
 				return;
 			}
 			const build = isBuild && secret.isBuildSecret;
