@@ -50,6 +50,9 @@ function generateRouters(
 	isHttp2 = false
 ) {
 	let rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
+	let ruleWWW = `Host(\`www.${nakedDomain}\`)${
+		pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''
+	}`;
 	let http: any = {
 		entrypoints: ['web'],
 		rule,
@@ -69,14 +72,14 @@ function generateRouters(
 	};
 	let httpWWW: any = {
 		entrypoints: ['web'],
-		rule,
+		rule: ruleWWW,
 		service: `${serviceId}`,
 		priority: 2,
 		middlewares: []
 	};
 	let httpsWWW: any = {
 		entrypoints: ['websecure'],
-		rule,
+		rule: ruleWWW,
 		service: `${serviceId}`,
 		priority: 2,
 		tls: {
