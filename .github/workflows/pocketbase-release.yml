@@ -5,7 +5,9 @@ on:
     paths:
       - "others/pocketbase/*"
       - ".github/workflows/pocketbase-release.yml"
-
+    branches:
+      - next
+      - main
 jobs:
   arm64:
     runs-on: [self-hosted, arm64]

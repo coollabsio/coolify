@@ -54,7 +54,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64
+          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}
           cache-from: type=registry,ref=coollabsio/coolify:buildcache-amd64
           cache-to: type=registry,ref=coollabsio/coolify:buildcache-amd64,mode=max
   aarch64:
@@ -103,10 +103,10 @@ jobs:
         id: package-version
       - name: Create & publish manifest
         run: |
-          docker manifest create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64
-          docker manifest create coollabsio/coolify:latest --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --amend coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64
-          docker manifest push coollabsio/coolify:${{steps.package-version.outputs.current-version}}
-           docker manifest push coollabsio/coolify:latest
+          docker buildx imagetools create --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64 --tag coollabsio/coolify:${{steps.package-version.outputs.current-version}}
+          docker tag coollabsio/coolify:${{steps.package-version.outputs.current-version}} coollabsio/coolify:latest
+          docker push coollabsio/coolify:latest
+          docker buildx imagetools create --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64 --tag coollabsio/coolify:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
