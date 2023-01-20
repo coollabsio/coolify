@@ -13,7 +13,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -28,23 +28,13 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
-      - name: Docker meta
-        id: staging
-        uses: docker/metadata-action@v3
-        with:
-          images: coollabsio/coolify
-          tags: |
-            type=ref,event=branch
       - name: Build and push
         uses: docker/build-push-action@v2
         with:
           context: .
-          platforms: linux/amd64,linux/arm/v7
+          platforms: linux/amd64
           push: true
-          tags: ${{ steps.staging.outputs.tags }}
+          tags: coollabsio/coolify:next
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
