@@ -66,10 +66,12 @@ export default async function (data) {
 				}
 			}
 		}
+    if (build.length > 0 || buildArgs.length > 0 ) {
 		value['build'] = {
 			...build,
 			args: finalArgs
 		};
+    }
 
 		value['labels'] = labels;
 		// TODO: If we support separated volume for each service, we need to add it here
@@ -116,7 +118,6 @@ export default async function (data) {
 	dockerComposeYaml['networks'] = Object.assign({ ...networks }, { [network]: { external: true } });
 
 	await fs.writeFile(fileYaml, yaml.dump(dockerComposeYaml));
-	console.log(yaml.dump(dockerComposeYaml));
 	await executeCommand({
 		debug,
 		buildId,
