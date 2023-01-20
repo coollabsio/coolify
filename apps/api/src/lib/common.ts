@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.14';
+export const version = '3.12.15';
 export const isDev = process.env.NODE_ENV === 'development';
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
@@ -1714,78 +1714,24 @@ export function convertTolOldVolumeNames(type) {
 	}
 }
 
-export async function cleanupDockerStorage(dockerId, lowDiskSpace, force) {
-	// Cleanup old coolify images
+export async function cleanupDockerStorage(dockerId) {
+	// Cleanup images that are not used by any container
 	try {
-		let { stdout: images } = await executeCommand({
-			dockerId,
-			command: `docker images coollabsio/coolify --filter before="coollabsio/coolify:${version}" -q | xargs -r`,
-			shell: true
-		});
-
-		images = images.trim();
-		if (images) {
-			await executeCommand({
-				dockerId,
-				command: `docker rmi -f ${images}" -q | xargs -r`,
-				shell: true
-			});
-		}
+		await executeCommand({ dockerId, command: `docker image prune -af` });
 	} catch (error) {}
-	if (lowDiskSpace || force) {
-		// Cleanup images that are not used
-		try {
-			await executeCommand({ dockerId, command: `docker image prune -f` });
-		} catch (error) {}
 
-		const { numberOfDockerImagesKeptLocally } = await prisma.setting.findUnique({
-			where: { id: '0' }
-		});
-		const { stdout: images } = await executeCommand({
+	// Prune coolify managed containers
+	try {
+		await executeCommand({
 			dockerId,
-			command: `docker images|grep -v "<none>"|grep -v REPOSITORY|awk '{print $1, $2}'`,
-			shell: true
+			command: `docker container prune -f --filter "label=coolify.managed=true"`
 		});
-		const imagesArray = images.trim().replaceAll(' ', ':').split('\n');
-		const imagesSet = new Set(imagesArray.map((image) => image.split(':')[0]));
-		let deleteImage = [];
-		for (const image of imagesSet) {
-			let keepImage = [];
-			for (const image2 of imagesArray) {
-				if (image2.startsWith(image)) {
-					if (force) {
-						deleteImage.push(image2);
-						continue;
-					}
-					if (keepImage.length >= numberOfDockerImagesKeptLocally) {
-						deleteImage.push(image2);
-					} else {
-						keepImage.push(image2);
-					}
-				}
-			}
-		}
-		for (const image of deleteImage) {
-			try {
-				await executeCommand({ dockerId, command: `docker image rm -f ${image}` });
-			} catch (error) {
-				console.log(error);
-			}
-		}
+	} catch (error) {}
 
-		// Prune coolify managed containers
-		try {
-			await executeCommand({
-				dockerId,
-				command: `docker container prune -f --filter "label=coolify.managed=true"`
-			});
-		} catch (error) {}
-
-		// Cleanup build caches
-		try {
-			await executeCommand({ dockerId, command: `docker builder prune -a -f` });
-		} catch (error) {}
-	}
+	// Cleanup build caches
+	try {
+		await executeCommand({ dockerId, command: `docker builder prune -af` });
+	} catch (error) {}
 }
 
 export function persistentVolumes(id, persistentStorage, config) {

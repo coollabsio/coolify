@@ -591,6 +591,8 @@ async function cleanupStorage() {
 				}
 			}
 		} catch (error) {}
-		await cleanupDockerStorage(destination.id, lowDiskSpace, force);
+		if (lowDiskSpace) {
+			await cleanupDockerStorage(destination.id);
+		}
 	}
 }

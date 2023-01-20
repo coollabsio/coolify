@@ -59,7 +59,7 @@ export async function cleanupManually(request: FastifyRequest) {
 		const destination = await prisma.destinationDocker.findUnique({
 			where: { id: serverId }
 		});
-		await cleanupDockerStorage(destination.id, true, true);
+		await cleanupDockerStorage(destination.id);
 		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
