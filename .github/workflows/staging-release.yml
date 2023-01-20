@@ -35,7 +35,7 @@ jobs:
         id: staging
         uses: docker/metadata-action@v3
         with:
-          images: coollabsio/coolify:next
+          images: coollabsio/coolify
           tags: |
             type=ref,event=branch
       - name: Build and push
