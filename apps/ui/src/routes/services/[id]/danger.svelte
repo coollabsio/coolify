@@ -28,16 +28,12 @@
 	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
-	let forceDelete = false;
 	async function deleteService() {
 		const sure = confirm($t('application.confirm_to_delete', { name: service.name }));
 		if (sure) {
 			$status.service.initialLoading = true;
 			try {
-				if (service.type && $status.service.overallStatus !== 'stopped') {
-					await post(`/services/${service.id}/stop`, {});
-				}
-				await del(`/services/${service.id}`, { id: service.id });
+				await del(`/services/${service.id}`, {});
 				return await goto('/');
 			} catch (error) {
 				return errorNotification(error);

@@ -171,6 +171,11 @@ const host = '0.0.0.0';
 			await cleanupStorage();
 		}, 60000 * 15);
 
+		// Cleanup stucked containers (not defined in Coolify, but still running and managed by Coolify)
+		setInterval(async () => {
+			await cleanupStuckedContainers();
+		}, 60000 * 5);
+
 		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
 			await checkProxies();

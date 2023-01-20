@@ -437,7 +437,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this application!');
 			if (sure) {
-				await del(`/applications/${id}`, { force: true });
+				await del(`/applications/${id}`, {});
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -459,7 +459,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this database!');
 			if (sure) {
-				await del(`/databases/${id}`, { force: true });
+				await del(`/databases/${id}`, {  });
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -784,11 +784,11 @@
 											</a>
 										{/if}
 										{#if $appSession.isAdmin}
-										<button
-											class="icons hover:bg-green-500"
-											on:click|stopPropagation|preventDefault={() =>
-												deleteApplication(application.id)}><DeleteIcon /></button
-										>
+											<button
+												class="icons hover:bg-green-500"
+												on:click|stopPropagation|preventDefault={() =>
+													deleteApplication(application.id)}><DeleteIcon /></button
+											>
 										{/if}
 									</div>
 								</div>
@@ -899,11 +899,11 @@
 										</a>
 									{/if}
 									{#if $appSession.isAdmin}
-									<button
-										class="icons hover:bg-green-500"
-										on:click|stopPropagation|preventDefault={() =>
-											deleteApplication(application.id)}><DeleteIcon /></button
-									>
+										<button
+											class="icons hover:bg-green-500"
+											on:click|stopPropagation|preventDefault={() =>
+												deleteApplication(application.id)}><DeleteIcon /></button
+										>
 									{/if}
 								</div>
 							</div>
@@ -996,11 +996,11 @@
 												</a>
 											{/if}
 											{#if $appSession.isAdmin}
-											<button
-												class="icons hover:bg-pink-500"
-												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
-												><DeleteIcon /></button
-											>
+												<button
+													class="icons hover:bg-pink-500"
+													on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+													><DeleteIcon /></button
+												>
 											{/if}
 										</div>
 									</div>
@@ -1084,11 +1084,11 @@
 											</a>
 										{/if}
 										{#if $appSession.isAdmin}
-										<button
-											class="icons hover:bg-pink-500"
-											on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
-											><DeleteIcon /></button
-										>
+											<button
+												class="icons hover:bg-pink-500"
+												on:click|stopPropagation|preventDefault={() => deleteService(service.id)}
+												><DeleteIcon /></button
+											>
 										{/if}
 									</div>
 								</div>
@@ -1182,11 +1182,11 @@
 												</div>
 											{/if}
 											{#if $appSession.isAdmin}
-											<button
-												class="icons hover:bg-databases-100"
-												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
-												><DeleteIcon /></button
-											>
+												<button
+													class="icons hover:bg-databases-100"
+													on:click|stopPropagation|preventDefault={() =>
+														deleteDatabase(database.id)}><DeleteIcon /></button
+												>
 											{/if}
 										</div>
 									</div>
@@ -1270,11 +1270,11 @@
 											</div>
 										{/if}
 										{#if $appSession.isAdmin}
-										<button
-											class="icons hover:bg-databases"
-											on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
-											><DeleteIcon /></button
-										>
+											<button
+												class="icons hover:bg-databases"
+												on:click|stopPropagation|preventDefault={() => deleteDatabase(database.id)}
+												><DeleteIcon /></button
+											>
 										{/if}
 									</div>
 								</div>

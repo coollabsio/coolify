@@ -617,6 +617,29 @@ export async function getServiceLogs(request: FastifyRequest<GetServiceLogs>) {
 export async function deleteService(request: FastifyRequest<OnlyId>) {
 	try {
 		const { id } = request.params;
+		const teamId = request.user.teamId;
+		const { destinationDockerId } = await getServiceFromDB({ id, teamId });
+		if (destinationDockerId) {
+			const { stdout: containers } = await executeCommand({
+				dockerId: destinationDockerId,
+				command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}`
+			});
+			if (containers) {
+				const containerArray = containers.split('\n');
+				if (containerArray.length > 0) {
+					for (const container of containerArray) {
+						await executeCommand({
+							dockerId: destinationDockerId,
+							command: `docker stop -t 0 ${container}`
+						});
+						await executeCommand({
+							dockerId: destinationDockerId,
+							command: `docker rm --force ${container}`
+						});
+					}
+				}
+			}
+		}
 		await removeService({ id });
 		return {};
 	} catch ({ status, message }) {

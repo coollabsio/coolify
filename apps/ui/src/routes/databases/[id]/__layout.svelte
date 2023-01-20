@@ -75,7 +75,7 @@
 		if (sure) {
 			$status.database.initialLoading = true;
 			try {
-				await del(`/databases/${database.id}`, { id: database.id, force });
+				await del(`/databases/${database.id}`, {});
 				return await window.location.assign('/');
 			} catch (error) {
 				return errorNotification(error);

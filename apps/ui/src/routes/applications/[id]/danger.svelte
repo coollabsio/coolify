@@ -34,7 +34,7 @@
 		if (sure) {
 			$status.application.initialLoading = true;
 			try {
-				await del(`/applications/${id}`, { id, force });
+				await del(`/applications/${id}`,{});
 				return await goto('/')
 			} catch (error) {
 				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {

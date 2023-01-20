@@ -827,6 +827,29 @@ export const servicesRouter = router({
 		.mutation(async ({ input }) => {
 			// todo: check if user is allowed to delete service
 			const { id } = input;
+			const teamId = ctx.user?.teamId;
+			const { destinationDockerId } = await getServiceFromDB({ id, teamId });
+			if (destinationDockerId) {
+				const { stdout: containers } = await executeCommand({
+					dockerId: destinationDockerId,
+					command: `docker ps -a --filter 'label=com.docker.compose.project=${id}' --format {{.ID}}`
+				});
+				if (containers) {
+					const containerArray = containers.split('\n');
+					if (containerArray.length > 0) {
+						for (const container of containerArray) {
+							await executeCommand({
+								dockerId: destinationDockerId,
+								command: `docker stop -t 0 ${container}`
+							});
+							await executeCommand({
+								dockerId: destinationDockerId,
+								command: `docker rm --force ${container}`
+							});
+						}
+					}
+				}
+			}
 			await prisma.serviceSecret.deleteMany({ where: { serviceId: id } });
 			await prisma.serviceSetting.deleteMany({ where: { serviceId: id } });
 			await prisma.servicePersistentStorage.deleteMany({ where: { serviceId: id } });

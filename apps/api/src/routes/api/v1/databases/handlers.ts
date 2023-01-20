@@ -427,19 +427,15 @@ export async function deleteDatabase(request: FastifyRequest<DeleteDatabase>) {
 	try {
 		const teamId = request.user.teamId;
 		const { id } = request.params;
-		const { force } = request.body;
 		const database = await prisma.database.findFirst({
 			where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 			include: { destinationDocker: true, settings: true }
 		});
-		if (!force) {
-			if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
-			if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
-			if (database.destinationDockerId) {
-				const everStarted = await stopDatabaseContainer(database);
-				if (everStarted)
-					await stopTcpHttpProxy(id, database.destinationDocker, database.publicPort);
-			}
+		if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
+		if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
+		if (database.destinationDockerId) {
+			const everStarted = await stopDatabaseContainer(database);
+			if (everStarted) await stopTcpHttpProxy(id, database.destinationDocker, database.publicPort);
 		}
 		await prisma.databaseSettings.deleteMany({ where: { databaseId: id } });
 		await prisma.databaseSecret.deleteMany({ where: { databaseId: id } });

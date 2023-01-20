@@ -4,7 +4,7 @@ export interface SaveDatabaseType extends OnlyId {
     Body: { type: string }
 }
 export interface DeleteDatabase extends OnlyId {
-    Body: { force: string }
+    Body: { }
 }
 export interface SaveVersion extends OnlyId {
     Body: {
