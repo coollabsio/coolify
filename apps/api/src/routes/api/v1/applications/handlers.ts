@@ -732,14 +732,15 @@ export async function deleteApplication(
 ) {
 	try {
 		const { id } = request.params;
-		const { force } = request.body;
-
 		const { teamId } = request.user;
 		const application = await prisma.application.findUnique({
 			where: { id },
-			include: { destinationDocker: true }
+			include: { destinationDocker: true, teams: true }
 		});
-		if (!force && application?.destinationDockerId && application.destinationDocker?.network) {
+		if (!application.teams.find((team) => team.id === teamId) || teamId !== '0') {
+			throw { status: 403, message: 'You are not allowed to delete this application.' };
+		}
+		if (application?.destinationDocker?.id && application.destinationDocker?.network) {
 			const { stdout: containers } = await executeCommand({
 				dockerId: application.destinationDocker.id,
 				command: `docker ps -a --filter network=${application.destinationDocker.network} --filter name=${id} --format '{{json .}}'`

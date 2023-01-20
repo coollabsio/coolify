@@ -89,7 +89,7 @@
 		const sure = confirm($t('application.confirm_to_delete', { name }));
 		if (sure) {
 			try {
-				await del(`/applications/${id}`, { id, force });
+				await del(`/applications/${id}`, {});
 				return await goto('/');
 			} catch (error) {
 				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
