@@ -197,7 +197,13 @@ const host = '0.0.0.0';
 			await copySSLCertificates();
 		}, 10000);
 
-		await Promise.all([getTagsTemplates(), getArch(), getIPAddress(), configureRemoteDockers()]);
+		await Promise.all([
+			getTagsTemplates(),
+			getArch(),
+			getIPAddress(),
+			configureRemoteDockers(),
+			cleanupStuckedContainers()
+		]);
 	} catch (error) {
 		console.error(error);
 		process.exit(1);
@@ -311,6 +317,42 @@ async function getArch() {
 	} catch (error) {}
 }
 
+async function cleanupStuckedContainers() {
+	try {
+		const destinationDockers = await prisma.destinationDocker.findMany();
+		let enginesDone = new Set();
+		for (const destination of destinationDockers) {
+			if (enginesDone.has(destination.engine) || enginesDone.has(destination.remoteIpAddress))
+				return;
+			if (destination.engine) {
+				enginesDone.add(destination.engine);
+			}
+			if (destination.remoteIpAddress) {
+				if (!destination.remoteVerified) continue;
+				enginesDone.add(destination.remoteIpAddress);
+			}
+			const { stdout: containers } = await executeCommand({
+				dockerId: destination.id,
+				command: `docker container ps -a --filter "label=coolify.managed=true" --format '{{ .Names}}'`
+			});
+			if (containers) {
+				const containersArray = containers.trim().split('\n');
+				if (containersArray.length > 0) {
+					for (const container of containersArray) {
+						const application = await prisma.application.findFirst({ where: { id: container } });
+						const service = await prisma.service.findFirst({ where: { id: container } });
+						const database = await prisma.database.findFirst({ where: { id: container } });
+						if (!application && !service && !database) {
+							await executeCommand({ command: `docker container rm -f ${container}` });
+						}
+					}
+				}
+			}
+		}
+	} catch (error) {
+		console.log(error);
+	}
+}
 async function configureRemoteDockers() {
 	try {
 		const remoteDocker = await prisma.destinationDocker.findMany({
@@ -543,9 +585,13 @@ async function cleanupStorage() {
 	let enginesDone = new Set();
 	for (const destination of destinationDockers) {
 		if (enginesDone.has(destination.engine) || enginesDone.has(destination.remoteIpAddress)) return;
-		if (destination.engine) enginesDone.add(destination.engine);
-		if (destination.remoteIpAddress) enginesDone.add(destination.remoteIpAddress);
-		let force = false;
+		if (destination.engine) {
+			enginesDone.add(destination.engine);
+		}
+		if (destination.remoteIpAddress) {
+			if (!destination.remoteVerified) continue;
+			enginesDone.add(destination.remoteIpAddress);
+		}
 		let lowDiskSpace = false;
 		try {
 			let stdout = null;
