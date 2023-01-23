@@ -172,9 +172,9 @@ const host = '0.0.0.0';
 		}, 60000 * 15);
 
 		// Cleanup stucked containers (not defined in Coolify, but still running and managed by Coolify)
-		// setInterval(async () => {
-		// 	await cleanupStuckedContainers();
-		// }, 60000 * 5);
+		setInterval(async () => {
+			await cleanupStuckedContainers();
+		}, 2000);
 
 		// checkProxies, checkFluentBit & refresh templates
 		setInterval(async () => {
@@ -344,9 +344,16 @@ async function cleanupStuckedContainers() {
 				const containersArray = containers.trim().split('\n');
 				if (containersArray.length > 0) {
 					for (const container of containersArray) {
-						const application = await prisma.application.findFirst({ where: { id: container } });
-						const service = await prisma.service.findFirst({ where: { id: container } });
-						const database = await prisma.database.findFirst({ where: { id: container } });
+						const containerId = container.split('-')[0];
+						const application = await prisma.application.findFirst({
+							where: { id: { startsWith: containerId } }
+						});
+						const service = await prisma.service.findFirst({
+							where: { id: { startsWith: containerId } }
+						});
+						const database = await prisma.database.findFirst({
+							where: { id: { startsWith: containerId } }
+						});
 						if (!application && !service && !database) {
 							await executeCommand({ command: `docker container rm -f ${container}` });
 						}
