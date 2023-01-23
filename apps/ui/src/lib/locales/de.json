@@ -3,7 +3,7 @@
 		"update_done": "Update abgeschlossen.",
 		"wait_new_version_startup": "Bitte warten auf den Start der neuen Version ...",
 		"new_version": "Neue Version erreichbar. Neustart ...",
-		"switch_to_a_different_team": "Wechseln Sie zu einem anderen Team ...",
+		"switch_to_a_different_team": "Wechsel in ein anderes Team ...",
 		"update_available": "Update verfügbar"
 	},
 	"error": {
@@ -83,33 +83,33 @@
 		"verifying": "Überprüfung",
 		"verify_emails_without_smtp": "Überprüfen Sie E-Mails ohne SMTP",
 		"extra_config": "Zusätzliche Konfiguration",
-		"select_a_service": "Wählen Sie einen Dienst",
-		"select_a_service_version": "Wählen Sie eine Serviceversion aus",
+		"select_a_service": "Wähl einen Dienst",
+		"select_a_service_version": "Wähl eine Serviceversion aus",
 		"removing": "Entfernen ...",
 		"remove_domain": "Domain entfernen",
 		"public_port_range": "Öffentliche Port-Range",
-		"public_port_range_explainer": "Ports, mit der Datenbanken/Dienste/interne Dienste veröffentlicht wurden. <br> Fügen Sie sie Ihrer Firewall hinzu (falls zutreffend). 9000-9100 </span>",
+		"public_port_range_explainer": "Ports, mit der Datenbanken/Dienste/Interne Dienste veröffentlicht wurden. <br> Füge sie der Firewall hinzu (falls zutreffend). 9000-9100 </span>",
 		"no_actions_available": "Keine Aktionen verfügbar",
 		"admin_api_key": "Admin-API-Schlüssel"
 	},
 	"register": {
 		"register": "Registrieren",
 		"registering": "Registrieren...",
-		"first_user": "Sie registrieren den ersten Benutzer. Dieser wird der Administrator Ihrer Coolify-Instanz sein."
+		"first_user": "Du registrierst den ersten Benutzer. Dieser wird der Administrator deiner Coolify-Instanz sein."
 	},
 	"reset": {
 		"reset_password": "Zurücksetzen",
 		"invalid_secret_key": "Ungültiger Geheimschlüssel.",
 		"secret_key": "Geheim Schlüssel",
-		"find_path_secret_key": "Sie finden ihn in ~/coolify/.env (coolify_secret_key)"
+		"find_path_secret_key": "Du findest ihn in ~/coolify/.env (coolify_secret_key)"
 	},
 	"application": {
 		"configuration": {
 			"buildpack": {
-				"choose_this_one": "Wählen Sie diesen ..."
+				"choose_this_one": "Wähle diesen ..."
 			},
-			"branch_already_in_use": "Dieser Branch wird bereits von einer anderen Anwendung verwendet. Webhooks funktioniert in diesem Fall nicht für beide Anwendungen. Sind Sie sicher, dass Sie es verwenden möchten?",
-			"no_repositories_configured": "Keine Repositories für Ihre Git-Anwendung konfiguriert.",
+			"branch_already_in_use": "Dieser Branch wird bereits von einer anderen Anwendung verwendet. Webhooks funktioniert in diesem Fall nicht für beide Anwendungen. Bist du dir sicher, dass du das Feature verwenden möchtest?",
+			"no_repositories_configured": "Keine Repositories für deine Git-Anwendung konfiguriert.",
 			"configure_it_now": "Konfigurieren Sie es jetzt",
 			"loading_repositories": "Repositorys laden ...",
 			"select_a_repository": "Bitte wählen Sie ein Repository aus",
@@ -159,16 +159,16 @@
 			"storage_saved": "Speicher gespeichert.",
 			"storage_updated": "Speicher aktualisiert.",
 			"storage_deleted": "Speicher gelöscht.",
-			"persistent_storage_explainer": "Sie können jeden Ordner angeben, den Sie über Bereitstellungen hinweg anhalten möchten. /Beispiel </span> zwischen den Bereitstellungen. <br> <br> Die Daten Ihrer Anwendung werden in <span class = 'text-settings'>/App </span> im Container kopiert. In dem Container können Sie auch Daten darunter bewahren. wie <span class = 'text-settings'>/app/db </span>. /span> oder a <span class = 'text-settings'> cache </span>."
+			"persistent_storage_explainer": "Hier kannst du Ordner angeben, die du über alle Builds erhalten bleiben sollen.<br><br><span class='text-settings '>/example</span> würde <span class='text-settings '>/example</span> zwischen build unberührt lassen.<br><br>Die Daten deines Programms werden in deinem Container unter <span class='text-settings '>/app</span> gespeichert, auch unter diesem Verzeichnis lässen sich daten erhalten lassen z.B. <span class='text-settings '>/app/db</span>.<br><br>Dies kann genutzt werden um Daten für eine <span class='text-settings '>Datenbank (SQLite)</span> oder einem <span class='text-settings '>cache</span> zu Speichern."
 		},
 		"deployment_queued": "Bereitstellung in der Warteschlange.",
-		"confirm_to_delete": "Sind Sie sicher, dass Sie '{{name}}' löschen möchten?",
+		"confirm_to_delete": "Bist du dir sicher, dass du '{{name}}' löschen möchtest?",
 		"stop_application": "Beantragung der Anwendung",
-		"permission_denied_stop_application": "Sie haben keine Erlaubnis, den Antrag zu stoppen.",
+		"permission_denied_stop_application": "Du hast nicht die erforderlichen Rechte, um das Program zu stoppen.",
 		"rebuild_application": "Anwendung neuaufsetzen",
-		"permission_denied_rebuild_application": "Sie haben keine Erlaubnis zum Wiederaufbau der Bewerbung.",
+		"permission_denied_rebuild_application": "Du hast nicht die erforderlichen Rechte, um einen neuen Build zu erstellen..",
 		"build_and_start_application": "Einsetzen",
-		"permission_denied_build_and_start_application": "Sie haben keine Erlaubnis zur Bereitstellung der Anwendung.",
+		"permission_denied_build_and_start_application": "Du bist nicht berechtigt, die Anwendung zu Starten/Builden.",
 		"configurations": "Konfigurationen",
 		"secret": "Secrets",
 		"persistent_storage": "Persistenter Speicher",
@@ -176,13 +176,13 @@
 		"logs": "Anwendungslogs",
 		"build_logs": "Logs erstellen",
 		"delete_application": "Anwendung Löschen",
-		"permission_denied_delete_application": "Sie haben keine Erlaubnis, diese Anwendung zu löschen",
+		"permission_denied_delete_application": "Du hast nicht die erforderlichen Rechte, um diese Anwendung zu löschen",
 		"domain_already_in_use": "Domain {{domain}} wird bereits verwendet.",
 		"dns_not_set_error": "DNS nicht korrekt eingestellt oder für {{domain}}. <br> <br> Bitte überprüfen Sie Ihre DNS-Einstellungen.",
 		"domain_required": "Domain ist erforderlich.",
 		"settings_saved": "Konfiguration gespeichert.",
 		"dns_not_set_partial_error": "DNS nicht gesetzt",
-		"domain_not_valid": "Domain konnte Domain nicht behoben werden oder es zeigt nicht auf die Server-IP-Adresse. <br> <br> Bitte überprüfen Sie Ihre DNS-Konfiguration und versuchen Sie es erneut.",
+		"domain_not_valid": "Domain konnte Domain nicht behoben werden oder es zeigt nicht auf die Server-IP-Adresse. <br> <br> Bitte überprüfe deine DNS-Konfiguration und versuche es erneut.",
 		"git_source": "Git-Quelle",
 		"git_repository": "Git-Repository",
 		"build_pack": "Pack builden",
@@ -194,7 +194,7 @@
 		"application": "Anwendung",
 		"url_fqdn": "URL (FQDN)",
 		"domain_fqdn": "Domain (FQDN)",
-		"https_explainer": "Wenn Sie <span class = 'text-settings'> https </span> angeben, ist die Anwendung nur über HTTPS zugegriffen. SSL-Zertifikat wird für Sie generiert. <br> Wenn Sie <span class = 'text-settings'> www </span> angeben, wird die Anwendung aus Nicht-WWW umgeleitet und umgekehrt. BR> Um die Domain zu ändern, müssen Sie zuerst die Anwendung stoppen.",
+		"https_explainer": "Wenn du <span class = 'text-settings'> https </span> angibst, ist die Anwendung nur über HTTPS aufrufbar. SSL-Zertifikat wird für Sie generiert. <br> Wenn <span class = 'text-settings'> www </span> angegeben wurde, wird die Anwendung aus Nicht-WWW umgeleitet und umgekehrt. <br> Um die Domain zu ändern, musst du zuerst die Anwendung stoppen.",
 		"ssl_www_and_non_www": "SSL für www und nicht www generieren?",
 		"ssl_explainer": "Es werden Zertifikate für www und non-www generiert. <br> Sie müssen <span class = 'text-settings'> Beide DNS-Einträge </span> im Voraus einstellen. <br> <br> nützlich, wenn Sie erwarten, dass Sie Besucher auf beiden haben.",
 		"install_command": "Befehl installieren",
