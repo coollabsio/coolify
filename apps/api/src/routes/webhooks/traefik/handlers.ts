@@ -535,12 +535,13 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 					if (!found) {
 						continue;
 					}
-					found = await parseAndFindServiceTemplates(service, null, true);
+					found = JSON.parse(JSON.stringify(found).replaceAll('$$id', id));
 					for (const oneService of Object.keys(found.services)) {
 						const isDomainAndProxyConfiguration =
-							found?.services[oneService]?.proxy?.filter((p) => p.domain && p.port) ?? [];
+							found?.services[oneService]?.proxy?.filter((p) => p.port) ?? [];
 						if (isDomainAndProxyConfiguration.length > 0) {
-							const { proxy } = found.services[oneService];
+							const template: any = await parseAndFindServiceTemplates(service, null, true);
+							const { proxy } = template.services[oneService] || found.services[oneService];
 							for (let configuration of proxy) {
 								if (configuration.domain) {
 									const setting = serviceSetting.find(
