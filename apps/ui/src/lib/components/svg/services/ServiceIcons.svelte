@@ -6,7 +6,6 @@
 	let extension = 'png';
 	let svgs = [
 		'mattermost',
-		'repman',
 		'directus',
 		'pocketbase',
 		'gitea',
