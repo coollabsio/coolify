@@ -55,7 +55,7 @@ jobs:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-amd64
+          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}
           cache-from: type=registry,ref=coollabsio/coolify:buildcache-amd64
           cache-to: type=registry,ref=coollabsio/coolify:buildcache-amd64,mode=max
   aarch64:
