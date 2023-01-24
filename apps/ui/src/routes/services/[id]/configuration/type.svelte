@@ -34,6 +34,7 @@
 	import { page } from '$app/stores';
 	import { get, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
+	import Beta from '$lib/components/Beta.svelte';
 	import ServiceIcons from '$lib/components/svg/services/ServiceIcons.svelte';
 	import { onMount } from 'svelte';
 
@@ -116,12 +117,15 @@
 </div>
 <div class=" lg:pt-20 lg:p-0 px-8 pt-20">
 	<div class="grid grid-flow-rows grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-		{#each sortMe(filteredServices).filter(s=> !s.ignore) as service}
+		{#each sortMe(filteredServices).filter((s) => !s.ignore) as service}
 			{#key service.name}
 				<button
 					on:click={() => handleSubmit(service)}
 					class="box-selection relative text-xl font-bold hover:bg-primary"
 				>
+					{#if service.isBeta}
+						<div class="text-center"><Beta /></div>
+					{/if}
 					<div class="flex flex-col">
 						<div class="flex justify-center items-center gap-2 pb-4">
 							<ServiceIcons type={service.type} />
