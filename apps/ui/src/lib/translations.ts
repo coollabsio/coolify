@@ -1,9 +1,9 @@
 import i18n from 'sveltekit-i18n';
-import { derived, writable } from "svelte/store";
+import { derived, writable } from 'svelte/store';
 import lang from './lang.json';
 
-export let currentLocale = writable("en");
-export let debugTranslation = writable(false);
+export const currentLocale = writable('en');
+export const debugTranslation = writable(false);
 
 /** @type {import('sveltekit-i18n').Config} */
 export const config = {
@@ -13,7 +13,8 @@ export const config = {
 		es: { lang },
 		pt: { lang },
 		ko: { lang },
-		fr: { lang }
+		fr: { lang },
+		cs: { lang }
 	},
 	loaders: [
 		{
@@ -40,6 +41,11 @@ export const config = {
 			locale: 'ko',
 			key: '',
 			loader: async () => (await import('./locales/ko.json')).default
+		},
+		{
+			locale: 'cs',
+			key: '',
+			loader: async () => (await import('./locales/cs.json')).default
 		}
 	]
 };
