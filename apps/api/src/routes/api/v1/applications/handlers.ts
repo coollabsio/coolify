@@ -117,7 +117,7 @@ export async function getImages(request: FastifyRequest<GetImages>) {
 export async function cleanupUnconfiguredApplications(request: FastifyRequest<any>) {
 	try {
 		const teamId = request.user.teamId;
-		let applications = await prisma.application.findMany({
+		const applications = await prisma.application.findMany({
 			where: { teams: { some: { id: teamId === '0' ? undefined : teamId } } },
 			include: { settings: true, destinationDocker: true, teams: true }
 		});
@@ -167,7 +167,7 @@ export async function getApplicationStatus(request: FastifyRequest<OnlyId>) {
 	try {
 		const { id } = request.params;
 		const { teamId } = request.user;
-		let payload = [];
+		const payload = [];
 		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			if (application.buildPack === 'compose') {
@@ -565,7 +565,7 @@ export async function restartApplication(
 		const { id } = request.params;
 		const { imageId = null } = request.body;
 		const { teamId } = request.user;
-		let application: any = await getApplicationFromDB(id, teamId);
+		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			const buildId = cuid();
 			const { id: dockerId, network } = application.destinationDocker;
@@ -737,7 +737,7 @@ export async function deleteApplication(
 			where: { id },
 			include: { destinationDocker: true, teams: true }
 		});
-		if (!application.teams.find((team) => team.id === teamId) || teamId !== '0') {
+		if (teamId === '0' || !application.teams.some((team) => team.id === teamId)) {
 			throw { status: 403, message: 'You are not allowed to delete this application.' };
 		}
 		if (application?.destinationDocker?.id && application.destinationDocker?.network) {
@@ -1377,7 +1377,7 @@ export async function restartPreview(
 	try {
 		const { id, pullmergeRequestId } = request.params;
 		const { teamId } = request.user;
-		let application: any = await getApplicationFromDB(id, teamId);
+		const application: any = await getApplicationFromDB(id, teamId);
 		if (application?.destinationDockerId) {
 			const buildId = cuid();
 			const { id: dockerId, network } = application.destinationDocker;
@@ -1692,7 +1692,7 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
 		try {
 			await fs.stat(file);
 		} catch (error) {
-			let logs = await prisma.buildLog.findMany({
+			const logs = await prisma.buildLog.findMany({
 				where: { buildId, time: { gt: sequence } },
 				orderBy: { time: 'asc' }
 			});
@@ -1708,9 +1708,9 @@ export async function getBuildIdLogs(request: FastifyRequest<GetBuildIdLogs>) {
 				status: data?.status || 'queued'
 			};
 		}
-		let fileLogs = (await fs.readFile(file)).toString();
-		let decryptedLogs = await csv({ noheader: true }).fromString(fileLogs);
-		let logs = decryptedLogs
+		const fileLogs = (await fs.readFile(file)).toString();
+		const decryptedLogs = await csv({ noheader: true }).fromString(fileLogs);
+		const logs = decryptedLogs
 			.map((log) => {
 				const parsed = {
 					time: log['field1'],
