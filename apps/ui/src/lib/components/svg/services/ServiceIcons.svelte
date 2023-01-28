@@ -2,7 +2,7 @@
 	export let type: string;
 	export let isAbsolute = false;
 	let githubRawIconUrl =
-		'https://raw.githubusercontent.com/tetrisiq/coolify-community-templates/main/services/icons';
+		'https://raw.githubusercontent.com/coollabsio/coolify-community-templates/main/services/icons';
 
 	let fallback = '/icons/default.png';
 
