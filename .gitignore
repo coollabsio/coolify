@@ -1,4 +1,5 @@
 .DS_Store
+.dccache
 node_modules
 .pnpm-store
 /apps/ui/build
@@ -20,6 +21,6 @@ others/certificates
 backups/*
 !backups/.gitkeep
 
-# Trpc
+# tRPC
 apps/server/db/*.db
 apps/server/db/*.db-journal
