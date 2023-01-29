@@ -26,6 +26,7 @@
 	import { addToast, appSession } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 	let loadBuildingStatusInterval: any = null;
@@ -167,14 +168,11 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
-			<div class="title font-bold pb-3">Preview Deployments</div>
-			<div class="text-center">
-				<button class="btn btn-sm bg-coollabs" on:click={loadPreviewsFromDocker}
-					>Load Previews</button
-				>
-			</div>
-		</div>
+		<HeaderWithButton title="Preview Deployments">
+			<button class="btn btn-sm bg-coollabs" on:click={loadPreviewsFromDocker}>
+				Load Previews
+			</button>
+		</HeaderWithButton>
 	</div>
 </div>
 

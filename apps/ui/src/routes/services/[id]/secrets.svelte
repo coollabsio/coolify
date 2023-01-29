@@ -25,6 +25,7 @@
 	import { get } from '$lib/api';
 	import { t } from '$lib/translations';
 	import pLimit from 'p-limit';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { addToast, appSession } from '$lib/store';
 	import { saveSecret } from './utils';
 	const limit = pLimit(1);
@@ -67,9 +68,7 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3">Secrets</div>
-	</div>
+	<HeaderWithButton title="Secrets" />
 	<div class="overflow-x-auto">
 		<table class="w-full border-separate text-left">
 			<thead>
@@ -100,12 +99,10 @@
 	</div>
 	{#if $appSession.isAdmin}
 		<form on:submit|preventDefault={getValues} class="mb-12 w-full">
-			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 pt-10">
-				<div class="flex flex-row space-x-2">
-					<div class="title font-bold pb-3 ">Paste <code>.env</code> file</div>
-					<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
-				</div>
-			</div>
+			<HeaderWithButton>
+				<span slot="title">Paste <code>.env</code> file</span>
+				<button type="submit" class="btn btn-sm bg-primary">Add Secrets in Batch</button>
+			</HeaderWithButton>
 
 			<textarea
 				placeholder={`PORT=1337\nPASSWORD=supersecret`}

@@ -41,6 +41,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
 	import Setting from '$lib/components/Setting.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 
@@ -51,7 +52,7 @@
 	let isDBBranching = application.settings.isDBBranching;
 
 	async function changeSettings(name: any) {
-		if (!$appSession.isAdmin) return
+		if (!$appSession.isAdmin) return;
 		if (name === 'previews') {
 			previews = !previews;
 		}
@@ -110,9 +111,7 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
-			<div class="title font-bold pb-3">Features</div>
-		</div>
+		<HeaderWithButton title="Features" />
 		<div class="px-4 lg:pb-10 pb-6">
 			{#if !application.settings.isPublicRepository}
 				<div class="grid grid-cols-2 items-center">

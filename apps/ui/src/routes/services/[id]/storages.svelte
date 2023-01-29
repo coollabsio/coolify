@@ -27,6 +27,7 @@
 	import { t } from '$lib/translations';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import { appSession } from '$lib/store';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 	async function refreshStorage() {
@@ -47,14 +48,14 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-			<div class="title font-bold pb-3">
+		<HeaderWithButton>
+			<span slot="title">
 				Persistent Volumes <Explainer
 					position="dropdown-bottom"
 					explanation={$t('application.storage.persistent_storage_explainer')}
 				/>
-			</div>
-		</div>
+			</span>
+		</HeaderWithButton>
 		{#if persistentStorages.filter((s) => s.predefined).length > 0}
 			<div class="title">Predefined Volumes</div>
 			<div class="w-full lg:px-0 px-4">

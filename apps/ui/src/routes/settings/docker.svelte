@@ -21,6 +21,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { addToast } from '$lib/store';
 	let isModalActive = false;
 
@@ -28,7 +29,8 @@
 		name: '',
 		username: '',
 		password: '',
-		url: ''
+		url: '',
+		isSystemWide: false
 	};
 
 	async function handleSubmit() {
@@ -74,7 +76,8 @@
 					name: 'Docker Hub',
 					username: '',
 					password: '',
-					url: 'https://index.docker.io/v1/'
+					url: 'https://index.docker.io/v1/',
+					isSystemWide: false
 				};
 				await handleSubmit();
 				break;
@@ -83,7 +86,8 @@
 					name: 'Google Container Registry',
 					username: '',
 					password: '',
-					url: 'https://gcr.io'
+					url: 'https://gcr.io',
+					isSystemWide: false
 				};
 				await handleSubmit();
 				break;
@@ -92,7 +96,8 @@
 					name: 'GitHub Container Registry',
 					username: '',
 					password: '',
-					url: 'https://ghcr.io'
+					url: 'https://ghcr.io',
+					isSystemWide: false
 				};
 				await handleSubmit();
 				break;
@@ -101,13 +106,12 @@
 </script>
 
 <div class="w-full">
-	<div class="flex border-b border-coolgray-500 mb-6">
-		<div class="title font-bold pb-3 pr-4">Docker Registries</div>
-		<!-- svelte-ignore a11y-click-events-have-key-events -->
-		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-			>Add Docker Registry</label
-		>
-	</div>
+	<HeaderWithButton
+		title="Docker Registries"
+		buttonText="Add Docker Registry"
+		isModal
+		on:click={() => (isModalActive = true)}
+	/>
 	<div class="flex items-center pb-4 gap-2">
 		<div class="text-xs">Quick Action</div>
 		<button class="btn btn-sm text-xs" on:click={() => addRegistry('dockerhub')}>DockerHub</button>
@@ -119,57 +123,57 @@
 		>
 	</div>
 	{#if registries.length > 0}
-	<div class="mx-auto w-full">
-		<table class="table w-full">
-			<thead>
-				<tr>
-					<th>Name</th>
-					<th>Username</th>
-					<th>Password</th>
-					<th>Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each registries as registry}
+		<div class="mx-auto w-full">
+			<table class="table w-full">
+				<thead>
 					<tr>
-						<td
-							>{registry.name}
-							<div class="text-xs">{registry.url}</div></td
-						>
-						<td>
-							<CopyPasswordField
-								name="username"
-								id="Username"
-								bind:value={registry.username}
-								placeholder="Username"
-							/></td
-						>
-						<td
-							><CopyPasswordField
-								isPasswordField={true}
-								name="Password"
-								id="Password"
-								bind:value={registry.password}
-								placeholder="Password"
-							/></td
-						>
-
-						<td>
-							<button on:click={() => setRegistry(registry)} class="btn btn-sm btn-primary"
-								>Set</button
-							>
-							{#if registry.id !== '0'}
-								<button
-									on:click={() => deleteDockerRegistry(registry.id)}
-									class="btn btn-sm btn-error">Delete</button
-								>
-							{/if}
-						</td>
+						<th>Name</th>
+						<th>Username</th>
+						<th>Password</th>
+						<th>Actions</th>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
-	</div>
+				</thead>
+				<tbody>
+					{#each registries as registry}
+						<tr>
+							<td
+								>{registry.name}
+								<div class="text-xs">{registry.url}</div></td
+							>
+							<td>
+								<CopyPasswordField
+									name="username"
+									id="Username"
+									bind:value={registry.username}
+									placeholder="Username"
+								/></td
+							>
+							<td
+								><CopyPasswordField
+									isPasswordField={true}
+									name="Password"
+									id="Password"
+									bind:value={registry.password}
+									placeholder="Password"
+								/></td
+							>
+
+							<td>
+								<button on:click={() => setRegistry(registry)} class="btn btn-sm btn-primary"
+									>Set</button
+								>
+								{#if registry.id !== '0'}
+									<button
+										on:click={() => deleteDockerRegistry(registry.id)}
+										class="btn btn-sm btn-error">Delete</button
+									>
+								{/if}
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </div>
 

@@ -3,6 +3,7 @@
 	import { get } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { onMount, onDestroy } from 'svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	let application: any = {};
 	let logsLoading = false;
@@ -107,9 +108,7 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3">Application Logs</div>
-	</div>
+	<HeaderWithButton title="Application Logs" />
 </div>
 <div class="flex gap-2 lg:gap-8 pb-4">
 	{#each services as service}

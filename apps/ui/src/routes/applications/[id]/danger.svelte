@@ -27,6 +27,7 @@
 	import { errorNotification } from '$lib/common';
 	import { goto } from '$app/navigation';
 	const { id } = $page.params;
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	let forceDelete = false;
 	async function deleteApplication(name: string, force: boolean) {
@@ -34,8 +35,8 @@
 		if (sure) {
 			$status.application.initialLoading = true;
 			try {
-				await del(`/applications/${id}`,{});
-				return await goto('/')
+				await del(`/applications/${id}`, {});
+				return await goto('/');
 			} catch (error) {
 				if (error.message.startsWith(`Command failed: SSH_AUTH_SOCK=/tmp/coolify-ssh-agent.pid`)) {
 					forceDelete = true;
@@ -49,10 +50,7 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3">Danger Zone</div>
-	</div>
-
+	<HeaderWithButton title="Danger Zone" />
 	{#if forceDelete}
 		<button
 			id="forcedelete"

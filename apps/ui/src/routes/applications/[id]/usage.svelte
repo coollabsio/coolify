@@ -5,6 +5,7 @@
 	import { get } from '$lib/api';
 	import { status } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 	let services: any = [];
@@ -71,9 +72,7 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3">Monitoring</div>
-	</div>
+	<HeaderWithButton title="Monitoring" />
 </div>
 <div class="flex gap-2 lg:gap-8 pb-4">
 	{#each services as service}

@@ -51,6 +51,7 @@
 	import { goto } from '$app/navigation';
 	import Beta from '$lib/components/Beta.svelte';
 	import { saveForm } from './utils';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 	$: isDisabled =
@@ -494,8 +495,7 @@
 <div class="w-full">
 	<form id="saveForm" on:submit|preventDefault={() => handleSubmit()}>
 		<div class="mx-auto w-full">
-			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-				<div class="title font-bold pb-3">General</div>
+			<HeaderWithButton title="General">
 				{#if $appSession.isAdmin}
 					<button
 						class="btn btn-sm  btn-primary"
@@ -506,7 +506,7 @@
 						disabled={loading.save}>{$t('forms.save')}</button
 					>
 				{/if}
-			</div>
+			</HeaderWithButton>
 			<div class="grid grid-flow-row gap-2 px-4">
 				<div class="mt-2 grid grid-cols-2 items-center">
 					<label for="name">{$t('forms.name')}</label>
@@ -751,7 +751,7 @@
 							on:click={() => !isDisabled && changeSettings('dualCerts')}
 						/>
 					</div>
-				
+
 					{#if isHttps && application.buildPack !== 'compose'}
 						<div class="grid grid-cols-2 items-center pb-4">
 							<Setting
@@ -1239,7 +1239,7 @@
 								/>
 							</label>
 							<input
-								for="destinationdns"
+								id="destinationdns"
 								class="w-full"
 								disabled
 								readonly
@@ -1253,7 +1253,7 @@
 									explanation={'You can use these DNS names to access the application from this stack.'}
 								/>
 							</label>
-							<input for="stackdns" class="w-full" disabled readonly value={service.name} />
+							<input id="stackdns" class="w-full" disabled readonly value={service.name} />
 						</div>
 						<div class="grid grid-cols-2 items-center px-8 pb-4">
 							<label for="port"

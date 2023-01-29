@@ -3,6 +3,8 @@
 	import { post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import { appSession } from '$lib/store';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
+
 	if ($appSession.pendingInvitations.length === 0) {
 		goto('/iam/teams');
 	}
@@ -26,9 +28,7 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 items-center">
-			<div class="title font-bold pb-3">Pending Invitations</div>
-		</div>
+		<HeaderWithButton title="Pending Invitations" />
 	</div>
 </div>
 

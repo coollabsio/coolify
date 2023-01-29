@@ -27,6 +27,7 @@
 	import { status, addToast } from '$lib/store';
 	import { errorNotification } from '$lib/common';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	const { id } = $page.params;
 	let remoteImage: any = null;
@@ -76,15 +77,14 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6  space-x-2">
-			<div class="title font-bold pb-3">
+		<HeaderWithButton>
+			<span slot="title">
 				Revert <Explainer
 					position="dropdown-bottom"
-					explanation="You can revert application to a previously built image. Currently only locally stored images
-				supported."
+					explanation="You can revert application to a previously built image. Currently only locally stored images supported."
 				/>
-			</div>
-		</div>
+			</span>
+		</HeaderWithButton>
 		<div class="pb-4 text-xs">
 			If you do not want the next commit to overwrite the reverted application, temporary disable <span
 				class="text-yellow-400 font-bold">Automatic Deployment</span

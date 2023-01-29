@@ -33,6 +33,7 @@
 	import DocLink from '$lib/components/DocLink.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import ServiceStatus from '$lib/components/ServiceStatus.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { saveForm } from './utils';
 	import Select from 'svelte-select';
 	import Wordpress from './_Services/wordpress.svelte';
@@ -223,8 +224,7 @@
 <div class="w-full">
 	<form id="saveForm" on:submit|preventDefault={handleSubmit}>
 		<div class="mx-auto w-full">
-			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-				<div class="title font-bold pb-3 ">General</div>
+			<HeaderWithButton title="General">
 				{#if $appSession.isAdmin}
 					<button
 						type="submit"
@@ -234,12 +234,13 @@
 						class:loading={loading.save}
 						class:btn-primary={!loading.save}
 						disabled={loading.save}
-						>{loading.save
+					>
+						{loading.save
 							? $t('forms.save')
 							: forceSave
 							? $t('forms.confirm_continue')
-							: $t('forms.save')}</button
-					>
+							: $t('forms.save')}
+					</button>
 				{/if}
 				{#if service.type === 'plausibleanalytics' && $status.service.overallStatus === 'healthy'}
 					<button
@@ -247,16 +248,17 @@
 						on:click|preventDefault={setEmailsToVerified}
 						disabled={loading.verification}
 						class:loading={loading.verification}
-						>{loading.verification
-							? $t('forms.verifying')
-							: $t('forms.verify_emails_without_smtp')}</button
 					>
+						{loading.verification ? $t('forms.verifying') : $t('forms.verify_emails_without_smtp')}
+					</button>
 					<button
 						class="btn btn-sm"
 						on:click|preventDefault={cleanupLogs}
 						disabled={loading.cleanup}
-						class:loading={loading.cleanup}>Cleanup Unnecessary Database Logs</button
+						class:loading={loading.cleanup}
 					>
+						Cleanup Unnecessary Database Logs
+					</button>
 				{/if}
 				{#if service.type === 'appwrite' && $status.service.overallStatus === 'healthy'}
 					<button
@@ -264,15 +266,14 @@
 						on:click|preventDefault={migrateAppwriteDB}
 						disabled={loading.verification}
 						class:loading={loading.verification}
-						>{loading.verification
-							? 'Migrating... it may take a while...'
-							: "Migrate Appwrite's Database"}</button
 					>
-					<div>
-						<DocLink url="https://appwrite.io/docs/upgrade#run-the-migration" />
-					</div>
+						{loading.verification
+							? 'Migrating... it may take a while...'
+							: "Migrate Appwrite's Database"}
+					</button>
+					<DocLink url="https://appwrite.io/docs/upgrade#run-the-migration" />
 				{/if}
-			</div>
+			</HeaderWithButton>
 		</div>
 
 		<div class="grid grid-flow-row gap-2 px-4">

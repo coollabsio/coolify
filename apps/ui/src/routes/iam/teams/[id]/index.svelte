@@ -23,6 +23,7 @@
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Cookies from 'js-cookie';
 	import { goto } from '$app/navigation';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	const { id } = $page.params;
 
 	let invitation: any = {
@@ -165,18 +166,18 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 items-center  pb-3">
-			<div class="title font-bold">{team.name}</div>
-
+		<HeaderWithButton title={team.name}>
 			<button class="btn btn-sm bg-primary" on:click={handleSubmit}>{$t('forms.save')}</button>
 			<button
 				id="delete"
 				on:click={deleteTeam}
 				type="submit"
 				disabled={!$appSession.isAdmin}
-				class="btn btn-sm bg-error">Remove Team</button
+				class="btn btn-sm bg-error"
 			>
-		</div>
+				Remove Team
+			</button>
+		</HeaderWithButton>
 	</div>
 </div>
 

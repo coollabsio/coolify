@@ -22,6 +22,7 @@
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import Menu from './_Menu.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	let loading = {
 		save: false
@@ -58,12 +59,12 @@
 </script>
 
 <div class="w-full">
-	<div class="flex border-b border-coolgray-500 mb-6">
-		<div class="title font-bold pb-3 pr-4">SSH Keys</div>
-		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-			>Add SSH Key</label
-		>
-	</div>
+	<HeaderWithButton
+		title="SSH Keys"
+		buttonText="Add SSH Key"
+		isModal
+		on:click={() => (isModalActive = true)}
+	/>
 	{#if sshKeys.length === 0}
 		<div class="text-sm">No SSH keys found</div>
 	{:else}

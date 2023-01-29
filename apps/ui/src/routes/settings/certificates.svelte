@@ -21,6 +21,7 @@
 	import { del, post } from '$lib/api';
 	import { errorNotification } from '$lib/common';
 	import Beta from '$lib/components/Beta.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	let loading = {
 		save: false
@@ -57,12 +58,13 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex border-b border-coolgray-500 mb-6">
-		<div class="title font-bold pb-3 pr-4">SSL Certificates <Beta /></div>
-		<label for="my-modal" class="btn btn-sm btn-primary" on:click={() => (isModalActive = true)}
-			>Add SSL Certificate</label
-		>
-	</div>
+	<HeaderWithButton
+		title="SSL Certificates"
+		buttonText="Add SSL Certificate"
+		isBeta
+		isModal
+		on:click={() => (isModalActive = true)}
+	/>
 	{#if certificates.length > 0}
 		<table class="table w-full">
 			<thead>

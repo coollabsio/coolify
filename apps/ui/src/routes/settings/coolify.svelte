@@ -24,6 +24,7 @@
 	import { addToast, appSession, features } from '$lib/store';
 	import { asyncSleep, errorNotification, getDomain } from '$lib/common';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { dev } from '$app/env';
 
 	let isAPIDebuggingEnabled = settings.isAPIDebuggingEnabled;
@@ -267,35 +268,36 @@
 
 <div class="mx-auto w-full">
 	<form on:submit|preventDefault={handleSubmit}>
-		<div class="flex flex-row border-b border-coolgray-500 mb-6">
-			<div class="title font-bold pb-3 pr-4">Coolify Settings</div>
-			<div class="flex flex-row space-x-2">
-				<button
-					class="btn btn-sm btn-primary"
-					type="submit"
-					class:bg-orange-600={forceSave}
-					class:hover:bg-orange-400={forceSave}
-					class:loading={loading.save}
-					disabled={loading.save}
-					>{loading.save
-						? $t('forms.saving')
-						: forceSave
-						? $t('forms.confirm_continue')
-						: $t('forms.save')}</button
-				>
+		<HeaderWithButton title="Coolify Settings">
+			<button
+				class="btn btn-sm btn-primary"
+				type="submit"
+				class:bg-orange-600={forceSave}
+				class:hover:bg-orange-400={forceSave}
+				class:loading={loading.save}
+				disabled={loading.save}
+			>
+				{loading.save
+					? $t('forms.saving')
+					: forceSave
+					? $t('forms.confirm_continue')
+					: $t('forms.save')}
+			</button>
 
-				{#if isFqdnSet}
-					<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn btn-sm"
-						>{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}</button
-					>
-				{/if}
-				<button
-					on:click={restartCoolify}
-					class:loading={loading.restart}
-					class="btn btn-sm btn-error">Restart Coolify</button
-				>
-			</div>
-		</div>
+			{#if isFqdnSet}
+				<button on:click|preventDefault={removeFqdn} disabled={loading.remove} class="btn btn-sm">
+					{loading.remove ? $t('forms.removing') : $t('forms.remove_domain')}
+				</button>
+			{/if}
+
+			<button
+				on:click={restartCoolify}
+				class:loading={loading.restart}
+				class="btn btn-sm btn-error"
+			>
+				Restart Coolify
+			</button>
+		</HeaderWithButton>
 		<div class="flex lg:flex-row flex-col">
 			<div class="grid grid-flow-row gap-2 px-4 pr-5">
 				<div class="grid grid-cols-2 items-center">

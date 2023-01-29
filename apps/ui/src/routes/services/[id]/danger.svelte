@@ -25,6 +25,7 @@
 	import { t } from '$lib/translations';
 	import { appSession, status } from '$lib/store';
 	import { errorNotification } from '$lib/common';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { goto } from '$app/navigation';
 	const { id } = $page.params;
 
@@ -45,9 +46,7 @@
 </script>
 
 <div class="mx-auto w-full">
-	<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="title font-bold pb-3">Danger Zone</div>
-	</div>
+	<HeaderWithButton title="Danger Zone" />
 	<button
 		id="forcedelete"
 		on:click={() => deleteService()}

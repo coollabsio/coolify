@@ -25,6 +25,7 @@
 	import { appSession } from '$lib/store';
 	import { errorNotification } from '$lib/common';
 	import { goto } from '$app/navigation';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 
 	async function switchTeam(selectedTeamId: any) {
 		try {
@@ -52,10 +53,7 @@
 
 <div class="w-full">
 	<div class="mx-auto w-full">
-		<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2 items-center  pb-3">
-			<div class="title font-bold">Teams</div>
-			<button on:click={newTeam} class="btn btn-sm btn-primary"> Add New Team </button>
-		</div>
+		<HeaderWithButton title="Teams" buttonText="Add New Team" on:click={newTeam} />
 	</div>
 </div>
 <div class="grid grid-col gap-4 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-2 px-6">
