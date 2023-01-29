@@ -1,7 +1,7 @@
 <script lang="ts">
 	export let isNew = false;
 	export let storage: any = {};
-	export let services: any = [];
+	export let services: { id: string; name: string }[] = [];
 	import { del, post } from '$lib/api';
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
@@ -86,7 +86,7 @@
 					readonly
 					class="w-full"
 					value={`${
-						services.find((s) => s.id === storage.containerId).name || storage.containerId
+						services.find((s) => s.id === storage.containerId)?.name ?? storage.containerId
 					}`}
 				/>
 			</div>
@@ -101,54 +101,50 @@
 			</div>
 		</div>
 	{:else if isNew}
-		<form id="saveVolumesForm" on:submit|preventDefault={saveStorage}>
-			<div class="grid grid-col-1 lg:grid-cols-2 lg:space-x-4 pt-8">
-				<div class="flex flex-row">
-					<div class="flex flex-col w-full">
-						<label for="name" class="pb-2 uppercase font-bold">Container</label>
-						<select
-							form="saveVolumesForm"
-							name="containerId"
-							class="w-full lg:w-64"
-							disabled={storage.predefined}
-							readonly={storage.predefined}
-							bind:value={storage.containerId}
-						>
-							{#if services.length === 1}
-								{#if services[0].name}
-									<option selected value={services[0].id}>{services[0].name}</option>
-								{:else}
-									<option selected value={services[0]}>{services[0]}</option>
-								{/if}
+		<form id="saveVolumesForm" on:submit|preventDefault={saveStorage} class="mt-8">
+			<div class="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:max-w-4xl">
+				<label for="name" class="uppercase font-bold">Container</label>
+				<label for="name" class="uppercase font-bold lg:col-span-2">Path</label>
+
+				<select
+					form="saveVolumesForm"
+					name="containerId"
+					class="w-full"
+					disabled={storage.predefined}
+					bind:value={storage.containerId}
+				>
+					{#if services.length === 1}
+						{#if services[0].name}
+							<option selected value={services[0].id}>{services[0].name}</option>
+						{:else}
+							<option selected value={services[0]}>{services[0]}</option>
+						{/if}
+					{:else}
+						{#each services as service}
+							{#if service.name}
+								<option value={service.id}>{service.name}</option>
 							{:else}
-								{#each services as service}
-									{#if service.name}
-										<option value={service.id}>{service.name}</option>
-									{:else}
-										<option value={service}>{service}</option>
-									{/if}
-								{/each}
+								<option value={service}>{service}</option>
 							{/if}
-						</select>
-					</div>
-					<div class="flex flex-col w-full">
-						<label for="name" class="pb-2 uppercase font-bold">Path</label>
-						<input
-							name="path"
-							disabled={storage.predefined}
-							readonly={storage.predefined}
-							class="w-full lg:w-64"
-							bind:value={storage.path}
-							required
-							placeholder="eg: /sqlite.db"
-						/>
-					</div>
-				</div>
-				<div class="pt-8">
-					<button type="submit" class="btn btn-sm btn-primary w-full lg:w-64"
-						>{$t('forms.add')}</button
-					>
-				</div>
+						{/each}
+					{/if}
+				</select>
+
+				<input
+					name="path"
+					disabled={storage.predefined}
+					readonly={storage.predefined}
+					class="w-full"
+					bind:value={storage.path}
+					required
+					placeholder="eg: /sqlite.db"
+				/>
+
+				<button
+					type="submit"
+					class="btn btn-sm btn-primary w-full place-self-center col-span-2 lg:col-span-1"
+					>{$t('forms.add')}</button
+				>
 			</div>
 		</form>
 	{:else}
@@ -157,7 +153,7 @@
 				disabled
 				readonly
 				class="w-full"
-				value={`${services.find((s) => s.id === storage.containerId).name || storage.containerId}`}
+				value={`${services.find((s) => s.id === storage.containerId)?.name ?? storage.containerId}`}
 			/>
 			<input disabled readonly class="w-full" value={`${storage.volumeName}:${storage.path}`} />
 			<button
