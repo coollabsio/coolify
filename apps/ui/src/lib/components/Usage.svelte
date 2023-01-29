@@ -143,8 +143,12 @@
 			</div>
 
 			<div class="stat">
-				<div class="stat-title">Load Average (5,10,30mins)</div>
-				<div class="stat-value text-2xl text-white">{usage?.cpu?.load}</div>
+				<div class="stat-title">Load Average (5, 10, 30 mins)</div>
+				<div class="stat-value text-2xl text-white">
+					{#each usage?.cpu?.load ?? [] as load, i}
+						{Number.parseFloat((load ?? 0).toString()).toFixed(3)}{#if i <= 1},{' '}{/if}
+					{/each}
+				</div>
 			</div>
 		</div>
 		<div class="stats stats-vertical min-w-[16rem] mb-5 bg-transparent rounded">
