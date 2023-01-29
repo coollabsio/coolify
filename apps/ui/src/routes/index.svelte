@@ -459,7 +459,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this database!');
 			if (sure) {
-				await del(`/databases/${id}`, {  });
+				await del(`/databases/${id}`, {});
 				return window.location.reload();
 			}
 		} catch (error) {
