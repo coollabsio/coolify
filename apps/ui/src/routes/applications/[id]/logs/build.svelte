@@ -29,6 +29,7 @@
 	import { t } from '$lib/translations';
 	import { changeQueryParams, dateOptions, errorNotification, asyncSleep } from '$lib/common';
 	import Tooltip from '$lib/components/Tooltip.svelte';
+	import HeaderWithButton from '$lib/components/HeaderWithButton.svelte';
 	import { day } from '$lib/dayjs';
 	import { onDestroy, onMount } from 'svelte';
 	const { id } = $page.params;
@@ -129,15 +130,12 @@
 </script>
 
 <div class="mx-auto w-full lg:px-0 px-1">
-	<div class="flex lg:flex-row flex-col border-b border-coolgray-500 mb-6 space-x-2">
-		<div class="flex flex-row">
-			<div class="title font-bold pb-3 pr-3">Build Logs</div>
-			<button class="btn btn-sm bg-error" on:click={resetQueue}>Reset Build Queue</button>
-		</div>
-		<div class=" flex-1" />
+	<HeaderWithButton title="Build Logs">
+		<button class="btn btn-sm bg-error" on:click={resetQueue}>Reset Build Queue</button>
+		<div class="flex-1" />
 		<div class="form-control">
 			<label class="label cursor-pointer">
-				<span class="label-text text-white pr-4 font-bold">Enable Debug Logs</span>
+				<span class="label-text text-white font-bold pr-4">Enable Debug Logs</span>
 				<input
 					type="checkbox"
 					checked={debug}
@@ -146,7 +144,7 @@
 				/>
 			</label>
 		</div>
-	</div>
+	</HeaderWithButton>
 </div>
 <div class="justify-start space-x-5 flex flex-col-reverse lg:flex-row">
 	<div class="flex-1 md:w-96">

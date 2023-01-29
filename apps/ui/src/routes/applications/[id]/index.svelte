@@ -777,9 +777,7 @@
 				{/if}
 			</div>
 			{#if isSimpleDockerfile}
-				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Configuration
-				</div>
+				<HeaderWithButton title="Configuration" />
 
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					<div class="grid grid-cols-2 items-center  pt-4">
@@ -814,9 +812,7 @@
 					</div>
 				</div>
 			{:else if application.buildPack !== 'compose'}
-				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Configuration
-				</div>
+				<HeaderWithButton title="Configuration" />
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
 					{#if application.buildCommand || application.buildPack === 'rust' || application.buildPack === 'laravel'}
 						<div class="grid grid-cols-2 items-center">
@@ -1162,17 +1158,16 @@
 					{/if}
 				</div>
 			{:else}
-				<div class="title font-bold pb-3 pt-10 border-b border-coolgray-500 mb-6">
-					Stack <Beta />
+				<HeaderWithButton title="Stack" isBeta>
 					{#if $appSession.isAdmin}
-						<button
-							class="btn btn-sm btn-primary"
-							class:loading={loading.reloadCompose}
-							disabled={loading.reloadCompose}
-							on:click|preventDefault={reloadCompose}>Reload Docker Compose File</button
-						>
-					{/if}
-				</div>
+					<button
+						class="btn btn-sm btn-primary"
+						class:loading={loading.reloadCompose}
+						disabled={loading.reloadCompose}
+						on:click|preventDefault={reloadCompose}>Reload Docker Compose File</button
+					>
+				{/if}
+			</HeaderWithButton>
 				<div class="grid grid-flow-row gap-2">
 					<div class="grid grid-cols-2 items-center px-8 pb-4">
 						<label for="dockerComposeFileLocation"
