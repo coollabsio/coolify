@@ -21,6 +21,8 @@ import type { ExecaChildProcess } from 'execa';
 
 export const version = '3.12.19';
 export const isDev = process.env.NODE_ENV === 'development';
+export const proxyPort = process.env.COOLIFY_PROXY_PORT;
+export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
 export const sentryDSN =
 	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
 const algorithm = 'aes-256-ctr';
@@ -712,8 +714,8 @@ export async function startTraefikProxy(id: string): Promise<void> {
 			-v coolify-traefik-letsencrypt:/etc/traefik/acme \
 			-v /var/run/docker.sock:/var/run/docker.sock \
 			--network coolify-infra \
-			-p "80:80" \
-			-p "443:443" \
+			-p ${proxyPort ? `${proxyPort}:80` : `80:80`} \
+			-p ${proxySecurePort ? `${proxySecurePort}:443` : `443:443`} \
 			${isDev ? '-p "8080:8080"' : ''} \
 			--name coolify-proxy \
 			-d ${defaultTraefikImage} \
