@@ -13,11 +13,11 @@
 	<div class="grid grid-cols-2 items-center">
 		<label for="dbUserPassword" 
 			>{$t('forms.password')}
-			<Explainer explanation="Could be changed while the database is running." /></label
+			<Explainer explanation="Can be modified even when the database is active." /></label
 		>
 		<CopyPasswordField
-			disabled={!$status.database.isRunning}
-			readonly={!$status.database.isRunning}
+			readonly={false}
+			disabled={false}
 			placeholder={$t('forms.generated_automatically_after_start')}
 			isPasswordField
 			id="dbUserPassword"
