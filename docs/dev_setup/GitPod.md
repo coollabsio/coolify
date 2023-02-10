@@ -1,6 +1,6 @@
 ### Gitpod
 
-#### Option 1 - Prefered:
+#### Option 1 - Preferred:
 
 Follow the same steps as [container based development flow](./Container.md)
 

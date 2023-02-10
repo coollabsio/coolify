@@ -10,7 +10,7 @@ You'll need a set of skills to [get started](docs/contribution/GettingStarted.md
 
 ## 1) Setup your development environment
 
-- 🌟 [Container based](docs/dev_setup/Container.md) &larr; *Recomended*
+- 🌟 [Container based](docs/dev_setup/Container.md) &larr; *Recommended*
 - 📦 [DockerContainer](docs/dev_setup/DockerContiner.md) *WIP
 - 🐙 [Github Codespaces](docs/dev_setup/GithubCodespaces.md)
 - ☁️ [GitPod](docs/dev_setup/GitPod.md)
@@ -28,12 +28,12 @@ You'll need a set of skills to [get started](docs/contribution/GettingStarted.md
 - Copy `apps/api/.env.example` to `apps/api/.env` 
 - Edit `apps/api/.env`, set the `COOLIFY_APP_ID` environment variable to something cool.
 - Run `pnpm install` to install dependencies.
-- Run `pnpm db:push` to o create a local SQlite database. This will apply all migrations at `db/dev.db`.
+- Run `pnpm db:push` to create a local SQlite database. This will apply all migrations at `db/dev.db`.
 - Run `pnpm db:seed` seed the database.
 - Run `pnpm dev` start coding.
 
 ```sh
-# Or... Copy and paste commands bellow:
+# Or... Copy and paste commands below:
 cp apps/api/.env.example apps/api/.env
 pnpm install
 pnpm db:push
