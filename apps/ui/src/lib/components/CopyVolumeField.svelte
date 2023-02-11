@@ -14,9 +14,18 @@
 		}
 	}
 </script>
+<style>
+	.box {
+		position: relative;
+		border: 1px dashed #202020;
+		border-radius: 5px;
+		padding: 5px;
+	}
+	
+</style>
 
-<div class="w-full relative">
-	<p class="text-white  p-5">{value}</p>
+<div class="w-full relative box">
+	<p class="text-white  p-2">{value}</p>
     <div class="absolute top-0 right-0 flex justify-center items-center h-full cursor-pointer text-stone-600 mr-3">
 		<div on:click={copyToClipboard}>
             
