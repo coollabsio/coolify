@@ -56,6 +56,10 @@
 				Authorization: `Bearer ${$appSession.tokens.gitlab}`
 			});
 			username = user.username;
+			groups.push({
+				full_name: username,
+				name: username
+			});
 			await loadGroups();
 		} catch (error) {
 			loading.base = false;
