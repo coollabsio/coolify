@@ -128,7 +128,6 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
                 }
             }
             let image = template.services[s].image
-            console.log({ arm, imageArm: template.services[s].imageArm })
             if (arm && template.services[s].imageArm) {
                 image = template.services[s].imageArm
             }
