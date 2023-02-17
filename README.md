@@ -119,7 +119,7 @@ Learn how to contribute to Coolify as as ...
 
 <!-- 
 &rarr; 🧑🏽‍🎨 Designer
-&rarr; 🙋‍♀️ Community Managemer
+&rarr; 🙋‍♀️ Community Manager
 &rarr; 🧙🏻‍♂️ Text Content Creator
 &rarr; 👨🏼‍🎤 Video Content Creator
 -->
