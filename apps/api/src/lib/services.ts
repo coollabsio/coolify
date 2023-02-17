@@ -6,7 +6,7 @@ export async function getTemplates() {
 	try {
 		let data = await open.readFile({ encoding: 'utf-8' });
 		let jsonData = JSON.parse(data);
-		if (isARM(process.arch)) {
+		if (isARM()) {
 			jsonData = jsonData.filter((d) => d.arch !== 'amd64');
 		}
 		return jsonData;

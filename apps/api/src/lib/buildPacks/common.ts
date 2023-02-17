@@ -341,8 +341,8 @@ export function setDefaultBaseImage(
 	};
 	if (nodeBased.includes(buildPack)) {
 		if (deploymentType === 'static') {
-			payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
-			payload.baseImages = isARM(process.arch)
+			payload.baseImage = isARM() ? 'nginx:alpine' : 'webdevops/nginx:alpine';
+			payload.baseImages = isARM()
 				? staticVersions.filter((version) => !version.value.includes('webdevops'))
 				: staticVersions;
 			payload.baseBuildImage = 'node:lts';
@@ -355,8 +355,8 @@ export function setDefaultBaseImage(
 		}
 	}
 	if (staticApps.includes(buildPack)) {
-		payload.baseImage = isARM(process.arch) ? 'nginx:alpine' : 'webdevops/nginx:alpine';
-		payload.baseImages = isARM(process.arch)
+		payload.baseImage = isARM() ? 'nginx:alpine' : 'webdevops/nginx:alpine';
+		payload.baseImages = isARM()
 			? staticVersions.filter((version) => !version.value.includes('webdevops'))
 			: staticVersions;
 		payload.baseBuildImage = 'node:lts';
@@ -376,18 +376,18 @@ export function setDefaultBaseImage(
 		payload.baseImage = 'denoland/deno:latest';
 	}
 	if (buildPack === 'php') {
-		payload.baseImage = isARM(process.arch)
+		payload.baseImage = isARM()
 			? 'php:8.1-fpm-alpine'
 			: 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = isARM(process.arch)
+		payload.baseImages = isARM()
 			? phpVersions.filter((version) => !version.value.includes('webdevops'))
 			: phpVersions;
 	}
 	if (buildPack === 'laravel') {
-		payload.baseImage = isARM(process.arch)
+		payload.baseImage = isARM()
 			? 'php:8.1-fpm-alpine'
 			: 'webdevops/php-apache:8.2-alpine';
-		payload.baseImages = isARM(process.arch)
+		payload.baseImages = isARM()
 			? phpVersions.filter((version) => !version.value.includes('webdevops'))
 			: phpVersions;
 		payload.baseBuildImage = 'node:18';

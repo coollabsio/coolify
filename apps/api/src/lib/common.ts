@@ -913,10 +913,10 @@ type DatabaseConfiguration =
 				EDGEDB_SERVER_TLS_CERT_MODE: string;
 			};
 	  };
-export function generateDatabaseConfiguration(database: any, arch: string): DatabaseConfiguration {
+export function generateDatabaseConfiguration(database: any): DatabaseConfiguration {
 	const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } =
 		database;
-	const baseImage = getDatabaseImage(type, arch);
+	const baseImage = getDatabaseImage(type);
 	if (type === 'mysql') {
 		const configuration = {
 			privatePort: 3306,
@@ -931,7 +931,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/mysql/data`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
 		}
 		return configuration;
@@ -949,7 +949,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/mariadb`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/var/lib/mysql`;
 		}
 		return configuration;
@@ -964,7 +964,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/mongodb`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.environmentVariables = {
 				MONGO_INITDB_ROOT_USERNAME: rootUser,
 				MONGO_INITDB_ROOT_PASSWORD: rootUserPassword
@@ -985,7 +985,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/postgresql`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
 			configuration.environmentVariables = {
 				POSTGRES_PASSWORD: dbUserPassword,
@@ -1009,7 +1009,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/redis/data`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/data`;
 			configuration.command = `/usr/local/bin/redis-server --appendonly ${
 				appendOnly ? 'yes' : 'no'
@@ -1027,7 +1027,7 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 			volume: `${id}-${type}-data:/bitnami/couchdb`,
 			ulimits: {}
 		};
-		if (isARM(arch)) {
+		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/opt/couchdb/data`;
 		}
 		return configuration;
@@ -1047,16 +1047,17 @@ export function generateDatabaseConfiguration(database: any, arch: string): Data
 		return configuration;
 	}
 }
-export function isARM(arch: string) {
-	if (arch === 'arm' || arch === 'arm64' || arch === 'aarch' || arch === 'aarch64') {
+export function isARM() {
+	const arch = process.arch;
+	if (arch === 'arm' || arch === 'arm64') {
 		return true;
 	}
 	return false;
 }
-export function getDatabaseImage(type: string, arch: string): string {
+export function getDatabaseImage(type: string): string {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
-		if (isARM(arch)) {
+		if (isARM()) {
 			return found.baseImageARM || found.baseImage;
 		}
 		return found.baseImage;
@@ -1064,10 +1065,10 @@ export function getDatabaseImage(type: string, arch: string): string {
 	return '';
 }
 
-export function getDatabaseVersions(type: string, arch: string): string[] {
+export function getDatabaseVersions(type: string): string[] {
 	const found = supportedDatabaseTypesAndVersions.find((t) => t.name === type);
 	if (found) {
-		if (isARM(arch)) {
+		if (isARM()) {
 			return found.versionsARM || found.versions;
 		}
 		return found.versions;
