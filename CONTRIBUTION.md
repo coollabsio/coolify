@@ -20,7 +20,7 @@ You'll need a set of skills to [get started](docs/contribution/GettingStarted.md
 
 - [Install Pnpm](https://pnpm.io/installation)
 - [Install Docker Engine](https://docs.docker.com/engine/install/)
-- [Setup Docker Compose Plugin](https://docs.docker.com/compose/install/linux/)
+- [Setup Docker Compose Plugin](https://docs.docker.com/compose/install/)
 - [Setup GIT LFS Support](https://git-lfs.github.com/)
 
 ## 3) Setup Coolify
