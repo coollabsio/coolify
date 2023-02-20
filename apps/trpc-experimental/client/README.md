@@ -1,1 +1,0 @@
-# SvelteKit Static site

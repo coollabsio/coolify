@@ -66,12 +66,12 @@ export default async function (data) {
 				}
 			}
 		}
-    if (build.length > 0 || buildArgs.length > 0 ) {
-		value['build'] = {
-			...build,
-			args: finalArgs
-		};
-    }
+		if (build.length > 0 || buildArgs.length > 0) {
+			value['build'] = {
+				...build,
+				args: finalArgs
+			};
+		}
 
 		value['labels'] = labels;
 		// TODO: If we support separated volume for each service, we need to add it here
@@ -104,8 +104,11 @@ export default async function (data) {
 					name: network
 				};
 			});
+			value['networks'] = [...(value['networks'] || ''), network];
+		} else {
+			value['networks'] = [network];
 		}
-		value['networks'] = [...(value['networks'] || ''), network];
+
 		dockerComposeYaml.services[key] = {
 			...dockerComposeYaml.services[key],
 			restart: defaultComposeConfiguration(network).restart,

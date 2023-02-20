@@ -119,7 +119,7 @@ Learn how to contribute to Coolify as as ...
 
 <!-- 
 &rarr; 🧑🏽‍🎨 Designer
-&rarr; 🙋‍♀️ Community Managemer
+&rarr; 🙋‍♀️ Community Manager
 &rarr; 🧙🏻‍♂️ Text Content Creator
 &rarr; 👨🏼‍🎤 Video Content Creator
 -->
@@ -130,11 +130,11 @@ Learn how to contribute to Coolify as as ...
 
 Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/coollabsio/contribute)]
 
-### Individuals
-
-<a href="https://opencollective.com/coollabsio"><img src="https://opencollective.com/coollabsio/individuals.svg?width=890"></a>
-
 ### Organizations
+
+Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
+
+![CCCareers](./others/logo/ccc-logo.webp)
 
 Support this project with your organization. Your logo will show up here with a link to your website. 
 
@@ -148,3 +148,8 @@ Support this project with your organization. Your logo will show up here with a 
 <a href="https://opencollective.com/coollabsio/organization/7/website"><img src="https://opencollective.com/coollabsio/organization/7/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/8/website"><img src="https://opencollective.com/coollabsio/organization/8/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a> 
+
+### Individuals
+
+<a href="https://opencollective.com/coollabsio"><img src="https://opencollective.com/coollabsio/individuals.svg?width=890"></a>
+

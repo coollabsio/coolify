@@ -210,7 +210,7 @@
       defaultValue: $$generate_password
       description: "password to encrypt preferences"
 - templateVersion: 1.0.0
-  defaultVersion: 1.1.3
+  defaultVersion: 1.1.5
   documentation: https://docs.openblocks.dev/
   type: openblocks
   name: Openblocks
@@ -223,7 +223,7 @@
       ports:
         - "3000"
 - templateVersion: 1.0.0
-  defaultVersion: "0.11.0"
+  defaultVersion: "0.12.3"
   documentation: https://pocketbase.io/docs/
   type: pocketbase
   name: Pocketbase
@@ -594,7 +594,7 @@
       defaultValue: $$generate_password
       required: true
 - templateVersion: 1.0.0
-  defaultVersion: v1.9.3
+  defaultVersion: v1.9.6
   documentation: https://docs.appsmith.com/getting-started/setup/instance-configuration/
   type: appsmith
   name: Appsmith
@@ -3324,7 +3324,7 @@
       defaultValue: $$generate_username
       description: ""
 - templateVersion: 1.0.0
-  defaultVersion: 0.210.1
+  defaultVersion: 0.215.1
   documentation: https://docs.n8n.io
   type: n8n
   name: n8n.io
@@ -3501,7 +3501,7 @@
       defaultValue: plausible.js
       description: This is the default script name.
 - templateVersion: 1.0.0
-  defaultVersion: 0.101.2
+  defaultVersion: 0.104.2
   documentation: https://docs.nocodb.com
   type: nocodb
   name: NocoDB

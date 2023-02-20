@@ -111,7 +111,7 @@
 		<div class="title font-bold pb-3">Application Logs</div>
 	</div>
 </div>
-<div class="flex gap-2 lg:gap-8 pb-4">
+<div class="grid grid-cols-3 gap-2 lg:gap-8 pb-4">
 	{#each services as service}
 		<button
 			on:click={() => selectService(service, true)}

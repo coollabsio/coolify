@@ -746,7 +746,7 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
 			let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting;
 			if (value) {
 				if (changed) {
-					await prisma.serviceSetting.update({ where: { id: settingId }, data: { value } });
+					await prisma.serviceSetting.update({ where: { id: settingId }, data: { value: value.replace(/\n/, "\\n") } });
 				}
 				if (isNew) {
 					if (!variableName) {
@@ -1101,17 +1101,14 @@ export async function activateWordpressFtp(
 							shell: true
 						});
 					}
-				} catch (error) {}
+				} catch (error) { }
 				const volumes = [
 					`${id}-wordpress-data:/home/${ftpUser}/wordpress`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.sh:/etc/sftp.d/chmod.sh`
 				];
 
@@ -1181,6 +1178,6 @@ export async function activateWordpressFtp(
 			await executeCommand({
 				command: `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
 			});
-		} catch (error) {}
+		} catch (error) { }
 	}
 }

@@ -20,7 +20,7 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 				whiteLabeled: process.env.COOLIFY_WHITE_LABELED === 'true',
 				whiteLabeledIcon: process.env.COOLIFY_WHITE_LABELED_ICON,
 				isRegistrationEnabled: settings.isRegistrationEnabled,
-				isARM: isARM(process.arch)
+				isARM: isARM()
 			};
 		} catch ({ status, message }) {
 			return errorHandler({ status, message });

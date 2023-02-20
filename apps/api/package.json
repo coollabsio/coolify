@@ -21,7 +21,7 @@
 		"@fastify/cors": "8.2.0",
 		"@fastify/env": "4.2.0",
 		"@fastify/jwt": "6.5.0",
-		"@fastify/multipart": "7.3.0",
+		"@fastify/multipart": "7.4.1",
 		"@fastify/static": "6.6.0",
 		"@iarna/toml": "2.2.5",
 		"@ladjs/graceful": "3.2.1",

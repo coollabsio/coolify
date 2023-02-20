@@ -105,7 +105,7 @@
 	{#if ownSources.length > 0 || otherSources.length > 0}
 		<div class="title pb-8">Integrated with Git App</div>
 	{/if}
-	{#if ownSources.length > 0}
+	{#if ownSources.length > 0 || otherSources.length > 0}
 		<div class="flex flex-wrap justify-center">
 			<div class="flex flex-col lg:flex-row lg:flex-wrap justify-center">
 				{#each ownSources as source}
