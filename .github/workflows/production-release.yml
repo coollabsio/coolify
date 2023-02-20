@@ -104,7 +104,7 @@ jobs:
       - name: Create & publish manifest
         run: |
           docker buildx imagetools create --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64 --tag coollabsio/coolify:${{steps.package-version.outputs.current-version}}
-          docker buildx imagetools create coollabsio/coolify:3.12.19 --tag coollabsio/coolify:latest
+          docker buildx imagetools create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --tag coollabsio/coolify:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
