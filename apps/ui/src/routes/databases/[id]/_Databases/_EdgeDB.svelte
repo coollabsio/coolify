@@ -11,11 +11,12 @@
 </div>
 <div class="space-y-2 lg:px-10 px-2">
 	<div class="grid grid-cols-2 items-center">
-		<label for="defaultDatabase">{$t('database.default_database')}</label>
+		<label for="defaultDatabase">{$t('database.default_database')}
+			<Explainer explanation="Can only be modified when the database is not active."/></label>
 		<CopyPasswordField
 			required
-			readonly={database.defaultDatabase}
-			disabled={database.defaultDatabase}
+			readonly={$status.database.isRunning}
+			disabled={$status.database.isRunning}
 			placeholder="{$t('forms.eg')}: edgedb"
 			id="defaultDatabase"
 			name="defaultDatabase"
@@ -23,10 +24,11 @@
 		/>
 	</div>
 	<div class="grid grid-cols-2 items-center">
-		<label for="rootUser">{$t('forms.root_user')}</label>
+		<label for="rootUser">{$t('forms.root_user')}
+			<Explainer explanation="Can only be modified when the database is not active."/></label>
 		<CopyPasswordField
-			readonly
-			disabled
+		readonly={$status.database.isRunning}
+		disabled={$status.database.isRunning}
 			placeholder={$t('forms.generated_automatically_after_start')}
 			id="rootUser"
 			name="rootUser"
@@ -35,18 +37,16 @@
 	</div>
 	<div class="grid grid-cols-2 items-center">
 		<label for="rootUser"
-			>Root Password <Explainer
-				explanation="Could be changed while the database is running."
-			/></label
+			>Root Password 	<Explainer explanation="Can be modified even when the database is active." /></label
 		>
 		<CopyPasswordField
-			readonly
-			disabled
+		readonly={false}
+		disabled={false}
 			placeholder="Generated automatically after start"
 			isPasswordField
 			id="rootUserPassword"
 			name="rootUserPassword"
-			value={database.rootUserPassword}
+			bind:value={database.rootUserPassword}
 		/>
 	</div>
 </div>

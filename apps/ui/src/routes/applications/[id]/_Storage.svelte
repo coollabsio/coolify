@@ -7,12 +7,23 @@
 	import { del, post } from '$lib/api';
 	import { page } from '$app/stores';
 	import { createEventDispatcher } from 'svelte';
-
+	import { browser } from '$app/env';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast } from '$lib/store';
+	import CopyVolumeField from '$lib/components/CopyVolumeField.svelte';
 	const { id } = $page.params;
-
+	let isHttps = browser && window.location.protocol === 'https:';
+	export let value: string;
+	function copyToClipboard() {
+		if (isHttps && navigator.clipboard) {
+			navigator.clipboard.writeText(value);
+			addToast({
+				message: 'Copied to clipboard.',
+				type: 'success'
+			});
+		}
+	}
 	const dispatch = createEventDispatcher();
 	async function saveStorage(newStorage = false) {
 		try {
@@ -69,18 +80,14 @@
 		<div class="flex gap-4 pb-2" class:pt-8={isNew}>
 			{#if storage.applicationId}
 				{#if storage.oldPath}
-					<input
-						disabled
-						readonly
-						class="w-full"
+		
+					<CopyVolumeField 
 						value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
-					/>
+						/>
 				{:else}
-					<input
-						disabled
-						readonly
-						class="w-full"
-						value="{storage.applicationId}{storage.path.replace(/\//gi, '-')}"
+				
+					<CopyVolumeField 
+					value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
 					/>
 				{/if}
 			{/if}
