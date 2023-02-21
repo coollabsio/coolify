@@ -75,10 +75,10 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             }
             const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: id } })
             let volumes = new Set()
+            console.log(template.services[s].volumes, arm)
             if (arm && template.services[s]?.volumesArm?.length > 0) {
                 template.services[s].volumesArm.forEach(v => volumes.add(v))
-            }
-            if (!arm && template.services[s]?.volumes?.length > 0) {
+            } else {
                 template.services[s].volumes.forEach(v => volumes.add(v))
             }
             // Workaround: old plausible analytics service wrong volume id name
