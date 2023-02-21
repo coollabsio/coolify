@@ -50,16 +50,7 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const config = {};
         for (const s in template.services) {
             let newEnvironments = []
-            if (arm && template.services[s]?.environmentArm?.length > 0) {
-                for (const environment of template.services[s].environmentArm) {
-                    let [env, ...value] = environment.split("=");
-                    value = value.join("=")
-                    if (!value.startsWith('$$secret') && value !== '') {
-                        newEnvironments.push(`${env}=${value}`)
-                    }
-                }
-            }
-            if (!arm && template.services[s]?.environment?.length > 0) {
+            if (template.services[s]?.environment?.length > 0) {
                 for (const environment of template.services[s].environment) {
                     let [env, ...value] = environment.split("=");
                     value = value.join("=")
