@@ -50,24 +50,12 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
         const config = {};
         for (const s in template.services) {
             let newEnvironments = []
-            if (arm) {
-                if (template.services[s]?.environmentArm?.length > 0) {
-                    for (const environment of template.services[s].environmentArm) {
-                        let [env, ...value] = environment.split("=");
-                        value = value.join("=")
-                        if (!value.startsWith('$$secret') && value !== '') {
-                            newEnvironments.push(`${env}=${value}`)
-                        }
-                    }
-                }
-            } else {
-                if (template.services[s]?.environment?.length > 0) {
-                    for (const environment of template.services[s].environment) {
-                        let [env, ...value] = environment.split("=");
-                        value = value.join("=")
-                        if (!value.startsWith('$$secret') && value !== '') {
-                            newEnvironments.push(`${env}=${value}`)
-                        }
+            if (template.services[s]?.environment?.length > 0) {
+                for (const environment of template.services[s].environment) {
+                    let [env, ...value] = environment.split("=");
+                    value = value.join("=")
+                    if (!value.startsWith('$$secret') && value !== '') {
+                        newEnvironments.push(`${env}=${value}`)
                     }
                 }
             }
@@ -87,10 +75,11 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             }
             const customVolumes = await prisma.servicePersistentStorage.findMany({ where: { serviceId: id } })
             let volumes = new Set()
-            if (arm) {
-                template.services[s]?.volumesArm && template.services[s].volumesArm.length > 0 && template.services[s].volumesArm.forEach(v => volumes.add(v))
-            } else {
-                template.services[s]?.volumes && template.services[s].volumes.length > 0 && template.services[s].volumes.forEach(v => volumes.add(v))
+            if (arm && template.services[s]?.volumesArm?.length > 0) {
+                template.services[s].volumesArm.forEach(v => volumes.add(v))
+            }
+            if (!arm && template.services[s]?.volumes?.length > 0) {
+                template.services[s].volumes.forEach(v => volumes.add(v))
             }
 
             // Workaround: old plausible analytics service wrong volume id name

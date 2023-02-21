@@ -19,7 +19,7 @@ import { saveBuildLog, saveDockerRegistryCredentials } from './buildPacks/common
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.20';
+export const version = '3.12.21';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
@@ -1048,7 +1048,7 @@ export function generateDatabaseConfiguration(database: any): DatabaseConfigurat
 }
 export function isARM() {
 	const arch = process.arch;
-	if (arch === 'arm' || arch === 'arm64') {
+	if (arch === 'arm' || arch === 'arm64' || arch === 'aarch' || arch === 'aarch64') {
 		return true;
 	}
 	return false;
