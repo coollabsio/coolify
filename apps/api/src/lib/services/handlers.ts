@@ -77,11 +77,11 @@ export async function startService(request: FastifyRequest<ServiceStartStop>, fa
             let volumes = new Set()
             if (arm && template.services[s]?.volumesArm?.length > 0) {
                 template.services[s].volumesArm.forEach(v => volumes.add(v))
+            } else {
+                if (template.services[s]?.volumes?.length > 0) {
+                    template.services[s].volumes.forEach(v => volumes.add(v))
+                }
             }
-            if (!arm && template.services[s]?.volumes?.length > 0) {
-                template.services[s].volumes.forEach(v => volumes.add(v))
-            }
-
             // Workaround: old plausible analytics service wrong volume id name
             if (service.type === 'plausibleanalytics' && service.plausibleAnalytics?.id) {
                 let temp = Array.from(volumes)
