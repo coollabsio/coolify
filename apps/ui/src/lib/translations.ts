@@ -13,7 +13,8 @@ export const config = {
 		es: { lang },
 		pt: { lang },
 		ko: { lang },
-		fr: { lang }
+		fr: { lang },
+		chs:{ lang }
 	},
 	loaders: [
 		{
@@ -40,7 +41,12 @@ export const config = {
 			locale: 'ko',
 			key: '',
 			loader: async () => (await import('./locales/ko.json')).default
-		}
+		},
+		{
+			locale: 'chs',
+			key: '',
+			loader: async () => (await import('./locales/chs.json')).default
+		},
 	]
 };
 
