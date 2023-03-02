@@ -95,7 +95,7 @@ export default async function (data) {
 				value['volumes'].push(volume);
 			}
 		}
-		if (dockerComposeConfiguration[key].port) {
+		if (dockerComposeConfiguration[key]?.port) {
 			value['expose'] = [dockerComposeConfiguration[key].port];
 		}
 		if (value['networks']?.length > 0) {
