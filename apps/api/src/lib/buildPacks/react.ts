@@ -8,7 +8,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`FROM ${image}`);
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
-	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/${publishDirectory} ./`);
+	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/ ./`);
 	if (baseImage?.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
