@@ -406,7 +406,7 @@
 		>
 		{#if tryAgain}
 			<div class="p-5">
-				An error occured during authenticating with GitLab. Please check your GitLab Source
+				An error occurred during authenticating with GitLab. Please check your GitLab Source
 				configuration <a href={`/sources/${application.gitSource.id}`}>here.</a>
 			</div>
 			<button
