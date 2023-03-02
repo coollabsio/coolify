@@ -153,3 +153,6 @@ Support this project with your organization. Your logo will show up here with a 
 
 <a href="https://opencollective.com/coollabsio"><img src="https://opencollective.com/coollabsio/individuals.svg?width=890"></a>
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=coollabsio/coolify&type=Date)](https://star-history.com/#coollabsio/coolify&Date)
