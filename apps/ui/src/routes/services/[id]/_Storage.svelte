@@ -86,7 +86,7 @@
 					readonly
 					class="w-full"
 					value={`${
-						services.find((s) => s.id === storage.containerId).name || storage.containerId
+						services.find((s) => s.id === storage.containerId)?.name || storage.containerId
 					}`}
 				/>
 			</div>
@@ -111,19 +111,18 @@
 							name="containerId"
 							class="w-full lg:w-64"
 							disabled={storage.predefined}
-							readonly={storage.predefined}
 							bind:value={storage.containerId}
 						>
 							{#if services.length === 1}
 								{#if services[0].name}
-									<option selected value={services[0].id}>{services[0].name}</option>
+									<option selected value={services[0].id}>{services[0]?.name}</option>
 								{:else}
 									<option selected value={services[0]}>{services[0]}</option>
 								{/if}
 							{:else}
 								{#each services as service}
 									{#if service.name}
-										<option value={service.id}>{service.name}</option>
+										<option value={service.id}>{service?.name}</option>
 									{:else}
 										<option value={service}>{service}</option>
 									{/if}
@@ -157,7 +156,7 @@
 				disabled
 				readonly
 				class="w-full"
-				value={`${services.find((s) => s.id === storage.containerId).name || storage.containerId}`}
+				value={`${services.find((s) => s.id === storage.containerId)?.name || storage.containerId}`}
 			/>
 			<input disabled readonly class="w-full" value={`${storage.volumeName}:${storage.path}`} />
 			<button
