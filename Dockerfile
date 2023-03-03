@@ -22,7 +22,7 @@ ARG DOCKER_VERSION=20.10.18
 # Reverted to 2.6.1 because of this https://github.com/docker/compose/issues/9704. 2.9.0 still has a bug.
 ARG DOCKER_COMPOSE_VERSION=2.6.1
 # https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=v0.27.0
+ARG PACK_VERSION=0.27.0
 
 RUN apt update && apt -y install --no-install-recommends ca-certificates git git-lfs openssh-client curl jq cmake sqlite3 openssl psmisc python3
 RUN apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/

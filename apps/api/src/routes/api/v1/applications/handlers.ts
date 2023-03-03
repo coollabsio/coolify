@@ -736,7 +736,7 @@ export async function deleteApplication(
 			where: { id },
 			include: { destinationDocker: true, teams: true }
 		});
-		if (teamId !== '0' || !application.teams.some((team) => team.id === teamId)) {
+		if (teamId !== '0' && !application.teams.some((team) => team.id === teamId)) {
 			throw { status: 403, message: 'You are not allowed to delete this application.' };
 		}
 		if (application?.destinationDocker?.id && application.destinationDocker?.network) {
