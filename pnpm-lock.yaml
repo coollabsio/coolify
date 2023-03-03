@@ -153,7 +153,7 @@ importers:
       '@typescript-eslint/eslint-plugin': 5.44.0
       '@typescript-eslint/parser': 5.44.0
       autoprefixer: 10.4.13
-      carbon-icons-svelte: ^11.4.0
+      carbon-icons-svelte: 11.4.0
       classnames: 2.3.2
       cuid: 2.1.8
       daisyui: 2.41.0
