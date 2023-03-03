@@ -153,6 +153,7 @@ importers:
       '@typescript-eslint/eslint-plugin': 5.44.0
       '@typescript-eslint/parser': 5.44.0
       autoprefixer: 10.4.13
+      carbon-icons-svelte: ^11.4.0
       classnames: 2.3.2
       cuid: 2.1.8
       daisyui: 2.41.0
@@ -184,6 +185,7 @@ importers:
       '@sentry/tracing': 7.21.1
       '@sveltejs/adapter-static': 1.0.0-next.48
       '@tailwindcss/typography': 0.5.8_tailwindcss@3.2.4
+      carbon-icons-svelte: 11.4.0
       cuid: 2.1.8
       daisyui: 2.41.0_2lwn2upnx27dqeg6hqdu7sq75m
       dayjs: 1.11.6
@@ -2391,6 +2393,10 @@ packages:
 
   /caniuse-lite/1.0.30001434:
     resolution: {integrity: sha512-aOBHrLmTQw//WFa2rcF1If9fa3ypkC1wzqqiKHgfdrXTWcU8C4gKVZT77eQAPWN1APys3+uQ0Df07rKauXGEYA==}
+
+  /carbon-icons-svelte/11.4.0:
+    resolution: {integrity: sha512-p/llZde2kP2BI9SOqM+QFKGfQnYrW+4dVxF1rAYriEADXDsjt9EYlh+KpQ5qf4JpXAq+e2+TB/r/lIG1xdUbAQ==}
+    dev: false
 
   /chalk/1.1.3:
     resolution: {integrity: sha512-U3lRVLMSlsCfjqYPbLyVv11M9CPW4I728d6TCKMAOJueEeB9/8o+eSsMnxPJD+Q+K909sdESg7C+tIkoH6on1A==}

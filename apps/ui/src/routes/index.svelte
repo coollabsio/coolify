@@ -43,9 +43,10 @@
 	import NewResource from './_NewResource.svelte';
 	import { onMount } from 'svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	import StatusIndicatorIcon from '$lib/components/svg/StatusIndicatorIcon.svelte';
 
 	let numberOfGetStatus = 0;
-	let status: any = {};
+	let status: Record<string, 'stopped' | 'error' | 'running' | 'degraded' | 'loading'> = {};
 	let noInitialStatus: any = {
 		applications: false,
 		services: false,
@@ -459,7 +460,7 @@
 		try {
 			const sure = confirm('Are you sure? This will delete this database!');
 			if (sure) {
-				await del(`/databases/${id}`, {  });
+				await del(`/databases/${id}`, {});
 				return window.location.reload();
 			}
 		} catch (error) {
@@ -682,7 +683,7 @@
 	{#if filtered.applications.length > 0 && applications.length > 0}
 		<div class="divider" />
 		<div
-			class="grid grid-col gap-2 lg:gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-2 lg:gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#if filtered.applications.length > 0}
 				{#each filtered.applications as application}
@@ -691,21 +692,10 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150"
 						>
 							{#await getStatus(application)}
-								<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								<StatusIndicatorIcon status={'loading'} />
 							{:then}
 								{#if !noInitialStatus.applications}
-									{#if status[application.id] === 'loading'}
-										<span class="indicator-item badge bg-yellow-300 badge-sm" />
-									{:else if status[application.id] === 'running'}
-										<span class="indicator-item badge bg-success badge-sm" />
-									{:else if status[application.id] === 'degraded'}
-										<span
-											class="indicator-item indicator-middle indicator-center badge bg-warning  text-black font-bold badge-xl"
-											>Degraded</span
-										>
-									{:else}
-										<span class="indicator-item badge bg-error badge-sm" />
-									{/if}
+									<StatusIndicatorIcon status={status[application.id]} />
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -808,22 +798,16 @@
 	{/if}
 	{#if filtered.otherApplications.length > 0}
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#each filtered.otherApplications as application}
 				<a class="no-underline mb-5" href={`/applications/${application.id}`}>
 					<div class="w-full rounded p-5 bg-coolgray-200 hover:bg-green-600 indicator duration-150">
 						{#await getStatus(application)}
-							<span class="indicator-item badge bg-yellow-300 badge-sm" />
+							<StatusIndicatorIcon status={'loading'} />
 						{:then}
 							{#if !noInitialStatus.applications}
-								{#if status[application.id] === 'loading'}
-									<span class="indicator-item badge bg-yellow-300 badge-sm" />
-								{:else if status[application.id] === 'running'}
-									<span class="indicator-item badge bg-success badge-sm" />
-								{:else}
-									<span class="indicator-item badge bg-error badge-sm" />
-								{/if}
+								<StatusIndicatorIcon status={status[application.id]} />
 							{/if}
 						{/await}
 						<div class="w-full flex flex-row">
@@ -932,7 +916,7 @@
 	{#if filtered.services.length > 0 && services.length > 0}
 		<div class="divider" />
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#if filtered.services.length > 0}
 				{#each filtered.services as service}
@@ -942,16 +926,10 @@
 								class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150"
 							>
 								{#await getStatus(service)}
-									<span class="indicator-item badge bg-yellow-300 badge-sm" />
+									<StatusIndicatorIcon status={'loading'} />
 								{:then}
 									{#if !noInitialStatus.services}
-										{#if status[service.id] === 'loading'}
-											<span class="indicator-item badge bg-yellow-300 badge-sm" />
-										{:else if status[service.id] === 'running'}
-											<span class="indicator-item badge bg-success badge-sm" />
-										{:else}
-											<span class="indicator-item badge bg-error badge-sm" />
-										{/if}
+										<StatusIndicatorIcon status={status[service.id]} />
 									{/if}
 								{/await}
 								<div class="w-full flex flex-row">
@@ -1021,7 +999,7 @@
 	{/if}
 	{#if filtered.otherServices.length > 0}
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#each filtered.otherServices as service}
 				{#key service.id}
@@ -1030,16 +1008,10 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-pink-600 indicator duration-150"
 						>
 							{#await getStatus(service)}
-								<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								<StatusIndicatorIcon status={'loading'} />
 							{:then}
 								{#if !noInitialStatus.services}
-									{#if status[service.id] === 'loading'}
-										<span class="indicator-item badge bg-yellow-300 badge-sm" />
-									{:else if status[service.id] === 'running'}
-										<span class="indicator-item badge bg-success badge-sm" />
-									{:else}
-										<span class="indicator-item badge bg-error badge-sm" />
-									{/if}
+									<StatusIndicatorIcon status={status[service.id]} />
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -1118,26 +1090,20 @@
 	{#if filtered.databases.length > 0 && databases.length > 0}
 		<div class="divider" />
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#if filtered.databases.length > 0}
-				{#each filtered.databases as database}
+				{#each filtered.databases as database, dbIdx}
 					{#key database.id}
 						<a class="no-underline mb-5" href={`/databases/${database.id}`}>
 							<div
 								class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
 							>
 								{#await getStatus(database)}
-									<span class="indicator-item badge bg-yellow-300 badge-sm" />
+									<StatusIndicatorIcon status={'loading'} />
 								{:then}
 									{#if !noInitialStatus.databases}
-										{#if status[database.id] === 'loading'}
-											<span class="indicator-item badge bg-yellow-300 badge-sm" />
-										{:else if status[database.id] === 'running'}
-											<span class="indicator-item badge bg-success badge-sm" />
-										{:else}
-											<span class="indicator-item badge bg-error badge-sm" />
-										{/if}
+										<StatusIndicatorIcon status={status[database.id]} />
 									{/if}
 								{/await}
 								<div class="w-full flex flex-row">
@@ -1207,7 +1173,7 @@
 	{/if}
 	{#if filtered.otherDatabases.length > 0}
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#each filtered.otherDatabases as database}
 				{#key database.id}
@@ -1216,16 +1182,10 @@
 							class="w-full rounded p-5 bg-coolgray-200 hover:bg-databases indicator duration-150"
 						>
 							{#await getStatus(database)}
-								<span class="indicator-item badge bg-yellow-300 badge-sm" />
+								<StatusIndicatorIcon status={'loading'} />
 							{:then}
 								{#if !noInitialStatus.databases}
-									{#if status[database.id] === 'loading'}
-										<span class="indicator-item badge bg-yellow-300 badge-sm" />
-									{:else if status[database.id] === 'running'}
-										<span class="indicator-item badge bg-success badge-sm" />
-									{:else}
-										<span class="indicator-item badge bg-error badge-sm" />
-									{/if}
+									<StatusIndicatorIcon status={status[database.id]} />
 								{/if}
 							{/await}
 							<div class="w-full flex flex-row">
@@ -1293,7 +1253,7 @@
 	{#if filtered.gitSources.length > 0 && gitSources.length > 0}
 		<div class="divider" />
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#if filtered.gitSources.length > 0}
 				{#each filtered.gitSources as source}
@@ -1393,7 +1353,7 @@
 	{/if}
 	{#if filtered.otherGitSources.length > 0}
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#each filtered.otherGitSources as source}
 				{#key source.id}
@@ -1481,7 +1441,7 @@
 	{#if filtered.destinations.length > 0 && destinations.length > 0}
 		<div class="divider" />
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4 "
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4 "
 		>
 			{#if filtered.destinations.length > 0}
 				{#each filtered.destinations as destination}
@@ -1565,7 +1525,7 @@
 	{/if}
 	{#if filtered.otherDestinations.length > 0}
 		<div
-			class="grid grid-col gap-8 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
+			class="grid grid-col gap-10 auto-cols-max grid-cols-1 md:grid-cols-2 lg:md:grid-cols-3 xl:grid-cols-4 p-4"
 		>
 			{#each filtered.otherDestinations as destination}
 				{#key destination.id}

@@ -26,6 +26,7 @@
 	import { addToast, appSession } from '$lib/store';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import DeleteIcon from '$lib/components/DeleteIcon.svelte';
+	import StatusIndicatorIcon from '$lib/components/svg/StatusIndicatorIcon.svelte';
 
 	const { id } = $page.params;
 	let loadBuildingStatusInterval: any = null;
@@ -190,11 +191,7 @@
 					{#await getStatus(preview)}
 						<span class="indicator-item badge bg-yellow-500 badge-sm" />
 					{:then}
-						{#if status[preview.id] === 'running'}
-							<span class="indicator-item badge bg-success badge-sm" />
-						{:else}
-							<span class="indicator-item badge bg-error badge-sm" />
-						{/if}
+						<StatusIndicatorIcon status={status[preview.id]} />
 					{/await}
 					<div class="w-full flex flex-row">
 						<div class="w-full flex flex-col">
