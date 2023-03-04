@@ -42,7 +42,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		if (baseImage?.includes('nginx')) {
 			Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 		}
-		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/ ./`);
+		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app${publishDirectory} ./`);
 		Dockerfile.push(`EXPOSE 80`);
 	}
 

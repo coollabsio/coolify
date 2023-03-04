@@ -386,7 +386,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 								try {
 									dockerComposeConfiguration = JSON.parse(dockerComposeConfiguration);
-								} catch (error) {}
+								} catch (error) { }
 								let deployNeeded = true;
 								let destinationType;
 
@@ -453,7 +453,7 @@ import * as buildpacks from '../lib/buildPacks';
 
 									try {
 										await prisma.build.update({ where: { id: buildId }, data: { commit } });
-									} catch (err) {}
+									} catch (err) { }
 
 									if (!pullmergeRequestId) {
 										if (configHash !== currentHash) {
@@ -494,9 +494,8 @@ import * as buildpacks from '../lib/buildPacks';
 									try {
 										await executeCommand({
 											dockerId: destinationDocker.id,
-											command: `docker ${
-												location ? `--config ${location}` : ''
-											} pull ${imageName}:${customTag}`
+											command: `docker ${location ? `--config ${location}` : ''
+												} pull ${imageName}:${customTag}`
 										});
 										imageFoundRemotely = true;
 									} catch (error) {
@@ -659,9 +658,8 @@ import * as buildpacks from '../lib/buildPacks';
 										try {
 											const { stdout: containers } = await executeCommand({
 												dockerId: destinationDockerId,
-												command: `docker ps -a --filter 'label=com.docker.compose.service=${
-													pullmergeRequestId ? imageId : applicationId
-												}' --format {{.ID}}`
+												command: `docker ps -a --filter 'label=com.docker.compose.service=${pullmergeRequestId ? imageId : applicationId
+													}' --format {{.ID}}`
 											});
 											if (containers) {
 												const containerArray = containers.split('\n');
