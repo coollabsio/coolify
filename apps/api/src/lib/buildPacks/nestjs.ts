@@ -12,7 +12,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	if (isPnpm) {
 		Dockerfile.push('RUN curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7');
 	}
-	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/ ./`);
+	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app${publishDirectory} ./`);
 
 	Dockerfile.push(`EXPOSE ${port}`);
 	Dockerfile.push(`CMD ${startCommand}`);

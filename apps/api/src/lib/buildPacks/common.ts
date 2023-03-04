@@ -429,7 +429,12 @@ export const setDefaultConfiguration = async (data: any) => {
 		startCommand = template?.startCommand || 'yarn start';
 	if (!buildCommand && buildPack !== 'static' && buildPack !== 'laravel')
 		buildCommand = template?.buildCommand || null;
-	if (!publishDirectory) publishDirectory = template?.publishDirectory || null;
+	if (!publishDirectory) {
+		publishDirectory = template?.publishDirectory || null;
+	} else {
+		if (!publishDirectory.startsWith('/')) publishDirectory = `/${publishDirectory}`;
+		if (publishDirectory.endsWith('/')) publishDirectory = publishDirectory.slice(0, -1);
+	}
 	if (baseDirectory) {
 		if (!baseDirectory.startsWith('/')) baseDirectory = `/${baseDirectory}`;
 		if (baseDirectory.endsWith('/') && baseDirectory !== '/')
@@ -702,9 +707,8 @@ export async function buildImage({
 		buildId,
 		applicationId,
 		dockerId,
-		command: `docker ${location ? `--config ${location}` : ''} build ${
-			forceRebuild ? '--no-cache' : ''
-		} --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}`
+		command: `docker ${location ? `--config ${location}` : ''} build ${forceRebuild ? '--no-cache' : ''
+			} --progress plain -f ${workdir}/${dockerFile} -t ${cache} --build-arg SOURCE_COMMIT=${commit} ${workdir}`
 	});
 
 	const { status } = await prisma.build.findUnique({ where: { id: buildId } });
