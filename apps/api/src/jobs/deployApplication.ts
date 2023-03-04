@@ -406,7 +406,7 @@ import * as buildpacks from '../lib/buildPacks';
 									installCommand = configuration.installCommand;
 									startCommand = configuration.startCommand;
 									buildCommand = configuration.buildCommand;
-									publishDirectory = configuration.publishDirectory;
+									publishDirectory = configuration.publishDirectory || '';
 									baseDirectory = configuration.baseDirectory || '';
 									dockerFileLocation = configuration.dockerFileLocation;
 									dockerComposeFileLocation = configuration.dockerComposeFileLocation;
