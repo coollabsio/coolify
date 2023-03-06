@@ -510,7 +510,9 @@ export async function createRemoteEngineConfiguration(id: string) {
 		remoteUser
 	} = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } });
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 });
-	const config = sshConfig.parse('');
+
+	const currentConfigFileContent = (await fs.readFile(`${homedir}/.ssh/config`)).toString();
+	const config = sshConfig.parse(currentConfigFileContent.toString());
 	const Host = `${remoteIpAddress}-remote`;
 
 	try {
