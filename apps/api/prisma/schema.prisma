@@ -195,6 +195,7 @@ model ApplicationSettings {
 model ApplicationPersistentStorage {
   id            String      @id @default(cuid())
   applicationId String
+  hostPath      String?
   path          String
   oldPath       Boolean     @default(false)
   createdAt     DateTime    @default(now())

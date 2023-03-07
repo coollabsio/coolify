@@ -1633,6 +1633,9 @@ export function errorHandler({
 	type?: string | null;
 }) {
 	if (message.message) message = message.message;
+	if (message.includes('Unique constraint failed')) {
+		message = 'This data is unique and already exists. Please try again with a different value.';
+	}
 	if (type === 'normal') {
 		Sentry.captureException(message);
 	}

@@ -36,12 +36,13 @@ export default async function (data) {
 	if (volumes.length > 0) {
 		for (const volume of volumes) {
 			let [v, path] = volume.split(':');
-			composeVolumes[v] = {
-				name: v
-			};
+			if (!v.startsWith('.') && !v.startsWith('..') && !v.startsWith('/') && !v.startsWith('~')) {
+				composeVolumes[v] = {
+					name: v
+				};
+			}
 		}
 	}
-
 	let networks = {};
 	for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
 		value['container_name'] = `${applicationId}-${key}`;
@@ -78,6 +79,7 @@ export default async function (data) {
 		if (value['volumes']?.length > 0) {
 			value['volumes'] = value['volumes'].map((volume) => {
 				let [v, path, permission] = volume.split(':');
+				console.log(v, path, permission)
 				if (
 					v.startsWith('.') ||
 					v.startsWith('..') ||
@@ -106,6 +108,7 @@ export default async function (data) {
 				value['volumes'].push(volume);
 			}
 		}
+		console.log({ volumes, composeVolumes })
 		if (dockerComposeConfiguration[key]?.port) {
 			value['expose'] = [dockerComposeConfiguration[key].port];
 		}

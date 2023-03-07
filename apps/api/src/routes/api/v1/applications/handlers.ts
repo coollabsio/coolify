@@ -1340,16 +1340,16 @@ export async function getStorages(request: FastifyRequest<OnlyId>) {
 export async function saveStorage(request: FastifyRequest<SaveStorage>, reply: FastifyReply) {
 	try {
 		const { id } = request.params;
-		const { path, newStorage, storageId } = request.body;
+		const { hostPath, path, newStorage, storageId } = request.body;
 
 		if (newStorage) {
 			await prisma.applicationPersistentStorage.create({
-				data: { path, application: { connect: { id } } }
+				data: { hostPath, path, application: { connect: { id } } }
 			});
 		} else {
 			await prisma.applicationPersistentStorage.update({
 				where: { id: storageId },
-				data: { path }
+				data: { hostPath, path }
 			});
 		}
 		return reply.code(201).send();

@@ -12,6 +12,7 @@
 	import { errorNotification } from '$lib/common';
 	import { addToast } from '$lib/store';
 	import CopyVolumeField from '$lib/components/CopyVolumeField.svelte';
+	import SimpleExplainer from '$lib/components/SimpleExplainer.svelte';
 	const { id } = $page.params;
 	let isHttps = browser && window.location.protocol === 'https:';
 	export let value: string;
@@ -33,11 +34,13 @@
 			storage.path.replace(/\/\//g, '/');
 			await post(`/applications/${id}/storages`, {
 				path: storage.path,
+				hostPath: storage.hostPath,
 				storageId: storage.id,
 				newStorage
 			});
 			dispatch('refresh');
 			if (isNew) {
+				storage.hostPath = null;
 				storage.path = null;
 				storage.id = null;
 			}
@@ -80,16 +83,31 @@
 		<div class="flex gap-4 pb-2" class:pt-8={isNew}>
 			{#if storage.applicationId}
 				{#if storage.oldPath}
-		
-					<CopyVolumeField 
+					<CopyVolumeField
 						value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
-						/>
-				{:else}
-				
-					<CopyVolumeField 
-					value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
+					/>
+				{:else if !storage.hostPath}
+					<CopyVolumeField
+						value="{storage.applicationId}{storage.path.replace(/\//gi, '-').replace('-app', '')}"
 					/>
 				{/if}
+			{/if}
+
+			{#if isNew}
+				<div class="w-full">
+					<input
+						disabled={!isNew}
+						readonly={!isNew}
+						bind:value={storage.hostPath}
+						placeholder="Host path, example: ~/.directory"
+					/>
+
+					<SimpleExplainer
+						text="You can mount <span class='text-yellow-400 font-bold'>host paths</span> from the operating system.<br>Leave it empty to define a volume based volume."
+					/>
+				</div>
+			{:else if storage.hostPath}
+				<input disabled readonly value={storage.hostPath} />
 			{/if}
 			<input
 				disabled={!isNew}
@@ -97,10 +115,10 @@
 				class="w-full"
 				bind:value={storage.path}
 				required
-				placeholder="eg: /data"
+				placeholder="Mount point inside the container, example: /data"
 			/>
 
-			<div class="flex items-center justify-center">
+			<div class="flex items-start justify-center">
 				{#if isNew}
 					<div class="w-full lg:w-64">
 						<button class="btn btn-sm btn-primary w-full" on:click={() => saveStorage(true)}

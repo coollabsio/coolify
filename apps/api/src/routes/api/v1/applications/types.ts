@@ -96,6 +96,7 @@ export interface DeleteSecret extends OnlyId {
 }
 export interface SaveStorage extends OnlyId {
 	Body: {
+		hostPath?: string;
 		path: string;
 		newStorage: boolean;
 		storageId: string;
