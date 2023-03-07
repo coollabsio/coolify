@@ -2,7 +2,7 @@ import { promises as fs } from 'fs';
 import { buildCacheImageWithNode, buildImage } from './common';
 
 const createDockerfile = async (data, image): Promise<void> => {
-	const { buildId, applicationId, tag, port, startCommand, workdir, baseDirectory } = data;
+	const { buildId, applicationId, tag, port, startCommand, workdir, publishDirectory } = data;
 	const Dockerfile: Array<string> = [];
 	const isPnpm = startCommand.includes('pnpm');
 
