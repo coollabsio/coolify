@@ -78,15 +78,25 @@ export default async function (data) {
 		if (value['volumes']?.length > 0) {
 			value['volumes'] = value['volumes'].map((volume) => {
 				let [v, path, permission] = volume.split(':');
-				if (!path) {
-					path = v;
-					v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+				if (
+					v.startsWith('.') ||
+					v.startsWith('..') ||
+					v.startsWith('/') ||
+					v.startsWith('~')
+				) {
+					// Nothing to do here, host path
 				} else {
-					v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					if (!path) {
+						path = v;
+						v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					} else {
+						v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					}
+					composeVolumes[v] = {
+						name: v
+					};
 				}
-				composeVolumes[v] = {
-					name: v
-				};
+
 				return `${v}:${path}${permission ? ':' + permission : ''}`;
 			});
 		}

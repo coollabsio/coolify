@@ -36,14 +36,20 @@
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
 					let [volume, target] = volumeName.split(':');
-					if (volume === '.') {
-						volume = target;
-					}
-					if (!target) {
-						target = volume;
-						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					if (
+						volume.startsWith('.') ||
+						volume.startsWith('..') ||
+						volume.startsWith('/') ||
+						volume.startsWith('~')
+					) {
+						// Nothing to do here, host path
 					} else {
-						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						if (!target) {
+							target = volume;
+							volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						} else {
+							volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						}
 					}
 					predefinedVolumes.push({ id: volume, path: target, predefined: true });
 				}
@@ -88,14 +94,14 @@
 			{/key}
 		{/each}
 		{#if $appSession.isAdmin}
-		<div class:pt-10={predefinedVolumes.length > 0}>
-			Add New Volume <Explainer
-				position="dropdown-bottom"
-				explanation={$t('application.storage.persistent_storage_explainer')}
-			/>
-		</div>
-	
-		<Storage on:refresh={refreshStorage} isNew />
+			<div class:pt-10={predefinedVolumes.length > 0}>
+				Add New Volume <Explainer
+					position="dropdown-bottom"
+					explanation={$t('application.storage.persistent_storage_explainer')}
+				/>
+			</div>
+
+			<Storage on:refresh={refreshStorage} isNew />
 		{/if}
 	</div>
 </div>
