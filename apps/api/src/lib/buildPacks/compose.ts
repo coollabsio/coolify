@@ -79,7 +79,6 @@ export default async function (data) {
 		if (value['volumes']?.length > 0) {
 			value['volumes'] = value['volumes'].map((volume) => {
 				let [v, path, permission] = volume.split(':');
-				console.log(v, path, permission)
 				if (
 					v.startsWith('.') ||
 					v.startsWith('..') ||
@@ -108,7 +107,6 @@ export default async function (data) {
 				value['volumes'].push(volume);
 			}
 		}
-		console.log({ volumes, composeVolumes })
 		if (dockerComposeConfiguration[key]?.port) {
 			value['expose'] = [dockerComposeConfiguration[key].port];
 		}
