@@ -35,24 +35,46 @@
 		for (const [_, service] of Object.entries(composeJson.services)) {
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
-					let [volume, target] = volumeName.split(':');
-					if (
-						volume.startsWith('.') ||
-						volume.startsWith('..') ||
-						volume.startsWith('/') ||
-						volume.startsWith('~') ||
-						volume.startsWith('$PWD')
-					) {
-						volume = volume.replace('$.', `~`).replace('$..', '~').replace('$$PWD', '~');
-					} else {
-						if (!target) {
-							target = volume;
-							volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					if (typeof volumeName === 'string') {
+						let [volume, target] = volumeName.split(':');
+						if (
+							volume.startsWith('.') ||
+							volume.startsWith('..') ||
+							volume.startsWith('/') ||
+							volume.startsWith('~') ||
+							volume.startsWith('$PWD')
+						) {
+							volume = volume.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
 						} else {
-							volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							if (!target) {
+								target = volume;
+								volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							} else {
+								volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							}
 						}
+						predefinedVolumes.push({ id: volume, path: target, predefined: true });
 					}
-					predefinedVolumes.push({ id: volume, path: target, predefined: true });
+					if (typeof volumeName === 'object') {
+						let { source, target } = volumeName;
+						if (
+							source.startsWith('.') ||
+							source.startsWith('..') ||
+							source.startsWith('/') ||
+							source.startsWith('~') ||
+							source.startsWith('$PWD')
+						) {
+							source = source.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
+						} else {
+							if (!target) {
+								target = source;
+								source = `${application.id}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							} else {
+								source = `${application.id}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							}
+						}
+						predefinedVolumes.push({ id: source, path: target, predefined: true });
+					}
 				}
 			}
 		}

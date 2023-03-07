@@ -427,29 +427,6 @@
 				</svg> Stop
 			</button>
 		{:else if $isDeploymentEnabled && !$page.url.pathname.startsWith(`/applications/${id}/configuration/`)}
-			{#if $status.application.overallStatus === 'degraded'}
-				<button
-					on:click={stopApplication}
-					type="submit"
-					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
-					class="btn btn-sm gap-2"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						class="w-6 h-6 text-error"
-						viewBox="0 0 24 24"
-						stroke-width="1.5"
-						stroke="currentColor"
-						fill="none"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
-						<rect x="6" y="5" width="4" height="14" rx="1" />
-						<rect x="14" y="5" width="4" height="14" rx="1" />
-					</svg> Stop
-				</button>
-			{/if}
 			<button
 				class="btn btn-sm gap-2"
 				disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
@@ -493,6 +470,29 @@
 						: 'Redeploy Stack'
 					: 'Deploy'}
 			</button>
+			{#if $status.application.overallStatus === 'degraded'}
+				<button
+					on:click={stopApplication}
+					type="submit"
+					disabled={!$isDeploymentEnabled || !$appSession.isAdmin}
+					class="btn btn-sm gap-2"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						class="w-6 h-6 text-error"
+						viewBox="0 0 24 24"
+						stroke-width="1.5"
+						stroke="currentColor"
+						fill="none"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path stroke="none" d="M0 0h24v24H0z" fill="none" />
+						<rect x="6" y="5" width="4" height="14" rx="1" />
+						<rect x="14" y="5" width="4" height="14" rx="1" />
+					</svg> Stop
+				</button>
+			{/if}
 		{/if}
 		{#if $location && $status.application.overallStatus === 'healthy'}
 			<a href={$location} target="_blank noreferrer" class="btn btn-sm gap-2 text-sm bg-primary"

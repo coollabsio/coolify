@@ -78,28 +78,54 @@ export default async function (data) {
 		// TODO: If we support separated volume for each service, we need to add it here
 		if (value['volumes']?.length > 0) {
 			value['volumes'] = value['volumes'].map((volume) => {
-				let [v, path, permission] = volume.split(':');
-				if (
-					v.startsWith('.') ||
-					v.startsWith('..') ||
-					v.startsWith('/') ||
-					v.startsWith('~') ||
-					v.startsWith('$PWD')
-				) {
-					v = v.replace('$.', `~`).replace('$..', '~').replace('$$PWD', '~');
-				} else {
-					if (!path) {
-						path = v;
-						v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+				if (typeof volume === 'string') {
+					let [v, path, permission] = volume.split(':');
+					if (
+						v.startsWith('.') ||
+						v.startsWith('..') ||
+						v.startsWith('/') ||
+						v.startsWith('~') ||
+						v.startsWith('$PWD')
+					) {
+						v = v.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
 					} else {
-						v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						if (!path) {
+							path = v;
+							v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						} else {
+							v = `${applicationId}${v.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						}
+						composeVolumes[v] = {
+							name: v
+						};
 					}
-					composeVolumes[v] = {
-						name: v
-					};
+					return `${v}:${path}${permission ? ':' + permission : ''}`;
+				}
+				if (typeof volume === 'object') {
+					let { source, target, mode } = volume;
+					if (
+						source.startsWith('.') ||
+						source.startsWith('..') ||
+						source.startsWith('/') ||
+						source.startsWith('~') ||
+						source.startsWith('$PWD')
+					) {
+
+						source = source.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
+						console.log({source})
+
+					} else {
+						if (!target) {
+							target = source;
+							source = `${applicationId}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						} else {
+							source = `${applicationId}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+						}
+					}
+
+					return `${source}:${target}${mode ? ':' + mode : ''}`;
 				}
 
-				return `${v}:${path}${permission ? ':' + permission : ''}`;
 			});
 		}
 		if (volumes.length > 0) {
