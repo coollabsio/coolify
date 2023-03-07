@@ -40,9 +40,10 @@
 						volume.startsWith('.') ||
 						volume.startsWith('..') ||
 						volume.startsWith('/') ||
-						volume.startsWith('~')
+						volume.startsWith('~') ||
+						volume.startsWith('$PWD')
 					) {
-						// Nothing to do here, host path
+						volume = volume.replace('$.', `~`).replace('$..', '~').replace('$$PWD', '~');
 					} else {
 						if (!target) {
 							target = volume;

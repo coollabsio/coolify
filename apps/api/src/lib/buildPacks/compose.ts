@@ -82,9 +82,10 @@ export default async function (data) {
 					v.startsWith('.') ||
 					v.startsWith('..') ||
 					v.startsWith('/') ||
-					v.startsWith('~')
+					v.startsWith('~') ||
+					v.startsWith('$PWD')
 				) {
-					// Nothing to do here, host path
+					v = v.replace('$.', `~`).replace('$..', '~').replace('$$PWD', '~');
 				} else {
 					if (!path) {
 						path = v;
