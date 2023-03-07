@@ -49,23 +49,23 @@
 			databaseDbUser = '';
 		}
 	}
-	function generateUrl() {
-		const ipAddress = () => {
-			if ($status.database.isPublic) {
-				if (database.destinationDocker.remoteEngine) {
-					return database.destinationDocker.remoteIpAddress;
-				}
-				if ($appSession.ipv6) {
-					return $appSession.ipv6;
-				}
-				if ($appSession.ipv4) {
-					return $appSession.ipv4;
-				}
-				return '<Cannot determine public IP address>';
-			} else {
-				return database.id;
+	function ipAddress() {
+		if ($status.database.isPublic) {
+			if (database.destinationDocker.remoteEngine) {
+				return database.destinationDocker.remoteIpAddress;
 			}
-		};
+			if ($appSession.ipv6) {
+				return $appSession.ipv6;
+			}
+			if ($appSession.ipv4) {
+				return $appSession.ipv4;
+			}
+			return '<Cannot determine public IP address>';
+		} else {
+			return database.id;
+		}
+	}
+	function generateUrl() {
 		const user = () => {
 			if (databaseDbUser) {
 				return databaseDbUser + ':';
@@ -183,16 +183,38 @@
 					class:cursor-pointer={!$status.database.isRunning}
 				/></a
 			>
-			<label for="host">{$t('forms.host')}</label>
-			<CopyPasswordField
-				placeholder={$t('forms.generated_automatically_after_start')}
-				isPasswordField={false}
-				readonly
-				disabled
-				id="host"
-				name="host"
-				value={database.id}
-			/>
+			{#if $status.database.isPublic}
+				<label for="internalHost">Internal Host</label>
+				<CopyPasswordField
+					isPasswordField={false}
+					readonly
+					disabled
+					id="internalHost"
+					name="internalHost"
+					value={database.id}
+				/>
+				<label for="host">Public Host</label>
+				<CopyPasswordField
+					placeholder={$t('forms.generated_automatically_after_start')}
+					isPasswordField={false}
+					readonly
+					disabled
+					id="host"
+					name="host"
+					value={loading.public ? 'Loading...' : ipAddress()}
+				/>
+			{:else}
+				<label for="internalHost">Host</label>
+				<CopyPasswordField
+					isPasswordField={false}
+					readonly
+					disabled
+					id="internalHost"
+					name="internalHost"
+					value={database.id}
+				/>
+			{/if}
+
 			<label for="publicPort">{$t('forms.port')}</label>
 			<CopyPasswordField
 				placeholder={$t('database.generated_automatically_after_set_to_public')}
