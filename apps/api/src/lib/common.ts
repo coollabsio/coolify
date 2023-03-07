@@ -11,7 +11,7 @@ import { promises as dns } from 'dns';
 import * as Sentry from '@sentry/node';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
-import sshConfig from 'ssh-config';
+import * as SSHConfig from 'ssh-config/src/ssh-config';
 import jsonwebtoken from 'jsonwebtoken';
 import { checkContainer, removeContainer } from './docker';
 import { day } from './dayjs';
@@ -498,33 +498,56 @@ export async function getFreeSSHLocalPort(id: string): Promise<number | boolean>
 	return false;
 }
 
+/**
+ * Update the ssh config file with a host
+ *
+ * @param id Destination ID
+ * @returns
+ */
 export async function createRemoteEngineConfiguration(id: string) {
-	const homedir = os.homedir();
 	const sshKeyFile = `/tmp/id_rsa-${id}`;
 	const localPort = await getFreeSSHLocalPort(id);
 	const {
 		sshKey: { privateKey },
-		network,
 		remoteIpAddress,
 		remotePort,
 		remoteUser
 	} = await prisma.destinationDocker.findFirst({ where: { id }, include: { sshKey: true } });
+
+	// Write new keyfile
 	await fs.writeFile(sshKeyFile, decrypt(privateKey) + '\n', { encoding: 'utf8', mode: 400 });
-	const config = sshConfig.parse('');
+
 	const Host = `${remoteIpAddress}-remote`;
 
+	// Removes previous ssh-keys
 	try {
 		await executeCommand({ command: `ssh-keygen -R ${Host}` });
 		await executeCommand({ command: `ssh-keygen -R ${remoteIpAddress}` });
 		await executeCommand({ command: `ssh-keygen -R localhost:${localPort}` });
-	} catch (error) { }
+	} catch (error) {
+		//
+	}
 
+	const homedir = os.homedir();
+	let currentConfigFileContent = '';
+	try {
+		// Read the current config file
+		currentConfigFileContent = (await fs.readFile(`${homedir}/.ssh/config`)).toString();
+	} catch (error) {
+		// File doesn't exist, so we do nothing, a new one is going to be created
+	}
+
+	// Parse the config file
+	const config = SSHConfig.parse(currentConfigFileContent);
+
+	// Remove current config for the given host
 	const found = config.find({ Host });
 	const foundIp = config.find({ Host: remoteIpAddress });
 
 	if (found) config.remove({ Host });
 	if (foundIp) config.remove({ Host: remoteIpAddress });
 
+	// Create the new config
 	config.append({
 		Host,
 		Hostname: remoteIpAddress,
@@ -537,13 +560,17 @@ export async function createRemoteEngineConfiguration(id: string) {
 		ControlPersist: '10m'
 	});
 
+	// Check if .ssh folder exists, and if not create one
 	try {
 		await fs.stat(`${homedir}/.ssh/`);
 	} catch (error) {
 		await fs.mkdir(`${homedir}/.ssh/`);
 	}
-	return await fs.writeFile(`${homedir}/.ssh/config`, sshConfig.stringify(config));
+
+	// Write the config
+	return await fs.writeFile(`${homedir}/.ssh/config`, SSHConfig.stringify(config));
 }
+
 export async function executeCommand({
 	command,
 	dockerId = null,
