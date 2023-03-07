@@ -35,17 +35,46 @@
 		for (const [_, service] of Object.entries(composeJson.services)) {
 			if (service?.volumes) {
 				for (const [_, volumeName] of Object.entries(service.volumes)) {
-					let [volume, target] = volumeName.split(':');
-					if (volume === '.') {
-						volume = target;
+					if (typeof volumeName === 'string') {
+						let [volume, target] = volumeName.split(':');
+						if (
+							volume.startsWith('.') ||
+							volume.startsWith('..') ||
+							volume.startsWith('/') ||
+							volume.startsWith('~') ||
+							volume.startsWith('$PWD')
+						) {
+							volume = volume.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
+						} else {
+							if (!target) {
+								target = volume;
+								volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							} else {
+								volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							}
+						}
+						predefinedVolumes.push({ id: volume, path: target, predefined: true });
 					}
-					if (!target) {
-						target = volume;
-						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
-					} else {
-						volume = `${application.id}${volume.replace(/\//gi, '-').replace(/\./gi, '')}`;
+					if (typeof volumeName === 'object') {
+						let { source, target } = volumeName;
+						if (
+							source.startsWith('.') ||
+							source.startsWith('..') ||
+							source.startsWith('/') ||
+							source.startsWith('~') ||
+							source.startsWith('$PWD')
+						) {
+							source = source.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
+						} else {
+							if (!target) {
+								target = source;
+								source = `${application.id}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							} else {
+								source = `${application.id}${source.replace(/\//gi, '-').replace(/\./gi, '')}`;
+							}
+						}
+						predefinedVolumes.push({ id: source, path: target, predefined: true });
 					}
-					predefinedVolumes.push({ id: volume, path: target, predefined: true });
 				}
 			}
 		}
@@ -88,14 +117,14 @@
 			{/key}
 		{/each}
 		{#if $appSession.isAdmin}
-		<div class:pt-10={predefinedVolumes.length > 0}>
-			Add New Volume <Explainer
-				position="dropdown-bottom"
-				explanation={$t('application.storage.persistent_storage_explainer')}
-			/>
-		</div>
-	
-		<Storage on:refresh={refreshStorage} isNew />
+			<div class:pt-10={predefinedVolumes.length > 0}>
+				Add New Volume <Explainer
+					position="dropdown-bottom"
+					explanation={$t('application.storage.persistent_storage_explainer')}
+				/>
+			</div>
+
+			<Storage on:refresh={refreshStorage} isNew />
 		{/if}
 	</div>
 </div>

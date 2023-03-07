@@ -110,6 +110,9 @@ import * as buildpacks from '../lib/buildPacks';
 													.replace(/\//gi, '-')
 													.replace('-app', '')}:${storage.path}`;
 											}
+											if (storage.hostPath) {
+												return `${storage.hostPath}:${storage.path}`
+											}
 											return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 										}) || [];
 
@@ -160,7 +163,11 @@ import * as buildpacks from '../lib/buildPacks';
 											port: exposePort ? `${exposePort}:${port}` : port
 										});
 										try {
-											const composeVolumes = volumes.map((volume) => {
+											const composeVolumes = volumes.filter(v => {
+												if (!v.startsWith('.') && !v.startsWith('..') && !v.startsWith('/') && !v.startsWith('~')) {
+													return v;
+												}
+											}).map((volume) => {
 												return {
 													[`${volume.split(':')[0]}`]: {
 														name: volume.split(':')[0]
@@ -380,6 +387,9 @@ import * as buildpacks from '../lib/buildPacks';
 											return `${applicationId}${storage.path
 												.replace(/\//gi, '-')
 												.replace('-app', '')}:${storage.path}`;
+										}
+										if (storage.hostPath) {
+											return `${storage.hostPath}:${storage.path}`
 										}
 										return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 									}) || [];
@@ -691,7 +701,11 @@ import * as buildpacks from '../lib/buildPacks';
 											await saveDockerRegistryCredentials({ url, username, password, workdir });
 										}
 										try {
-											const composeVolumes = volumes.map((volume) => {
+											const composeVolumes = volumes.filter(v => {
+												if (!v.startsWith('.') && !v.startsWith('..') && !v.startsWith('/') && !v.startsWith('~')) {
+													return v;
+												}
+											}).map((volume) => {
 												return {
 													[`${volume.split(':')[0]}`]: {
 														name: volume.split(':')[0]
