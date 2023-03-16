@@ -1,6 +1,7 @@
 name: staging-release
 
 on:
+  pull_request:
   push:
     paths:
       - "**"
@@ -8,8 +9,8 @@ on:
       - "!others/pocketbase"
       - "!.github/workflows/fluent-bit-release.yml"
       - "!.github/workflows/pocketbase-release.yml"
-    branches:
-      - "!main"
+    branches-ignore:
+      - "main"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: "coollabsio/coolify"
