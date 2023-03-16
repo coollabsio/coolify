@@ -4,33 +4,11 @@ on:
   release:
     types: [released]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: "coollabsio/coolify"
+
 jobs:
-  arm64:
-    runs-on: [self-hosted, arm64]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
-      - name: Build and push
-        uses: docker/build-push-action@v2
-        with:
-          context: .
-          platforms: linux/arm64
-          push: true
-          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache-arm64
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache-arm64,mode=max
   amd64:
     runs-on: ubuntu-latest
     steps:
@@ -40,23 +18,25 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
           context: .
           platforms: linux/amd64
           push: true
-          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache-amd64
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache-amd64,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
   aarch64:
     runs-on: [self-hosted, arm64]
     steps:
@@ -66,26 +46,28 @@ jobs:
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
-      - name: Login to DockerHub
-        uses: docker/login-action@v1
+      - name: Login to ghcr.io
+        uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Build and push
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           platforms: linux/aarch64
           push: true
-          tags: coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64
-          cache-from: type=registry,ref=coollabsio/coolify:buildcache-aarch64
-          cache-to: type=registry,ref=coollabsio/coolify:buildcache-aarch64,mode=max
+          tags: ${{ steps.meta.outputs.tags }}-aarch64
+          labels: ${{ steps.meta.outputs.labels }}
   merge-manifest:
     runs-on: ubuntu-latest
-    needs: [amd64, arm64, aarch64]
+    needs: [amd64, aarch64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -93,18 +75,20 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Get current package version
-        uses: martinbeentjes/npm-get-version-action@v1.2.3
-        id: package-version
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-arm64 --append coollabsio/coolify:${{steps.package-version.outputs.current-version}}-aarch64 --tag coollabsio/coolify:${{steps.package-version.outputs.current-version}}
-          docker buildx imagetools create coollabsio/coolify:${{steps.package-version.outputs.current-version}} --tag coollabsio/coolify:latest
+          docker buildx imagetools create --append ${{ steps.meta.outputs.tags }}-aarch64 --tag ${{ steps.meta.outputs.tags }}
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
