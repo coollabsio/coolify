@@ -60,7 +60,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern={{version}}-aarch64
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
