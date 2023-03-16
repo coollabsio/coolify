@@ -38,7 +38,7 @@ RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/pack-$PACK_VERSION -o /
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack
 
 COPY --from=build /app/apps/api/build/ .
-COPY --from=build /app/others/fluentbit/ ./fluentbit
+# COPY --from=build /app/others/fluentbit/ ./fluentbit
 COPY --from=build /app/apps/ui/build/ ./public
 COPY --from=build /app/apps/api/prisma/ ./prisma
 COPY --from=build /app/apps/api/package.json .

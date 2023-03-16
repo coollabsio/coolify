@@ -34,7 +34,7 @@ services:
     networks:
       - coolify-infra
  fluent-bit:
-    image: coollabsio/coolify-fluent-bit:1.0.0
+    image: ghcr.io/coollabsio/fluent-bit:1.0.0
     command: /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/fluent-bit-dev.conf
     container_name: coolify-fluentbit
     volumes:
