@@ -1,4 +1,4 @@
-name: production-release
+name: Production Release to DockerHub
 
 on:
   release:

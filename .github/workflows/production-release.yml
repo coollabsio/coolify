@@ -1,4 +1,4 @@
-name: production-release
+name: Production Release to ghcr.io
 
 on:
   release:
@@ -29,6 +29,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
@@ -57,6 +59,8 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
       - name: Build and push
         uses: docker/build-push-action@v3
         with:
@@ -86,9 +90,12 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ steps.meta.outputs.tags }}-aarch64 --tag ${{ steps.meta.outputs.tags }}
+          docker buildx imagetools create --append ${{ fromJSON(steps.meta.outputs.json).tags[0] }}-aarch64 --tag ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:

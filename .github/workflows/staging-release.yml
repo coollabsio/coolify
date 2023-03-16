@@ -1,4 +1,4 @@
-name: staging-release
+name: Staging Release to ghcr.io
 
 on:
   push:

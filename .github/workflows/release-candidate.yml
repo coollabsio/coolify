@@ -1,4 +1,4 @@
-name: release-candidate
+name: Release Candidate to ghcr.io
 
 on:
   release:
