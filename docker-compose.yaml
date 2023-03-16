@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   coolify:
-    image: coollabsio/coolify:${TAG:-latest}
+    image: ghcr.io/coollabsio/coolify:${TAG:-latest}
     restart: always
     container_name: coolify
     ports:
@@ -23,7 +23,7 @@ services:
     networks:
       - coolify-infra
   fluent-bit:
-    image: coollabsio/coolify-fluent-bit:1.0.0
+    image: ghcr.io/coollabsio/fluent-bit:1.0.0
     container_name: coolify-fluentbit
     volumes:
       - 'coolify-logs:/app/logs'
