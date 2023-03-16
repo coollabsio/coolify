@@ -1,7 +1,6 @@
 name: staging-release
 
 on:
-  pull_request:
   push:
     paths:
       - "**"
@@ -27,13 +26,13 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -46,7 +45,7 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-  arm64:
+  aarch64:
     runs-on: [self-hosted, arm64]
     steps:
       - name: Checkout
@@ -57,13 +56,13 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -72,13 +71,13 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           context: .
-          platforms: linux/arm64
+          platforms: linux/aarch64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}-arm64
+          tags: ${{ steps.meta.outputs.tags }}-aarch64
           labels: ${{ steps.meta.outputs.labels }}
   merge-manifest:
     runs-on: ubuntu-latest
-    needs: [amd64, arm64]
+    needs: [amd64, aarch64]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -86,20 +85,20 @@ jobs:
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - name: Login to DockerHub
+      - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN  }}
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ steps.meta.outputs.tags }}-arm64 --tag ${{ steps.meta.outputs.tags }}
+          docker buildx imagetools create --append ${{ steps.meta.outputs.tags }}-aarch64 --tag ${{ steps.meta.outputs.tags }}
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
