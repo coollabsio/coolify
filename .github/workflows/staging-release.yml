@@ -1,5 +1,7 @@
 name: Staging Release to ghcr.io
-
+concurrency:
+  group: staging_environment
+  cancel-in-progress: true
 on:
   push:
     branches-ignore:
