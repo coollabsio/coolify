@@ -156,14 +156,21 @@ export async function update(request: FastifyRequest<Update>) {
 	try {
 		if (!isDev) {
 			const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
-			await executeCommand({ command: `docker pull ghcr.io/coollabsio/coolify:${latestVersion}` });
+			let image = `ghcr.io/coollabsio/coolify:${latestVersion}`;
+			try {
+				await executeCommand({ command: `docker pull ${image}` });
+			} catch (error) {
+				image = `coollabsio/coolify:${latestVersion}`;
+				await executeCommand({ command: `docker pull ${image}` });
+			}
+
 			await executeCommand({ shell: true, command: `env | grep COOLIFY > .env` });
 			await executeCommand({
 				command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 			});
 			await executeCommand({
 				shell: true,
-				command: `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db ghcr.io/coollabsio/coolify:${latestVersion} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
+				command: `docker run --rm -tid --env-file .env -v /var/run/docker.sock:/var/run/docker.sock -v coolify-db ${image} /bin/sh -c "env | grep COOLIFY > .env && echo 'TAG=${latestVersion}' >> .env && docker stop -t 0 coolify coolify-fluentbit && docker rm coolify coolify-fluentbit && docker compose pull && docker compose up -d --force-recreate"`
 			});
 			return {};
 		} else {
