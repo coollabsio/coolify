@@ -1,8 +1,9 @@
 name: Production Release to DockerHub
 
 on:
-  release:
-    types: [released]
+  push:
+    branches:
+      - "this-branch-does-not-exists"
 
 jobs:
   arm64:

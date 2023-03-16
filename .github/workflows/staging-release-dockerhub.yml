@@ -3,7 +3,7 @@ name: Staging Release to DockerHub
 on:
   push:
     branches:
-      - "next"
+      - "this-branch-does-not-exists"
 
 jobs:
   arm64:
