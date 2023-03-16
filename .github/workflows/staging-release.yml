@@ -9,7 +9,7 @@ on:
       - "!.github/workflows/fluent-bit-release.yml"
       - "!.github/workflows/pocketbase-release.yml"
     branches:
-      - "not-existing-branch" # should be !main
+      - "!main"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: "coollabsio/coolify"

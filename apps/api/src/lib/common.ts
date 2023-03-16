@@ -19,7 +19,7 @@ import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.27';
+export const version = '3.12.28';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;

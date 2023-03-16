@@ -158,7 +158,7 @@
 				id="dockerImage"
 				name="dockerImage"
 				required
-				placeholder="coollabsio/coolify:0.0.1"
+				placeholder="ghcr.io/coollabsio/coolify:0.0.1"
 				bind:value={remoteImage}
 			/>
 			<button class="btn btn-sm btn-primary" type="submit">Revert Now</button>

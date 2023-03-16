@@ -1,4 +1,4 @@
-name: release-cancidate
+name: release-candidate
 
 on:
   release:
@@ -6,7 +6,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: "coollabsio/coolify-test"
+  IMAGE_NAME: "coollabsio/coolify"
 
 jobs:
   amd64:
@@ -108,7 +108,7 @@ jobs:
           context: .
           platforms: linux/aarch64
           push: true
-          tags: ${{ steps.meta.outputs.tags }}-arm64
+          tags: ${{ steps.meta.outputs.tags }}-aarch64
           labels: ${{ steps.meta.outputs.labels }}
   merge-manifest:
     runs-on: ubuntu-latest
