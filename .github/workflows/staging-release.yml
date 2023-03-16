@@ -2,12 +2,6 @@ name: staging-release
 
 on:
   push:
-    paths:
-      - "**"
-      - "!others/fluentbit"
-      - "!others/pocketbase"
-      - "!.github/workflows/fluent-bit-release.yml"
-      - "!.github/workflows/pocketbase-release.yml"
     branches-ignore:
       - "main"
 env:
