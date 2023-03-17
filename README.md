@@ -24,9 +24,10 @@ Become a financial contributor and help us sustain our community. [[Contribute](
 
 ### Organizations
 
-Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
+Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and [Appwrite](https://appwrite.io)!
 
-![CCCareers](./other/logos/ccc-logo.webp)
+<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="appwrite logo" width="200"/></a>
+<a href="https://appwrite.io" target="_blank"><img src="./other/logos/appwrite.svg" alt="appwrite logo" width="200"/></a>
 
 Support this project with your organization. Your logo will show up here with a link to your website.
 
