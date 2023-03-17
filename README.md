@@ -10,11 +10,11 @@ Thinks will be added here incrementally through PR's.
 
 ## Support
 
-- Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
-- Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
-- Twitter: [@andrasbacsai](https://twitter.com/heyandras)
-- Email: [andras@coollabs.io](mailto:andras@coollabs.io)
-- Discord: [Invitation](https://coollabs.io/discord)
+-   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
+-   Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
+-   Twitter: [@andrasbacsai](https://twitter.com/heyandras)
+-   Email: [andras@coollabs.io](mailto:andras@coollabs.io)
+-   Discord: [Invitation](https://coollabs.io/discord)
 
 ---
 
@@ -26,9 +26,9 @@ Become a financial contributor and help us sustain our community. [[Contribute](
 
 Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
 
-![CCCareers](./others/logo/ccc-logo.webp)
+![CCCareers](./others/logos/ccc-logo.webp)
 
-Support this project with your organization. Your logo will show up here with a link to your website. 
+Support this project with your organization. Your logo will show up here with a link to your website.
 
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/1/website"><img src="https://opencollective.com/coollabsio/organization/1/avatar.svg"></a>
@@ -39,7 +39,7 @@ Support this project with your organization. Your logo will show up here with a 
 <a href="https://opencollective.com/coollabsio/organization/6/website"><img src="https://opencollective.com/coollabsio/organization/6/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/7/website"><img src="https://opencollective.com/coollabsio/organization/7/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/8/website"><img src="https://opencollective.com/coollabsio/organization/8/avatar.svg"></a>
-<a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a> 
+<a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a>
 
 ### Individuals
 
