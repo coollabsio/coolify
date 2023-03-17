@@ -1,53 +1,26 @@
-ARG PNPM_VERSION=7.11.0
+FROM serversideup/php:8.2-fpm-nginx
 
-FROM node:18-slim as build
-WORKDIR /app
+ARG NODE_VERSION=18
+ARG POSTGRES_VERSION=15
 
-RUN apt update && apt -y install curl
-RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
+RUN apt-get update \
+    && curl -sLS https://deb.nodesource.com/setup_$NODE_VERSION.x | bash - \
+    && apt-get install -y nodejs \
+    && npm install -g npm 
 
-COPY . .
-RUN pnpm install
-RUN pnpm build
+RUN apt-get install -y php-pgsql
 
-# Production build
-FROM node:18-slim
-WORKDIR /app
-ENV NODE_ENV production
-ARG TARGETPLATFORM
+RUN apt-get -y autoremove \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
-# https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=20.10.18
-# https://github.com/docker/compose/releases
-# Reverted to 2.6.1 because of this https://github.com/docker/compose/issues/9704. 2.9.0 still has a bug.
-ARG DOCKER_COMPOSE_VERSION=2.6.1
-# https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.27.0
-
-RUN apt update && apt -y install --no-install-recommends ca-certificates git git-lfs openssh-client curl jq cmake sqlite3 openssl psmisc python3
-RUN apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,dpkg,cache,log}/
-RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
-RUN npm install -g npm@${PNPM_VERSION}
-
-RUN mkdir -p ~/.docker/cli-plugins/
-
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-$DOCKER_VERSION -o /usr/bin/docker
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-compose-linux-$DOCKER_COMPOSE_VERSION -o ~/.docker/cli-plugins/docker-compose
-RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/pack-$PACK_VERSION -o /usr/local/bin/pack 
-
-RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack
-
-COPY --from=build /app/apps/api/build/ .
-# COPY --from=build /app/others/fluentbit/ ./fluentbit
-COPY --from=build /app/apps/ui/build/ ./public
-COPY --from=build /app/apps/api/prisma/ ./prisma
-COPY --from=build /app/apps/api/package.json .
-COPY --from=build /app/docker-compose.yaml .
-COPY --from=build /app/apps/api/tags.json .
-COPY --from=build /app/apps/api/templates.json .
-
-RUN pnpm install -p
-
-EXPOSE 3000
-ENV CHECKPOINT_DISABLE=1
-CMD pnpm start
+# Adding test ssh key
+RUN mkdir -p ~/.ssh
+RUN echo "-----BEGIN OPENSSH PRIVATE KEY-----\n\
+    b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\n\
+    QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk\n\
+    hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA\n\
+    AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV\n\
+    uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==\n\
+    -----END OPENSSH PRIVATE KEY-----" >> ~/.ssh/id_ed25519
+RUN chmod 0600 ~/.ssh/id_ed25519

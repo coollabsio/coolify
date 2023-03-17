@@ -1,3 +1,0 @@
-prefer-workspace-packages: true
-packages:
-  - 'apps/*'

@@ -1,51 +1,44 @@
 version: '3.8'
-
 services:
-  coolify:
-    image: ghcr.io/coollabsio/coolify:${TAG:-latest}
-    restart: always
-    container_name: coolify
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - target: 3000
-        published: 3000
-        protocol: tcp
-        mode: host
+      - "${APP_PORT:-8000}:80"
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    environment:
+      PGID: "${USERID:-9999}"
+      PUID: "${USERID:-9999}"
+      SSL_MODE: 'off'
     volumes:
-      - 'coolify-local-backup:/app/backups'
-      - 'coolify-db:/app/db'
-      - 'coolify-logs:/app/logs'
-      - 'coolify-ssl-certs:/app/ssl'
-      - 'coolify-traefik-letsencrypt:/etc/traefik/acme'
-      - 'coolify-letsencrypt:/etc/letsencrypt'
-      - '/var/run/docker.sock:/var/run/docker.sock'
-    env_file:
-      - '.env'
-    networks:
-      - coolify-infra
-  fluent-bit:
-    image: ghcr.io/coollabsio/fluent-bit:1.0.0
-    container_name: coolify-fluentbit
+      - .:/var/www/html:cached
+  postgres:
+    image: postgres:15-alpine
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
     volumes:
-      - 'coolify-logs:/app/logs'
-    networks:
-      - coolify-infra
-networks:
-  coolify-infra:
-    attachable: true
-    name: coolify-infra
-
+      - db-coolify:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $$DB_USERNAME",
+          "-d",
+          "db_prod"
+        ]
+      retries: 3
+      timeout: 5s
+  mailpit:
+    image: "axllent/mailpit:latest"
+    ports:
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
 volumes:
-  coolify-local-backup:
-    name: coolify-local-backup
-  coolify-logs:
-    name: coolify-logs
-  coolify-db:
-    name: coolify-db
-  coolify-pgdb:
-    name: coolify-pgdb
-  coolify-ssl-certs:
-    name: coolify-ssl-certs
-  coolify-letsencrypt:
-    name: coolify-letsencrypt
-  coolify-traefik-letsencrypt:
-    name: coolify-traefik-letsencrypt
+  db-coolify:
+    driver: local
