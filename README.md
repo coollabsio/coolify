@@ -26,7 +26,7 @@ Become a financial contributor and help us sustain our community. [[Contribute](
 
 Special thanks to our biggest sponsor, [CCCareers](https://cccareers.org/)!
 
-![CCCareers](./others/logos/ccc-logo.webp)
+![CCCareers](./other/logos/ccc-logo.webp)
 
 Support this project with your organization. Your logo will show up here with a link to your website.
 
