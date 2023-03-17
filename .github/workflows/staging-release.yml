@@ -4,6 +4,7 @@ on:
   push:
     branches-ignore:
       - "main"
+      - "v4"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: "coollabsio/coolify"
