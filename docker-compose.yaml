@@ -8,11 +8,11 @@ services:
       - "${APP_PORT:-8000}:80"
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     environment:
-      PGID: "${USERID:-9999}"
       PUID: "${USERID:-9999}"
+      PGID: "${GROUPID:-9999}"
       SSL_MODE: 'off'
     volumes:
-      - .:/var/www/html:cached
+      - .:/var/www/html
   postgres:
     image: postgres:15-alpine
     ports:
@@ -34,11 +34,7 @@ services:
         ]
       retries: 3
       timeout: 5s
-  mailpit:
-    image: "axllent/mailpit:latest"
-    ports:
-      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
-      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+
 volumes:
   db-coolify:
     driver: local
