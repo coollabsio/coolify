@@ -12,7 +12,7 @@ class RunCommand extends Component
 
     public $manualKeepAlive = false;
 
-    public $command = '';
+    public $command = 'ls';
 
     public function render()
     {
@@ -21,30 +21,32 @@ class RunCommand extends Component
 
     public function runCommand()
     {
-        // TODO Execute with Livewire Normally
-        $this->activity = coolifyProcess($this->command, 'testing-host');
-
+        $this->isKeepAliveOn = true;
 
         // Override manual to experiment
-//        $sleepingBeauty = 'x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done';
-//
-//        $commandString = <<<EOT
-//        cd projects/dummy-project
-//        ~/.docker/cli-plugins/docker-compose build --no-cache
-//        # $sleepingBeauty
-//        EOT;
-//
-//        $this->activity = coolifyProcess($commandString, 'testing-host');
+        $override = 0;
 
+        if($override) {
+            // Good to play with the throttle feature
+            $sleepingBeauty = 'x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done';
 
-        $this->isKeepAliveOn = true;
+            $this->activity = coolifyProcess(<<<EOT
+            cd projects/dummy-project
+            # ~/.docker/cli-plugins/docker-compose build --no-cache
+            $sleepingBeauty
+            EOT, 'testing-host');
+
+            return;
+        }
+
+        $this->activity = coolifyProcess($this->command, 'testing-host');
     }
 
     public function polling()
     {
         $this->activity?->refresh();
 
-        if ($this->activity?->properties['status'] === 'finished') {
+        if (data_get($this->activity, 'properties.exitCode') !== null) {
             $this->isKeepAliveOn = false;
         }
     }

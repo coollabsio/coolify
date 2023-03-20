@@ -3,15 +3,18 @@ services:
   php:
     image: coolify:4
     build:
-      dockerfile: Dockerfile
       context: ./docker/dev
+      dockerfile: Dockerfile
+      args:
+        WWWGROUP: '${WWWGROUP}'
     ports:
       - "${APP_PORT:-8000}:80"
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     environment:
-      PUID: "${USERID:-9999}"
-      PGID: "${GROUPID:-9999}"
-      SSL_MODE: 'off'
+      WWWUSER: "${WWWUSER}"
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: "${SAIL_XDEBUG_MODE:-off}"
+      XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
     volumes:
       - .:/var/www/html
     networks:

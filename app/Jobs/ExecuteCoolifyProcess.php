@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\ProcessStatus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -11,7 +12,6 @@ use Illuminate\Process\InvokedProcess;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -43,8 +43,7 @@ class ExecuteCoolifyProcess implements ShouldQueue
      */
     public function handle(): ?ProcessResult
     {
-        ray()->clearAll();
-        $this->timeStart = $start = hrtime(true);
+        $this->timeStart = hrtime(true);
 
         $user = $this->activity->getExtraProperty('user');
         $destination = $this->activity->getExtraProperty('destination');
@@ -53,24 +52,16 @@ class ExecuteCoolifyProcess implements ShouldQueue
 
         $delimiter = 'EOF-COOLIFY-SSH';
 
-        File::chmod(base_path('coolify_id25519'), 0600);
-
         $sshCommand = 'ssh '
-            . '-i ./coolify_id25519 '
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
+            . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
             . $command . PHP_EOL
             . $delimiter;
 
-//        $sshCommand = "whoami ; pwd ; ls ";
-
-        $process = Process::start(
-            $sshCommand,
-            $this->handleOutput(...),
-        );
-
+        $process = Process::start($sshCommand, $this->handleOutput(...));
 
         $res = $process->wait();
 
@@ -78,13 +69,20 @@ class ExecuteCoolifyProcess implements ShouldQueue
             return $res;
         }
 
-      
-        // TODO Why is this not persisting?? Immutable property??
-        $this->activity->properties->put('pid', $process->id());
-        $this->activity->properties->put('exitCode', $res->exitCode());
-        $this->activity->properties->put('stdout', $res->output());
-        $this->activity->properties->put('stderr', $res->errorOutput());
+        $status = match ($res->exitCode()) {
+            0 => ProcessStatus::FINISHED,
+            default => ProcessStatus::ERROR,
+        };
+
+        $this->activity->properties = $this->activity->properties->merge([
+            'exitCode' => $res->exitCode(),
+            'stdout' => $res->output(),
+            'stderr' => $res->errorOutput(),
+            'status' => $status,
+        ]);
+
         $this->activity->save();
+
         return $res;
     }
 

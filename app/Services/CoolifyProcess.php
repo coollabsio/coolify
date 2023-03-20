@@ -19,12 +19,14 @@ class CoolifyProcess
         protected ?string   $user = 'root',
     ){
         $this->activity = activity()
-            ->withProperty('type', 'COOLIFY_PROCESS')
-            ->withProperty('user', $this->user)
-            ->withProperty('destination', $this->destination)
-            ->withProperty('port', $this->port)
-            ->withProperty('command', $this->command)
-            ->withProperty('status', ProcessStatus::HOLDING)
+            ->withProperties([
+                'type' => 'COOLIFY_PROCESS',
+                'user' => $this->user,
+                'destination' => $this->destination,
+                'port' => $this->port,
+                'command' => $this->command,
+                'status' => ProcessStatus::HOLDING,
+            ])
             ->log("Awaiting to start command...\n\n");
     }
 
