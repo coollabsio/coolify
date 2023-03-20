@@ -22,7 +22,6 @@ class RunCommand extends Component
     public function runCommand()
     {
         $this->isKeepAliveOn = true;
-        
 
         $this->activity = coolifyProcess($this->command, 'testing-host');
     }
