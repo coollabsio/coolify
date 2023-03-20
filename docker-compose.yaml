@@ -3,8 +3,8 @@ services:
   php:
     image: coolify:4
     build:
-      context: .
       dockerfile: Dockerfile
+      context: ./docker/dev
     ports:
       - "${APP_PORT:-8000}:80"
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
