@@ -55,6 +55,10 @@ class ExecuteCoolifyProcess implements ShouldQueue
         $sshCommand = 'ssh '
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
+            // Quiet mode. Causes most warning and diagnostic messages to be suppressed.
+            // Errors are still out put. This is to silence for example, that warning
+            // Permanently added <host and key type> to the list of known hosts.
+            . '-q '
             . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
