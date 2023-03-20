@@ -302,7 +302,7 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
 			databaseSecret
 		} = database;
 		const { privatePort, command, environmentVariables, image, volume, ulimits } =
-			generateDatabaseConfiguration(database, arch);
+			generateDatabaseConfiguration(database);
 
 		const network = destinationDockerId && destinationDocker.network;
 		const volumeName = volume.split(':')[0];
