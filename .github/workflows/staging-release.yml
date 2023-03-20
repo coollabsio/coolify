@@ -4,8 +4,9 @@ concurrency:
   cancel-in-progress: true
 on:
   push:
-    branches:
-      - "next"
+    branches-ignore:
+      - "main"
+      - "v4"
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: "coollabsio/coolify"

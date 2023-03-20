@@ -100,7 +100,7 @@ Deploy your resource to:
 
 - Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
 - Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
-- Twitter: [@andrasbacsai](https://twitter.com/andrasbacsai)
+- Twitter: [@andrasbacsai](https://twitter.com/heyandras)
 - Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 - Discord: [Invitation](https://coollabs.io/discord)
 
