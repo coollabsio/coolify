@@ -41,7 +41,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   aarch64:
-    runs-on: buildjet-4vcpu-ubuntu-2204-arm
+    runs-on:
+      group: aarch-runners
     steps:
       - name: Checkout
         uses: actions/checkout@v3
