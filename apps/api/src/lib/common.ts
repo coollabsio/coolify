@@ -19,7 +19,7 @@ import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.28';
+export const version = '3.12.29';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
@@ -402,8 +402,8 @@ export const supportedDatabaseTypesAndVersions = [
 		fancyName: 'MongoDB',
 		baseImage: 'bitnami/mongodb',
 		baseImageARM: 'mongo',
-		versions: ['5.0', '4.4', '4.2'],
-		versionsARM: ['5.0', '4.4', '4.2']
+		versions: ['6.0', '5.0', '4.4', '4.2'],
+		versionsARM: ['6.0', '5.0', '4.4', '4.2']
 	},
 	{
 		name: 'mysql',
@@ -418,16 +418,16 @@ export const supportedDatabaseTypesAndVersions = [
 		fancyName: 'MariaDB',
 		baseImage: 'bitnami/mariadb',
 		baseImageARM: 'mariadb',
-		versions: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2'],
-		versionsARM: ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
+		versions: ['10.11', '10.10', '10.9', '10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2'],
+		versionsARM: ['10.11', '10.10', '10.9', '10.8', '10.7', '10.6', '10.5', '10.4', '10.3', '10.2']
 	},
 	{
 		name: 'postgresql',
 		fancyName: 'PostgreSQL',
 		baseImage: 'bitnami/postgresql',
 		baseImageARM: 'postgres',
-		versions: ['14.5.0', '13.8.0', '12.12.0', '11.17.0', '10.22.0'],
-		versionsARM: ['14.5', '13.8', '12.12', '11.17', '10.22']
+		versions: ['15.2.0', '14.7.0', '14.5.0', '13.8.0', '12.12.0', '11.17.0', '10.22.0'],
+		versionsARM: ['15.2', '14.7', '14.5', '13.8', '12.12', '11.17', '10.22']
 	},
 	{
 		name: 'redis',
@@ -442,14 +442,14 @@ export const supportedDatabaseTypesAndVersions = [
 		fancyName: 'CouchDB',
 		baseImage: 'bitnami/couchdb',
 		baseImageARM: 'couchdb',
-		versions: ['3.2.2', '3.1.2', '2.3.1'],
-		versionsARM: ['3.2.2', '3.1.2', '2.3.1']
+		versions: ['3.3.1', '3.2.2', '3.1.2', '2.3.1'],
+		versionsARM: ['3.3', '3.2.2', '3.1.2', '2.3.1']
 	},
 	{
 		name: 'edgedb',
 		fancyName: 'EdgeDB',
 		baseImage: 'edgedb/edgedb',
-		versions: ['latest', '2.1', '2.0', '1.4']
+		versions: ['latest', '2.9', '2.8', '2.7']
 	}
 ];
 
@@ -849,97 +849,97 @@ export function generatePassword({
 
 type DatabaseConfiguration =
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MYSQL_DATABASE: string;
-			MYSQL_PASSWORD: string;
-			MYSQL_ROOT_USER: string;
-			MYSQL_USER: string;
-			MYSQL_ROOT_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MYSQL_DATABASE: string;
+				MYSQL_PASSWORD: string;
+				MYSQL_ROOT_USER: string;
+				MYSQL_USER: string;
+				MYSQL_ROOT_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MONGO_INITDB_ROOT_USERNAME?: string;
-			MONGO_INITDB_ROOT_PASSWORD?: string;
-			MONGODB_ROOT_USER?: string;
-			MONGODB_ROOT_PASSWORD?: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MONGO_INITDB_ROOT_USERNAME?: string;
+				MONGO_INITDB_ROOT_PASSWORD?: string;
+				MONGODB_ROOT_USER?: string;
+				MONGODB_ROOT_PASSWORD?: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			MARIADB_ROOT_USER: string;
-			MARIADB_ROOT_PASSWORD: string;
-			MARIADB_USER: string;
-			MARIADB_PASSWORD: string;
-			MARIADB_DATABASE: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				MARIADB_ROOT_USER: string;
+				MARIADB_ROOT_PASSWORD: string;
+				MARIADB_USER: string;
+				MARIADB_PASSWORD: string;
+				MARIADB_DATABASE: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			POSTGRES_PASSWORD?: string;
-			POSTGRES_USER?: string;
-			POSTGRES_DB?: string;
-			POSTGRESQL_POSTGRES_PASSWORD?: string;
-			POSTGRESQL_USERNAME?: string;
-			POSTGRESQL_PASSWORD?: string;
-			POSTGRESQL_DATABASE?: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				POSTGRES_PASSWORD?: string;
+				POSTGRES_USER?: string;
+				POSTGRES_DB?: string;
+				POSTGRESQL_POSTGRES_PASSWORD?: string;
+				POSTGRESQL_USERNAME?: string;
+				POSTGRESQL_PASSWORD?: string;
+				POSTGRESQL_DATABASE?: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			REDIS_AOF_ENABLED: string;
-			REDIS_PASSWORD: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				REDIS_AOF_ENABLED: string;
+				REDIS_PASSWORD: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			COUCHDB_PASSWORD: string;
-			COUCHDB_USER: string;
-		};
-	}
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				COUCHDB_PASSWORD: string;
+				COUCHDB_USER: string;
+			};
+	  }
 	| {
-		volume: string;
-		image: string;
-		command?: string;
-		ulimits: Record<string, unknown>;
-		privatePort: number;
-		environmentVariables: {
-			EDGEDB_SERVER_PASSWORD: string;
-			EDGEDB_SERVER_USER: string;
-			EDGEDB_SERVER_DATABASE: string;
-			EDGEDB_SERVER_TLS_CERT_MODE: string;
-		};
-	};
+			volume: string;
+			image: string;
+			command?: string;
+			ulimits: Record<string, unknown>;
+			privatePort: number;
+			environmentVariables: {
+				EDGEDB_SERVER_PASSWORD: string;
+				EDGEDB_SERVER_USER: string;
+				EDGEDB_SERVER_DATABASE: string;
+				EDGEDB_SERVER_TLS_CERT_MODE: string;
+			};
+	  };
 export function generateDatabaseConfiguration(database: any): DatabaseConfiguration {
 	const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } =
 		database;
@@ -1013,7 +1013,7 @@ export function generateDatabaseConfiguration(database: any): DatabaseConfigurat
 			ulimits: {}
 		};
 		if (isARM()) {
-			configuration.volume = `${id}-${type}-data:/var/lib/postgresql`;
+			configuration.volume = `${id}-${type}-data:/var/lib/postgresql/data`;
 			configuration.environmentVariables = {
 				POSTGRES_PASSWORD: dbUserPassword,
 				POSTGRES_USER: dbUser,
@@ -1038,8 +1038,9 @@ export function generateDatabaseConfiguration(database: any): DatabaseConfigurat
 		};
 		if (isARM()) {
 			configuration.volume = `${id}-${type}-data:/data`;
-			configuration.command = `/usr/local/bin/redis-server --appendonly ${appendOnly ? 'yes' : 'no'
-				} --requirepass ${dbUserPassword}`;
+			configuration.command = `/usr/local/bin/redis-server --appendonly ${
+				appendOnly ? 'yes' : 'no'
+			} --requirepass ${dbUserPassword}`;
 		}
 		return configuration;
 	} else if (type === 'couchdb') {
@@ -1124,12 +1125,12 @@ export type ComposeFileService = {
 	command?: string;
 	ports?: string[];
 	build?:
-	| {
-		context: string;
-		dockerfile: string;
-		args?: Record<string, unknown>;
-	}
-	| string;
+		| {
+				context: string;
+				dockerfile: string;
+				args?: Record<string, unknown>;
+		  }
+		| string;
 	deploy?: {
 		restart_policy?: {
 			condition?: string;
@@ -1200,7 +1201,7 @@ export const createDirectories = async ({
 	let workdirFound = false;
 	try {
 		workdirFound = !!(await fs.stat(workdir));
-	} catch (error) { }
+	} catch (error) {}
 	if (workdirFound) {
 		await executeCommand({ command: `rm -fr ${workdir}` });
 	}
@@ -1727,7 +1728,7 @@ export async function stopBuild(buildId, applicationId) {
 					}
 				}
 				count++;
-			} catch (error) { }
+			} catch (error) {}
 		}, 100);
 	});
 }
@@ -1750,7 +1751,7 @@ export async function cleanupDockerStorage(dockerId) {
 	// Cleanup images that are not used by any container
 	try {
 		await executeCommand({ dockerId, command: `docker image prune -af` });
-	} catch (error) { }
+	} catch (error) {}
 
 	// Prune coolify managed containers
 	try {
@@ -1758,12 +1759,12 @@ export async function cleanupDockerStorage(dockerId) {
 			dockerId,
 			command: `docker container prune -f --filter "label=coolify.managed=true"`
 		});
-	} catch (error) { }
+	} catch (error) {}
 
 	// Cleanup build caches
 	try {
 		await executeCommand({ dockerId, command: `docker builder prune -af` });
-	} catch (error) { }
+	} catch (error) {}
 }
 
 export function persistentVolumes(id, persistentStorage, config) {

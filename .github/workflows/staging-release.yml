@@ -1,5 +1,7 @@
 name: Staging Release to ghcr.io
-
+concurrency:
+  group: staging_environment
+  cancel-in-progress: true
 on:
   push:
     branches-ignore:
@@ -11,14 +13,12 @@ env:
 
 jobs:
   amd64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           ref: "next"
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to ghcr.io
@@ -41,14 +41,13 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
   aarch64:
-    runs-on: [self-hosted, arm64]
+    runs-on:
+      group: aarch-runners
     steps:
       - name: Checkout
         uses: actions/checkout@v3
         with:
           ref: "next"
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
       - name: Login to ghcr.io

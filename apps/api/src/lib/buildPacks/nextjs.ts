@@ -43,6 +43,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 			Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 		}
 		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app${publishDirectory} ./`);
+		Dockerfile.push('RUN rm -fr .git');
 		Dockerfile.push(`EXPOSE 80`);
 	}
 

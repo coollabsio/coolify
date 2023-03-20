@@ -20,6 +20,7 @@ const createDockerfile = async (data, image, name): Promise<void> => {
 	);
 	Dockerfile.push(`RUN update-ca-certificates`);
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app/target/release/${name} ${name}`);
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	Dockerfile.push(`CMD ["/app/${name}"]`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));

@@ -543,6 +543,9 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							const template: any = await parseAndFindServiceTemplates(service, null, true);
 							const { proxy } = template.services[oneService] || found.services[oneService];
 							for (let configuration of proxy) {
+								if (configuration.hostPort) {
+									continue;
+								}
 								if (configuration.domain) {
 									const setting = serviceSetting.find(
 										(a) => a.variableName === configuration.domain
