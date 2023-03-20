@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   php:
-    image: coolify:4
+    image: "coolify:${TAG:-4}"
     build:
       context: ./docker/dev
       dockerfile: Dockerfile

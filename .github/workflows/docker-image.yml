@@ -1,0 +1,26 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Build the Docker image
+      run: |
+        docker run --rm -u "$(id -u):$(id -g)" \
+          -v "$(pwd):/app" \
+          -w /app composer:2 \
+          composer install --ignore-platform-reqs
+        TAG=$(date +%s) ./vendor/bin/sail build
+        TAG=$(date +%s) ./vendor/bin/sail up -d
+        sleep 5
+        ./vendor/bin/sail artisan test
