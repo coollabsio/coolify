@@ -53,10 +53,10 @@ class ExecuteCoolifyProcess implements ShouldQueue
 
         $delimiter = 'EOF-COOLIFY-SSH';
 
-        File::chmod(base_path('coolify_id25519'), '0600');
+        File::chmod(base_path('coolify_id25519'), 0600);
 
         $sshCommand = 'ssh '
-            . '-i ./coolify_id25519'
+            . '-i ./coolify_id25519 '
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . "{$user}@{$destination} "
@@ -78,12 +78,14 @@ class ExecuteCoolifyProcess implements ShouldQueue
             return $res;
         }
 
+      
         // TODO Why is this not persisting?? Immutable property??
         $this->activity->properties->put('pid', $process->id());
         $this->activity->properties->put('exitCode', $res->exitCode());
         $this->activity->properties->put('stdout', $res->output());
         $this->activity->properties->put('stderr', $res->errorOutput());
         $this->activity->save();
+        return $res;
     }
 
     protected function handleOutput(string $type, string $output)
