@@ -2,12 +2,36 @@
     <div>
         <div>
             <label for="command">
-                <input class="ring-1" id="command" wire:model="command" type="text"/>
+                <input class="py-2 rounded ring-1" id="command" wire:model="command" type="text"/>
             </label>
-            <button class="btn btn-success btn-xs rounded-none" wire:click="runCommand">
+            <button
+                @disabled($activity)
+                class="bg-indigo-500 rounded py-2 px-4 disabled:bg-gray-300"
+                wire:click="runCommand"
+            >
                 Run command
-                <button>
+            <button>
         </div>
+
+        <div class="mt-2 flex gap-2">
+            <button
+                @disabled($activity)
+                class="bg-indigo-500 rounded py-2 px-4 disabled:bg-gray-300"
+                wire:click="runSleepingBeauty"
+            >
+                Run sleeping beauty
+            <button>
+        </div>
+        <div class="mt-2 flex gap-2">
+            <button
+                @disabled($activity)
+                class="bg-indigo-500 rounded py-2 px-4 disabled:bg-gray-300"
+                wire:click="runDummyProjectBuild"
+            >
+                Build DummyProject
+            <button>
+        </div>
+
 
         @isset($activity?->id)
             <div>
@@ -51,7 +75,7 @@
         style="
             background-color: #FFFFFF;
             width: 1200px;
-            height: 600px;
+            height: 300px;
             overflow-y: scroll;
             display: flex;
             flex-direction: column-reverse;

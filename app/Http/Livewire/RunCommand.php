@@ -26,7 +26,7 @@ class RunCommand extends Component
         // Override manual to experiment
         $override = 0;
 
-        if($override) {
+        if ($override) {
             // Good to play with the throttle feature
             $sleepingBeauty = 'x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done';
 
@@ -40,6 +40,23 @@ class RunCommand extends Component
         }
 
         $this->activity = coolifyProcess($this->command, 'testing-host');
+    }
+
+    public function runSleepingBeauty()
+    {
+        $this->isKeepAliveOn = true;
+
+        $this->activity = coolifyProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', 'testing-host');
+    }
+
+    public function runDummyProjectBuild()
+    {
+        $this->isKeepAliveOn = true;
+
+        $this->activity = coolifyProcess(<<<EOT
+        cd projects/dummy-project
+        ~/.docker/cli-plugins/docker-compose build --no-cache
+        EOT, 'testing-host');
     }
 
     public function polling()
