@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   php:
+    image: coolify:4
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,12 +14,16 @@ services:
       SSL_MODE: 'off'
     volumes:
       - .:/var/www/html
+    networks:
+      - coolify
   postgres:
     image: postgres:15-alpine
     ports:
       - "${FORWARD_DB_PORT:-5432}:5432"
     volumes:
       - db-coolify:/var/lib/postgresql/data
+    networks:
+      - coolify
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
@@ -34,7 +39,22 @@ services:
         ]
       retries: 3
       timeout: 5s
+  testing-host:
+    container_name: coolify-testing-host
+    image: coolify-testing-host
+    build:
+      dockerfile: Dockerfile
+      context: ./docker/testing-host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+    networks:
+      - coolify
 
 volumes:
   db-coolify:
     driver: local
+
+networks:
+  coolify:
+    driver: bridge
