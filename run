@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# Inspired on https://github.com/adriancooney/Taskfile
+# Install an alias, to be able to simply execute `run` => echo 'alias run=./run' >> ~/.aliases
+#
+
+set -e
+
+function help {
+    echo "$0 <task> <args>"
+    echo "Tasks:"
+    compgen -A function | cat -n
+}
+
+function default {
+    help
+}
+
+function bash {
+	docker-compose exec -u $(id -u) php bash
+}
+
+# The user with native SSH capability
+function coolify-bash {
+	docker-compose exec -u coolify php bash
+}
+
+function root-bash {
+	docker-compose exec php bash
+}
+
+# Usage: ./Taskfile envFile:set FOOBAR abc
+# This will set the FOOBAR variable to "abc" in the .env file
+function envFile:set {
+    sed -i "s#^$1=.*#$1=$2#g" .env
+}
+
+TIMEFORMAT="Task completed in %3lR"
+time "${@:-default}"
