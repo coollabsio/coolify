@@ -580,7 +580,6 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 								const isWWW = fqdn.includes('www.');
 								const isCustomSSL = false;
 								const serviceId = `${oneService}-${port || 'default'}`;
-								console.log(port)
 								traefik.http.routers = {
 									...traefik.http.routers,
 									...generateRouters(

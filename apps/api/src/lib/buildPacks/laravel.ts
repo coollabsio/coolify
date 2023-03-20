@@ -30,6 +30,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		`COPY --chown=application:application --from=${applicationId}:${tag}-cache /app/mix-manifest.json /app/public/mix-manifest.json`
 	);
 	Dockerfile.push(`COPY --chown=application:application . ./`);
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
