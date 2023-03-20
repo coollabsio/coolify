@@ -22,5 +22,8 @@ jobs:
           composer install --ignore-platform-reqs
         TAG=$(date +%s) ./vendor/bin/sail build
         TAG=$(date +%s) ./vendor/bin/sail up -d
-        sleep 5
-        ./vendor/bin/sail artisan test
+        sleep 1
+        ./vendor/bin/sail ps
+        # Now to create .env
+        # Await database is created
+        # pest
