@@ -3,7 +3,7 @@
 namespace App\Actions\RemoteProcess;
 
 use App\Data\RemoteProcessArgs;
-use App\Jobs\ExecuteCoolifyProcess;
+use App\Jobs\ExecuteRemoteProcess;
 use Spatie\Activitylog\Models\Activity;
 
 class DispatchRemoteProcess
@@ -18,7 +18,7 @@ class DispatchRemoteProcess
 
     public function __invoke(): Activity
     {
-        $job = new ExecuteCoolifyProcess($this->activity);
+        $job = new ExecuteRemoteProcess($this->activity);
 
         dispatch($job);
 

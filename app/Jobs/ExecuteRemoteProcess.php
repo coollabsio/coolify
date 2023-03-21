@@ -10,7 +10,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Spatie\Activitylog\Models\Activity;
 
-class ExecuteCoolifyProcess implements ShouldQueue
+class ExecuteRemoteProcess implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
