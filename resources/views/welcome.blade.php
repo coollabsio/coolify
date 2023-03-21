@@ -11,7 +11,7 @@
 
 <body class="antialiased">
     <h1 class="text-3xl font-bold">
-        Hello from Coolify!
+        Coolify v4
     </h1>
 
     <p class="mt-4">
