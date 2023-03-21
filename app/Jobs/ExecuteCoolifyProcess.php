@@ -41,7 +41,7 @@ class ExecuteCoolifyProcess implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(): ?ProcessResult
+    public function handle(): ProcessResult
     {
         $this->timeStart = hrtime(true);
 
@@ -68,27 +68,23 @@ class ExecuteCoolifyProcess implements ShouldQueue
 
         $process = Process::start($sshCommand, $this->handleOutput(...));
 
-        $res = $process->wait();
+        $processResult = $process->wait();
 
-        if (app()->environment('testing')) {
-            return $res;
-        }
-
-        $status = match ($res->exitCode()) {
+        $status = match ($processResult->exitCode()) {
             0 => ProcessStatus::FINISHED,
             default => ProcessStatus::ERROR,
         };
 
         $this->activity->properties = $this->activity->properties->merge([
-            'exitCode' => $res->exitCode(),
-            'stdout' => $res->output(),
-            'stderr' => $res->errorOutput(),
+            'exitCode' => $processResult->exitCode(),
+            'stdout' => $processResult->output(),
+            'stderr' => $processResult->errorOutput(),
             'status' => $status,
         ]);
 
         $this->activity->save();
 
-        return $res;
+        return $processResult;
     }
 
     protected function handleOutput(string $type, string $output)
