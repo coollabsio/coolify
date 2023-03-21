@@ -1,24 +1,32 @@
 version: '3.8'
 services:
   php:
+    image: "coolify:${TAG:-4}"
     build:
-      context: .
+      context: ./docker/dev
       dockerfile: Dockerfile
+      args:
+        WWWGROUP: '${WWWGROUP}'
     ports:
       - "${APP_PORT:-8000}:80"
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     environment:
-      PGID: "${USERID:-9999}"
-      PUID: "${USERID:-9999}"
-      SSL_MODE: 'off'
+      WWWUSER: "${WWWUSER}"
+      LARAVEL_SAIL: 1
+      XDEBUG_MODE: "${SAIL_XDEBUG_MODE:-off}"
+      XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
     volumes:
-      - .:/var/www/html:cached
+      - .:/var/www/html
+    networks:
+      - coolify
   postgres:
     image: postgres:15-alpine
     ports:
       - "${FORWARD_DB_PORT:-5432}:5432"
     volumes:
       - db-coolify:/var/lib/postgresql/data
+    networks:
+      - coolify
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
@@ -34,11 +42,22 @@ services:
         ]
       retries: 3
       timeout: 5s
-  mailpit:
-    image: "axllent/mailpit:latest"
-    ports:
-      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
-      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
+  testing-host:
+    container_name: coolify-testing-host
+    image: coolify-testing-host
+    build:
+      dockerfile: Dockerfile
+      context: ./docker/testing-host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+    networks:
+      - coolify
+
 volumes:
   db-coolify:
     driver: local
+
+networks:
+  coolify:
+    driver: bridge

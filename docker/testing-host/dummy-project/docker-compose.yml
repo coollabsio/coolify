@@ -1,0 +1,10 @@
+version: "3"
+
+services:
+    dummy-project:
+        image: dummy-project
+        build:
+            context: .
+            dockerfile: Dockerfile
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
