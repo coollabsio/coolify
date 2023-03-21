@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Jobs\ExecuteCoolifyProcess;
-use Illuminate\Process\ProcessResult;
 use Spatie\Activitylog\Contracts\Activity;
 
 class CoolifyProcess
@@ -36,8 +35,11 @@ class CoolifyProcess
 
         dispatch($job);
 
+        $this->activity->refresh();
+
+        ray($this->activity->id);
+
         return $this->activity;
     }
-
 
 }

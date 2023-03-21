@@ -23,21 +23,21 @@ class RunCommand extends Component
     {
         $this->isKeepAliveOn = true;
 
-        $this->activity = coolifyProcess($this->command, 'testing-host');
+        $this->activity = remoteProcess($this->command, 'testing-host');
     }
 
     public function runSleepingBeauty()
     {
         $this->isKeepAliveOn = true;
 
-        $this->activity = coolifyProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', 'testing-host');
+        $this->activity = remoteProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', 'testing-host');
     }
 
     public function runDummyProjectBuild()
     {
         $this->isKeepAliveOn = true;
 
-        $this->activity = coolifyProcess(<<<EOT
+        $this->activity = remoteProcess(<<<EOT
         cd projects/dummy-project
         ~/.docker/cli-plugins/docker-compose build --no-cache
         EOT, 'testing-host');
