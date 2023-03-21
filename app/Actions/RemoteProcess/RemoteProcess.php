@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Services\RemoteProcess;
+namespace App\Actions\RemoteProcess;
 
-use App\Services\ProcessStatus;
+use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;

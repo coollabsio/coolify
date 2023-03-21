@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\ProcessStatus;
 use App\Jobs\ExecuteCoolifyProcess;
 use Spatie\Activitylog\Contracts\Activity;
 
