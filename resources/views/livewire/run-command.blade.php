@@ -56,8 +56,7 @@
             flex-direction: column-reverse;
         "
             placeholder="Build output"
-        >
-        {{ data_get($activity, 'description') }}
+        >{{ data_get($activity, 'description') }}
     </pre>
 
         <div>

@@ -27,16 +27,12 @@ class CoolifyProcess
                 'command' => $this->command,
                 'status' => ProcessStatus::HOLDING,
             ])
-            ->log("Awaiting to start command...\n\n");
+            ->log("Awaiting command to start...\n\n");
     }
 
-    public function __invoke(): Activity|ProcessResult
+    public function __invoke(): Activity
     {
         $job = new ExecuteCoolifyProcess($this->activity);
-
-        if (app()->environment('testing')) {
-            return $job->handle();
-        }
 
         dispatch($job);
 
