@@ -2,6 +2,7 @@
 
 namespace App\Actions\RemoteProcess;
 
+use App\Data\RemoteProcessArgs;
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Jobs\ExecuteCoolifyProcess;
@@ -19,15 +20,15 @@ class DispatchRemoteProcess
         protected ?int      $port = 22,
         protected ?string   $user = 'root',
     ){
+        $arguments = new RemoteProcessArgs(
+            destination: $this->destination,
+            command: $this->command,
+            port: $this->port,
+            user: $this->user,
+        );
+        
         $this->activity = activity()
-            ->withProperties([
-                'type' => ActivityTypes::COOLIFY_PROCESS,
-                'status' => ProcessStatus::HOLDING,
-                'user' => $this->user,
-                'destination' => $this->destination,
-                'port' => $this->port,
-                'command' => $this->command,
-            ])
+            ->withProperties($arguments->toArray())
             ->log("Awaiting command to start...\n\n");
     }
 
