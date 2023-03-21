@@ -2,14 +2,17 @@
 
 namespace App\Actions\RemoteProcess;
 
+use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Contracts\Activity;
 
-class RemoteProcess
+class RunRemoteProcess
 {
+    public Activity $activity;
+
     protected $timeStart;
 
     protected $currentTime;
@@ -25,9 +28,14 @@ class RemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(
-        public Activity $activity,
-    ){}
+    public function __construct(Activity $activity)
+    {
+        if ($activity->getExtraProperty('type') !== ActivityTypes::COOLIFY_PROCESS->value) {
+            throw new \RuntimeException('Incompatible Activity to run a remote command.');
+        }
+
+        $this->activity = $activity;
+    }
 
     public function __invoke(): ProcessResult
     {

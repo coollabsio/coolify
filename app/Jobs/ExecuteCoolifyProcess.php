@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Actions\RemoteProcess\RemoteProcess;
+use App\Actions\RemoteProcess\RunRemoteProcess;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -26,7 +26,7 @@ class ExecuteCoolifyProcess implements ShouldQueue
      */
     public function handle(): void
     {
-        $remoteProcess = resolve(RemoteProcess::class, [
+        $remoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
         ]);
 

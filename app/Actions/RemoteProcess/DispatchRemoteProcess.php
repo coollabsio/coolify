@@ -1,12 +1,13 @@
 <?php
 
-namespace App\Services;
+namespace App\Actions\RemoteProcess;
 
+use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Jobs\ExecuteCoolifyProcess;
 use Spatie\Activitylog\Contracts\Activity;
 
-class CoolifyProcess
+class DispatchRemoteProcess
 {
     protected Activity $activity;
 
@@ -20,12 +21,12 @@ class CoolifyProcess
     ){
         $this->activity = activity()
             ->withProperties([
-                'type' => 'COOLIFY_PROCESS',
+                'type' => ActivityTypes::COOLIFY_PROCESS,
+                'status' => ProcessStatus::HOLDING,
                 'user' => $this->user,
                 'destination' => $this->destination,
                 'port' => $this->port,
                 'command' => $this->command,
-                'status' => ProcessStatus::HOLDING,
             ])
             ->log("Awaiting command to start...\n\n");
     }
@@ -37,8 +38,6 @@ class CoolifyProcess
         dispatch($job);
 
         $this->activity->refresh();
-
-        ray($this->activity->id);
 
         return $this->activity;
     }

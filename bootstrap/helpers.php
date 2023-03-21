@@ -1,6 +1,6 @@
 <?php
 
-use App\Services\CoolifyProcess;
+use App\Actions\RemoteProcess\DispatchRemoteProcess;
 use Spatie\Activitylog\Contracts\Activity;
 
 if (! function_exists('remoteProcess')) {
@@ -11,7 +11,7 @@ if (! function_exists('remoteProcess')) {
      */
     function remoteProcess($command, $destination): Activity
     {
-        return resolve(CoolifyProcess::class, [
+        return resolve(DispatchRemoteProcess::class, [
             'destination' => $destination,
             'command' => $command,
         ])();
