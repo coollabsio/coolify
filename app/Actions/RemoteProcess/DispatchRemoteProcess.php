@@ -3,32 +3,16 @@
 namespace App\Actions\RemoteProcess;
 
 use App\Data\RemoteProcessArgs;
-use App\Enums\ActivityTypes;
-use App\Enums\ProcessStatus;
 use App\Jobs\ExecuteCoolifyProcess;
-use Spatie\Activitylog\Contracts\Activity;
+use Spatie\Activitylog\Models\Activity;
 
 class DispatchRemoteProcess
 {
     protected Activity $activity;
 
-    // TODO Left 'root' as default user instead of 'coolify' because
-    //      there's a task at TODO.md to run docker without sudo
-    public function __construct(
-        protected string    $destination,
-        protected string    $command,
-        protected ?int      $port = 22,
-        protected ?string   $user = 'root',
-    ){
-        $arguments = new RemoteProcessArgs(
-            destination: $this->destination,
-            command: $this->command,
-            port: $this->port,
-            user: $this->user,
-        );
-        
+    public function __construct(RemoteProcessArgs $remoteProcessArgs){
         $this->activity = activity()
-            ->withProperties($arguments->toArray())
+            ->withProperties($remoteProcessArgs->toArray())
             ->log("Awaiting command to start...\n\n");
     }
 
@@ -42,5 +26,4 @@ class DispatchRemoteProcess
 
         return $this->activity;
     }
-
 }

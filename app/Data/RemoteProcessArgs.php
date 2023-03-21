@@ -9,11 +9,11 @@ use Spatie\LaravelData\Data;
 class RemoteProcessArgs extends Data
 {
     public function __construct(
-        protected string    $destination,
-        protected string    $command,
-        protected int       $port = 22,
-        protected string    $user = 'root',
-        protected string    $type = ActivityTypes::COOLIFY_PROCESS->value,
-        protected string    $status = ProcessStatus::HOLDING->value,
+        public string    $destination,
+        public string    $command,
+        public int       $port,
+        public string    $user,
+        public string    $type = ActivityTypes::COOLIFY_PROCESS->value,
+        public string    $status = ProcessStatus::HOLDING->value,
     ){}
 }

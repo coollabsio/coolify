@@ -7,7 +7,7 @@ use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
-use Spatie\Activitylog\Contracts\Activity;
+use Spatie\Activitylog\Models\Activity;
 
 class RunRemoteProcess
 {
@@ -73,10 +73,6 @@ class RunRemoteProcess
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
-            // Quiet mode. Causes most warning and diagnostic messages to be suppressed.
-            // Errors are still out put. This is to silence for example, that warning
-            // Permanently added <host and key type> to the list of known hosts.
-            . '-q '
             . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
