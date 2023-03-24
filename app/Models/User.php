@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Xaevik\Cuid2\Cuid2;
 
 class User extends Authenticatable
 {
@@ -41,4 +42,28 @@ class User extends Authenticatable
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::creating(function (Model $model) {
+            $model->uuid = (string) new Cuid2();
+        });
+    }
+    public function teams()
+    {
+        return $this->belongsToMany(Team::class);
+    }
+    public function currentTeam()
+    {
+        return $this->belongsTo(Team::class);
+    }
+    public function otherTeams()
+    {
+        $team_id = session('currentTeam')->id;
+        return auth()->user()->teams->filter(function ($team) use ($team_id) {
+            return $team->id != $team_id;
+        });
+    }
 }
