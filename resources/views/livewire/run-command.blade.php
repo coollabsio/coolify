@@ -1,11 +1,14 @@
 <div>
     <div>
         <label for="command">
-            <input autofocus id="command" wire:model="command" type="text" wire:keydown.enter="runCommand" />
-            <input id="command" wire:model="server" type="text" />
+            <input autofocus id="command" wire:model.defer="command" type="text" wire:keydown.enter="runCommand" />
+            <select wire:model.defer="server">
+                @foreach ($servers as $server)
+                    <option value="{{ $server }}">{{ $server }}</option>
+                @endforeach
+            </select>
         </label>
         <button wire:click="runCommand">Run command</button>
-
         <button wire:click="runSleepingBeauty">Run sleeping beauty</button>
         <button wire:click="runDummyProjectBuild">Build DummyProject</button>
     </div>

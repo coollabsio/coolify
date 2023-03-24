@@ -4,8 +4,8 @@ namespace App\Models;
 
 class Server extends BaseModel
 {
-    public function private_key()
+    public function privateKeys()
     {
-        return $this->morphMany(PrivateKey::class, 'private_key_morph');
+        return $this->morphToMany(PrivateKey::class, 'private_keyable');
     }
 }

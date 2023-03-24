@@ -22,5 +22,12 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host",
             'team_id' => $root_team->id,
         ]);
+        Server::create([
+            'id' => 2,
+            'name' => "testing-host2",
+            'description' => "This is a test docker container",
+            'ip' => "coolify-testing-host-2",
+            'team_id' => $root_team->id,
+        ]);
     }
 }

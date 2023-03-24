@@ -10,6 +10,7 @@ class RemoteProcessArgs extends Data
 {
     public function __construct(
         public string    $destination,
+        public string    $private_key_location,
         public string    $command,
         public int       $port,
         public string    $user,

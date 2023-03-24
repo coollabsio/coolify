@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('private_keys', function (Blueprint $table) {
+        Schema::create('private_keyables', function (Blueprint $table) {
             $table->id();
-            $table->string('uuid')->unique();
-            $table->string('name');
-            $table->string('description')->nullable();
-            $table->longText('private_key');
-            $table->nullableMorphs('private_keys_morph');
+            $table->unsignedBigInteger('private_key_id');
+            $table->unsignedBigInteger('private_keyable_id');
+            $table->string('private_keyable_type');
             $table->timestamps();
         });
     }
@@ -27,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('private_keys');
+        Schema::dropIfExists('private_keyables');
     }
 };

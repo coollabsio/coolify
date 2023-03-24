@@ -64,12 +64,14 @@ class RunRemoteProcess
     {
         $user = $this->activity->getExtraProperty('user');
         $destination = $this->activity->getExtraProperty('destination');
+        $private_key_location = $this->activity->getExtraProperty('private_key_location');
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
 
         $delimiter = 'EOF-COOLIFY-SSH';
 
-        return 'ssh '
+        $ssh_command = "ssh "
+            . "-i {$private_key_location} "
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
@@ -78,6 +80,7 @@ class RunRemoteProcess
             . " 'bash -se' << \\$delimiter" . PHP_EOL
             . $command . PHP_EOL
             . $delimiter;
+        return $ssh_command;
     }
 
     protected function handleOutput(string $type, string $output)

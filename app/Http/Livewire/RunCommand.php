@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Models\Server;
 use Livewire\Component;
 
 class RunCommand extends Component
@@ -16,6 +17,12 @@ class RunCommand extends Component
 
     public $server = 'testing-host';
 
+    public $servers = [];
+
+    public function mount()
+    {
+        $this->servers = Server::all()->pluck('name')->toArray();
+    }
     public function render()
     {
         return view('livewire.run-command');

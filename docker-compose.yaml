@@ -53,6 +53,17 @@ services:
       - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
     networks:
       - coolify
+  testing-host2:
+    container_name: coolify-testing-host-2
+    image: coolify-testing-host
+    build:
+      dockerfile: Dockerfile
+      context: ./docker/testing-host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+    networks:
+      - coolify
 
 volumes:
   db-coolify:
