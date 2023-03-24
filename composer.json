@@ -7,13 +7,15 @@
     "require": {
         "php": "^8.2",
         "guzzlehttp/guzzle": "^7.2",
+        "laravel/fortify": "^1.16",
         "laravel/framework": "^10.0",
         "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
         "livewire/livewire": "^2.12",
         "spatie/laravel-activitylog": "^4.7",
         "spatie/laravel-data": "^3.2",
-        "spatie/laravel-ray": "^1.32"
+        "spatie/laravel-ray": "^1.32",
+        "xaevik/cuid2": "^1.7"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",

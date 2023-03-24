@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" data-theme="light" class="h-full">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
     <meta charset="utf-8">
@@ -10,11 +10,9 @@
     @livewireStyles
 </head>
 
-<body class="h-full">
-    @auth
-        <x-navbar />
-    @endauth
-    <main class="h-full pt-10 p-4">
+<body>
+    <x-navbar />
+    <main>
         {{ $slot }}
     </main>
 
