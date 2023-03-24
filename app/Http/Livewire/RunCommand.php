@@ -14,6 +14,8 @@ class RunCommand extends Component
 
     public $command = 'ls';
 
+    public $server = 'testing-host';
+
     public function render()
     {
         return view('livewire.run-command');
@@ -23,14 +25,14 @@ class RunCommand extends Component
     {
         $this->isKeepAliveOn = true;
 
-        $this->activity = remoteProcess($this->command, 'testing-host');
+        $this->activity = remoteProcess($this->command, $this->server);
     }
 
     public function runSleepingBeauty()
     {
         $this->isKeepAliveOn = true;
 
-        $this->activity = remoteProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', 'testing-host');
+        $this->activity = remoteProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', $this->server);
     }
 
     public function runDummyProjectBuild()
@@ -40,7 +42,7 @@ class RunCommand extends Component
         $this->activity = remoteProcess(<<<EOT
         cd projects/dummy-project
         ~/.docker/cli-plugins/docker-compose build --no-cache
-        EOT, 'testing-host');
+        EOT, $this->server);
     }
 
     public function polling()

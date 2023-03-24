@@ -1,8 +1,8 @@
 <div>
     <div>
         <label for="command">
-            <input autofocus class="py-2 rounded ring-1" id="command" wire:model="command" type="text"
-                wire:keydown.enter="runCommand" />
+            <input autofocus id="command" wire:model="command" type="text" wire:keydown.enter="runCommand" />
+            <input id="command" wire:model="server" type="text" />
         </label>
         <button wire:click="runCommand">Run command</button>
 
