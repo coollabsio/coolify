@@ -1,24 +1,29 @@
 <?php
 
-use App\Services\CoolifyProcess;
-use Illuminate\Process\ProcessResult;
+use App\Actions\RemoteProcess\DispatchRemoteProcess;
+use App\Data\RemoteProcessArgs;
 use Spatie\Activitylog\Contracts\Activity;
 
-if (! function_exists('coolifyProcess')) {
-
+if (! function_exists('remoteProcess')) {
     /**
-     * Run a Coolify Process, which SSH's into a machine to run the command(s).
+     * Run a Coolify Process, which SSH's asynchronously into a machine to run the command(s).
+     * @TODO Change 'root' to 'coolify' when it's able to run Docker commands without sudo
      *
      */
-    function coolifyProcess($command, $destination): Activity|ProcessResult
+    function remoteProcess(
+        string    $command,
+        string    $destination,
+        ?int      $port = 22,
+        ?string   $user = 'root',
+    ): Activity
     {
-        $process = resolve(CoolifyProcess::class, [
-            'destination' => $destination,
-            'command' => $command,
-        ]);
-
-        $activityLog = $process();
-
-        return $activityLog;
+        return resolve(DispatchRemoteProcess::class, [
+            'remoteProcessArgs' => new RemoteProcessArgs(
+                destination: $destination,
+                command: $command,
+                port: $port,
+                user: $user,
+            ),
+        ])();
     }
 }

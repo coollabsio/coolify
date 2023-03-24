@@ -1,31 +1,25 @@
 <?php
 
-namespace App\Jobs;
+namespace App\Actions\RemoteProcess;
 
-use App\Services\ProcessStatus;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Process\InvokedProcess;
+use App\Enums\ActivityTypes;
+use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
-use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
-use Spatie\Activitylog\Contracts\Activity;
+use Spatie\Activitylog\Models\Activity;
 
-class ExecuteCoolifyProcess implements ShouldQueue
+class RunRemoteProcess
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
-    protected $throttleIntervalMS = 500;
+    public Activity $activity;
 
     protected $timeStart;
 
     protected $currentTime;
 
     protected $lastWriteAt = 0;
+
+    protected $throttleIntervalMS = 500;
 
     protected string $stdOutIncremental = '';
 
@@ -34,41 +28,20 @@ class ExecuteCoolifyProcess implements ShouldQueue
     /**
      * Create a new job instance.
      */
-    public function __construct(
-        public Activity $activity,
-    ){}
+    public function __construct(Activity $activity)
+    {
+        if ($activity->getExtraProperty('type') !== ActivityTypes::COOLIFY_PROCESS->value) {
+            throw new \RuntimeException('Incompatible Activity to run a remote command.');
+        }
 
-    /**
-     * Execute the job.
-     */
-    public function handle(): ProcessResult
+        $this->activity = $activity;
+    }
+
+    public function __invoke(): ProcessResult
     {
         $this->timeStart = hrtime(true);
 
-        $user = $this->activity->getExtraProperty('user');
-        $destination = $this->activity->getExtraProperty('destination');
-        $port = $this->activity->getExtraProperty('port');
-        $command = $this->activity->getExtraProperty('command');
-
-        $delimiter = 'EOF-COOLIFY-SSH';
-
-        $sshCommand = 'ssh '
-            . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-            . '-o PasswordAuthentication=no '
-            . '-o RequestTTY=no '
-            // Quiet mode. Causes most warning and diagnostic messages to be suppressed.
-            // Errors are still out put. This is to silence for example, that warning
-            // Permanently added <host and key type> to the list of known hosts.
-            . '-q '
-            . "-p {$port} "
-            . "{$user}@{$destination} "
-            . " 'bash -se' << \\$delimiter" . PHP_EOL
-            . $command . PHP_EOL
-            . $delimiter;
-
-        $process = Process::start($sshCommand, $this->handleOutput(...));
-
-        $processResult = $process->wait();
+        $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
 
         $status = match ($processResult->exitCode()) {
             0 => ProcessStatus::FINISHED,
@@ -85,6 +58,26 @@ class ExecuteCoolifyProcess implements ShouldQueue
         $this->activity->save();
 
         return $processResult;
+    }
+
+    protected function getCommand(): string
+    {
+        $user = $this->activity->getExtraProperty('user');
+        $destination = $this->activity->getExtraProperty('destination');
+        $port = $this->activity->getExtraProperty('port');
+        $command = $this->activity->getExtraProperty('command');
+
+        $delimiter = 'EOF-COOLIFY-SSH';
+
+        return 'ssh '
+            . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+            . '-o PasswordAuthentication=no '
+            . '-o RequestTTY=no '
+            . "-p {$port} "
+            . "{$user}@{$destination} "
+            . " 'bash -se' << \\$delimiter" . PHP_EOL
+            . $command . PHP_EOL
+            . $delimiter;
     }
 
     protected function handleOutput(string $type, string $output)
@@ -109,7 +102,7 @@ class ExecuteCoolifyProcess implements ShouldQueue
     }
 
     /**
-     * Decides if it's time to write again to database.
+     * Determines if it's time to write again to database.
      *
      * @return bool
      */

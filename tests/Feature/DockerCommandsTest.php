@@ -13,20 +13,20 @@ it('starts a docker container correctly', function () {
     $host = 'testing-host';
 
     // Assert there's no containers start with coolify_test_*
-    $processResult = coolifyProcess($areThereCoolifyTestContainers, $host);
-    $containers = Output::containerList($processResult->output());
+    $activity = remoteProcess($areThereCoolifyTestContainers, $host);
+    $containers = Output::containerList($activity->getExtraProperty('stdout'));
     expect($containers)->toBeEmpty();
 
     // start a container nginx -d --name = $containerName
-    $processResult = coolifyProcess("docker run -d --name {$containerName} nginx", $host);
-    expect($processResult->successful())->toBeTrue();
+    $activity = remoteProcess("docker run -d --rm --name {$containerName} nginx", $host);
+    expect($activity->getExtraProperty('exitCode'))->toBe(0);
 
     // docker ps name = $container
-    $processResult = coolifyProcess($areThereCoolifyTestContainers, $host);
-    $containers = Output::containerList($processResult->output());
+    $activity = remoteProcess($areThereCoolifyTestContainers, $host);
+    $containers = Output::containerList($activity->getExtraProperty('stdout'));
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
     // Stop testing containers
-    $processResult = coolifyProcess("docker stop $(docker ps --filter='name={$coolifyNamePrefix}*' -q)", $host);
-    expect($processResult->successful())->toBeTrue();
+    $activity = remoteProcess("docker stop $(docker ps --filter='name={$coolifyNamePrefix}*' -q)", $host);
+    expect($activity->getExtraProperty('exitCode'))->toBe(0);
 });
