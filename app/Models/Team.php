@@ -13,4 +13,7 @@ class Team extends BaseModel
     public function projects() {
         return $this->hasMany(Project::class);
     }
+    public function servers() {
+        return $this->hasMany(Server::class);
+    }
 }

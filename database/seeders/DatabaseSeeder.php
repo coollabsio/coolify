@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\StandaloneDocker;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -12,11 +13,13 @@ class DatabaseSeeder extends Seeder
             $this->call([
                 UserSeeder::class,
                 TeamSeeder::class,
-                ServerSeeder::class,
                 PrivateKeySeeder::class,
+                ServerSeeder::class,
                 ProjectSeeder::class,
                 ProjectSettingSeeder::class,
                 EnvironmentSeeder::class,
+                StandaloneDockerSeeder::class,
+                SwarmDockerSeeder::class,
                 ApplicationSeeder::class,
                 DBSeeder::class,
             ]);

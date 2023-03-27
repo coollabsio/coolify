@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('name');
             $table->string('description')->nullable();
             $table->longText('private_key');
-            $table->nullableMorphs('private_keys_morph');
             $table->timestamps();
         });
     }

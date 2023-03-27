@@ -11,14 +11,23 @@
                 <h2>Environments</h2>
                 @forelse ($project->environments as $environment)
                     <p>Environment Name: {{ $environment->name }}</p>
-                    <p>Applications: {{ $environment->applications }}</p>
-                    <p>Databases: {{ $environment->databases }}</p>
-                @empty
-                    <p>No environments found</p>
-                @endforelse
-            </li>
+                    @forelse ($environment->applications as $application)
+                        <p>Application: {{ $application }}</p>
+                        <livewire:temporary-check-status :application_id="$application->id" />
+                    @empty
+            <li>No application found</li>
+        @endforelse
+        @forelse ($environment->databases as $database)
+            <p>Database: {{ $database }}</p>
         @empty
-            <li>No projects found</li>
+            <li>No database found</li>
+        @endforelse
+    @empty
+        <p>No environments found</p>
+        @endforelse
+        </li>
+    @empty
+        <li>No projects found</li>
         @endforelse
     </ul>
 </x-layout>

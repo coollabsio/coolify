@@ -8,4 +8,8 @@ class Application extends BaseModel
     {
         return $this->morphToMany(Environment::class, 'environmentable');
     }
+    public function destination()
+    {
+        return $this->morphTo();
+    }
 }

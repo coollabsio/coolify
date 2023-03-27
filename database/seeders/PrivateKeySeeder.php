@@ -14,9 +14,7 @@ class PrivateKeySeeder extends Seeder
      */
     public function run(): void
     {
-        $server = Server::find(1);
-        $server2 = Server::find(2);
-        $private_key = PrivateKey::create([
+        PrivateKey::create([
             "name" => "Testing-host",
             "description" => "This is a test docker container",
             "private_key" => "-----BEGIN OPENSSH PRIVATE KEY-----
@@ -26,9 +24,7 @@ hwAAAAtzc2gtZWQyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevA
 AAAECBQw4jg1WRT2IGHMncCiZhURCts2s24HoDS0thHnnRKVuGmoeGq/pojrsyP1pszcNV
 uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 -----END OPENSSH PRIVATE KEY-----
-",
+"
         ]);
-        $server->privateKeys()->attach($private_key);
-        $server2->privateKeys()->attach($private_key);
     }
 }

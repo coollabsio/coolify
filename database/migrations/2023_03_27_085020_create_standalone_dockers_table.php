@@ -11,16 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('servers', function (Blueprint $table) {
+        Schema::create('standalone_dockers', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
-            $table->string('name');
-            $table->string('description')->nullable();
-            $table->string('ip');
-            $table->integer('port')->default(22);
-            $table->string('user')->default('root');
-            $table->foreignId('team_id');
-            $table->foreignId('private_key_id');
+            $table->string('network');
+
+            $table->foreignId('server_id');
             $table->timestamps();
         });
     }
@@ -30,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('servers');
+        Schema::dropIfExists('standalone_dockers');
     }
 };
