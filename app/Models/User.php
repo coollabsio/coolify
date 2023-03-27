@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
-use Xaevik\Cuid2\Cuid2;
+use Visus\Cuid2\Cuid2;
 
 class User extends Authenticatable
 {

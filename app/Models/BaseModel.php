@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Xaevik\Cuid2\Cuid2;
+use Visus\Cuid2\Cuid2;
 
 abstract class BaseModel extends Model
 {

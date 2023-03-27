@@ -15,7 +15,7 @@
         "spatie/laravel-activitylog": "^4.7",
         "spatie/laravel-data": "^3.2",
         "spatie/laravel-ray": "^1.32",
-        "xaevik/cuid2": "^1.7"
+        "visus/cuid2": "^2.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",
