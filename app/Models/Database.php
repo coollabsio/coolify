@@ -4,8 +4,12 @@ namespace App\Models;
 
 class Database extends BaseModel
 {
-    public function environments()
+    public function environment()
     {
-        return $this->morphToMany(Environment::class, 'environmentable');
+        return $this->morphTo();
+    }
+    public function destination()
+    {
+        return $this->morphTo();
     }
 }

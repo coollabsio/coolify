@@ -15,9 +15,6 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->string('name')->unique();
-
-            $table->nullableMorphs('environments_morph');
-
             $table->foreignId('project_id');
             $table->timestamps();
         });

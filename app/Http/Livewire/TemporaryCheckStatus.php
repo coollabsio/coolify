@@ -10,7 +10,7 @@ class TemporaryCheckStatus extends Component
     public $application_id;
 
     public function checkStatus() {
-           dd(Application::find(1)->environments);
+           dd(Application::find(1)->environment);
     }
     public function render()
     {

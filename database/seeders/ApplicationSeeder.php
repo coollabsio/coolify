@@ -3,13 +3,10 @@
 namespace Database\Seeders;
 
 use App\Models\Application;
-use App\Models\Destination;
 use App\Models\Environment;
-use App\Models\Project;
 use App\Models\StandaloneDocker;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\SwarmDocker;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
 
 class ApplicationSeeder extends Seeder
 {
@@ -20,13 +17,21 @@ class ApplicationSeeder extends Seeder
     {
         $environment_1 = Environment::find(1);
         $standalone_docker_1 = StandaloneDocker::find(1);
+        $swarm_docker_1 = SwarmDocker::find(1);
 
-        $application_1 = Application::create([
+        Application::create([
             'id' => 1,
             'name' => 'My first application',
+            'environment_id' => $environment_1->id,
             'destination_id' => $standalone_docker_1->id,
             'destination_type' => StandaloneDocker::class,
         ]);
-        $environment_1->applications()->attach($application_1);
+        Application::create([
+            'id' => 2,
+            'name' => 'My Second application',
+            'environment_id' => $environment_1->id,
+            'destination_id' => $swarm_docker_1->id,
+            'destination_type' => SwarmDocker::class,
+        ]);
     }
 }
