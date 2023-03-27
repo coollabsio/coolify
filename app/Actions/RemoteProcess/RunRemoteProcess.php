@@ -75,6 +75,7 @@ class RunRemoteProcess
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
+            . "-o LogLevel=ERROR "
             . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL

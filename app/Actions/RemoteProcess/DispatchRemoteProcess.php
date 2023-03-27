@@ -13,7 +13,7 @@ class DispatchRemoteProcess
     public function __construct(RemoteProcessArgs $remoteProcessArgs){
         $this->activity = activity()
             ->withProperties($remoteProcessArgs->toArray())
-            ->log("Awaiting command to start...\n\n");
+            ->log("");
     }
 
     public function __invoke(): Activity
