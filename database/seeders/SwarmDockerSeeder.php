@@ -19,7 +19,6 @@ class SwarmDockerSeeder extends Seeder
         $server_1 = Server::find(1);
         SwarmDocker::create([
             'id' => 1,
-            'network' => 'coolify-swarms',
             'server_id' => $server_1->id,
         ]);
     }

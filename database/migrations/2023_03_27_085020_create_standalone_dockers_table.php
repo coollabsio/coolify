@@ -14,7 +14,6 @@ return new class extends Migration
         Schema::create('standalone_dockers', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
-            $table->string('network');
 
             $table->foreignId('server_id');
             $table->timestamps();
