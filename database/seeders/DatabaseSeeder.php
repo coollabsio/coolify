@@ -14,6 +14,11 @@ class DatabaseSeeder extends Seeder
                 TeamSeeder::class,
                 ServerSeeder::class,
                 PrivateKeySeeder::class,
+                ProjectSeeder::class,
+                ProjectSettingSeeder::class,
+                EnvironmentSeeder::class,
+                ApplicationSeeder::class,
+                DBSeeder::class,
             ]);
         }
     }
