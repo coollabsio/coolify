@@ -78,7 +78,7 @@ class RunRemoteProcess
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
             . '-o LogLevel=ERROR '
-            . '-o ControlMaster=auto -o ControlPersist=yes -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
+            . '-o ControlMaster=auto -o ControlPersist=yes -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
             . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
