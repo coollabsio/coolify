@@ -21,8 +21,7 @@ class DeployApplication extends Component
     }
     private function start_builder_container()
     {
-        // @TODO: Add --pull=always if the container is published to ghcr.io
-        $this->command[] = "docker run -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock coolify-builder >/dev/null";
+        $this->command[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null";
     }
     public function deploy()
     {
