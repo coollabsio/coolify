@@ -22,7 +22,6 @@ if (!function_exists('remoteProcess')) {
         $temp_file = 'id.rsa_' . 'root' . '@' . $found_server->ip;
         Storage::disk('local')->put($temp_file, $found_server->privateKey->private_key, 'private');
         $private_key_location = '/var/www/html/storage/app/' . $temp_file;
-
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
                 destination: $found_server->ip,

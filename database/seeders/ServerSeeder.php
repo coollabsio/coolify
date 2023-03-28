@@ -37,7 +37,7 @@ class ServerSeeder extends Seeder
             'id' => 3,
             'name' => "localhost",
             'description' => "This is the local machine",
-            'user' => 'ab',
+            'user' => 'andrasbacsai',
             'ip' => "172.17.0.1",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
