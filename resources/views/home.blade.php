@@ -15,6 +15,7 @@
                     <h3>{{ $application->name }}</h3>
                     <p>Application: {{ $application }}</p>
                     <p>Destination Class: {{ $application->destination->getMorphClass() }}</p>
+                    <p>Source Class: {{ $application->source->getMorphClass() }}</p>
                 @empty
                     <li>No application found</li>
                 @endforelse

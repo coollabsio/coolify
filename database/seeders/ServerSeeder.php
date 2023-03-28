@@ -18,7 +18,7 @@ class ServerSeeder extends Seeder
     {
         $root_team = Team::find(1);
         $private_key_1 = PrivateKey::find(1);
-        $server_1 = Server::create([
+        Server::create([
             'id' => 1,
             'name' => "testing-host",
             'description' => "This is a test docker container",

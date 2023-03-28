@@ -11,10 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('kubernetes', function (Blueprint $table) {
+        Schema::create('git_deploy_keys', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
+            $table->string('name')->nullable();
+            $table->string('url');
 
+            $table->foreignId('private_key_id');
             $table->timestamps();
         });
     }
@@ -24,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('kubernetes');
+        Schema::dropIfExists('git_deploy_keys');
     }
 };

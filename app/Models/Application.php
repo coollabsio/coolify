@@ -12,4 +12,8 @@ class Application extends BaseModel
     {
         return $this->morphTo();
     }
+    public function source()
+    {
+        return $this->morphTo();
+    }
 }
