@@ -15,13 +15,15 @@ class RunCommand extends Component
 
     public $command = 'ls';
 
-    public $server = 'testing-host';
+    public $server;
 
     public $servers = [];
 
     public function mount()
     {
         $this->servers = Server::all()->pluck('name')->toArray();
+        $this->server = $this->servers[0];
+
     }
     public function render()
     {

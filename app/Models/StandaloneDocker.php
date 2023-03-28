@@ -8,4 +8,8 @@ class StandaloneDocker extends BaseModel
     {
         return $this->morphMany(Application::class, 'destination');
     }
+    public function server()
+    {
+        return $this->belongsTo(Server::class);
+    }
 }

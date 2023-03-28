@@ -19,21 +19,24 @@ if (!function_exists('remoteProcess')) {
         $found_server = checkServer($destination);
         checkTeam($found_server->team_id);
 
-        $temp_file = 'id.rsa_'.'root'.'@'.$found_server->ip;
+        $temp_file = 'id.rsa_' . 'root' . '@' . $found_server->ip;
         Storage::disk('local')->put($temp_file, $found_server->privateKey->private_key, 'private');
-        $private_key_location = '/var/www/html/storage/app/'.$temp_file;
+        $private_key_location = '/var/www/html/storage/app/' . $temp_file;
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
                 destination: $found_server->ip,
                 private_key_location: $private_key_location,
-                command: $command,
+                command: <<<EOT
+                {$command}
+                EOT,
                 port: $found_server->port,
                 user: $found_server->user,
             ),
         ])();
     }
-    function checkServer(string $destination){
+    function checkServer(string $destination)
+    {
         // @TODO: Use UUID instead of name
         $found_server = Server::where('name', $destination)->first();
         if (!$found_server) {
@@ -41,11 +44,11 @@ if (!function_exists('remoteProcess')) {
         };
         return $found_server;
     }
-    function checkTeam(string $team_id){
+    function checkTeam(string $team_id)
+    {
         $found_team = auth()->user()->teams->pluck('id')->contains($team_id);
         if (!$found_team) {
             throw new \RuntimeException('You do not have access to this server.');
         }
-
     }
 }

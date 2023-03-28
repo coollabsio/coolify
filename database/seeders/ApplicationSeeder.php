@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Application;
+use App\Models\ApplicationSetting;
 use App\Models\Environment;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
@@ -24,20 +25,25 @@ class ApplicationSeeder extends Seeder
         Application::create([
             'id' => 1,
             'name' => 'My first application',
+            'git_repository' => 'coollabsio/coolify-examples',
+            'git_branch' => 'nodejs-fastify',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'ports_mappings' => '3000:3000,3010:3001',
             'environment_id' => $environment_1->id,
             'destination_id' => $standalone_docker_1->id,
             'destination_type' => StandaloneDocker::class,
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class,
         ]);
-        Application::create([
-            'id' => 2,
-            'name' => 'My second application (Swarm)',
-            'environment_id' => $environment_1->id,
-            'destination_id' => $swarm_docker_1->id,
-            'destination_type' => SwarmDocker::class,
-            'source_id' => $github_public_source->id,
-            'source_type' => GithubApp::class,
-        ]);
+        // Application::create([
+        //     'id' => 2,
+        //     'name' => 'My second application (Swarm)',
+        //     'environment_id' => $environment_1->id,
+        //     'destination_id' => $swarm_docker_1->id,
+        //     'destination_type' => SwarmDocker::class,
+        //     'source_id' => $github_public_source->id,
+        //     'source_type' => GithubApp::class,
+        // ]);
     }
 }

@@ -9,6 +9,7 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         $this->call([
+            CoolifyInstanceSettingsSeeder::class,
             UserSeeder::class,
             TeamSeeder::class,
             PrivateKeySeeder::class,
@@ -22,6 +23,7 @@ class DatabaseSeeder extends Seeder
             GithubAppSeeder::class,
             GitlabAppSeeder::class,
             ApplicationSeeder::class,
+            ApplicationSettingsSeeder::class,
             DBSeeder::class,
             ServiceSeeder::class,
         ]);
