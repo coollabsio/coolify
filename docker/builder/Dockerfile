@@ -12,6 +12,7 @@ ARG PACK_VERSION=0.27.0
 ARG NIXPACKS_VERSION=1.6.0
 
 USER root
+WORKDIR /artifacts
 RUN apk add --no-cache bash curl git git-lfs openssh-client tar tini
 RUN mkdir -p ~/.docker/cli-plugins
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-$DOCKER_VERSION -o /usr/bin/docker
