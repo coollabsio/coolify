@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
                 EnvironmentSeeder::class,
                 StandaloneDockerSeeder::class,
                 SwarmDockerSeeder::class,
+                KubernetesSeeder::class,
                 ApplicationSeeder::class,
                 DBSeeder::class,
             ]);
