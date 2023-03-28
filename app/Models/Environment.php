@@ -12,5 +12,9 @@ class Environment extends BaseModel
     {
         return $this->hasMany(Database::class);
     }
+    public function services()
+    {
+        return $this->hasMany(Service::class);
+    }
 }
 

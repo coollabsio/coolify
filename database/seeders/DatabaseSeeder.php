@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
                 KubernetesSeeder::class,
                 ApplicationSeeder::class,
                 DBSeeder::class,
+                ServiceSeeder::class,
             ]);
         }
     }

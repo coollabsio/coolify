@@ -2,18 +2,21 @@
 
 namespace Database\Seeders;
 
-use App\Models\Database;
 use App\Models\Environment;
+use App\Models\Service;
 use App\Models\StandaloneDocker;
 use Illuminate\Database\Seeder;
 
-class DBSeeder extends Seeder
+class ServiceSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
         $environment_1 = Environment::find(1);
         $standalone_docker_1 = StandaloneDocker::find(1);
-        Database::create([
+        Service::create([
             'id' => 1,
             'name'=> "My first database",
             'environment_id' => $environment_1->id,

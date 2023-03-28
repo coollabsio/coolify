@@ -28,7 +28,7 @@ class ApplicationSeeder extends Seeder
         ]);
         Application::create([
             'id' => 2,
-            'name' => 'My Second application',
+            'name' => 'My second application (Swarm)',
             'environment_id' => $environment_1->id,
             'destination_id' => $swarm_docker_1->id,
             'destination_type' => SwarmDocker::class,
