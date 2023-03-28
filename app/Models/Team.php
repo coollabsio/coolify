@@ -10,4 +10,10 @@ class Team extends BaseModel
     protected $fillable = [
         'name',
     ];
+    public function projects() {
+        return $this->hasMany(Project::class);
+    }
+    public function servers() {
+        return $this->hasMany(Server::class);
+    }
 }

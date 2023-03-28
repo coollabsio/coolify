@@ -11,11 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('private_keyables', function (Blueprint $table) {
+        Schema::create('standalone_dockers', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('private_key_id');
-            $table->unsignedBigInteger('private_keyable_id');
-            $table->string('private_keyable_type');
+            $table->string('uuid')->unique();
+
+            $table->foreignId('server_id');
             $table->timestamps();
         });
     }
@@ -25,6 +25,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('private_keyables');
+        Schema::dropIfExists('standalone_dockers');
     }
 };

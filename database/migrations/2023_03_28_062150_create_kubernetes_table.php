@@ -11,12 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('private_keys', function (Blueprint $table) {
+        Schema::create('kubernetes', function (Blueprint $table) {
             $table->id();
-            $table->string('uuid')->unique();
-            $table->string('name');
-            $table->string('description')->nullable();
-            $table->longText('private_key');
             $table->timestamps();
         });
     }
@@ -26,6 +22,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('private_keys');
+        Schema::dropIfExists('kubernetes');
     }
 };

@@ -7,6 +7,7 @@ use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 
 class RunRemoteProcess
@@ -69,13 +70,15 @@ class RunRemoteProcess
         $command = $this->activity->getExtraProperty('command');
 
         $delimiter = 'EOF-COOLIFY-SSH';
+        Storage::disk('local')->makeDirectory('.ssh');
 
         $ssh_command = "ssh "
             . "-i {$private_key_location} "
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
-            . "-o LogLevel=ERROR "
+            . '-o LogLevel=ERROR '
+            . '-o ControlMaster=auto -o ControlPersist=yes -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
             . "-p {$port} "
             . "{$user}@{$destination} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
