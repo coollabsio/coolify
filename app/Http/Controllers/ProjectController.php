@@ -23,7 +23,8 @@ class ProjectController extends Controller
         if (!$project) {
             return redirect()->route('home');
         }
-        return view('project.resources', ['project' => $project]);
+        $environment = $project->environments->where('name', request()->route('environment_name'))->first();
+        return view('project.resources', ['project' => $project, 'environment' => $environment]);
     }
     public function application()
     {
