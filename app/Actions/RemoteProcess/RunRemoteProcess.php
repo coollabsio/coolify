@@ -31,7 +31,7 @@ class RunRemoteProcess
      */
     public function __construct(Activity $activity)
     {
-        if ($activity->getExtraProperty('type') !== ActivityTypes::COOLIFY_PROCESS->value) {
+        if ($activity->getExtraProperty('type') !== ActivityTypes::REMOTE_PROCESS->value) {
             throw new \RuntimeException('Incompatible Activity to run a remote command.');
         }
 
@@ -64,7 +64,7 @@ class RunRemoteProcess
     protected function getCommand(): string
     {
         $user = $this->activity->getExtraProperty('user');
-        $destination = $this->activity->getExtraProperty('destination');
+        $server_ip = $this->activity->getExtraProperty('server_ip');
         $private_key_location = $this->activity->getExtraProperty('private_key_location');
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
@@ -80,7 +80,7 @@ class RunRemoteProcess
             . '-o LogLevel=ERROR '
             . '-o ControlMaster=auto -o ControlPersist=yes -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
             . "-p {$port} "
-            . "{$user}@{$destination} "
+            . "{$user}@{$server_ip} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
             . $command . PHP_EOL
             . $delimiter;

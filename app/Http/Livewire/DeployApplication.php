@@ -21,7 +21,7 @@ class DeployApplication extends Component
     }
     private function start_builder_container()
     {
-        $this->command[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null";
+        $this->command[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1";
     }
     public function deploy()
     {
@@ -36,18 +36,17 @@ class DeployApplication extends Component
         $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
 
         // Create Deployment ID
-        $this->deployment_uuid = new Cuid2(10);
+        $this->deployment_uuid = new Cuid2(12);
         $workdir = "/artifacts/{$this->deployment_uuid}";
 
         // Start build process
         $this->command[] = "echo 'Starting deployment of {$application->name} ({$application->uuid})'";
         $this->start_builder_container();
-        $this->execute_in_builder('hostname');
+        // $this->execute_in_builder('hostname');
         $this->execute_in_builder("git clone -b {$application->git_branch} {$source->html_url}/{$application->git_repository}.git {$workdir}");
         $this->execute_in_builder("ls -l {$workdir}");
         $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
-
-        $this->activity = remoteProcess(implode("\n", $this->command), $destination->server->name);
+        $this->activity = remoteProcess($this->command, $destination->server, $this->deployment_uuid, $application);
 
         // Create Deployment
         Deployment::create([

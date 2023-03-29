@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use Spatie\Activitylog\Models\Activity;
+
 class Application extends BaseModel
 {
     public function environment()
@@ -20,8 +22,9 @@ class Application extends BaseModel
     {
         return $this->morphTo();
     }
-    public function deployments()
+
+    public function get_deployment(string $deployment_uuid)
     {
-        return $this->morphMany(Deployment::class, 'type');
+        return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '=', $deployment_uuid)->first();
     }
 }

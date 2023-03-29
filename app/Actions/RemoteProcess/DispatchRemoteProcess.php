@@ -10,10 +10,23 @@ class DispatchRemoteProcess
 {
     protected Activity $activity;
 
-    public function __construct(RemoteProcessArgs $remoteProcessArgs){
-        $this->activity = activity()
-            ->withProperties($remoteProcessArgs->toArray())
-            ->log("");
+    public function __construct(RemoteProcessArgs $remoteProcessArgs)
+    {
+        if ($remoteProcessArgs->model) {
+            $properties = $remoteProcessArgs->toArray();
+            unset($properties['model']);
+
+            $this->activity = activity()
+                ->withProperties($properties)
+                ->performedOn($remoteProcessArgs->model)
+                ->event('deployment')
+                ->log("");
+        } else {
+            $this->activity = activity()
+                ->withProperties($remoteProcessArgs->toArray())
+                ->event('remote_process')
+                ->log("");
+        }
     }
 
     public function __invoke(): Activity

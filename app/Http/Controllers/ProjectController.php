@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ProjectController extends Controller
 {
@@ -103,7 +104,7 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        $deployment = $application->deployments->where('uuid', $deployment_uuid)->first();
-        return view('project.deployment', ['project' => $project, 'deployment' => $deployment]);
+        $activity = $application->get_deployment($deployment_uuid);
+        return view('project.deployment', ['project' => $project, 'activity' => $activity]);
     }
 }
