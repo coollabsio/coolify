@@ -67,10 +67,10 @@ class DeployApplication extends Component
         // Export git commit to a file
         $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD > {$workdir}/.git-commit");
 
-        // Set TAG in docker-compose.yml
+        // Create docker-compose.yml
         $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml");
+        // Set TAG in docker-compose.yml
         $this->execute_in_builder("sed -i \"s/TAG/$(cat {$workdir}/.git-commit)/g\" {$workdir}/docker-compose.yml");
-        $this->execute_in_builder("cat {$workdir}/docker-compose.yml");
 
         if (str_starts_with($application->base_image, 'apache') || str_starts_with($application->base_image, 'nginx')) {
             // @TODO: Add static site builds
