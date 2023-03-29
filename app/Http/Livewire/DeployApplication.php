@@ -36,7 +36,7 @@ class DeployApplication extends Component
         $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
 
         // Create Deployment ID
-        $this->deployment_uuid = new Cuid2(12);
+        $this->deployment_uuid = new Cuid2(7);
         $workdir = "/artifacts/{$this->deployment_uuid}";
 
         // Start build process
@@ -48,20 +48,9 @@ class DeployApplication extends Component
         $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
         $this->activity = remoteProcess($this->command, $destination->server, $this->deployment_uuid, $application);
 
-        // Create Deployment
-        Deployment::create([
-            'uuid' => $this->deployment_uuid,
-            'type_id' => $application->id,
-            'type_type' => Application::class,
-            'activity_log_id' => $this->activity->id,
-        ]);
-        // Redirect to deployment page
-        return redirect()->route('project.deployment', [
-            "deployment_uuid" => $this->deployment_uuid,
-            "project_uuid" => $application->environment->project->uuid,
-            "environment_name" => $application->environment->name,
-            "application_uuid" => $application->uuid
-        ]);
+        $currentUrl = url()->previous();
+        $deploymentUrl = "$currentUrl/deployment/$this->deployment_uuid";
+        return redirect($deploymentUrl);
     }
     public function render()
     {

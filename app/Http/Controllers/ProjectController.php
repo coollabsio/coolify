@@ -42,7 +42,7 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        return view('project.application', ['project' => $project, 'application' => $application]);
+        return view('project.application', ['project' => $project, 'application' => $application, 'deployments' => $application->deployments()]);
     }
     public function database()
     {

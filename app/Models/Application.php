@@ -22,7 +22,10 @@ class Application extends BaseModel
     {
         return $this->morphTo();
     }
-
+    public function deployments()
+    {
+        return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '!=', null)->orderBy('created_at', 'desc')->get();
+    }
     public function get_deployment(string $deployment_uuid)
     {
         return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '=', $deployment_uuid)->first();

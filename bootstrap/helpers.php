@@ -2,6 +2,7 @@
 
 use App\Actions\RemoteProcess\DispatchRemoteProcess;
 use App\Data\RemoteProcessArgs;
+use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,7 @@ if (!function_exists('remoteProcess')) {
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
+                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
                 model: $model,
                 server_ip: $server->ip,
                 deployment_uuid: $deployment_uuid,
