@@ -1,4 +1,16 @@
 version: '3.8'
+
+x-testing-host: &testing-host-base
+  image: coolify-testing-host
+  build:
+    dockerfile: Dockerfile
+    context: ./docker/testing-host
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+  networks:
+    - coolify
+
 services:
   php:
     image: "coolify:${TAG:-4}"
@@ -19,6 +31,9 @@ services:
       - .:/var/www/html
     networks:
       - coolify
+    depends_on:
+      postgres:
+        condition: service_healthy
   postgres:
     image: postgres:15-alpine
     ports:
@@ -36,34 +51,18 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U $$DB_USERNAME",
+          "pg_isready -U coolify",
           "-d",
-          "db_prod"
+          "coolify"
         ]
-      retries: 3
-      timeout: 5s
+      retries: 5
+      timeout: 10s
   testing-host:
+    <<: *testing-host-base
     container_name: coolify-testing-host
-    image: coolify-testing-host
-    build:
-      dockerfile: Dockerfile
-      context: ./docker/testing-host
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
-    networks:
-      - coolify
   testing-host2:
+    <<: *testing-host-base
     container_name: coolify-testing-host-2
-    image: coolify-testing-host
-    build:
-      dockerfile: Dockerfile
-      context: ./docker/testing-host
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
-    networks:
-      - coolify
 
 volumes:
   db-coolify:

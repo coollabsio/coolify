@@ -13,17 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Build the Docker image
-      run: |
-        docker run --rm -u "$(id -u):$(id -g)" \
-          -v "$(pwd):/app" \
-          -w /app composer:2 \
-          composer install --ignore-platform-reqs
-        TAG=$(date +%s) ./vendor/bin/sail build
-        TAG=$(date +%s) ./vendor/bin/sail up -d
-        sleep 1
-        ./vendor/bin/sail ps
-        # Now to create .env
-        # Await database is created
-        # pest
+      - uses: actions/checkout@v3
+      - name: Build the Docker image
+        run: |
+          cp .env.example .env
+          docker run --rm -u "$(id -u):$(id -g)" \
+            -v "$(pwd):/app" \
+            -w /app composer:2 \
+            composer install --ignore-platform-reqs
+          ./vendor/bin/sail build
+          ./vendor/bin/sail up -d
+          ./vendor/bin/sail artisan key:generate
+          ./vendor/bin/sail artisan migrate:fresh --seed
+          ./vendor/bin/pest
