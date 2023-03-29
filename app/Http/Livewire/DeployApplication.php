@@ -91,7 +91,8 @@ class DeployApplication extends Component
             $this->execute_in_builder("rm -f {$workdir}/.nixpacks/Dockerfile");
         }
         $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT=$(cat {$workdir}/.git-commit) --progress plain -t {$application->uuid}:$(cat {$workdir}/.git-commit) {$workdir}");
-        $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
+        $this->execute_in_builder("test -z \"$(docker ps --format '{{.State}}' --filter 'name={$application->uuid}')\" && docker rm -f {$application->uuid} >/dev/null 2>&1");
+        $this->execute_in_builder("docker compose --project-directory {$workdir} up -d >/dev/null 2>&1");
         $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
         $this->activity = remoteProcess($this->command, $destination->server, $this->deployment_uuid, $application);
 
