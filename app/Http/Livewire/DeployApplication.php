@@ -59,7 +59,7 @@ class DeployApplication extends Component
         $workdir = "/artifacts/{$this->deployment_uuid}";
 
         // Start build process
-        $docker_compose = $this->generate_docker_compose($application);
+        $docker_compose_base64 = base64_encode($this->generate_docker_compose($application));
         $this->command[] = "echo 'Starting deployment of {$application->name} ({$application->uuid})'";
         $this->start_builder_container();
         $this->execute_in_builder("git clone -b {$application->git_branch} {$source->html_url}/{$application->git_repository}.git {$workdir}");
@@ -68,7 +68,7 @@ class DeployApplication extends Component
         $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD > {$workdir}/.git-commit");
 
         // Set TAG in docker-compose.yml
-        $this->execute_in_builder("echo -e '{$docker_compose}' > {$workdir}/docker-compose.yml");
+        $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml");
         $this->execute_in_builder("sed -i \"s/TAG/$(cat {$workdir}/.git-commit)/g\" {$workdir}/docker-compose.yml");
         $this->execute_in_builder("cat {$workdir}/docker-compose.yml");
 
