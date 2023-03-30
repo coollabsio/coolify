@@ -46,13 +46,13 @@ class ContainerStatusJob implements ShouldQueue
                     });
                     $found_application->status = $container['State'];
                     $found_application->save();
-                    Log::info('Found application: ' . $found_application->uuid . ' settings status to: ' . $found_application->status);
+                    // Log::info('Found application: ' . $found_application->uuid . ' settings status to: ' . $found_application->status);
                 }
             }
             foreach ($not_found_applications as $not_found_application) {
                 $not_found_application->status = 'exited';
                 $not_found_application->save();
-                Log::info('Not found application: ' . $not_found_application->uuid . ' settings status to: ' . $not_found_application->status);
+                // Log::info('Not found application: ' . $not_found_application->uuid . ' settings status to: ' . $not_found_application->status);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());

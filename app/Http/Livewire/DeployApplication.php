@@ -27,6 +27,13 @@ class DeployApplication extends Component
     protected $destination;
     protected $source;
 
+    public function mount($application_uuid) {
+        $this->application_uuid = $application_uuid;
+    }
+    public function render()
+    {
+        return view('livewire.deploy-application');
+    }
     private function execute_in_builder(string $command)
     {
         if ($this->application->settings->is_debug) {
@@ -46,7 +53,6 @@ class DeployApplication extends Component
             'services' => [
                 $this->application->uuid => [
                     'image' => "{$this->application->uuid}:TAG",
-                    'expose' => $this->application->ports_exposes,
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'labels' => $this->set_labels_for_applications(),
@@ -234,12 +240,16 @@ class DeployApplication extends Component
         $deploymentUrl = "$currentUrl/deployment/$this->deployment_uuid";
         return redirect($deploymentUrl);
     }
-    public function cancel()
+
+    public function stop()
     {
+        $application = Application::where('uuid', $this->application_uuid)->first();
+        $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
+        $command[] = "docker rm -f {$application->uuid} >/dev/null 2>&1";
+        remoteProcess($command, $destination->server, null, $application);
+    }
+    public function checkStatus() {
         ContainerStatusJob::dispatch();
     }
-    public function render()
-    {
-        return view('livewire.deploy-application');
-    }
+
 }
