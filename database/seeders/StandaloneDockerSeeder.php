@@ -18,6 +18,7 @@ class StandaloneDockerSeeder extends Seeder
         $server_3 = Server::find(3);
         StandaloneDocker::create([
             'id' => 1,
+            'network' => 'coolify',
             'server_id' => $server_3->id,
         ]);
     }

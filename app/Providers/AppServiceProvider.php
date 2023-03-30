@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +21,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // @TODO: Should remove builder container here
+        // Queue::after(function (JobProcessed $event) {
+        //     dd($event->job->resolveName());
+        // });
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Models\Activity;
 
 class Application extends BaseModel
@@ -21,6 +22,27 @@ class Application extends BaseModel
     public function source()
     {
         return $this->morphTo();
+    }
+
+    public function portsMappings(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string|null $portsMappings) =>
+            is_null($portsMappings)
+                ? []
+                : explode(',', $portsMappings)
+
+        );
+    }
+    public function portsExposes(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string|null $portsExposes) =>
+            is_null($portsExposes)
+                ? []
+                : explode(',', $portsExposes)
+
+        );
     }
     public function deployments()
     {
