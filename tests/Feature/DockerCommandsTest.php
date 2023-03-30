@@ -1,8 +1,12 @@
 <?php
 
+use App\Models\User;
 use Tests\Support\Output;
 
 it('starts a docker container correctly', function () {
+
+    test()->actingAs(User::factory()->create());
+
 
     $coolifyNamePrefix = 'coolify_test_';
     $format = '{"ID":"{{ .ID }}", "Image": "{{ .Image }}", "Names":"{{ .Names }}"}';
