@@ -3,12 +3,12 @@
     <div>
         @foreach ($environment->applications as $application)
             <p>
-                <a href="{{ route('project.application', [$project->uuid, $environment->name, $application->uuid]) }}">
+                <a href="{{ route('project.application', [$application->uuid]) }}">
                     {{ $application->name }}
                 </a>
             </p>
         @endforeach
-        @foreach ($environment->databases as $database)
+        {{-- @foreach ($environment->databases as $database)
             <p>
                 <a href="{{ route('project.database', [$project->uuid, $environment->name, $database->uuid]) }}">
                     {{ $database->name }}
@@ -21,6 +21,6 @@
                     {{ $service->name }}
                 </a>
             </p>
-        @endforeach
+        @endforeach --}}
     </div>
 </x-layout>
