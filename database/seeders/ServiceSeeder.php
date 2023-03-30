@@ -18,7 +18,7 @@ class ServiceSeeder extends Seeder
         $standalone_docker_1 = StandaloneDocker::find(1);
         Service::create([
             'id' => 1,
-            'name'=> "My first database",
+            'name'=> "My first service",
             'environment_id' => $environment_1->id,
             'destination_id' => $standalone_docker_1->id,
             'destination_type' => StandaloneDocker::class,

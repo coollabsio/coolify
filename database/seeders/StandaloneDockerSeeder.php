@@ -15,10 +15,11 @@ class StandaloneDockerSeeder extends Seeder
      */
     public function run(): void
     {
-        $server_1 = Server::find(1);
+        $server_3 = Server::find(3);
         StandaloneDocker::create([
             'id' => 1,
-            'server_id' => $server_1->id,
+            'network' => 'coolify',
+            'server_id' => $server_3->id,
         ]);
     }
 }
