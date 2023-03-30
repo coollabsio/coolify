@@ -22,6 +22,7 @@ class ApplicationSeeder extends Seeder
         $swarm_docker_1 = SwarmDocker::find(1);
 
         $github_public_source = GithubApp::find(1);
+        $github_private_source = GithubApp::find(2);
         Application::create([
             'id' => 1,
             'name' => 'My first application',
@@ -36,14 +37,19 @@ class ApplicationSeeder extends Seeder
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class,
         ]);
-        // Application::create([
-        //     'id' => 2,
-        //     'name' => 'My second application (Swarm)',
-        //     'environment_id' => $environment_1->id,
-        //     'destination_id' => $swarm_docker_1->id,
-        //     'destination_type' => SwarmDocker::class,
-        //     'source_id' => $github_public_source->id,
-        //     'source_type' => GithubApp::class,
-        // ]);
+        Application::create([
+            'id' => 2,
+            'name' => 'My second application',
+            'git_repository' => 'coollabsio/nodejs-example',
+            'git_branch' => 'main',
+            'build_pack' => 'nixpacks',
+            'ports_exposes' => '3000',
+            'ports_mappings' => '3001:3000',
+            'environment_id' => $environment_1->id,
+            'destination_id' => $standalone_docker_1->id,
+            'destination_type' => StandaloneDocker::class,
+            'source_id' => $github_private_source->id,
+            'source_type' => GithubApp::class,
+        ]);
     }
 }
