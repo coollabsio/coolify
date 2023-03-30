@@ -36,7 +36,7 @@ it('starts a docker container correctly', function () {
         "docker stop $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
         "docker rm $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
     ], $host);
-    ray($activity->description);
+
     expect($activity->getExtraProperty('exitCode'))->toBe(0);
 
     // Assert there's no containers start with coolify_test_*
