@@ -51,17 +51,21 @@ class User extends Authenticatable
             $model->uuid = (string) new Cuid2(7);
         });
     }
+
     public function teams()
     {
         return $this->belongsToMany(Team::class);
     }
+
     public function currentTeam()
     {
         return $this->belongsTo(Team::class);
     }
+
     public function otherTeams()
     {
-        $team_id = session('currentTeam')->id;
+        $team_id = data_get(session('currentTeam'), 'id');
+
         return auth()->user()->teams->filter(function ($team) use ($team_id) {
             return $team->id != $team_id;
         });

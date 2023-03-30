@@ -30,19 +30,22 @@ if (!function_exists('remoteProcess')) {
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
-                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
                 model: $model,
                 server_ip: $server->ip,
-                deployment_uuid: $deployment_uuid,
                 private_key_location: $private_key_location,
+                deployment_uuid: $deployment_uuid,
                 command: <<<EOT
                 {$command_string}
                 EOT,
                 port: $server->port,
                 user: $server->user,
+                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
             ),
         ])();
     }
+}
+
+if (!function_exists('checkTeam')) {
     function checkTeam(string $team_id)
     {
         $found_team = auth()->user()->teams->pluck('id')->contains($team_id);
