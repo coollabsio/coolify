@@ -12,4 +12,8 @@ class Database extends BaseModel
     {
         return $this->morphTo();
     }
+    public function deployments()
+    {
+        return $this->morphMany(Deployment::class, 'type');
+    }
 }

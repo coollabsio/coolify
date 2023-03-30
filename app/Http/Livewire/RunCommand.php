@@ -15,13 +15,17 @@ class RunCommand extends Component
 
     public $command = 'ls';
 
-    public $server = 'testing-host';
+    public $server;
 
     public $servers = [];
 
+    protected $rules = [
+        'server' => 'required',
+    ];
     public function mount()
     {
-        $this->servers = Server::all()->pluck('name')->toArray();
+        $this->servers = Server::all();
+        $this->server = $this->servers[0]->uuid;
     }
     public function render()
     {
@@ -31,25 +35,19 @@ class RunCommand extends Component
     public function runCommand()
     {
         $this->isKeepAliveOn = true;
-
-        $this->activity = remoteProcess($this->command, $this->server);
+        $this->activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first());
     }
 
     public function runSleepingBeauty()
     {
         $this->isKeepAliveOn = true;
-
-        $this->activity = remoteProcess('x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done', $this->server);
+        $this->activity = remoteProcess(['x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done'], Server::where('uuid', $this->server)->first());
     }
 
     public function runDummyProjectBuild()
     {
         $this->isKeepAliveOn = true;
-
-        $this->activity = remoteProcess(<<<EOT
-        cd projects/dummy-project
-        ~/.docker/cli-plugins/docker-compose build --no-cache
-        EOT, $this->server);
+        $this->activity = remoteProcess([' cd projects/dummy-project', 'docker-compose build --no-cache'], Server::where('uuid', $this->server)->first());
     }
 
     public function polling()

@@ -2,7 +2,9 @@
 
 use App\Actions\RemoteProcess\DispatchRemoteProcess;
 use App\Data\RemoteProcessArgs;
+use App\Enums\ActivityTypes;
 use App\Models\Server;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -13,39 +15,39 @@ if (!function_exists('remoteProcess')) {
      *
      */
     function remoteProcess(
-        string    $command,
-        string    $destination
+        array           $command,
+        Server          $server,
+        string|null     $deployment_uuid = null,
+        Model|null      $model = null,
     ): Activity {
-        $found_server = checkServer($destination);
-        checkTeam($found_server->team_id);
+        $command_string = implode("\n", $command);
+        // @TODO: Check if the user has access to this server
+        // checkTeam($server->team_id);
 
-        $temp_file = 'id.rsa_'.'root'.'@'.$found_server->ip;
-        Storage::disk('local')->put($temp_file, $found_server->privateKey->private_key, 'private');
-        $private_key_location = '/var/www/html/storage/app/'.$temp_file;
+        $temp_file = 'id.rsa_' . 'root' . '@' . $server->ip;
+        Storage::disk('local')->put($temp_file, $server->privateKey->private_key, 'private');
+        $private_key_location = '/var/www/html/storage/app/' . $temp_file;
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
-                destination: $found_server->ip,
+                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
+                model: $model,
+                server_ip: $server->ip,
+                deployment_uuid: $deployment_uuid,
                 private_key_location: $private_key_location,
-                command: $command,
-                port: $found_server->port,
-                user: $found_server->user,
+                command: <<<EOT
+                {$command_string}
+                EOT,
+                port: $server->port,
+                user: $server->user,
             ),
         ])();
     }
-    function checkServer(string $destination){
-        // @TODO: Use UUID instead of name
-        $found_server = Server::where('name', $destination)->first();
-        if (!$found_server) {
-            throw new \RuntimeException('Server not found.');
-        };
-        return $found_server;
-    }
-    function checkTeam(string $team_id){
+    function checkTeam(string $team_id)
+    {
         $found_team = auth()->user()->teams->pluck('id')->contains($team_id);
         if (!$found_team) {
             throw new \RuntimeException('You do not have access to this server.');
         }
-
     }
 }
