@@ -8,4 +8,8 @@ class GithubApp extends BaseModel
     {
         return $this->morphMany(Application::class, 'source');
     }
+    public function privateKey()
+    {
+        return $this->belongsTo(PrivateKey::class);
+    }
 }

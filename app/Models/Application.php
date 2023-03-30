@@ -7,6 +7,15 @@ use Spatie\Activitylog\Models\Activity;
 
 class Application extends BaseModel
 {
+    protected static function booted()
+    {
+        static::created(function ($application) {
+            ApplicationSetting::create([
+                'application_id' => $application->id,
+            ]);
+        });
+    }
+
     public function environment()
     {
         return $this->belongsTo(Environment::class);
