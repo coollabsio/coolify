@@ -19,4 +19,7 @@ class Project extends BaseModel
     public function settings() {
         return $this->hasOne(ProjectSetting::class);
     }
+    public function applications() {
+        return $this->hasManyThrough(Application::class, Environment::class);
+    }
 }

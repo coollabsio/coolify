@@ -11,7 +11,7 @@ class ProjectController extends Controller
 {
     public function environments()
     {
-        $project = session('currentTeam')->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first()->load(['environments']);
         if (!$project) {
             return redirect()->route('home');
         }
@@ -19,17 +19,27 @@ class ProjectController extends Controller
     }
     public function resources()
     {
-        $project = session('currentTeam')->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('home');
         }
-        $environment = Environment::where('name', request()->route('environment_name'))->where('project_id', $project->id)->first();
-        // $environment = $project->environments->where('name', request()->route('environment_name'))->first();
+        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
+        if (!$environment) {
+            return redirect()->route('home');
+        }
         return view('project.resources', ['project' => $project, 'environment' => $environment]);
     }
     public function application()
     {
-        $application = Application::where('uuid', request()->route('application_uuid'))->first();
+        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        if (!$project) {
+            return redirect()->route('home');
+        }
+        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
+        if (!$environment) {
+            return redirect()->route('home');
+        }
+        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (!$application) {
             return redirect()->route('home');
         }
@@ -38,7 +48,6 @@ class ProjectController extends Controller
 
     public function deployment()
     {
-        $application_uuid = request()->route('application_uuid');
         $deployment_uuid = request()->route('deployment_uuid');
 
         $application = Application::where('uuid', request()->route('application_uuid'))->first();
