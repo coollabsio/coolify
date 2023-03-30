@@ -13,12 +13,12 @@ class DBSeeder extends Seeder
     {
         $environment_1 = Environment::find(1);
         $standalone_docker_1 = StandaloneDocker::find(1);
-        Database::create([
-            'id' => 1,
-            'name'=> "My first database",
-            'environment_id' => $environment_1->id,
-            'destination_id' => $standalone_docker_1->id,
-            'destination_type' => StandaloneDocker::class,
-        ]);
+        // Database::create([
+        //     'id' => 1,
+        //     'name'=> "My first database",
+        //     'environment_id' => $environment_1->id,
+        //     'destination_id' => $standalone_docker_1->id,
+        //     'destination_type' => StandaloneDocker::class,
+        // ]);
     }
 }

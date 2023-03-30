@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
 use DateTimeImmutable;
@@ -220,7 +221,7 @@ class DeployApplication extends Component
 
         $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT=$(cat {$workdir}/.git-commit) --progress plain -t {$this->application->uuid}:$(cat {$workdir}/.git-commit) {$workdir}");
         $this->command[] = "echo 'Done.'";
-        $this->execute_in_builder("test ! -z \"$(docker ps --format '{{.State}}' --filter 'name={$this->application->uuid}')\" && docker rm -f {$this->application->uuid} >/dev/null 2>&1");
+        // $this->execute_in_builder("test ! -z \"$(docker ps --format '{{.State}}' --filter 'name={$this->application->uuid}')\" && docker rm -f {$this->application->uuid} >/dev/null 2>&1");
 
         $this->command[] = "echo -n 'Deploying... '";
 
@@ -235,6 +236,7 @@ class DeployApplication extends Component
     }
     public function cancel()
     {
+        ContainerStatusJob::dispatch();
     }
     public function render()
     {

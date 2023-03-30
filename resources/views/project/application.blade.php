@@ -1,7 +1,8 @@
 <x-layout>
     <h1>Application</h1>
-    <p>Name: {{ $project->name }}</p>
-    <p>UUID: {{ $project->uuid }}</p>
+    <p>Name: {{ $application->name }}</p>
+    <p>Application UUID: {{ $application->uuid }}</p>
+    <p>Status: {{ $application->status }}</p>
     <livewire:deploy-application :application_uuid="$application->uuid" />
     <div>
         <h1>Deployments</h1>
