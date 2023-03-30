@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
@@ -249,7 +250,20 @@ class DeployApplication extends Component
         remoteProcess($command, $destination->server, null, $application);
     }
     public function checkStatus() {
-        ContainerStatusJob::dispatch();
+        $application = Application::where('uuid', $this->application_uuid)->first();
+        $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
+        $private_key_location = savePrivateKey($destination->server);
+        $ssh_command = generateSshCommand($private_key_location, $destination->server->ip, $destination->server->user, $destination->server->port, "docker ps -a --format '{{.State}}' --filter 'name={$application->uuid}'");
+        $process = Process::run($ssh_command);
+        $output = trim($process->output());
+        if ($output == '') {
+            $application->status = 'exited';
+            $application->save();
+        } else {
+            $application->status = $output;
+            $application->save();
+        }
+        // ContainerStatusJob::dispatch();
     }
 
 }

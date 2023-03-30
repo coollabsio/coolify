@@ -4,7 +4,6 @@ namespace App\Models;
 
 class Project extends BaseModel
 {
-    protected $with = ['settings', 'environments'];
     protected static function booted()
     {
         static::created(function ($project) {
