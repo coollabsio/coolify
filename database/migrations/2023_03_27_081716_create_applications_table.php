@@ -58,7 +58,6 @@ return new class extends Migration
             $table->morphs('source');
 
             $table->foreignId('environment_id');
-
             $table->timestamps();
         });
     }

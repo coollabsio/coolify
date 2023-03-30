@@ -4,22 +4,35 @@ namespace App\Http\Livewire;
 
 use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
+use DateTimeImmutable;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
+use Lcobucci\JWT\Encoding\ChainedFormatter;
+use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Lcobucci\JWT\Token\Builder;
 
 class DeployApplication extends Component
 {
     public string $application_uuid;
     public $activity;
+
     protected string $deployment_uuid;
     protected array $command = [];
     protected Application $application;
     protected $destination;
+    protected $source;
 
     private function execute_in_builder(string $command)
     {
-        return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        if ($this->application->settings->is_debug) {
+            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        } else {
+            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}' > /dev/null 2>&1";
+        }
     }
     private function start_builder_container()
     {
@@ -27,7 +40,7 @@ class DeployApplication extends Component
     }
     private function generate_docker_compose()
     {
-        return Yaml::dump([
+        $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $this->application->uuid => [
@@ -35,6 +48,8 @@ class DeployApplication extends Component
                     'expose' => $this->application->ports_exposes,
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
+                    'labels' => $this->set_labels_for_applications(),
+                    'expose' => $this->application->ports_exposes,
                     'networks' => [
                         $this->destination->network,
                     ],
@@ -57,7 +72,30 @@ class DeployApplication extends Component
                     'attachable' => true,
                 ]
             ]
-        ]);
+        ];
+        if (count($this->application->ports_mappings) > 0) {
+            $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings;
+        }
+        // if (count($volumes) > 0) {
+        //     $docker_compose['services'][$this->application->uuid]['volumes'] = $volumes;
+        // }
+        // if (count($volume_names) > 0) {
+        //     $docker_compose['volumes'] = $volume_names;
+        // }
+        return Yaml::dump($docker_compose);
+    }
+    private function set_labels_for_applications()
+    {
+        $labels = [];
+        $labels[] = 'coolify.managed=true';
+        $labels[] = 'coolify.version=' . config('coolify.version');
+        $labels[] = 'coolify.applicationId=' . $this->application->id;
+        $labels[] = 'coolify.type=application';
+        $labels[] = 'coolify.name=' . $this->application->name;
+        if ($this->application->fqdn) {
+            $labels[] = "traefik.http.routers.container.rule=Host(`{$this->application->fqdn}`)";
+        }
+        return $labels;
     }
     private function generate_healthcheck_commands()
     {
@@ -81,12 +119,40 @@ class DeployApplication extends Component
         }
         return implode(' ', $generated_healthchecks_commands);
     }
+    private function generate_jwt_token_for_github()
+    {
+        $signingKey = InMemory::plainText($this->source->privateKey->private_key);
+        $algorithm = new Sha256();
+        $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+        $now = new DateTimeImmutable();
+        $now = $now->setTime($now->format('H'), $now->format('i'));
+        $issuedToken = $tokenBuilder
+            ->issuedBy($this->source->app_id)
+            ->issuedAt($now)
+            ->expiresAt($now->modify('+10 minutes'))
+            ->getToken($algorithm, $signingKey)
+            ->toString();
+        $token = Http::withHeaders([
+            'Authorization' => "Bearer $issuedToken",
+            'Accept' => 'application/vnd.github.machine-man-preview+json'
+        ])->post("{$this->source->api_url}/app/installations/{$this->source->installation_id}/access_tokens");
+        if ($token->failed()) {
+            throw new \Exception("Failed to get access token for $this->application_name from " . $this->source_name . " with error: " . $token->json()['message']);
+        }
+        return $token->json()['token'];
+    }
     public function deploy()
     {
         $coolify_instance_settings = CoolifyInstanceSettings::find(1);
         $this->application = Application::where('uuid', $this->application_uuid)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
-        $source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+        $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+
+        $source_html_url = data_get($this->application, 'source.html_url');
+        $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
+        $source_html_url_host = $url['host'];
+        $source_html_url_scheme = $url['scheme'];
+
         // Get Wildcard Domain
         $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
         $global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
@@ -103,20 +169,34 @@ class DeployApplication extends Component
         $workdir = "/artifacts/{$this->deployment_uuid}";
 
         // Start build process
-        $docker_compose_base64 = base64_encode($this->generate_docker_compose($this->application));
-        $this->command[] = "echo 'Starting deployment of {$this->application->name} ({$this->application->uuid})'";
+        $this->command[] = "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'";
+        $this->command[] = "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '";
         $this->start_builder_container();
-        $this->execute_in_builder("git clone -b {$this->application->git_branch} {$source->html_url}/{$this->application->git_repository}.git {$workdir}");
-
+        $this->command[] = "echo 'Done.'";
+        $this->command[] = "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$workdir}... '";
+        if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
+            if ($this->source->is_public) {
+                $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$workdir}");
+            } else {
+                $github_access_token = $this->generate_jwt_token_for_github();
+                $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$workdir}");
+            }
+        }
+        $this->command[] = "echo 'Done.'";
         // Export git commit to a file
+        $this->command[] = "echo -n 'Checking commit sha... '";
         $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD > {$workdir}/.git-commit");
+        $this->command[] = "echo 'Done.'";
+        // Remove .git folder
+        $this->command[] = "echo -n 'Removing .git folder... '";
         $this->execute_in_builder("rm -fr {$workdir}/.git");
-
-        // Create docker-compose.yml
+        $this->command[] = "echo 'Done.'";
+        // Create docker-compose.yml && replace TAG with git commit
+        $docker_compose_base64 = base64_encode($this->generate_docker_compose($this->application));
         $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml");
-        // Set TAG in docker-compose.yml
         $this->execute_in_builder("sed -i \"s/TAG/$(cat {$workdir}/.git-commit)/g\" {$workdir}/docker-compose.yml");
 
+        $this->command[] = "echo -n 'Generating nixpacks configuration... '";
         if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
             // @TODO: Add static site builds
         } else {
@@ -135,10 +215,17 @@ class DeployApplication extends Component
             $this->execute_in_builder("cp {$workdir}/.nixpacks/Dockerfile {$workdir}/Dockerfile");
             $this->execute_in_builder("rm -f {$workdir}/.nixpacks/Dockerfile");
         }
+        $this->command[] = "echo 'Done.'";
+        $this->command[] = "echo -n 'Building image... '";
 
         $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT=$(cat {$workdir}/.git-commit) --progress plain -t {$this->application->uuid}:$(cat {$workdir}/.git-commit) {$workdir}");
-        $this->execute_in_builder("test -z \"$(docker ps --format '{{.State}}' --filter 'name={$this->application->uuid}')\" && docker rm -f {$this->application->uuid}");
+        $this->command[] = "echo 'Done.'";
+        $this->execute_in_builder("test ! -z \"$(docker ps --format '{{.State}}' --filter 'name={$this->application->uuid}')\" && docker rm -f {$this->application->uuid} >/dev/null 2>&1");
+
+        $this->command[] = "echo -n 'Deploying... '";
+
         $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
+        $this->command[] = "echo 'Done. 🎉'";
         $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
         $this->activity = remoteProcess($this->command, $this->destination->server, $this->deployment_uuid, $this->application);
 
