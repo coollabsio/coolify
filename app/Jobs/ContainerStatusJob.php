@@ -32,10 +32,7 @@ class ContainerStatusJob implements ShouldQueue
             $not_found_applications = $applications;
             $containers = collect();
             foreach ($servers as $server) {
-                $private_key_location = savePrivateKey($server);
-                $ssh_command = generateSshCommand($private_key_location, $server->ip, $server->user, $server->port, 'docker ps -a -q --format \'{{json .}}\'');
-                $process = Process::run($ssh_command);
-                $output = trim($process->output());
+                $output = runRemoteCommandSync($server, ['docker ps -a -q --format \'{{json .}}\'']);
                 $containers = $containers->concat(formatDockerCmdOutputToJson($output));
             }
             foreach ($containers as $container) {
@@ -48,13 +45,13 @@ class ContainerStatusJob implements ShouldQueue
                     });
                     $found_application->status = $container['State'];
                     $found_application->save();
-                    Log::info('Found application: ' . $found_application->uuid . '.Set status to: ' . $found_application->status);
+                    Log::info('Found application: ' . $found_application->uuid . '. Set status to: ' . $found_application->status);
                 }
             }
             foreach ($not_found_applications as $not_found_application) {
                 $not_found_application->status = 'exited';
                 $not_found_application->save();
-                Log::info('Not found application: ' . $not_found_application->uuid . '.Set status to: ' . $not_found_application->status);
+                Log::info('Not found application: ' . $not_found_application->uuid . '. Set status to: ' . $not_found_application->status);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());

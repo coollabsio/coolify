@@ -7,6 +7,7 @@ use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -111,5 +112,20 @@ if (!function_exists('formatDockerLabelsToJson')) {
                         return [$outputLine[0] => $outputLine[1]];
                     });
             })[0];
+    }
+}
+if (!function_exists('runRemoteCommandSync')) {
+    function runRemoteCommandSync($server, array $command) {
+        $command_string = implode("\n", $command);
+        $private_key_location = savePrivateKey($server);
+        $ssh_command = generateSshCommand($private_key_location, $server->ip, $server->user, $server->port, $command_string);
+        $process = Process::run($ssh_command);
+        $output = trim($process->output());
+        $exitCode = $process->exitCode();
+        if ($exitCode !== 0) {
+            Log::error($output);
+            throw new \RuntimeException('There was an error running the command.');
+        }
+        return $output;
     }
 }
