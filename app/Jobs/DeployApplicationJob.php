@@ -117,7 +117,9 @@ class DeployApplicationJob implements ShouldQueue
 
         $this->executeNow([
             "echo -n 'Generating nixpacks configuration... '",
-            $this->getNixpacks(),
+            $this->nixpacks_build_cmd(),
+            $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
+            $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
             "echo 'Done.'",
             "echo -n 'Building image... '",
             $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
@@ -281,7 +283,7 @@ class DeployApplicationJob implements ShouldQueue
             }
         }
     }
-    private function getNixpacks()
+    private function nixpacks_build_cmd()
     {
         if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
             // @TODO: Add static site builds
@@ -297,10 +299,7 @@ class DeployApplicationJob implements ShouldQueue
                 $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
             }
             $nixpacks_command .= " {$this->workdir}";
-            $command_other_command[] = $this->execute_in_builder($nixpacks_command);
-            $command_other_command[] = $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile");
-            $command_other_command[] = $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile");
         }
-        return $command_other_command;
+        return $this->execute_in_builder($nixpacks_command);
     }
 }
