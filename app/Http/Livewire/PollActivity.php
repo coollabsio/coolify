@@ -20,7 +20,7 @@ class PollActivity extends Component
             $this->activity?->refresh();
         }
 
-        if (data_get($this->activity, 'properties.exitCode') !== null) {
+        if (data_get($this->activity, 'properties.status') == 'finished' || data_get($this->activity, 'properties.status') == 'failed' ) {
             $this->isKeepAliveOn = false;
         }
     }

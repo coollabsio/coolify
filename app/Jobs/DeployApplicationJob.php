@@ -129,7 +129,7 @@ class DeployApplicationJob implements ShouldQueue
             $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d"),
             "echo 'Done. 🎉'",
             "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
-        ]);
+        ], setStatus: true);
     }
 
     private function execute_in_builder(string $command)
@@ -244,7 +244,7 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false)
+    private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false)
     {
         $commandText = collect($command)->implode("\n");
 
@@ -256,6 +256,7 @@ class DeployApplicationJob implements ShouldQueue
         $remoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'hideFromOutput' => $hideFromOutput,
+            'setStatus' => $setStatus,
         ]);
 
         if ($propertyName) {
