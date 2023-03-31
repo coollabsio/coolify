@@ -31,8 +31,8 @@ class DeployApplicationJob implements ShouldQueue
     protected $destination;
     protected $source;
     protected Activity $activity;
-    protected array $command = [];
     protected string $git_commit;
+    protected string $workdir;
 
     /**
      * Create a new job instance.
@@ -75,11 +75,6 @@ class DeployApplicationJob implements ShouldQueue
         $coolify_instance_settings = CoolifyInstanceSettings::find(1);
         $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
-        $source_html_url = data_get($this->application, 'source.html_url');
-        $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-        $source_html_url_host = $url['host'];
-        $source_html_url_scheme = $url['scheme'];
-
         // Get Wildcard Domain
         $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
         $global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
@@ -90,66 +85,49 @@ class DeployApplicationJob implements ShouldQueue
             $this->application->fqdn = $this->application->uuid . '.' . $wildcard_domain;
             $this->application->save();
         }
-        $workdir = "/artifacts/{$this->deployment_uuid}";
+        $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
-        // Start build process
-        $command_git_clone[] = "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'";
-        $command_git_clone[] = "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '";
-        $command_git_clone[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1";
-        $command_git_clone[] = "echo 'Done.'";
-        $command_git_clone[] = "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$workdir}... '";
-        if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
-            if ($this->source->is_public) {
-                $command_git_clone[] = $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$workdir}");
-            } else {
-                $github_access_token = $this->generate_jwt_token_for_github();
-                $command_git_clone[] = $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$workdir}");
-            }
-        }
-        $command_git_clone[] = "echo 'Done.'";
-        $this->executeNow($command_git_clone, 'git_clone');
-        // Export git commit to a file
-        $this->executeNow([$this->execute_in_builder("cd {$workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
+        // Pull builder image
+        $this->executeNow([
+            "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...",
+            "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
+            "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1",
+            "echo 'Done.'",
+        ], 'docker_pull_builder_image');
+
+        // Import git repository
+        $this->executeNow([
+            "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '",
+            $this->gitImport(),
+            "echo 'Done.'"
+        ], 'importing_git_repository');
+
+        // Get git commit
+        $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
         $this->git_commit = $this->activity->properties->get('commit_sha');
 
-        $this->executeNow([$this->execute_in_builder("rm -fr {$workdir}/.git")], 'remote_git', hideFromOutput: true);
+        $this->executeNow([
+            $this->execute_in_builder("rm -fr {$this->workdir}/.git")
+        ], hideFromOutput: true);
 
-        // Create docker-compose.yml && replace TAG with git commit
         $docker_compose_base64 = base64_encode($this->generate_docker_compose());
-        $this->executeNow([$this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml")], 'docker_compose');
-        $this->executeNow([$this->execute_in_builder("cat {$workdir}/docker-compose.yml")], 'docker_compose_content');
-        $command_other_command[] = "echo -n 'Generating nixpacks configuration... '";
-        if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
-            // @TODO: Add static site builds
-        } else {
-            $nixpacks_command = "nixpacks build -o {$workdir} --no-error-without-start";
-            if ($this->application->install_command) {
-                $nixpacks_command .= " --install-cmd '{$this->application->install_command}'";
-            }
-            if ($this->application->build_command) {
-                $nixpacks_command .= " --build-cmd '{$this->application->build_command}'";
-            }
-            if ($this->application->start_command) {
-                $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
-            }
-            $nixpacks_command .= " {$workdir}";
-            $command_other_command[] = $this->execute_in_builder($nixpacks_command);
-            $command_other_command[] = $this->execute_in_builder("cp {$workdir}/.nixpacks/Dockerfile {$workdir}/Dockerfile");
-            $command_other_command[] = $this->execute_in_builder("rm -f {$workdir}/.nixpacks/Dockerfile");
-        }
-        $command_other_command[] =  "echo 'Done.'";
-        $command_other_command[] = "echo -n 'Building image... '";
+        $this->executeNow([
+            $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
+        ], hideFromOutput: true);
 
-        $command_other_command[] = $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$workdir}");
-        $command_other_command[] = "echo 'Done.'";
-        $command_other_command[] = $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1");
-
-        $command_other_command[] = "echo -n 'Deploying... '";
-
-        $command_other_command[] = $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
-        $command_other_command[] = "echo 'Done. 🎉'";
-        $command_other_command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
-        $this->executeNow($command_other_command, 'other_command');
+        $this->executeNow([
+            "echo -n 'Generating nixpacks configuration... '",
+            $this->getNixpacks(),
+            "echo 'Done.'",
+            "echo -n 'Building image... '",
+            $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+            "echo 'Done.'",
+            $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
+            "echo -n 'Deploying... '",
+            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d"),
+            "echo 'Done. 🎉'",
+            "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
+        ]);
     }
 
     private function execute_in_builder(string $command)
@@ -264,9 +242,10 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow(array $command, string $propertyName, bool $hideFromOutput = false)
+    private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false)
     {
         $commandText = collect($command)->implode("\n");
+        dd($commandText);
 
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
@@ -278,11 +257,51 @@ class DeployApplicationJob implements ShouldQueue
             'hideFromOutput' => $hideFromOutput,
         ]);
 
-        $result = $remoteProcess();
-
-        $this->activity->properties = $this->activity->properties->merge([
-            $propertyName => trim($result->output()),
-        ]);
-        $this->activity->save();
+        if ($propertyName) {
+            $result = $remoteProcess();
+            $this->activity->properties = $this->activity->properties->merge([
+                $propertyName => trim($result->output()),
+            ]);
+            $this->activity->save();
+        } else {
+            $remoteProcess();
+        }
+    }
+    private function gitImport()
+    {
+        $source_html_url = data_get($this->application, 'source.html_url');
+        $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
+        $source_html_url_host = $url['host'];
+        $source_html_url_scheme = $url['scheme'];
+        if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
+            if ($this->source->is_public) {
+                return $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}");
+            } else {
+                $github_access_token = $this->generate_jwt_token_for_github();
+                return $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}");
+            }
+        }
+    }
+    private function getNixpacks()
+    {
+        if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
+            // @TODO: Add static site builds
+        } else {
+            $nixpacks_command = "nixpacks build -o {$this->workdir} --no-error-without-start";
+            if ($this->application->install_command) {
+                $nixpacks_command .= " --install-cmd '{$this->application->install_command}'";
+            }
+            if ($this->application->build_command) {
+                $nixpacks_command .= " --build-cmd '{$this->application->build_command}'";
+            }
+            if ($this->application->start_command) {
+                $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
+            }
+            $nixpacks_command .= " {$this->workdir}";
+            $command_other_command[] = $this->execute_in_builder($nixpacks_command);
+            $command_other_command[] = $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile");
+            $command_other_command[] = $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile");
+        }
+        return $command_other_command;
     }
 }
