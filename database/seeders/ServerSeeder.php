@@ -38,7 +38,7 @@ class ServerSeeder extends Seeder
             'name' => "localhost",
             'description' => "This is the local machine",
             'user' => 'root',
-            'ip' => "172.17.0.1",
+            'ip' => "coolify-testing-host",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
         ]);

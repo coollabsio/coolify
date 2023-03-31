@@ -63,7 +63,7 @@ if (!function_exists('savePrivateKey')) {
 }
 
 if (!function_exists('generateSshCommand')) {
-    function generateSshCommand(string $private_key_location, string $server_ip, string $user, string $port, string $command, bool $isMux = true)
+    function generateSshCommand(string $private_key_location, string $server_ip, string $user, string $port, string $command, bool $isMux = false)
     {
         $delimiter = 'EOF-COOLIFY-SSH';
         Storage::disk('local')->makeDirectory('.ssh');
