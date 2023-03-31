@@ -14,6 +14,8 @@ class RunRemoteProcess
 {
     public Activity $activity;
 
+    public bool $hideFromOutput;
+
     protected $timeStart;
 
     protected $currentTime;
@@ -29,7 +31,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity)
+    public function __construct(Activity $activity, bool $hideFromOutput)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::REMOTE_PROCESS->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
@@ -37,6 +39,7 @@ class RunRemoteProcess
         }
 
         $this->activity = $activity;
+        $this->hideFromOutput = $hideFromOutput;
     }
 
     public function __invoke(): ProcessResult
@@ -55,7 +58,7 @@ class RunRemoteProcess
 
         $this->activity->properties = $this->activity->properties->merge([
             'exitCode' => $processResult->exitCode(),
-            'stdout' => $processResult->output(),
+            'stdout' => $this->hideFromOutput || $processResult->output(),
             'stderr' => $processResult->errorOutput(),
             'status' => $status,
         ]);
@@ -78,6 +81,9 @@ class RunRemoteProcess
 
     protected function handleOutput(string $type, string $output)
     {
+        if ($this->hideFromOutput) {
+            return;
+        }
         $this->currentTime = $this->elapsedTime();
 
         if ($type === 'out') {
