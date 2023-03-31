@@ -31,7 +31,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hideFromOutput)
+    public function __construct(Activity $activity, bool $hideFromOutput = false)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::REMOTE_PROCESS->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
