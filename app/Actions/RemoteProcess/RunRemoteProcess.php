@@ -41,6 +41,9 @@ class RunRemoteProcess
 
     public function __invoke(): ProcessResult
     {
+        $this->activity->properties = $this->activity->properties->merge([
+            'status' => ProcessStatus::IN_PROGRESS,
+        ]);
         $this->timeStart = hrtime(true);
 
         $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
@@ -70,22 +73,7 @@ class RunRemoteProcess
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
 
-        $delimiter = 'EOF-COOLIFY-SSH';
-        Storage::disk('local')->makeDirectory('.ssh');
-
-        $ssh_command = "ssh "
-            . "-i {$private_key_location} "
-            . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
-            . '-o PasswordAuthentication=no '
-            . '-o RequestTTY=no '
-            . '-o LogLevel=ERROR '
-            . '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
-            . "-p {$port} "
-            . "{$user}@{$server_ip} "
-            . " 'bash -se' << \\$delimiter" . PHP_EOL
-            . $command . PHP_EOL
-            . $delimiter;
-        return $ssh_command;
+        return generateSshCommand($private_key_location, $server_ip, $user, $port, $command);
     }
 
     protected function handleOutput(string $type, string $output)

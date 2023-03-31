@@ -6,7 +6,7 @@ class HomeController extends Controller
 {
     public function show()
     {
-        $projects = session('currentTeam')->projects;
+        $projects = session('currentTeam')->load(['projects'])->projects;
         return view('home', ['projects' => $projects]);
     }
 }

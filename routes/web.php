@@ -26,8 +26,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ProjectController::class, 'application'])->name('project.application');
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}', [ProjectController::class, 'deployment'])->name('project.deployment');
 
-    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [ProjectController::class, 'database'])->name('project.database');
-    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', [ProjectController::class, 'service'])->name('project.service');
+    // Route::get('/database/{database_uuid}', [ProjectController::class, 'database'])->name('project.database');
+    // Route::get('//service/{service_uuid}', [ProjectController::class, 'service'])->name('project.service');
 
     Route::get('/profile', function () {
         return view('profile');

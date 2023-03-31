@@ -25,7 +25,7 @@ class ApplicationSeeder extends Seeder
         $github_private_source = GithubApp::find(2);
         Application::create([
             'id' => 1,
-            'name' => 'My first application',
+            'name' => 'Public application (from GitHub)',
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'nodejs-fastify',
             'build_pack' => 'nixpacks',
@@ -39,7 +39,7 @@ class ApplicationSeeder extends Seeder
         ]);
         Application::create([
             'id' => 2,
-            'name' => 'My second application',
+            'name' => 'Private application (through GitHub App)',
             'git_repository' => 'coollabsio/nodejs-example',
             'git_branch' => 'main',
             'build_pack' => 'nixpacks',
