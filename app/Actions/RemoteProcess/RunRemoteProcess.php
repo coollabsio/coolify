@@ -41,6 +41,9 @@ class RunRemoteProcess
 
     public function __invoke(): ProcessResult
     {
+        $this->activity->properties = $this->activity->properties->merge([
+            'status' => ProcessStatus::IN_PROGRESS,
+        ]);
         $this->timeStart = hrtime(true);
 
         $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
