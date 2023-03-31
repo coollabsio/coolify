@@ -62,22 +62,26 @@ if (!function_exists('savePrivateKey')) {
 }
 
 if (!function_exists('generateSshCommand')) {
-    function generateSshCommand(string $private_key_location, string $server_ip, string $user, string $port, $command)
+    function generateSshCommand(string $private_key_location, string $server_ip, string $user, string $port, string $command, bool $isMux = true)
     {
         $delimiter = 'EOF-COOLIFY-SSH';
         Storage::disk('local')->makeDirectory('.ssh');
-        $ssh_command = "ssh "
-            . "-i {$private_key_location} "
+        $ssh_command = "ssh ";
+        if ($isMux) {
+            $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r ';
+        }
+        $ssh_command .= "-i {$private_key_location} "
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o RequestTTY=no '
             . '-o LogLevel=ERROR '
-            . '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r '
             . "-p {$port} "
             . "{$user}@{$server_ip} "
             . " 'bash -se' << \\$delimiter" . PHP_EOL
             . $command . PHP_EOL
             . $delimiter;
+
+        dd($ssh_command);
         return $ssh_command;
     }
 }
@@ -108,7 +112,5 @@ if (!function_exists('formatDockerLabelsToJson')) {
                         return [$outputLine[0] => $outputLine[1]];
                     });
             })[0];
-
     }
 }
-
