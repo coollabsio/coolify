@@ -16,6 +16,8 @@ class RunRemoteProcess
 
     public bool $hideFromOutput;
 
+    public bool $setStatus;
+
     protected $timeStart;
 
     protected $currentTime;
@@ -31,7 +33,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hideFromOutput = false)
+    public function __construct(Activity $activity, bool $hideFromOutput = false, bool $setStatus = false)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::REMOTE_PROCESS->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
@@ -40,6 +42,7 @@ class RunRemoteProcess
 
         $this->activity = $activity;
         $this->hideFromOutput = $hideFromOutput;
+        $this->setStatus = $setStatus;
     }
 
     public function __invoke(): ProcessResult
@@ -51,17 +54,18 @@ class RunRemoteProcess
 
         $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
 
-        $status = match ($processResult->exitCode()) {
-            0 => ProcessStatus::FINISHED,
-            default => ProcessStatus::ERROR,
-        };
+        $status = $processResult->exitCode() != 0 ? ProcessStatus::ERROR : ($this->setStatus ? ProcessStatus::FINISHED : null);
 
         $this->activity->properties = $this->activity->properties->merge([
             'exitCode' => $processResult->exitCode(),
             'stdout' => $this->hideFromOutput || $processResult->output(),
             'stderr' => $processResult->errorOutput(),
-            'status' => $status,
         ]);
+        if (isset($status)) {
+            $this->activity->properties = $this->activity->properties->merge([
+                'status' => $status->value,
+            ]);
+        }
 
         $this->activity->save();
 
