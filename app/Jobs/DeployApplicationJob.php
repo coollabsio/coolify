@@ -89,7 +89,7 @@ class DeployApplicationJob implements ShouldQueue
 
         // Pull builder image
         $this->executeNow([
-            "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...",
+            "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
             "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
             "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1",
             "echo 'Done.'",
@@ -245,7 +245,6 @@ class DeployApplicationJob implements ShouldQueue
     private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false)
     {
         $commandText = collect($command)->implode("\n");
-        dd($commandText);
 
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
