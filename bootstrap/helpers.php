@@ -81,7 +81,6 @@ if (!function_exists('generateSshCommand')) {
             . $command . PHP_EOL
             . $delimiter;
 
-        dd($ssh_command);
         return $ssh_command;
     }
 }
