@@ -31,6 +31,8 @@ class DeployApplicationJob implements ShouldQueue
     protected $destination;
     protected $source;
     protected Activity $activity;
+    protected array $command = [];
+    protected string $git_commit;
 
     /**
      * Create a new job instance.
@@ -38,15 +40,15 @@ class DeployApplicationJob implements ShouldQueue
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,
-    ){
+    ) {
         $this->application = Application::query()
             ->where('uuid', $this->application_uuid)
             ->firstOrFail();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
 
-        $private_key_location = savePrivateKey($this->destination->server);
-
         $server = $this->destination->server;
+
+        $private_key_location = savePrivateKey($server);
 
         $remoteProcessArgs = new RemoteProcessArgs(
             server_ip: $server->ip,
@@ -91,60 +93,32 @@ class DeployApplicationJob implements ShouldQueue
         $workdir = "/artifacts/{$this->deployment_uuid}";
 
         // Start build process
-        $this->command[] = "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'";
-        $this->command[] = "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '";
-        $this->start_builder_container();
-        $this->command[] = "echo 'Done.'";
-        $this->command[] = "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$workdir}... '";
+        $command_git_clone[] = "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'";
+        $command_git_clone[] = "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '";
+        $command_git_clone[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1";
+        $command_git_clone[] = "echo 'Done.'";
+        $command_git_clone[] = "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$workdir}... '";
         if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
             if ($this->source->is_public) {
-                $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$workdir}");
+                $command_git_clone[] = $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$workdir}");
             } else {
                 $github_access_token = $this->generate_jwt_token_for_github();
-                $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$workdir}");
+                $command_git_clone[] = $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$workdir}");
             }
         }
-        $this->command[] = "echo 'Done.'";
+        $command_git_clone[] = "echo 'Done.'";
+        $this->executeNow($command_git_clone, 'git_clone');
         // Export git commit to a file
-        $this->command[] = "echo -n 'Checking commit sha... '";
+        $this->executeNow([$this->execute_in_builder("cd {$workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
+        $this->git_commit = $this->activity->properties->get('commit_sha');
 
-        $this->executeNow($this->command);
-
-        ray($this->activity);
-
-        return;
-
-        // @TODO execute
-
-        $fullOutput = $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD");
-
-        // @TODO
-        // Run remote thing
-        // Get output
-        // Parse output
-        // Compare Commit_SHA in PHP, and decide if to stop or not
-
-
-        $this->command[] = "echo 'Done.'";
-        // Remove .git folder
-        $this->command[] = "echo -n 'Removing .git folder... '";
-        $this->execute_in_builder("rm -fr {$workdir}/.git");
-        $this->command[] = "echo 'Done.'";
-
-
-        $comparison = false; // work the output
-        if (! $comparison) {
-
-            return;
-        }
+        $this->executeNow([$this->execute_in_builder("rm -fr {$workdir}/.git")], 'remote_git', hideFromOutput: true);
 
         // Create docker-compose.yml && replace TAG with git commit
-        $docker_compose_base64 = base64_encode($this->generate_docker_compose($this->application));
-        $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml");
-        $this->execute_in_builder("sed -i \"s/TAG/$(cat {$workdir}/.git-commit)/g\" {$workdir}/docker-compose.yml");
-
-
-        $this->command[] = "echo -n 'Generating nixpacks configuration... '";
+        $docker_compose_base64 = base64_encode($this->generate_docker_compose());
+        $this->executeNow([$this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml")], 'docker_compose');
+        $this->executeNow([$this->execute_in_builder("cat {$workdir}/docker-compose.yml")], 'docker_compose_content');
+        $command_other_command[] = "echo -n 'Generating nixpacks configuration... '";
         if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
             // @TODO: Add static site builds
         } else {
@@ -159,41 +133,38 @@ class DeployApplicationJob implements ShouldQueue
                 $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
             }
             $nixpacks_command .= " {$workdir}";
-            $this->execute_in_builder($nixpacks_command);
-            $this->execute_in_builder("cp {$workdir}/.nixpacks/Dockerfile {$workdir}/Dockerfile");
-            $this->execute_in_builder("rm -f {$workdir}/.nixpacks/Dockerfile");
+            $command_other_command[] = $this->execute_in_builder($nixpacks_command);
+            $command_other_command[] = $this->execute_in_builder("cp {$workdir}/.nixpacks/Dockerfile {$workdir}/Dockerfile");
+            $command_other_command[] = $this->execute_in_builder("rm -f {$workdir}/.nixpacks/Dockerfile");
         }
-        $this->command[] = "echo 'Done.'";
-        $this->command[] = "echo -n 'Building image... '";
+        $command_other_command[] =  "echo 'Done.'";
+        $command_other_command[] = "echo -n 'Building image... '";
 
-        $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT=$(cat {$workdir}/.git-commit) --progress plain -t {$this->application->uuid}:$(cat {$workdir}/.git-commit) {$workdir}");
-        $this->command[] = "echo 'Done.'";
-        $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1");
+        $command_other_command[] = $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$workdir}");
+        $command_other_command[] = "echo 'Done.'";
+        $command_other_command[] = $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1");
 
-        $this->command[] = "echo -n 'Deploying... '";
+        $command_other_command[] = "echo -n 'Deploying... '";
 
-        $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
-        $this->command[] = "echo 'Done. 🎉'";
-        $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
-    }
-
-    private function start_builder_container()
-    {
-        $this->command[] = "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1";
+        $command_other_command[] = $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
+        $command_other_command[] = "echo 'Done. 🎉'";
+        $command_other_command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
+        $this->executeNow($command_other_command, 'other_command');
     }
 
     private function execute_in_builder(string $command)
     {
-        return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
     }
 
     private function generate_docker_compose()
     {
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $this->application->uuid => [
-                    'image' => "{$this->application->uuid}:TAG",
+                    'image' => "{$this->application->uuid}:$this->git_commit",
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'labels' => $this->set_labels_for_applications(),
@@ -293,19 +264,25 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow($command)
+    private function executeNow(array $command, string $propertyName, bool $hideFromOutput = false)
     {
         $commandText = collect($command)->implode("\n");
 
-        $currentProperties = $this->activity->properties;
-        $currentProperties->put('command', $commandText);
-        $this->activity->properties = $currentProperties;
+        $this->activity->properties = $this->activity->properties->merge([
+            'command' => $commandText,
+        ]);
         $this->activity->save();
 
         $remoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
+            'hideFromOutput' => $hideFromOutput,
         ]);
 
-        $remoteProcess();
+        $result = $remoteProcess();
+
+        $this->activity->properties = $this->activity->properties->merge([
+            $propertyName => trim($result->output()),
+        ]);
+        $this->activity->save();
     }
 }
