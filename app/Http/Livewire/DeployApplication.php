@@ -41,11 +41,11 @@ class DeployApplication extends Component
     }
     private function execute_in_builder(string $command)
     {
-        if ($this->application->settings->is_debug) {
-            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
-        } else {
-            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}' > /dev/null 2>&1";
-        }
+        return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // if ($this->application->settings->is_debug) {
+        // } else {
+        //     return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // }
     }
     private function start_builder_container()
     {
@@ -247,10 +247,9 @@ class DeployApplication extends Component
 
     public function stop()
     {
-        $output = runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid} >/dev/null 2>&1"]);
+        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid} >/dev/null 2>&1"]);
         $this->application->status = 'exited';
         $this->application->save();
-        // $this->application->refresh();
     }
     public function pollingStatus()
     {
