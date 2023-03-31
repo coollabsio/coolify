@@ -21,15 +21,19 @@ class DeployApplication extends Component
 {
     public string $application_uuid;
     public $activity;
+    public $status;
+    public Application $application;
+    public $destination;
 
     protected string $deployment_uuid;
     protected array $command = [];
-    protected Application $application;
-    protected $destination;
     protected $source;
 
-    public function mount($application_uuid) {
+    public function mount($application_uuid)
+    {
         $this->application_uuid = $application_uuid;
+        $this->application = Application::where('uuid', $this->application_uuid)->first();
+        $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
     public function render()
     {
@@ -152,7 +156,6 @@ class DeployApplication extends Component
     public function deploy()
     {
         $coolify_instance_settings = CoolifyInstanceSettings::find(1);
-        $this->application = Application::where('uuid', $this->application_uuid)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
@@ -244,26 +247,24 @@ class DeployApplication extends Component
 
     public function stop()
     {
-        $application = Application::where('uuid', $this->application_uuid)->first();
-        $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
-        $command[] = "docker rm -f {$application->uuid} >/dev/null 2>&1";
-        remoteProcess($command, $destination->server, null, $application);
+        $output = runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid} >/dev/null 2>&1"]);
+        $this->application->status = 'exited';
+        $this->application->save();
+        // $this->application->refresh();
     }
-    public function checkStatus() {
-        $application = Application::where('uuid', $this->application_uuid)->first();
-        $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
-        $private_key_location = savePrivateKey($destination->server);
-        $ssh_command = generateSshCommand($private_key_location, $destination->server->ip, $destination->server->user, $destination->server->port, "docker ps -a --format '{{.State}}' --filter 'name={$application->uuid}'");
-        $process = Process::run($ssh_command);
-        $output = trim($process->output());
+    public function pollingStatus()
+    {
+        $this->application->refresh();
+    }
+    public function checkStatus()
+    {
+        $output = runRemoteCommandSync($this->destination->server, ["docker ps -a --format '{{.State}}' --filter 'name={$this->application->uuid}'"]);
         if ($output == '') {
-            $application->status = 'exited';
-            $application->save();
+            $this->application->status = 'exited';
+            $this->application->save();
         } else {
-            $application->status = $output;
-            $application->save();
+            $this->application->status = $output;
+            $this->application->save();
         }
-        // ContainerStatusJob::dispatch();
     }
-
 }
