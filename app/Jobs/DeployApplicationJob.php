@@ -2,6 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Actions\RemoteProcess\RunRemoteProcess;
+use App\Data\RemoteProcessArgs;
+use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
 use DateTimeImmutable;
@@ -17,6 +20,7 @@ use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class DeployApplicationJob implements ShouldQueue
@@ -26,6 +30,7 @@ class DeployApplicationJob implements ShouldQueue
     protected $application;
     protected $destination;
     protected $source;
+    protected Activity $activity;
 
     /**
      * Create a new job instance.
@@ -33,20 +38,39 @@ class DeployApplicationJob implements ShouldQueue
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,
-    ){}
+    ){
+        $this->application = Application::query()
+            ->where('uuid', $this->application_uuid)
+            ->firstOrFail();
+        $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
+
+        $private_key_location = savePrivateKey($this->destination->server);
+
+        $server = $this->destination->server;
+
+        $remoteProcessArgs = new RemoteProcessArgs(
+            server_ip: $server->ip,
+            private_key_location: $private_key_location,
+            deployment_uuid: $this->deployment_uuid,
+            command: 'overwritten-later',
+            port: $server->port,
+            user: $server->user,
+            type: ActivityTypes::DEPLOYMENT->value,
+        );
+
+        $this->activity = activity()
+            ->performedOn($this->application)
+            ->withProperties($remoteProcessArgs->toArray())
+            ->event(ActivityTypes::DEPLOYMENT->value)
+            ->log("");
+    }
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $this->application = Application::query()
-            ->where('uuid', $this->application_uuid)
-            ->firstOrFail();
-
         $coolify_instance_settings = CoolifyInstanceSettings::find(1);
-
-        $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
         $source_html_url = data_get($this->application, 'source.html_url');
@@ -83,12 +107,37 @@ class DeployApplicationJob implements ShouldQueue
         $this->command[] = "echo 'Done.'";
         // Export git commit to a file
         $this->command[] = "echo -n 'Checking commit sha... '";
-        $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD > {$workdir}/.git-commit");
+
+        $this->executeNow($this->command);
+
+        ray($this->activity);
+
+        return;
+
+        // @TODO execute
+
+        $fullOutput = $this->execute_in_builder("cd {$workdir} && git rev-parse HEAD");
+
+        // @TODO
+        // Run remote thing
+        // Get output
+        // Parse output
+        // Compare Commit_SHA in PHP, and decide if to stop or not
+
+
         $this->command[] = "echo 'Done.'";
         // Remove .git folder
         $this->command[] = "echo -n 'Removing .git folder... '";
         $this->execute_in_builder("rm -fr {$workdir}/.git");
         $this->command[] = "echo 'Done.'";
+
+
+        $comparison = false; // work the output
+        if (! $comparison) {
+
+            return;
+        }
+
         // Create docker-compose.yml && replace TAG with git commit
         $docker_compose_base64 = base64_encode($this->generate_docker_compose($this->application));
         $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml");
@@ -126,8 +175,6 @@ class DeployApplicationJob implements ShouldQueue
         $this->execute_in_builder("docker compose --project-directory {$workdir} up -d");
         $this->command[] = "echo 'Done. 🎉'";
         $this->command[] = "docker stop -t 0 {$this->deployment_uuid} >/dev/null";
-
-        remoteProcess($this->command, $this->destination->server, $this->deployment_uuid, $this->application);
     }
 
     private function start_builder_container()
@@ -244,5 +291,21 @@ class DeployApplicationJob implements ShouldQueue
             $labels[] = "traefik.http.routers.container.rule=Host(`{$this->application->fqdn}`)";
         }
         return $labels;
+    }
+
+    private function executeNow($command)
+    {
+        $commandText = collect($command)->implode("\n");
+
+        $currentProperties = $this->activity->properties;
+        $currentProperties->put('command', $commandText);
+        $this->activity->properties = $currentProperties;
+        $this->activity->save();
+
+        $remoteProcess = resolve(RunRemoteProcess::class, [
+            'activity' => $this->activity,
+        ]);
+
+        $remoteProcess();
     }
 }
