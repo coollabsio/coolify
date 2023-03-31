@@ -16,12 +16,12 @@ class ServiceSeeder extends Seeder
     {
         $environment_1 = Environment::find(1);
         $standalone_docker_1 = StandaloneDocker::find(1);
-        Service::create([
-            'id' => 1,
-            'name'=> "My first service",
-            'environment_id' => $environment_1->id,
-            'destination_id' => $standalone_docker_1->id,
-            'destination_type' => StandaloneDocker::class,
-        ]);
+        // Service::create([
+        //     'id' => 1,
+        //     'name'=> "My first service",
+        //     'environment_id' => $environment_1->id,
+        //     'destination_id' => $standalone_docker_1->id,
+        //     'destination_type' => StandaloneDocker::class,
+        // ]);
     }
 }

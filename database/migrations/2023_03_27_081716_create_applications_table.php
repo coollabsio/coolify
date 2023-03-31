@@ -52,7 +52,7 @@ return new class extends Migration
             $table->integer('health_check_retries')->default(10);
             $table->integer('health_check_start_period')->default(5);
 
-            $table->string('status')->default('killed');
+            $table->string('status')->default('exited');
 
             $table->morphs('destination');
             $table->morphs('source');

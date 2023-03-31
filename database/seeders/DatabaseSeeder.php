@@ -14,6 +14,7 @@ class DatabaseSeeder extends Seeder
             TeamSeeder::class,
             PrivateKeySeeder::class,
             ServerSeeder::class,
+            ServerSettingSeeder::class,
             ProjectSeeder::class,
             ProjectSettingSeeder::class,
             EnvironmentSeeder::class,

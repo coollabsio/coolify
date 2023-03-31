@@ -2,10 +2,12 @@
 
 namespace App\Http\Livewire;
 
+use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
 use DateTimeImmutable;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Process;
 use Livewire\Component;
 use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
@@ -19,20 +21,31 @@ class DeployApplication extends Component
 {
     public string $application_uuid;
     public $activity;
+    public $status;
+    public Application $application;
+    public $destination;
 
     protected string $deployment_uuid;
     protected array $command = [];
-    protected Application $application;
-    protected $destination;
     protected $source;
 
+    public function mount($application_uuid)
+    {
+        $this->application_uuid = $application_uuid;
+        $this->application = Application::where('uuid', $this->application_uuid)->first();
+        $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
+    }
+    public function render()
+    {
+        return view('livewire.deploy-application');
+    }
     private function execute_in_builder(string $command)
     {
-        if ($this->application->settings->is_debug) {
-            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
-        } else {
-            return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}' > /dev/null 2>&1";
-        }
+        return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // if ($this->application->settings->is_debug) {
+        // } else {
+        //     return $this->command[] = "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // }
     }
     private function start_builder_container()
     {
@@ -45,7 +58,6 @@ class DeployApplication extends Component
             'services' => [
                 $this->application->uuid => [
                     'image' => "{$this->application->uuid}:TAG",
-                    'expose' => $this->application->ports_exposes,
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'labels' => $this->set_labels_for_applications(),
@@ -144,7 +156,6 @@ class DeployApplication extends Component
     public function deploy()
     {
         $coolify_instance_settings = CoolifyInstanceSettings::find(1);
-        $this->application = Application::where('uuid', $this->application_uuid)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
@@ -220,7 +231,7 @@ class DeployApplication extends Component
 
         $this->execute_in_builder("docker build -f {$workdir}/Dockerfile --build-arg SOURCE_COMMIT=$(cat {$workdir}/.git-commit) --progress plain -t {$this->application->uuid}:$(cat {$workdir}/.git-commit) {$workdir}");
         $this->command[] = "echo 'Done.'";
-        $this->execute_in_builder("test ! -z \"$(docker ps --format '{{.State}}' --filter 'name={$this->application->uuid}')\" && docker rm -f {$this->application->uuid} >/dev/null 2>&1");
+        $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1");
 
         $this->command[] = "echo -n 'Deploying... '";
 
@@ -233,11 +244,26 @@ class DeployApplication extends Component
         $deploymentUrl = "$currentUrl/deployment/$this->deployment_uuid";
         return redirect($deploymentUrl);
     }
-    public function cancel()
+
+    public function stop()
     {
+        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid} >/dev/null 2>&1"]);
+        $this->application->status = 'exited';
+        $this->application->save();
     }
-    public function render()
+    public function pollingStatus()
     {
-        return view('livewire.deploy-application');
+        $this->application->refresh();
+    }
+    public function checkStatus()
+    {
+        $output = runRemoteCommandSync($this->destination->server, ["docker ps -a --format '{{.State}}' --filter 'name={$this->application->uuid}'"]);
+        if ($output == '') {
+            $this->application->status = 'exited';
+            $this->application->save();
+        } else {
+            $this->application->status = $output;
+            $this->application->save();
+        }
     }
 }

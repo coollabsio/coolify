@@ -46,7 +46,7 @@ it('starts a docker container correctly', function () {
 
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = Output::containerList($activity->getExtraProperty('stdout'));
+    $containers = formatDockerCmdOutputToJson($activity->getExtraProperty('stdout'));
     expect($containers)->toBeEmpty();
 
     // start a container nginx -d --name = $containerName
@@ -55,7 +55,7 @@ it('starts a docker container correctly', function () {
 
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = Output::containerList($activity->getExtraProperty('stdout'));
+    $containers = formatDockerCmdOutputToJson($activity->getExtraProperty('stdout'));
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
     // Stop testing containers
