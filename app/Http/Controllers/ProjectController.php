@@ -17,6 +17,7 @@ class ProjectController extends Controller
         }
         return view('project.environments', ['project' => $project]);
     }
+
     public function resources()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -29,6 +30,7 @@ class ProjectController extends Controller
         }
         return view('project.resources', ['project' => $project, 'environment' => $environment]);
     }
+
     public function application()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -62,7 +64,9 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        $activity = $application->get_deployment($deployment_uuid);
-        return view('project.deployment', ['activity' => $activity]);
+
+        return view('project.deployment', [
+            'deployment_uuid' => $deployment_uuid,
+        ]);
     }
 }

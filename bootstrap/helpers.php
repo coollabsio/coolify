@@ -20,8 +20,8 @@ if (!function_exists('remoteProcess')) {
     function remoteProcess(
         array           $command,
         Server          $server,
-        string|null     $deployment_uuid = null,
-        Model|null      $model = null,
+        ?string         $deployment_uuid = null,
+        ?Model          $model = null,
     ): Activity {
         $command_string = implode("\n", $command);
         // @TODO: Check if the user has access to this server
@@ -31,27 +31,28 @@ if (!function_exists('remoteProcess')) {
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
-                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
                 model: $model,
                 server_ip: $server->ip,
-                deployment_uuid: $deployment_uuid,
                 private_key_location: $private_key_location,
+                deployment_uuid: $deployment_uuid,
                 command: <<<EOT
                 {$command_string}
                 EOT,
                 port: $server->port,
                 user: $server->user,
+                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
             ),
         ])();
     }
-    // function checkTeam(string $team_id)
-    // {
-    //     $found_team = auth()->user()->teams->pluck('id')->contains($team_id);
-    //     if (!$found_team) {
-    //         throw new \RuntimeException('You do not have access to this server.');
-    //     }
-    // }
 }
+
+// function checkTeam(string $team_id)
+// {
+//     $found_team = auth()->user()->teams->pluck('id')->contains($team_id);
+//     if (!$found_team) {
+//         throw new \RuntimeException('You do not have access to this server.');
+//     }
+// }
 
 if (!function_exists('savePrivateKey')) {
     function savePrivateKey(Server $server)
