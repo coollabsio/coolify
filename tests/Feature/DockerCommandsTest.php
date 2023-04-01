@@ -16,6 +16,7 @@ beforeEach(function () {
 
 it('starts a docker container correctly', function () {
 
+
     test()->actingAs(User::factory([
         'uuid' => Str::uuid(),
         'email' => Str::uuid().'@example.com',
@@ -31,22 +32,9 @@ it('starts a docker container correctly', function () {
     $containerName = 'coolify_test_' . now()->format('Ymd_his');
     $host = Server::where('name', 'testing-local-docker-container')->first();
 
-    // Stop testing containers
-    $activity = remoteProcess([
-        "docker stop $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
-        "docker rm $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
-    ], $host);
-
-    throw_if(
-        $activity->getExtraProperty('exitCode') !== 0,
-        new RuntimeException($activity->description),
-    );
-
-    expect($activity->getExtraProperty('exitCode'))->toBe(0);
-
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = formatDockerCmdOutputToJson($activity->getExtraProperty('stdout'));
+    $containers = formatDockerCmdOutputToJson($activity->description);
     expect($containers)->toBeEmpty();
 
     // start a container nginx -d --name = $containerName
@@ -55,13 +43,13 @@ it('starts a docker container correctly', function () {
 
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = formatDockerCmdOutputToJson($activity->getExtraProperty('stdout'));
+    $containers = formatDockerCmdOutputToJson($activity->description);
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
     // Stop testing containers
     $activity = remoteProcess([
-        "docker stop $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
-        "docker rm $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)",
+        "docker ps --filter='name={$coolifyNamePrefix}*' -aq && " .
+        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
     ], $host);
     expect($activity->getExtraProperty('exitCode'))->toBe(0);
 });

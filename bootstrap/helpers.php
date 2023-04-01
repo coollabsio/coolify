@@ -23,7 +23,9 @@ if (!function_exists('remoteProcess')) {
         ?string         $deployment_uuid = null,
         ?Model          $model = null,
     ): Activity {
+
         $command_string = implode("\n", $command);
+
         // @TODO: Check if the user has access to this server
         // checkTeam($server->team_id);
 
@@ -31,7 +33,6 @@ if (!function_exists('remoteProcess')) {
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
-                model: $model,
                 server_ip: $server->ip,
                 private_key_location: $private_key_location,
                 deployment_uuid: $deployment_uuid,
@@ -41,6 +42,7 @@ if (!function_exists('remoteProcess')) {
                 port: $server->port,
                 user: $server->user,
                 type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
+                model: $model,
             ),
         ])();
     }
