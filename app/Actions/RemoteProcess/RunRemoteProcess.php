@@ -7,7 +7,6 @@ use App\Enums\ProcessStatus;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 
 class RunRemoteProcess
@@ -26,9 +25,12 @@ class RunRemoteProcess
 
     protected $throttleIntervalMS = 500;
 
-    protected string $stdOutIncremental = '';
+    protected int $counter = 1;
 
-    protected string $stdErrIncremental = '';
+    public const MARK_START = "|--";
+    public const MARK_END = "--|";
+    public const SEPARATOR = '|';
+    public const MARK_REGEX = "/(\|--\d+\|\d+\|(?:out|err)--\|)/";
 
     /**
      * Create a new job instance.
@@ -88,15 +90,10 @@ class RunRemoteProcess
         if ($this->hideFromOutput) {
             return;
         }
+
         $this->currentTime = $this->elapsedTime();
 
-        if ($type === 'out') {
-            $this->stdOutIncremental .= $output;
-        } else {
-            $this->stdErrIncremental .= $output;
-        }
-
-        $this->activity->description .= $output;
+        $this->activity->description .= $this->encodeOutput($type, $output);
 
         if ($this->isAfterLastThrottle()) {
             // Let's write to database.
@@ -105,6 +102,16 @@ class RunRemoteProcess
                 $this->lastWriteAt = $this->currentTime;
             });
         }
+    }
+
+    public function encodeOutput($type, $output)
+    {
+        return
+            static::MARK_START . $this->counter++ .
+            static::SEPARATOR . $this->elapsedTime() .
+            static::SEPARATOR . $type .
+            static::MARK_END .
+            $output;
     }
 
     /**
