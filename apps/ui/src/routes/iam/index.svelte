@@ -35,18 +35,18 @@
 		});
 	}
 
-	function generateRandomPassword(){
+	function generateRandomPassword() {
 		const pwLength = 16;
-		let generatedPassword = "";
-    const validChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.-+!\"#$%/=?";
+		let generatedPassword = '';
+		const validChars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.-+!"#$%/=?';
 
-    for (let i = 0; i < pwLength; i++) {
-        let randomNumber = crypto.getRandomValues(new Uint32Array(1))[0];
-        randomNumber = randomNumber / 0x100000000;
-        randomNumber = Math.floor(randomNumber * validChars.length);
+		for (let i = 0; i < pwLength; i++) {
+			let randomNumber = crypto.getRandomValues(new Uint32Array(1))[0];
+			randomNumber = randomNumber / 0x100000000;
+			randomNumber = Math.floor(randomNumber * validChars.length);
 
-        generatedPassword += validChars[randomNumber];
-    }
+			generatedPassword += validChars[randomNumber];
+		}
 		return generatedPassword;
 	}
 
@@ -69,7 +69,7 @@
 		try {
 			// Enable registration
 			await post(`/settings`, {
-				isRegistrationEnabled: true,
+				isRegistrationEnabled: true
 			});
 
 			const { token, payload } = await post(`/login`, {
@@ -87,18 +87,19 @@
 			}
 			await post(`/iam/user/password`, { id });
 			addToast({
-				message: 'User setup successfully. They will be prompted to set their password when they next login.',
+				message:
+					'User setup successfully. They will be prompted to set their password when they next login.',
 				type: 'success'
 			});
 		} catch (error: any) {
 			return addToast({
-				message: "There was an error adding the user",
+				message: 'There was an error adding the user',
 				type: 'error'
 			});
 		} finally {
 			// Set the registration enabled stauts back to previous state
 			await post(`/settings`, {
-				isRegistrationEnabled,
+				isRegistrationEnabled
 			});
 		}
 	}
