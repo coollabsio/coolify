@@ -38,10 +38,7 @@
 	function generateRandomPassword(){
 		const pwLength = 16;
 		let generatedPassword = "";
-    const validChars = "0123456789" +
-        "abcdefghijklmnopqrstuvwxyz" +
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
-        ",.-+!\"#$%/=?";
+    const validChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,.-+!\"#$%/=?";
 
     for (let i = 0; i < pwLength; i++) {
         let randomNumber = crypto.getRandomValues(new Uint32Array(1))[0];
