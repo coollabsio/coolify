@@ -21,18 +21,71 @@
 	export let account: any;
 	export let accounts: any;
 
-	import { appSession } from '$lib/store';
+	import { appSession, addToast } from '$lib/store';
 	import { get, post } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
 	import Account from './_Account.svelte';
 	let search = '';
 	let searchResults: any = [];
+	let inviteUserAddress: string = '';
 
 	function searchAccount() {
 		searchResults = accounts.filter((account: { email: string | string[] }) => {
 			return account.email.includes(search);
 		});
+	}
+
+	function generateRandomPassword(){
+		const pwLength = 16;
+		let generatedPassword = "";
+    const validChars = "0123456789" +
+        "abcdefghijklmnopqrstuvwxyz" +
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ" +
+        ",.-+!\"#$%/=?";
+
+    for (let i = 0; i < pwLength; i++) {
+        let randomNumber = crypto.getRandomValues(new Uint32Array(1))[0];
+        randomNumber = randomNumber / 0x100000000;
+        randomNumber = Math.floor(randomNumber * validChars.length);
+
+        generatedPassword += validChars[randomNumber];
+    }
+		return generatedPassword;
+	}
+
+	async function inviteUser() {
+		if (!inviteUserAddress || inviteUserAddress.length === 0) {
+			return addToast({
+				message: 'Please enter an email address',
+				type: 'error'
+			});
+		}
+		try {
+			const { token, payload } = await post(`/login`, {
+				email: inviteUserAddress,
+				password: generateRandomPassword(),
+				isLogin: false
+			});
+			const id = payload?.userId;
+
+			if (!id) {
+				return addToast({
+					message: 'There was an error adding the user',
+					type: 'error'
+				});
+			}
+			await post(`/iam/user/password`, { id });
+			return addToast({
+				message: 'User setup successfully. They will be prompted to set their password when they next login.',
+				type: 'success'
+			});
+		} catch (error: any) {
+			return addToast({
+				message: "There was an error adding the user",
+				type: 'error'
+			});
+		}
 	}
 </script>
 
@@ -61,6 +114,14 @@
 				{/each}
 			{:else if searchResults.length === 0 && search !== ''}
 				<div>Nothing found.</div>
+				<input
+					class="input w-full mb-4"
+					bind:value={inviteUserAddress}
+					placeholder="Invite user"
+				/>
+				<button class="btn btn-sm btn-primary" on:click={() => inviteUser()}>
+					Reset Password
+				</button>
 			{:else}
 				{#each accounts as account}
 					<Account {account} {accounts} />
