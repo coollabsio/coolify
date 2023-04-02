@@ -89,7 +89,7 @@
 				});
 			}
 			await post(`/iam/user/password`, { id });
-			return addToast({
+			addToast({
 				message: 'User setup successfully. They will be prompted to set their password when they next login.',
 				type: 'success'
 			});
