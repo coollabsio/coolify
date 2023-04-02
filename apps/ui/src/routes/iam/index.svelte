@@ -28,7 +28,6 @@
 	import Account from './_Account.svelte';
 	let search = '';
 	let searchResults: any = [];
-	let inviteUserAddress: string = '';
 
 	function searchAccount() {
 		searchResults = accounts.filter((account: { email: string | string[] }) => {
@@ -55,15 +54,29 @@
 	}
 
 	async function inviteUser() {
-		if (!inviteUserAddress || inviteUserAddress.length === 0) {
+		if (!search || search.length === 0) {
 			return addToast({
 				message: 'Please enter an email address',
 				type: 'error'
 			});
 		}
+		// Get existing 'registration enabled state'
+		const currentSettings = await get(`/settings`);
+		const isRegistrationEnabled = currentSettings?.settings?.isRegistrationEnabled;
+		if (!currentSettings) {
+			return addToast({
+				message: 'There was an error retrieving settings',
+				type: 'error'
+			});
+		}
 		try {
+			// Enable registration
+			await post(`/settings`, {
+				isRegistrationEnabled: true,
+			});
+
 			const { token, payload } = await post(`/login`, {
-				email: inviteUserAddress,
+				email: search,
 				password: generateRandomPassword(),
 				isLogin: false
 			});
@@ -84,6 +97,11 @@
 			return addToast({
 				message: "There was an error adding the user",
 				type: 'error'
+			});
+		} finally {
+			// Set the registration enabled stauts back to previous state
+			await post(`/settings`, {
+				isRegistrationEnabled,
 			});
 		}
 	}
@@ -114,13 +132,8 @@
 				{/each}
 			{:else if searchResults.length === 0 && search !== ''}
 				<div>Nothing found.</div>
-				<input
-					class="input w-full mb-4"
-					bind:value={inviteUserAddress}
-					placeholder="Invite user"
-				/>
 				<button class="btn btn-sm btn-primary" on:click={() => inviteUser()}>
-					Reset Password
+					Create account for {search}
 				</button>
 			{:else}
 				{#each accounts as account}
