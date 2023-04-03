@@ -10,6 +10,7 @@ tasks:
       ./vendor/bin/sail up -d
       ./vendor/bin/sail php artisan key:generate
       ./vendor/bin/sail php artisan storage:link
+      ./vendor/bin/sail php artisan migrate:fresh --seed
       cat .coolify-logo
       gp sync-done sail-is-ready
 
@@ -19,6 +20,12 @@ tasks:
       gp sync-await sail-is-ready
       ./vendor/bin/sail npm install
       ./vendor/bin/sail npm run dev
+
+  - name: Laravel Queue Worker, listening to code changes
+    command: |
+      echo "Waiting for Sail environment to boot up."
+      gp sync-await sail-is-ready
+      ./vendor/bin/sail php artisan queue:listen
 
 ports:
   - port: 3306
@@ -33,7 +40,6 @@ ports:
 vscode:
   extensions:
     - bmewburn.vscode-intelephense-client
-    - eamodio.gitlens
     - ikappas.composer
     - ms-azuretools.vscode-docker
     - ecmel.vscode-html-css
