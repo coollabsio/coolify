@@ -17,8 +17,8 @@ return new class extends Migration
             $table->string('name');
 
             $table->morphs('destination');
-            $table->foreignId('environment_id');
 
+            $table->foreignId('environment_id');
             $table->timestamps();
         });
     }

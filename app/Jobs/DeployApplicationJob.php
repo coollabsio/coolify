@@ -121,15 +121,25 @@ class DeployApplicationJob implements ShouldQueue
             $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
             $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
             "echo 'Done.'",
+        ]);
+        $this->executeNow([
             "echo -n 'Building image... '",
             $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
             "echo 'Done.'",
+        ]);
+        $this->executeNow([
+            "echo -n 'Removing old container... '",
             $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
-            "echo -n 'Deploying... '",
-            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d"),
+            "echo 'Done.'",
+        ]);
+        $this->executeNow([
+            "echo -n 'Starting new container... '",
+            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null 2>&1"),
             "echo 'Done. 🎉'",
-            "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
         ], setStatus: true);
+        $this->executeNow([
+            "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
+        ]);
     }
 
     private function execute_in_builder(string $command)

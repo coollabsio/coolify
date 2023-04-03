@@ -11,14 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('services', function (Blueprint $table) {
+        Schema::create('local_persistent_volumes', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
             $table->string('name');
+            $table->string('mount_path');
+            $table->string('host_path')->nullable();
+            $table->string('container_id')->nullable();
 
-            $table->morphs('destination');
-
-            $table->foreignId('environment_id');
+            $table->nullableMorphs('resource');
             $table->timestamps();
         });
     }
@@ -28,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('services');
+        Schema::dropIfExists('local_persistent_volumes');
     }
 };

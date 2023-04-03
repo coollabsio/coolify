@@ -32,6 +32,10 @@ class Application extends BaseModel
     {
         return $this->morphTo();
     }
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
 
     public function portsMappings(): Attribute
     {
