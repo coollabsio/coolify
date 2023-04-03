@@ -240,7 +240,7 @@ import * as buildpacks from '../lib/buildPacks';
 											applicationId: application.id
 										});
 									}
-									await fs.rm(workdir, { recursive: true, force: true });
+									if (!isDev) await fs.rm(workdir, { recursive: true, force: true });
 									return;
 								}
 								try {
@@ -263,7 +263,7 @@ import * as buildpacks from '../lib/buildPacks';
 										await saveBuildLog({ line: error.stderr, buildId, applicationId });
 									}
 								} finally {
-									await fs.rm(workdir, { recursive: true, force: true });
+									if (!isDev) await fs.rm(workdir, { recursive: true, force: true });
 									await prisma.build.update({
 										where: { id: buildId },
 										data: { status: 'success' }
@@ -782,7 +782,7 @@ import * as buildpacks from '../lib/buildPacks';
 										applicationId: application.id
 									});
 								}
-								await fs.rm(workdir, { recursive: true, force: true });
+								if (!isDev) await fs.rm(workdir, { recursive: true, force: true });
 								return;
 							}
 							try {
@@ -803,7 +803,7 @@ import * as buildpacks from '../lib/buildPacks';
 									await saveBuildLog({ line: error.stderr, buildId, applicationId });
 								}
 							} finally {
-								await fs.rm(workdir, { recursive: true, force: true });
+								if (!isDev) await fs.rm(workdir, { recursive: true, force: true });
 								await prisma.build.update({ where: { id: buildId }, data: { status: 'success' } });
 							}
 						});

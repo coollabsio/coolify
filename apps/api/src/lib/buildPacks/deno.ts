@@ -36,6 +36,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	Dockerfile.push(`RUN deno cache ${denoMainFile}`);
 	Dockerfile.push(`ENV NO_COLOR true`);
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	Dockerfile.push(`CMD deno run ${denoOptions || ''} ${denoMainFile}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));

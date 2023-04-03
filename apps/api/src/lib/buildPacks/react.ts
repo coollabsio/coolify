@@ -9,10 +9,10 @@ const createDockerfile = async (data, image): Promise<void> => {
 	Dockerfile.push(`LABEL coolify.buildId=${buildId}`);
 	Dockerfile.push('WORKDIR /app');
 	Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app${publishDirectory} ./`);
-	Dockerfile.push('RUN rm -fr .git');
 	if (baseImage?.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };

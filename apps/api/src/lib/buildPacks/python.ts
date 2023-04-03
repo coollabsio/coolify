@@ -52,7 +52,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 	} else {
 		Dockerfile.push(`CMD python ${pythonModule}`);
 	}
-
+	Dockerfile.push('RUN rm -fr .git');
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
 

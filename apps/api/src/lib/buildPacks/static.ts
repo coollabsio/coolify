@@ -32,13 +32,13 @@ const createDockerfile = async (data, image): Promise<void> => {
 	}
 	if (buildCommand) {
 		Dockerfile.push(`COPY --from=${applicationId}:${tag}-cache /app${publishDirectory} ./`);
-		Dockerfile.push('RUN rm -fr .git');
 	} else {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 	}
 	if (baseImage?.includes('nginx')) {
 		Dockerfile.push(`COPY /nginx.conf /etc/nginx/nginx.conf`);
 	}
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
