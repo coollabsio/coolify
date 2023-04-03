@@ -47,7 +47,12 @@ export default async function (data) {
 	for (let [key, value] of Object.entries(dockerComposeYaml.services)) {
 		value['container_name'] = `${applicationId}-${key}`;
 
+		if (value['env_file']) {
+			delete value['env_file'];
+		}
+
 		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
+		console.log({ key, environment });
 		if (Object.keys(environment).length > 0) {
 			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
 		}
@@ -60,7 +65,7 @@ export default async function (data) {
 		const buildArgs = typeof build['args'] === 'undefined' ? [] : build['args'];
 		let finalArgs = [...buildEnvs];
 		if (Object.keys(buildArgs).length > 0) {
-			for (const arg of buildArgs) {
+			for (const arg of Object.keys(buildArgs)) {
 				const [key, _] = arg.split('=');
 				if (finalArgs.filter((env) => env.startsWith(key)).length === 0) {
 					finalArgs.push(arg);
@@ -87,7 +92,10 @@ export default async function (data) {
 						v.startsWith('~') ||
 						v.startsWith('$PWD')
 					) {
-						v = v.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
+						v = v
+							.replace(/^\./, `~`)
+							.replace(/^\.\./, '~')
+							.replace(/^\$PWD/, '~');
 					} else {
 						if (!path) {
 							path = v;
@@ -110,10 +118,11 @@ export default async function (data) {
 						source.startsWith('~') ||
 						source.startsWith('$PWD')
 					) {
-
-						source = source.replace(/^\./, `~`).replace(/^\.\./, '~').replace(/^\$PWD/, '~');
-						console.log({source})
-
+						source = source
+							.replace(/^\./, `~`)
+							.replace(/^\.\./, '~')
+							.replace(/^\$PWD/, '~');
+						console.log({ source });
 					} else {
 						if (!target) {
 							target = source;
@@ -125,7 +134,6 @@ export default async function (data) {
 
 					return `${source}:${target}${mode ? ':' + mode : ''}`;
 				}
-
 			});
 		}
 		if (volumes.length > 0) {
@@ -136,16 +144,20 @@ export default async function (data) {
 		if (dockerComposeConfiguration[key]?.port) {
 			value['expose'] = [dockerComposeConfiguration[key].port];
 		}
-		if (value['networks']?.length > 0) {
-			value['networks'].forEach((network) => {
-				networks[network] = {
-					name: network
-				};
-			});
-			value['networks'] = [...(value['networks'] || ''), network];
-		} else {
-			value['networks'] = [network];
+		value['networks'] = [network];
+		if (value['build']?.network) {
+			delete value['build']['network'];
 		}
+		// if (value['networks']?.length > 0) {
+		// 	value['networks'].forEach((network) => {
+		// 		networks[network] = {
+		// 			name: network
+		// 		};
+		// 	});
+		// 	value['networks'] = [...(value['networks'] || ''), network];
+		// } else {
+		// 	value['networks'] = [network];
+		// }
 
 		dockerComposeYaml.services[key] = {
 			...dockerComposeYaml.services[key],
