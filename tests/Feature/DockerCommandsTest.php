@@ -1,9 +1,9 @@
 <?php
 
+use App\Actions\RemoteProcess\TidyOutput;
 use App\Models\User;
 use App\Models\Server;
 use Database\Seeders\DatabaseSeeder;
-use Tests\Support\Output;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -32,9 +32,14 @@ it('starts a docker container correctly', function () {
     $containerName = 'coolify_test_' . now()->format('Ymd_his');
     $host = Server::where('name', 'testing-local-docker-container')->first();
 
+    remoteProcess([
+        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+    ], $host);
+
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = formatDockerCmdOutputToJson($activity->description);
+    $tidyOutput = (new TidyOutput($activity))();
+    $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers)->toBeEmpty();
 
     // start a container nginx -d --name = $containerName
@@ -43,7 +48,8 @@ it('starts a docker container correctly', function () {
 
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $containers = formatDockerCmdOutputToJson($activity->description);
+    $tidyOutput = (new TidyOutput($activity))();
+    $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
     // Stop testing containers
