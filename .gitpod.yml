@@ -1,0 +1,45 @@
+tasks:
+  - name: Setup Sail environment and Composer dependencies
+    # Fix because of https://github.com/gitpod-io/gitpod/issues/16614
+    before: sudo curl -o /usr/local/bin/docker-compose -fsSL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-$(uname -m)
+    init: |
+      cp .env.example .env &&
+      sed -i "s#APP_URL=http://localhost#APP_URL=$(gp url 80)#g" .env
+      sed -i "s#GITPOD_VITE_URL=#GITPOD_VITE_URL=$(gp url 5173)#g" .env
+      composer install --ignore-platform-reqs
+      ./vendor/bin/sail up -d
+      ./vendor/bin/sail php artisan key:generate
+      ./vendor/bin/sail php artisan storage:link
+      cat .coolify-logo
+      gp sync-done sail-is-ready
+
+  - name: Install Node dependencies and run Vite
+    command: |
+      echo "Waiting for Sail environment to boot up."
+      gp sync-await sail-is-ready
+      ./vendor/bin/sail npm install
+      ./vendor/bin/sail npm run dev
+
+ports:
+  - port: 3306
+    onOpen: ignore
+    name: MySQL Database Port
+  - port: 5173
+    onOpen: ignore
+    visibility: public
+    name: Node Server for Vite
+
+# Configure vscode
+vscode:
+  extensions:
+    - bmewburn.vscode-intelephense-client
+    - eamodio.gitlens
+    - ikappas.composer
+    - ms-azuretools.vscode-docker
+    - ecmel.vscode-html-css
+    - MehediDracula.php-namespace-resolver
+    - wmaurer.change-case
+    - Equinusocio.vsc-community-material-theme
+    - EditorConfig.EditorConfig
+    - streetsidesoftware.code-spell-checker
+    - rangav.vscode-thunder-client
