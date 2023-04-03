@@ -13,7 +13,10 @@ x-testing-host: &testing-host-base
 
 services:
   php:
+    hostname: coolify.test
     image: "coolify:${TAG:-4}"
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     build:
       context: ./docker/dev
       dockerfile: Dockerfile
@@ -34,6 +37,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      selenium:
+        condition: service_started
   postgres:
     image: postgres:15-alpine
     ports:
@@ -57,6 +62,14 @@ services:
         ]
       retries: 5
       timeout: 10s
+  selenium:
+    image: seleniarm/standalone-chromium
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    volumes:
+      - '/dev/shm:/dev/shm'
+    networks:
+      - coolify
   testing-host:
     <<: *testing-host-base
     container_name: coolify-testing-host
