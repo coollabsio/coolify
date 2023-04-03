@@ -22,6 +22,7 @@ export default async function (data) {
 			});
 		});
 	}
+	Dockerfile.push(`RUN rm -fr .git`);
 	await fs.writeFile(`${data.workdir}${dockerFileLocation}`, Dockerfile.join('\n'));
 	await buildImage(data);
 }

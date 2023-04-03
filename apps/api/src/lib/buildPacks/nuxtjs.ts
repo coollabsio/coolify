@@ -36,6 +36,7 @@ const createDockerfile = async (data, image): Promise<void> => {
 		Dockerfile.push(`COPY .${baseDirectory || ''} ./`);
 		Dockerfile.push(`RUN ${installCommand}`);
 		Dockerfile.push(`RUN ${buildCommand}`);
+		Dockerfile.push('RUN rm -fr .git');
 		Dockerfile.push(`EXPOSE ${port}`);
 		Dockerfile.push(`CMD ${startCommand}`);
 	} else if (deploymentType === 'static') {

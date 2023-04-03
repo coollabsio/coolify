@@ -804,6 +804,7 @@ export async function buildCacheImageWithNode(data, imageForBuild) {
 		Dockerfile.push(`RUN ${installCommand}`);
 	}
 	Dockerfile.push(`RUN ${buildCommand}`);
+	Dockerfile.push('RUN rm -fr .git');
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
 }
@@ -821,6 +822,7 @@ export async function buildCacheImageForLaravel(data, imageForBuild) {
 	}
 	Dockerfile.push(`COPY *.json *.mix.js /app/`);
 	Dockerfile.push(`COPY resources /app/resources`);
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`RUN yarn install && yarn production`);
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
@@ -842,6 +844,7 @@ export async function buildCacheImageWithCargo(data, imageForBuild) {
 	Dockerfile.push('RUN cargo install cargo-chef');
 	Dockerfile.push(`COPY --from=planner-${applicationId} /app/recipe.json recipe.json`);
 	Dockerfile.push('RUN cargo chef cook --release --recipe-path recipe.json');
+	Dockerfile.push('RUN rm -fr .git');
 	await fs.writeFile(`${workdir}/Dockerfile-cache`, Dockerfile.join('\n'));
 	await buildImage({ ...data, isCache: true });
 }

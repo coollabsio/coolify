@@ -28,6 +28,7 @@ const createDockerfile = async (data, image, htaccessFound): Promise<void> => {
 	}
 
 	Dockerfile.push(`COPY /entrypoint.sh /opt/docker/provision/entrypoint.d/30-entrypoint.sh`);
+	Dockerfile.push('RUN rm -fr .git');
 	Dockerfile.push(`EXPOSE ${port}`);
 	await fs.writeFile(`${workdir}/Dockerfile`, Dockerfile.join('\n'));
 };
