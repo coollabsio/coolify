@@ -154,6 +154,8 @@ class DeployApplicationJob implements ShouldQueue
 
     private function generate_docker_compose()
     {
+        $persistentStorages = $this->generate_local_persistent_volumes();
+        $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -192,15 +194,36 @@ class DeployApplicationJob implements ShouldQueue
         if (count($this->application->ports_mappings) > 0) {
             $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings;
         }
-        // if (count($volumes) > 0) {
-        //     $docker_compose['services'][$this->application->uuid]['volumes'] = $volumes;
-        // }
-        // if (count($volume_names) > 0) {
-        //     $docker_compose['volumes'] = $volume_names;
-        // }
+        if (count($persistentStorages) > 0) {
+            $docker_compose['services'][$this->application->uuid]['volumes'] = $persistentStorages;
+        }
+        if (count($volume_names) > 0) {
+            $docker_compose['volumes'] = $volume_names;
+        }
         return Yaml::dump($docker_compose);
     }
+    private function generate_local_persistent_volumes()
+    {
+        foreach ($this->application->persistentStorages as $persistentStorage) {
+            $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
+            $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+        }
+        return $local_persistent_volumes ?? [];
+    }
 
+    private function generate_local_persistent_volumes_only_volume_names()
+    {
+        foreach ($this->application->persistentStorages as $persistentStorage) {
+            if ($persistentStorage->host_path) {
+                continue;
+            }
+            $local_persistent_volumes_names[$persistentStorage->name] = [
+                'name' => $persistentStorage->name,
+                'external' => false,
+            ];
+        }
+        return $local_persistent_volumes_names ?? [];
+    }
     private function generate_healthcheck_commands()
     {
         if (!$this->application->health_check_port) {
@@ -208,18 +231,12 @@ class DeployApplicationJob implements ShouldQueue
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
-                "curl -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path}"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
             ];
         } else {
-            $generated_healthchecks_commands = [];
-            foreach ($this->application->ports_exposes as $key => $port) {
-                $generated_healthchecks_commands = [
-                    "curl -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$port}/"
-                ];
-                if (count($this->application->ports_exposes) != $key + 1) {
-                    $generated_healthchecks_commands[] = '&&';
-                }
-            }
+            $generated_healthchecks_commands = [
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
+            ];
         }
         return implode(' ', $generated_healthchecks_commands);
     }

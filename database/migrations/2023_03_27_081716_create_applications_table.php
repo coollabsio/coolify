@@ -40,7 +40,7 @@ return new class extends Migration
             $table->string('base_directory')->default('/');
             $table->string('publish_directory')->nullable();
 
-            $table->string('health_check_path')->nullable();
+            $table->string('health_check_path')->default('/');
             $table->string('health_check_port')->nullable();
             $table->string('health_check_host')->default('localhost');
             $table->string('health_check_method')->default('GET');
