@@ -29,7 +29,7 @@ if (!function_exists('remoteProcess')) {
         // @TODO: Check if the user has access to this server
         // checkTeam($server->team_id);
 
-        $private_key_location = savePrivateKey($server);
+        $private_key_location = savePrivateKeyForServer($server);
 
         return resolve(DispatchRemoteProcess::class, [
             'remoteProcessArgs' => new RemoteProcessArgs(
@@ -56,8 +56,8 @@ if (!function_exists('remoteProcess')) {
 //     }
 // }
 
-if (!function_exists('savePrivateKey')) {
-    function savePrivateKey(Server $server)
+if (!function_exists('savePrivateKeyForServer')) {
+    function savePrivateKeyForServer(Server $server)
     {
         $temp_file = 'id.rsa_' . 'root' . '@' . $server->ip;
         Storage::disk('local')->put($temp_file, $server->privateKey->private_key, 'private');
@@ -118,9 +118,10 @@ if (!function_exists('formatDockerLabelsToJson')) {
     }
 }
 if (!function_exists('runRemoteCommandSync')) {
-    function runRemoteCommandSync($server, array $command) {
+    function runRemoteCommandSync($server, array $command)
+    {
         $command_string = implode("\n", $command);
-        $private_key_location = savePrivateKey($server);
+        $private_key_location = savePrivateKeyForServer($server);
         $ssh_command = generateSshCommand($private_key_location, $server->ip, $server->user, $server->port, $command_string);
         $process = Process::run($ssh_command);
         $output = trim($process->output());

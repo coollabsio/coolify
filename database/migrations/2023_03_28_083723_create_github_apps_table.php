@@ -21,14 +21,15 @@ return new class extends Migration
             $table->string('html_url');
             $table->integer('custom_port')->default(22);
             $table->string('custom_user')->default('git');
-            $table->boolean('is_system_wide')->default(false);
-            $table->boolean('is_public')->default(false);
 
             $table->integer('app_id')->nullable();
             $table->integer('installation_id')->nullable();
             $table->string('client_id')->nullable();
             $table->longText('client_secret')->nullable();
             $table->longText('webhook_secret')->nullable();
+
+            $table->boolean('is_system_wide')->default(false);
+            $table->boolean('is_public')->default(false);
 
             $table->foreignId('private_key_id')->nullable();
             $table->foreignId('team_id');
