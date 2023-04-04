@@ -279,15 +279,13 @@ class DeployApplicationJob implements ShouldQueue
             'hideFromOutput' => $hideFromOutput,
             'setStatus' => $setStatus,
         ]);
+        $result = $remoteProcess();
 
         if ($propertyName) {
-            $result = $remoteProcess();
             $this->activity->properties = $this->activity->properties->merge([
                 $propertyName => trim($result->output()),
             ]);
             $this->activity->save();
-        } else {
-            $remoteProcess();
         }
     }
     private function gitImport()

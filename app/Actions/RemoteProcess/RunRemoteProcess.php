@@ -71,6 +71,9 @@ class RunRemoteProcess
 
         $this->activity->save();
 
+        if ($processResult->exitCode() != 0 && $processResult->errorOutput()) {
+            throw new \RuntimeException('Remote command failed');
+        }
         return $processResult;
     }
 
