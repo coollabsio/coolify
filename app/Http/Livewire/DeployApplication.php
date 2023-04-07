@@ -2,21 +2,10 @@
 
 namespace App\Http\Livewire;
 
-use App\Jobs\ContainerStatusJob;
 use App\Jobs\DeployApplicationJob;
 use App\Models\Application;
-use App\Models\CoolifyInstanceSettings;
-use DateTimeImmutable;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Process;
 use Livewire\Component;
-use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
-use Lcobucci\JWT\Encoding\ChainedFormatter;
-use Lcobucci\JWT\Encoding\JoseEncoder;
-use Lcobucci\JWT\Signer\Key\InMemory;
-use Lcobucci\JWT\Signer\Rsa\Sha256;
-use Lcobucci\JWT\Token\Builder;
 
 class DeployApplication extends Component
 {

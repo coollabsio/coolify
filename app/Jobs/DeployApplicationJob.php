@@ -64,7 +64,7 @@ class DeployApplicationJob implements ShouldQueue
             ->performedOn($this->application)
             ->withProperties($remoteProcessArgs->toArray())
             ->event(ActivityTypes::DEPLOYMENT->value)
-            ->log("");
+            ->log("[]");
     }
 
     /**
@@ -139,7 +139,7 @@ class DeployApplicationJob implements ShouldQueue
         ], setStatus: true);
         $this->executeNow([
             "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
-        ]);
+        ], setStatus: true);
     }
 
     private function execute_in_builder(string $command)

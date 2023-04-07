@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\RemoteProcess\RunRemoteProcess;
 use App\Actions\RemoteProcess\TidyOutput;
 use App\Models\User;
 use App\Models\Server;
@@ -38,7 +39,7 @@ it('starts a docker container correctly', function () {
 
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $tidyOutput = (new TidyOutput($activity))();
+    $tidyOutput = RunRemoteProcess::decodeOutput($activity);
     $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers)->toBeEmpty();
 
@@ -48,7 +49,7 @@ it('starts a docker container correctly', function () {
 
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $tidyOutput = (new TidyOutput($activity))();
+    $tidyOutput = RunRemoteProcess::decodeOutput($activity);
     $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
