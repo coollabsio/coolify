@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\RemoteProcess\RunRemoteProcess;
 use App\Actions\RemoteProcess\TidyOutput;
 use App\Models\User;
 use App\Models\Server;
@@ -33,12 +34,12 @@ it('starts a docker container correctly', function () {
     $host = Server::where('name', 'testing-local-docker-container')->first();
 
     remoteProcess([
-        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq) > /dev/null 2>&1"
     ], $host);
 
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $tidyOutput = (new TidyOutput($activity))();
+    $tidyOutput = RunRemoteProcess::decodeOutput($activity);
     $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers)->toBeEmpty();
 
@@ -48,7 +49,7 @@ it('starts a docker container correctly', function () {
 
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
-    $tidyOutput = (new TidyOutput($activity))();
+    $tidyOutput = RunRemoteProcess::decodeOutput($activity);
     $containers = formatDockerCmdOutputToJson($tidyOutput);
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 

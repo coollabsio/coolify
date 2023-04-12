@@ -40,31 +40,31 @@ class ApplicationSeeder extends Seeder
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class,
         ]);
-        Application::create([
-            'name' => 'Private application (through GitHub App)',
-            'git_repository' => 'coollabsio/nodejs-example',
-            'git_branch' => 'main',
-            'build_pack' => 'nixpacks',
-            'ports_exposes' => '3000',
-            'ports_mappings' => '3001:3000',
-            'environment_id' => $environment_1->id,
-            'destination_id' => $standalone_docker_1->id,
-            'destination_type' => StandaloneDocker::class,
-            'source_id' => $github_private_source->id,
-            'source_type' => GithubApp::class,
-        ]);
-        Application::create([
-            'name' => 'Public application (from GitHub through Deploy Key)',
-            'git_repository' => 'coollabsio/php',
-            'git_branch' => 'main',
-            'build_pack' => 'nixpacks',
-            'ports_exposes' => '80,3000',
-            'ports_mappings' => '3002:80',
-            'environment_id' => $environment_1->id,
-            'destination_id' => $standalone_docker_1->id,
-            'destination_type' => StandaloneDocker::class,
-            'source_id' => $github_private_source_with_deploy_key->id,
-            'source_type' => GithubApp::class,
-        ]);
+        // Application::create([
+        //     'name' => 'Private application (through GitHub App)',
+        //     'git_repository' => 'coollabsio/nodejs-example',
+        //     'git_branch' => 'main',
+        //     'build_pack' => 'nixpacks',
+        //     'ports_exposes' => '3000',
+        //     'ports_mappings' => '3001:3000',
+        //     'environment_id' => $environment_1->id,
+        //     'destination_id' => $standalone_docker_1->id,
+        //     'destination_type' => StandaloneDocker::class,
+        //     'source_id' => $github_private_source->id,
+        //     'source_type' => GithubApp::class,
+        // ]);
+        // Application::create([
+        //     'name' => 'Public application (from GitHub through Deploy Key)',
+        //     'git_repository' => 'coollabsio/php',
+        //     'git_branch' => 'main',
+        //     'build_pack' => 'nixpacks',
+        //     'ports_exposes' => '80,3000',
+        //     'ports_mappings' => '3002:80',
+        //     'environment_id' => $environment_1->id,
+        //     'destination_id' => $standalone_docker_1->id,
+        //     'destination_type' => StandaloneDocker::class,
+        //     'source_id' => $github_private_source_with_deploy_key->id,
+        //     'source_type' => GithubApp::class,
+        // ]);
     }
 }

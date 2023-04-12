@@ -4,6 +4,7 @@ namespace App\Actions\RemoteProcess;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
+use App\Jobs\DeployApplicationJob;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -26,11 +27,6 @@ class RunRemoteProcess
     protected $throttleIntervalMS = 500;
 
     protected int $counter = 1;
-
-    public const MARK_START = "|--";
-    public const MARK_END = "--|";
-    public const SEPARATOR = '|';
-    public const MARK_REGEX = "/(\|--\d+\|\d+\|(?:out|err)--\|)/";
 
     /**
      * Create a new job instance.
@@ -77,6 +73,15 @@ class RunRemoteProcess
         return $processResult;
     }
 
+    protected function getLatestCounter(): int
+    {
+        $description = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
+        if ($description === null || count($description) === 0) {
+            return 1;
+        }
+        return end($description)['order'] + 1;
+    }
+
     protected function getCommand(): string
     {
         $user = $this->activity->getExtraProperty('user');
@@ -96,7 +101,7 @@ class RunRemoteProcess
 
         $this->currentTime = $this->elapsedTime();
 
-        $this->activity->description .= $this->encodeOutput($type, $output);
+        $this->activity->description = $this->encodeOutput($type, $output);
 
         if ($this->isAfterLastThrottle()) {
             // Let's write to database.
@@ -109,12 +114,39 @@ class RunRemoteProcess
 
     public function encodeOutput($type, $output)
     {
-        return
-            static::MARK_START . $this->counter++ .
-            static::SEPARATOR . $this->elapsedTime() .
-            static::SEPARATOR . $type .
-            static::MARK_END .
-            $output;
+        $outputStack = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
+
+        $outputStack[] = [
+            'type' => $type,
+            'output' => $output,
+            'timestamp' => hrtime(true),
+            'batch' => DeployApplicationJob::$batch_counter,
+            'order' => $this->getLatestCounter(),
+        ];
+
+        return json_encode($outputStack, flags: JSON_THROW_ON_ERROR);
+    }
+
+    public static function decodeOutput(?Activity $activity = null): string
+    {
+        if (is_null($activity)) {
+            return '';
+        }
+
+        try {
+            $decoded = json_decode(
+                data_get($activity, 'description'),
+                associative: true,
+                flags: JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $exception) {
+            return '';
+        }
+
+        return collect($decoded)
+            ->sortBy(fn ($i) => $i['order'])
+            ->map(fn ($i) => $i['output'])
+            ->implode("");
     }
 
     /**

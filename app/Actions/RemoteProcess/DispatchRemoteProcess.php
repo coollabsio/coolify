@@ -20,12 +20,12 @@ class DispatchRemoteProcess
                 ->withProperties($properties)
                 ->performedOn($remoteProcessArgs->model)
                 ->event($remoteProcessArgs->type)
-                ->log("");
+                ->log("[]");
         } else {
             $this->activity = activity()
                 ->withProperties($remoteProcessArgs->toArray())
                 ->event($remoteProcessArgs->type)
-                ->log("");
+                ->log("[]");
         }
     }
 

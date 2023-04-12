@@ -24,6 +24,7 @@ class PollActivity extends Component
             $this->isKeepAliveOn = false;
         }
     }
+
     public function render()
     {
         return view('livewire.poll-activity');

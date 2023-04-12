@@ -2,10 +2,7 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Application;
-use App\Models\Environment;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Models\Activity;
 
 class ProjectController extends Controller
 {
@@ -64,8 +61,10 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
+        $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
 
         return view('project.deployment', [
+            'activity' => $activity,
             'deployment_uuid' => $deployment_uuid,
         ]);
     }

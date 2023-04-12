@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\RemoteProcess\RunRemoteProcess;
-use App\Actions\RemoteProcess\TidyOutput;
 use App\Models\Server;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -24,13 +23,10 @@ it('outputs correctly', function () {
     ], $host);
 
 
-    preg_match(RunRemoteProcess::MARK_REGEX, $activity->description, $matchesInRawContent);
-    $out = (new TidyOutput($activity))();
-    preg_match(RunRemoteProcess::MARK_REGEX, $out, $matchesInTidyOutput);
+    $tidyOutput = RunRemoteProcess::decodeOutput($activity);
 
-    expect($matchesInRawContent)
-        ->not()->toBeEmpty()
-        ->and($matchesInTidyOutput)
-        ->toBeEmpty();
-
+    expect($tidyOutput)
+        ->toContain('Welcome 1 times')
+        ->toContain('Welcome 3 times')
+        ->not()->toBeJson();
 });
