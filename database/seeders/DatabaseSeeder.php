@@ -18,7 +18,6 @@ class DatabaseSeeder extends Seeder
             ProjectSeeder::class,
             ProjectSettingSeeder::class,
             EnvironmentSeeder::class,
-            LocalPersistentVolumeSeeder::class,
             StandaloneDockerSeeder::class,
             SwarmDockerSeeder::class,
             KubernetesSeeder::class,
@@ -28,6 +27,7 @@ class DatabaseSeeder extends Seeder
             ApplicationSettingsSeeder::class,
             DBSeeder::class,
             ServiceSeeder::class,
+            LocalPersistentVolumeSeeder::class,
         ]);
     }
 }

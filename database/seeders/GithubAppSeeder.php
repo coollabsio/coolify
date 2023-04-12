@@ -16,9 +16,9 @@ class GithubAppSeeder extends Seeder
     public function run(): void
     {
         $root_team = Team::find(1);
+        $private_key_1 = PrivateKey::find(1);
         $private_key_2 = PrivateKey::find(2);
         GithubApp::create([
-            'id' => 1,
             'name' => 'Public GitHub',
             'api_url' => 'https://api.github.com',
             'html_url' => 'https://github.com',
@@ -26,7 +26,6 @@ class GithubAppSeeder extends Seeder
             'team_id' => $root_team->id,
         ]);
         GithubApp::create([
-            'id' => 2,
             'name' => 'coolify-laravel-development-private-github',
             'api_url' => 'https://api.github.com',
             'html_url' => 'https://github.com',
@@ -37,6 +36,14 @@ class GithubAppSeeder extends Seeder
             'client_secret' => '96b1b31f36ce0a34386d11798ff35b9b6d8aba3a',
             'webhook_secret' => '326a47b49054f03288f800d81247ec9414d0abf3',
             'private_key_id' => $private_key_2->id,
+            'team_id' => $root_team->id,
+        ]);
+        GithubApp::create([
+            'name' => 'Private GitHub (deployment key)',
+            'api_url' => 'https://api.github.com',
+            'html_url' => 'https://github.com',
+            'is_public' => false,
+            'private_key_id' => $private_key_1->id,
             'team_id' => $root_team->id,
         ]);
     }

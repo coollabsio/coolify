@@ -14,6 +14,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
@@ -49,7 +50,7 @@ class DeployApplicationJob implements ShouldQueue
 
         $server = $this->destination->server;
 
-        $private_key_location = savePrivateKey($server);
+        $private_key_location = savePrivateKeyForServer($server);
 
         $remoteProcessArgs = new RemoteProcessArgs(
             server_ip: $server->ip,
@@ -98,8 +99,14 @@ class DeployApplicationJob implements ShouldQueue
 
         // Import git repository
         $this->executeNow([
-            "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '",
-            $this->gitImport(),
+            "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '"
+        ]);
+
+        $this->executeNow([
+            ...$this->gitImport(),
+        ], 'importing_git_repository');
+
+        $this->executeNow([
             "echo 'Done.'"
         ]);
 
@@ -135,10 +142,8 @@ class DeployApplicationJob implements ShouldQueue
         ]);
         $this->executeNow([
             "echo -n 'Starting new container... '",
-            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null 2>&1"),
+            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
             "echo 'Done. 🎉'",
-        ], setStatus: true);
-        $this->executeNow([
             "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
         ], setStatus: true);
     }
@@ -150,7 +155,8 @@ class DeployApplicationJob implements ShouldQueue
 
     private function generate_docker_compose()
     {
-
+        $persistentStorages = $this->generate_local_persistent_volumes();
+        $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -158,6 +164,9 @@ class DeployApplicationJob implements ShouldQueue
                     'image' => "{$this->application->uuid}:$this->git_commit",
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
+                    'environment' => [
+                        'PORT' => $this->application->ports_exposes[0]
+                    ],
                     'labels' => $this->set_labels_for_applications(),
                     'expose' => $this->application->ports_exposes,
                     'networks' => [
@@ -186,15 +195,36 @@ class DeployApplicationJob implements ShouldQueue
         if (count($this->application->ports_mappings) > 0) {
             $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings;
         }
-        // if (count($volumes) > 0) {
-        //     $docker_compose['services'][$this->application->uuid]['volumes'] = $volumes;
-        // }
-        // if (count($volume_names) > 0) {
-        //     $docker_compose['volumes'] = $volume_names;
-        // }
+        if (count($persistentStorages) > 0) {
+            $docker_compose['services'][$this->application->uuid]['volumes'] = $persistentStorages;
+        }
+        if (count($volume_names) > 0) {
+            $docker_compose['volumes'] = $volume_names;
+        }
         return Yaml::dump($docker_compose);
     }
+    private function generate_local_persistent_volumes()
+    {
+        foreach ($this->application->persistentStorages as $persistentStorage) {
+            $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
+            $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
+        }
+        return $local_persistent_volumes ?? [];
+    }
 
+    private function generate_local_persistent_volumes_only_volume_names()
+    {
+        foreach ($this->application->persistentStorages as $persistentStorage) {
+            if ($persistentStorage->host_path) {
+                continue;
+            }
+            $local_persistent_volumes_names[$persistentStorage->name] = [
+                'name' => $persistentStorage->name,
+                'external' => false,
+            ];
+        }
+        return $local_persistent_volumes_names ?? [];
+    }
     private function generate_healthcheck_commands()
     {
         if (!$this->application->health_check_port) {
@@ -202,18 +232,12 @@ class DeployApplicationJob implements ShouldQueue
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
-                "curl -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path}"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
             ];
         } else {
-            $generated_healthchecks_commands = [];
-            foreach ($this->application->ports_exposes as $key => $port) {
-                $generated_healthchecks_commands = [
-                    "curl -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$port}/"
-                ];
-                if (count($this->application->ports_exposes) != $key + 1) {
-                    $generated_healthchecks_commands[] = '&&';
-                }
-            }
+            $generated_healthchecks_commands = [
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
+            ];
         }
         return implode(' ', $generated_healthchecks_commands);
     }
@@ -255,10 +279,14 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false)
+    private function executeNow(array|Collection $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false)
     {
         static::$batch_counter++;
-        $commandText = collect($command)->implode("\n");
+        if ($command instanceof Collection) {
+            $commandText = $command->implode("\n");
+        } else {
+            $commandText = collect($command)->implode("\n");
+        }
 
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
@@ -270,15 +298,13 @@ class DeployApplicationJob implements ShouldQueue
             'hideFromOutput' => $hideFromOutput,
             'setStatus' => $setStatus,
         ]);
+        $result = $remoteProcess();
 
         if ($propertyName) {
-            $result = $remoteProcess();
             $this->activity->properties = $this->activity->properties->merge([
                 $propertyName => trim($result->output()),
             ]);
             $this->activity->save();
-        } else {
-            $remoteProcess();
         }
     }
     private function gitImport()
@@ -287,12 +313,27 @@ class DeployApplicationJob implements ShouldQueue
         $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
         $source_html_url_host = $url['host'];
         $source_html_url_scheme = $url['scheme'];
+
         if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
             if ($this->source->is_public) {
-                return $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}");
+                return [
+                    $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}")
+                ];
             } else {
-                $github_access_token = $this->generate_jwt_token_for_github();
-                return $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}");
+                if (!$this->application->source->app_id) {
+                    $private_key = base64_encode($this->application->source->privateKey->private_key);
+                    return [
+                        $this->execute_in_builder("mkdir -p /root/.ssh"),
+                        $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                        $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
+                        $this->execute_in_builder("GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git clone -q -b {$this->application->git_branch} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}")
+                    ];
+                } else {
+                    $github_access_token = $this->generate_jwt_token_for_github();
+                    return [
+                        $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}")
+                    ];
+                }
             }
         }
     }

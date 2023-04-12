@@ -13,10 +13,11 @@ class LocalPersistentVolumeSeeder extends Seeder
      */
     public function run(): void
     {
+        $application = Application::where('name', 'Public application (from GitHub)')->first();
         LocalPersistentVolume::create([
             'name' => 'test-pv',
             'mount_path' => '/data',
-            'resource_id' => 1,
+            'resource_id' => $application->id,
             'resource_type' => Application::class,
         ]);
     }
