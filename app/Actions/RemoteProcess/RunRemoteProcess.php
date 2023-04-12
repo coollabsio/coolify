@@ -4,6 +4,7 @@ namespace App\Actions\RemoteProcess;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
+use App\Jobs\DeployApplicationJob;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -69,6 +70,15 @@ class RunRemoteProcess
         return $processResult;
     }
 
+    protected function getLatestCounter(): int
+    {
+        $description = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
+        if ($description === null || count($description) === 0) {
+            return 1;
+        }
+        return end($description)['order'] + 1;
+    }
+
     protected function getCommand(): string
     {
         $user = $this->activity->getExtraProperty('user');
@@ -106,8 +116,9 @@ class RunRemoteProcess
         $outputStack[] = [
             'type' => $type,
             'output' => $output,
-            'elapsed_time' => $this->elapsedTime(),
-            'order' => $this->counter++,
+            'timestamp' => hrtime(true),
+            'batch' => DeployApplicationJob::$batch_counter,
+            'order' => $this->getLatestCounter(),
         ];
 
         return json_encode($outputStack, flags: JSON_THROW_ON_ERROR);
@@ -115,12 +126,13 @@ class RunRemoteProcess
 
     public static function decodeOutput(?Activity $activity = null): string
     {
-        if(is_null($activity)) {
+        if (is_null($activity)) {
             return '';
         }
 
         try {
-            $decoded = json_decode(data_get($activity, 'description'),
+            $decoded = json_decode(
+                data_get($activity, 'description'),
                 associative: true,
                 flags: JSON_THROW_ON_ERROR
             );
@@ -129,9 +141,9 @@ class RunRemoteProcess
         }
 
         return collect($decoded)
-            ->sortBy(fn($i) => $i['order'])
-            ->map(fn($i) => $i['output'])
-            ->implode("\n");
+            ->sortBy(fn ($i) => $i['order'])
+            ->map(fn ($i) => $i['output'])
+            ->implode("");
     }
 
     /**

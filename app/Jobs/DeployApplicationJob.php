@@ -33,6 +33,7 @@ class DeployApplicationJob implements ShouldQueue
     protected Activity $activity;
     protected string $git_commit;
     protected string $workdir;
+    public static int $batch_counter = 0;
 
     /**
      * Create a new job instance.
@@ -93,14 +94,14 @@ class DeployApplicationJob implements ShouldQueue
             "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
             "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1",
             "echo 'Done.'",
-        ], 'docker_pull_builder_image');
+        ]);
 
         // Import git repository
         $this->executeNow([
             "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '",
             $this->gitImport(),
             "echo 'Done.'"
-        ], 'importing_git_repository');
+        ]);
 
         // Get git commit
         $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
@@ -256,6 +257,7 @@ class DeployApplicationJob implements ShouldQueue
 
     private function executeNow(array $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false)
     {
+        static::$batch_counter++;
         $commandText = collect($command)->implode("\n");
 
         $this->activity->properties = $this->activity->properties->merge([
