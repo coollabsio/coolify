@@ -19,7 +19,6 @@ services:
       dockerfile: ./docker/dev-ssu/Dockerfile
     ports:
       - "${APP_PORT:-8000}:80"
-      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     environment:
       PUID: "${USERID:-1000}"
       PGID: "${GROUPID:-1000}"
@@ -45,6 +44,8 @@ services:
   vite:
     image: node:19
     working_dir: /var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
     volumes:
       - .:/var/www/html:cached
     command: sh -c "npm install && npm run dev"
