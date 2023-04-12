@@ -1,4 +1,5 @@
 <nav>
+    <div>v{{ config('coolify.version') }}</div>
     @guest
         <a href="/login">Login</a>
         <a href="/register">Register</a>
