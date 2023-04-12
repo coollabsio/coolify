@@ -106,7 +106,7 @@ class RunRemoteProcess
         $outputStack[] = [
             'type' => $type,
             'output' => $output,
-            'elapsed_tim' => $this->elapsedTime(),
+            'elapsed_time' => $this->elapsedTime(),
             'order' => $this->counter++,
         ];
 
