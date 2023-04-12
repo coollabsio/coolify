@@ -34,7 +34,7 @@ it('starts a docker container correctly', function () {
     $host = Server::where('name', 'testing-local-docker-container')->first();
 
     remoteProcess([
-        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq) > /dev/null 2>&1"
     ], $host);
 
     // Assert there's no containers start with coolify_test_*
