@@ -29,12 +29,12 @@ jobs:
             -v "$(pwd):/app" \
             -w /app composer:2 \
             composer install --ignore-platform-reqs
-          ./vendor/bin/sail build
+          ./vendor/bin/spin build
       - name: Start the stack
         run: |
-          ./vendor/bin/sail up -d
-          ./vendor/bin/sail artisan key:generate
-          ./vendor/bin/sail artisan migrate:fresh --seed
+          ./vendor/bin/spin up -d
+          ./vendor/bin/spin exec coolify php artisan key:generate
+          ./vendor/bin/spin exec coolify php artisan migrate:fresh --seed
       - name: Test (missing E2E tests)
         run: |
-          ./vendor/bin/sail artisan test
+          ./vendor/bin/spin exec coolify php artisan test
