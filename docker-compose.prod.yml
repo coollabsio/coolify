@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  coolify:
+    build:
+      context: .
+      dockerfile: ./docker/prod-ssu/Dockerfile
+    environment:
+      AUTORUN_LARAVEL_STORAGE_LINK: "true"
+      AUTORUN_LARAVEL_MIGRATION: "true"
+    env_file:
+      - .env
+  postgres:
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+    env_file:
+      - .env

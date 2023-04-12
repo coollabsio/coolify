@@ -1,6 +1,0 @@
-version: '3.8'
-services:
-  coolify:
-    image: serversideup/php:8.2-fpm-nginx
-  postgres:
-    image: postgres:15-alpine

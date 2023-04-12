@@ -1,0 +1,15 @@
+version: '3.8'
+services:
+  coolify:
+    working_dir: /var/www/html
+    networks:
+      - coolify
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:15-alpine
+    networks:
+      - coolify
+networks:
+  coolify:
+    driver: bridge
