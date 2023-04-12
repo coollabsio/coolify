@@ -58,16 +58,4 @@ class DeployApplication extends Component
     {
         $this->application->refresh();
     }
-
-    public function checkStatus()
-    {
-        $output = runRemoteCommandSync($this->destination->server, ["docker ps -a --format '{{.State}}' --filter 'name={$this->application->uuid}'"]);
-        if ($output == '') {
-            $this->application->status = 'exited';
-            $this->application->save();
-        } else {
-            $this->application->status = $output;
-            $this->application->save();
-        }
-    }
 }
