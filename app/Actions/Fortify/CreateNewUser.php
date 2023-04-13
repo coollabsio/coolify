@@ -36,18 +36,21 @@ class CreateNewUser implements CreatesNewUsers
         $team = Team::create([
             'name' => explode(' ', $input['name'], 2)[0] . "'s Team",
             'personal_team' => true,
-            'is_root_user' => User::count() == 0 ? true : false,
         ]);
+
         $user = User::create([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => Hash::make($input['password']),
+            'is_root_user' => User::count() == 0 ? true : false,
         ]);
+
         DB::table('team_user')->insert([
-            'team_id' =>  $user->id,
-            'user_id' => $team->id,
+            'user_id' => $user->id,
+            'team_id' => $team->id,
             'role' => 'admin',
         ]);
+        session(['currentTeam' => $user->currentTeam = $team]);
         return $user;
     }
 }
