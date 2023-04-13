@@ -6,6 +6,7 @@ services:
       - coolify
     depends_on:
       - postgres
+
   postgres:
     image: postgres:15-alpine
     networks:
