@@ -9,6 +9,7 @@ class Team extends BaseModel
     ];
     protected $fillable = [
         'name',
+        'personal_team'
     ];
     public function projects() {
         return $this->hasMany(Project::class);

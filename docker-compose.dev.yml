@@ -1,0 +1,60 @@
+version: '3.8'
+
+x-testing-host: &testing-host-base
+  image: coolify-testing-host
+  build:
+    dockerfile: Dockerfile
+    context: ./docker/testing-host
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
+  networks:
+    - coolify
+
+
+services:
+  coolify:
+    build:
+      context: .
+      dockerfile: ./docker/dev-ssu/Dockerfile
+    ports:
+      - "${APP_PORT:-8000}:80"
+    environment:
+      PUID: "${USERID:-1000}"
+      PGID: "${GROUPID:-1000}"
+      SSL_MODE: "off"
+      AUTORUN_LARAVEL_STORAGE_LINK: "false"
+      AUTORUN_LARAVEL_MIGRATION: "false"
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www/html/:cached
+  postgres:
+    ports:
+      - "${FORWARD_DB_PORT:-5432}:5432"
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - ./_volumes/database/:/var/lib/postgresql/data
+  vite:
+    image: node:19
+    working_dir: /var/www/html
+    ports:
+      - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"
+    volumes:
+      - .:/var/www/html:cached
+    command: sh -c "npm install && npm run dev"
+  testing-host:
+      <<: *testing-host-base
+      container_name: coolify-testing-host
+  testing-host2:
+      <<: *testing-host-base
+      container_name: coolify-testing-host-2
+
+
+

@@ -2,7 +2,9 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\Team;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -31,10 +33,24 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return User::create([
+        $team = Team::create([
+            'name' => explode(' ', $input['name'], 2)[0] . "'s Team",
+            'personal_team' => true,
+        ]);
+
+        $user = User::create([
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => Hash::make($input['password']),
+            'is_root_user' => User::count() == 0 ? true : false,
         ]);
+
+        DB::table('team_user')->insert([
+            'user_id' => $user->id,
+            'team_id' => $team->id,
+            'role' => 'admin',
+        ]);
+        session(['currentTeam' => $user->currentTeam = $team]);
+        return $user;
     }
 }

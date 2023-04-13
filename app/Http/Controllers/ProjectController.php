@@ -8,10 +8,11 @@ class ProjectController extends Controller
 {
     public function environments()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first()->load(['environments']);
+        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('home');
         }
+        $project->load(['environments']);
         return view('project.environments', ['project' => $project]);
     }
 

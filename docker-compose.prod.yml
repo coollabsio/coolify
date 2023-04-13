@@ -1,0 +1,49 @@
+version: '3.8'
+services:
+  coolify:
+    container_name: coolify
+    build:
+      context: .
+      dockerfile: ./docker/prod-ssu/Dockerfile
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG
+      - APP_NAME
+      - APP_KEY
+      - APP_URL
+      - DB_CONNECTION
+      - DB_HOST
+      - DB_PORT
+      - DB_DATABASE
+      - DB_USERNAME
+      - DB_PASSWORD
+      - QUEUE_CONNECTION
+      - SSL_MODE=off
+      - AUTORUN_LARAVEL_MIGRATION=true
+    ports:
+      - "${APP_PORT:-8000}:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+  postgres:
+    container_name: coolify-db
+    volumes:
+      - coolify-db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_DB: "${DB_DATABASE}"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USERNAME}",
+          "-d",
+          "${DB_DATABASE}"
+        ]
+      interval: 2s
+      retries: 5
+      timeout: 2s
+volumes:
+  coolify-db:
+    name: coolify-db
