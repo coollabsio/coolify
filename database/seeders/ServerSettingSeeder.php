@@ -13,11 +13,11 @@ class ServerSettingSeeder extends Seeder
      */
     public function run(): void
     {
-        $server_2 = Server::find(2)->load(['settings']);
+        $server_2 = Server::find(1)->load(['settings']);
         $server_2->settings->is_build_server = true;
         $server_2->settings->save();
 
-        $server_3 = Server::find(3)->load(['settings']);
+        $server_3 = Server::find(2)->load(['settings']);
         $server_3->settings->is_build_server = true;
         $server_3->settings->save();
 

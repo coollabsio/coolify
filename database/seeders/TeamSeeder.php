@@ -11,8 +11,8 @@ class TeamSeeder extends Seeder
 {
     public function run(): void
     {
-        $root_user = User::find(1);
-        $normal_user = User::find(2);
+        $root_user = User::find(0);
+        $normal_user = User::find(1);
 
         $root_user_personal_team = Team::create([
             'id' => 0,
