@@ -22,7 +22,6 @@
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v7.7.0",
         "laravel/pint": "^v1.8.0",
-        "laravel/sail": "^v1.21.4",
         "mockery/mockery": "^1.5.1",
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^v2.4.0",
