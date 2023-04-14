@@ -105,7 +105,7 @@ class DeployApplicationJob implements ShouldQueue
 
             $this->executeNow([
                 "echo 'Started! 🎉'"
-            ]);
+            ], setStatus: true);
         } else {
             // Pull builder image
             $this->executeNow([
