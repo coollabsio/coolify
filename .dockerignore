@@ -5,6 +5,7 @@
 /public/storage
 /storage/*.key
 /vendor
+.env.example
 .env
 .env.backup
 .env.production
@@ -19,5 +20,5 @@ yarn-error.log
 /.vscode
 /.npm
 /.bash_history
-/_volumes/*
+/_volumes
 

@@ -14,5 +14,6 @@
             @csrf
             <button type="submit">Logout</button>
         </form>
+        <livewire:check-update>
     @endauth
 </nav>

@@ -2,6 +2,8 @@ version: '3.8'
 services:
   coolify:
     working_dir: /var/www/html
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
     networks:
       - coolify
     depends_on:

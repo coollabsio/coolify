@@ -32,6 +32,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile', function () {
         return view('profile');
     });
+    Route::get('/update', function () {
+        return view('update');
+    });
     Route::get('/demo', function () {
         return view('demo');
     });

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use Illuminate\Queue\Events\JobProcessed;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,6 +14,13 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // @TODO: Is this the best place to run the seeder?
+        // if (env('APP_ENV') === 'production') {
+        //     dump('Seed default data.');
+        //     Process::run('php artisan db:seed --class=ProductionSeeder --force');
+        // } else {
+        //     dump('Not in production environment.');
+        // }
         //
     }
 

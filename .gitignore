@@ -19,4 +19,4 @@ yarn-error.log
 /.vscode
 /.npm
 /.bash_history
-/_volumes/*
+/_volumes
