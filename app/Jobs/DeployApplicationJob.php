@@ -97,7 +97,7 @@ class DeployApplicationJob implements ShouldQueue
 
         if ($this->activity->properties->get('stopped_container_check') == 0) {
             $this->executeNow([
-                "echo 'Container {$this->application->uuid} was stopped, starting it...'"
+                "echo -n 'Container {$this->application->uuid} was stopped, starting it...'"
             ]);
             $this->executeNow([
                 "docker start {$this->application->uuid}"
@@ -144,29 +144,38 @@ class DeployApplicationJob implements ShouldQueue
 
             $this->executeNow([
                 "echo -n 'Generating nixpacks configuration... '",
+            ]);
+            $this->executeNow([
                 $this->nixpacks_build_cmd(),
                 $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
                 $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
-                "echo 'Done.'",
-            ]);
+            ], isDebuggable: true);
+
             $this->executeNow([
+                "echo 'Done.'",
                 "echo -n 'Building image... '",
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
-                "echo 'Done.'",
             ]);
+
             $this->executeNow([
-                "echo -n 'Removing old container... '",
+                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+            ], isDebuggable: true);
+
+            $this->executeNow([
+                "echo 'Done.'",
+                "echo -n 'Removing old instance... '",
                 $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
                 "echo 'Done.'",
+                "echo -n 'Starting your application... '",
             ]);
             $this->executeNow([
-                "echo -n 'Starting new container... '",
                 $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
+            ], isDebuggable: true);
+
+            $this->executeNow([
                 "echo 'Done. 🎉'",
                 "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
             ], setStatus: true);
         }
-
 
         dispatch(new ContainerStatusJob($this->application_uuid));
 
@@ -305,9 +314,10 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow(array|Collection $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false)
+    private function executeNow(array|Collection $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false, bool $isDebuggable = false)
     {
         static::$batch_counter++;
+
         if ($command instanceof Collection) {
             $commandText = $command->implode("\n");
         } else {
@@ -318,7 +328,9 @@ class DeployApplicationJob implements ShouldQueue
             'command' => $commandText,
         ]);
         $this->activity->save();
-
+        if ($isDebuggable && !$this->application->settings->is_debug) {
+            $hideFromOutput = true;
+        }
         $remoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'hideFromOutput' => $hideFromOutput,

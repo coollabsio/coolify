@@ -17,10 +17,8 @@ class ApplicationSettingsSeeder extends Seeder
      */
     public function run(): void
     {
-        // $application_1 = Application::find(1);
-        // ApplicationSetting::create([
-        //     'id' => 1,
-        //     'application_id' => $application_1->id,
-        // ]);
+        $application_1 = Application::find(1)->load(['settings']);
+        $application_1->settings->is_debug = false;
+        $application_1->settings->save();
     }
 }

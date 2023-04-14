@@ -19,6 +19,14 @@ class ContainerStatusJob implements ShouldQueue
         public string|null $container_id = null,
     ) {
     }
+    public function handle(): void
+    {
+        if ($this->container_id) {
+            $this->checkContainerStatus();
+        } else {
+            $this->checkAllServers();
+        }
+    }
     protected function checkAllServers()
     {
         try {
@@ -67,14 +75,6 @@ class ContainerStatusJob implements ShouldQueue
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
-        }
-    }
-    public function handle(): void
-    {
-        if ($this->container_id) {
-            $this->checkContainerStatus();
-        } else {
-            $this->checkAllServers();
         }
     }
 }

@@ -53,6 +53,14 @@ class DeployApplication extends Component
         $this->application->status = 'stopped';
         $this->application->save();
     }
+    public function kill()
+    {
+        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid}"]);
+        if ($this->application->status != 'exited') {
+            $this->application->status = 'exited';
+            $this->application->save();
+        }
+    }
 
     public function pollingStatus()
     {
