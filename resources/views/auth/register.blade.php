@@ -1,8 +1,8 @@
 <x-layout>
     <form action="/register" method="POST">
         @csrf
-        <input type="text" name="name" placeholder="name" @env('local') value="Andras Bacsai" @endenv />
-        <input type="text" name="email" placeholder="email" @env('local') value="andras@bacsai.com" @endenv />
+        <input type="text" name="name" placeholder="name" @env('local') value="Root" @endenv />
+        <input type="text" name="email" placeholder="email" @env('local') value="test@example.com" @endenv />
         <input type="password" name="password" placeholder="Password" @env('local') value="password" @endenv />
         <input type="password" name="password_confirmation" placeholder="Password"
             @env('local') value="password" @endenv />

@@ -8,6 +8,7 @@ class Team extends BaseModel
         'personal_team' => 'boolean',
     ];
     protected $fillable = [
+        'id',
         'name',
         'personal_team'
     ];

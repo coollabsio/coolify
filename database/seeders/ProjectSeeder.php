@@ -10,7 +10,7 @@ class ProjectSeeder extends Seeder
 {
     public function run(): void
     {
-        $root_team = Team::find(1);
+        $root_team = Team::find(0);
         Project::create([
             'id' => 1,
             'name' => "My first project",

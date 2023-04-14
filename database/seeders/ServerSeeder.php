@@ -14,10 +14,10 @@ class ServerSeeder extends Seeder
      */
     public function run(): void
     {
-        $root_team = Team::find(1);
+        $root_team = Team::find(0);
         $private_key_1 = PrivateKey::find(1);
         Server::create([
-            'id' => 1,
+            'id' => 0,
             'name' => "localhost",
             'description' => "This is the local machine",
             'user' => 'root',
@@ -26,7 +26,7 @@ class ServerSeeder extends Seeder
             'private_key_id' => $private_key_1->id,
         ]);
         Server::create([
-            'id' => 2,
+            'id' => 1,
             'name' => "testing-local-docker-container",
             'description' => "This is a test docker container",
             'ip' => "coolify-testing-host",
@@ -34,7 +34,7 @@ class ServerSeeder extends Seeder
             'private_key_id' => $private_key_1->id,
         ]);
         Server::create([
-            'id' => 3,
+            'id' => 2,
             'name' => "testing-local-docker-container-2",
             'description' => "This is a test docker container",
             'ip' => "coolify-testing-host-2",

@@ -15,7 +15,7 @@ class GithubAppSeeder extends Seeder
      */
     public function run(): void
     {
-        $root_team = Team::find(1);
+        $root_team = Team::find(0);
         $private_key_1 = PrivateKey::find(1);
         $private_key_2 = PrivateKey::find(2);
         GithubApp::create([

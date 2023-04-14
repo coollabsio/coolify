@@ -15,7 +15,7 @@ class GitlabAppSeeder extends Seeder
      */
     public function run(): void
     {
-        $root_team = Team::find(1);
+        $root_team = Team::find(0);
         $private_key_3 = PrivateKey::find(3);
         GitlabApp::create([
             'id' => 1,

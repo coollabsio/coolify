@@ -15,6 +15,7 @@ class TeamSeeder extends Seeder
         $normal_user = User::find(2);
 
         $root_user_personal_team = Team::create([
+            'id' => 0,
             'name' => "Root Team",
             'personal_team' => true,
         ]);
@@ -27,7 +28,7 @@ class TeamSeeder extends Seeder
             'personal_team' => true,
         ]);
         DB::table('team_user')->insert([
-            'team_id' =>  $root_user_personal_team->id,
+            'team_id' => $root_user_personal_team->id,
             'user_id' => $root_user->id,
             'role' => 'admin',
         ]);
