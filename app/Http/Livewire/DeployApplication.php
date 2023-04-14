@@ -32,7 +32,7 @@ class DeployApplication extends Component
     }
 
 
-    public function deploy()
+    public function start()
     {
         // Create Deployment ID
         $this->deployment_uuid = new Cuid2(7);
@@ -49,8 +49,8 @@ class DeployApplication extends Component
 
     public function stop()
     {
-        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid} >/dev/null 2>&1"]);
-        $this->application->status = 'exited';
+        runRemoteCommandSync($this->destination->server, ["docker stop -t 0 {$this->application_uuid} >/dev/null 2>&1"]);
+        $this->application->status = 'stopped';
         $this->application->save();
     }
 

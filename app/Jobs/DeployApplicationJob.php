@@ -90,69 +90,88 @@ class DeployApplicationJob implements ShouldQueue
         }
         $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
-        // Pull builder image
         $this->executeNow([
-            "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
-            "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
-            "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1",
-            "echo 'Done.'",
-        ]);
+            "docker inspect {$this->application->uuid} >/dev/null 2>&1",
+            "echo $?"
+        ], 'stopped_container_check', hideFromOutput: true);
 
-        // Import git repository
-        $this->executeNow([
-            "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '"
-        ]);
+        if ($this->activity->properties->get('stopped_container_check') == 0) {
+            $this->executeNow([
+                "echo 'Container {$this->application->uuid} was stopped, starting it...'"
+            ]);
+            $this->executeNow([
+                "docker start {$this->application->uuid}"
+            ], hideFromOutput: true);
 
-        $this->executeNow([
-            ...$this->gitImport(),
-        ], 'importing_git_repository');
+            $this->executeNow([
+                "echo 'Started! 🎉'"
+            ]);
+        } else {
+            // Pull builder image
+            $this->executeNow([
+                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
+                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
+                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder >/dev/null 2>&1",
+                "echo 'Done.'",
+            ]);
 
-        $this->executeNow([
-            "echo 'Done.'"
-        ]);
+            // Import git repository
+            $this->executeNow([
+                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '"
+            ]);
 
-        // Get git commit
-        $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
-        $this->git_commit = $this->activity->properties->get('commit_sha');
+            $this->executeNow([
+                ...$this->gitImport(),
+            ], 'importing_git_repository');
 
-        $this->executeNow([
-            $this->execute_in_builder("rm -fr {$this->workdir}/.git")
-        ], hideFromOutput: true);
+            $this->executeNow([
+                "echo 'Done.'"
+            ]);
 
-        $docker_compose = $this->generate_docker_compose();
-        $docker_compose_base64 = base64_encode($docker_compose);
-        $this->executeNow([
-            $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
-        ], hideFromOutput: true);
+            // Get git commit
+            $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
+            $this->git_commit = $this->activity->properties->get('commit_sha');
 
-        $this->executeNow([
-            "echo -n 'Generating nixpacks configuration... '",
-            $this->nixpacks_build_cmd(),
-            $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
-            $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
-            "echo 'Done.'",
-        ]);
-        $this->executeNow([
-            "echo -n 'Building image... '",
-            $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
-            "echo 'Done.'",
-        ]);
-        $this->executeNow([
-            "echo -n 'Removing old container... '",
-            $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
-            "echo 'Done.'",
-        ]);
-        $this->executeNow([
-            "echo -n 'Starting new container... '",
-            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
-            "echo 'Done. 🎉'",
-            "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
-        ], setStatus: true);
+            $this->executeNow([
+                $this->execute_in_builder("rm -fr {$this->workdir}/.git")
+            ], hideFromOutput: true);
+
+            $docker_compose = $this->generate_docker_compose();
+            $docker_compose_base64 = base64_encode($docker_compose);
+            $this->executeNow([
+                $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
+            ], hideFromOutput: true);
+
+            $this->executeNow([
+                "echo -n 'Generating nixpacks configuration... '",
+                $this->nixpacks_build_cmd(),
+                $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
+                $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
+                "echo 'Done.'",
+            ]);
+            $this->executeNow([
+                "echo -n 'Building image... '",
+                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                "echo 'Done.'",
+            ]);
+            $this->executeNow([
+                "echo -n 'Removing old container... '",
+                $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
+                "echo 'Done.'",
+            ]);
+            $this->executeNow([
+                "echo -n 'Starting new container... '",
+                $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
+                "echo 'Done. 🎉'",
+                "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
+            ], setStatus: true);
+        }
+
 
         dispatch(new ContainerStatusJob($this->application_uuid));
 
         // Saving docker-compose.yml
-        Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', Yaml::dump($docker_compose, 10));
+        Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $docker_compose);
     }
 
     private function execute_in_builder(string $command)
@@ -208,7 +227,7 @@ class DeployApplicationJob implements ShouldQueue
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        return Yaml::dump($docker_compose);
+        return Yaml::dump($docker_compose, 10);
     }
     private function generate_local_persistent_volumes()
     {
