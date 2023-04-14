@@ -9,7 +9,7 @@ use Visus\Cuid2\Cuid2;
 
 class DeployApplication extends Component
 {
-    public string $application_uuid;
+    public string $applicationId;
     public $activity;
     public $status;
     public Application $application;
@@ -19,10 +19,9 @@ class DeployApplication extends Component
     protected array $command = [];
     protected $source;
 
-    public function mount($application_uuid)
+    public function mount($applicationId)
     {
-        $this->application_uuid = $application_uuid;
-        $this->application = Application::where('uuid', $this->application_uuid)->first();
+        $this->application = Application::find($applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
 
@@ -39,7 +38,7 @@ class DeployApplication extends Component
 
         dispatch(new DeployApplicationJob(
             deployment_uuid: $this->deployment_uuid,
-            application_uuid: $this->application_uuid,
+            application_uuid: $this->application->uuid,
         ));
 
         $currentUrl = url()->previous();
@@ -49,13 +48,13 @@ class DeployApplication extends Component
 
     public function stop()
     {
-        runRemoteCommandSync($this->destination->server, ["docker stop -t 0 {$this->application_uuid} >/dev/null 2>&1"]);
+        runRemoteCommandSync($this->destination->server, ["docker stop -t 0 {$this->application->uuid} >/dev/null 2>&1"]);
         $this->application->status = 'stopped';
         $this->application->save();
     }
     public function kill()
     {
-        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application_uuid}"]);
+        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application->uuid}"]);
         if ($this->application->status != 'exited') {
             $this->application->status = 'exited';
             $this->application->save();

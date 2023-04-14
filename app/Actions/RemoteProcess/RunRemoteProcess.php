@@ -16,7 +16,9 @@ class RunRemoteProcess
 
     public bool $hideFromOutput;
 
-    public bool $setStatus;
+    public bool $isFinished;
+
+    public bool $ignoreErrors;
 
     protected $timeStart;
 
@@ -31,7 +33,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hideFromOutput = false, bool $setStatus = false)
+    public function __construct(Activity $activity, bool $hideFromOutput = false, bool $isFinished = false, bool $ignoreErrors = false)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::REMOTE_PROCESS->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
@@ -40,36 +42,41 @@ class RunRemoteProcess
 
         $this->activity = $activity;
         $this->hideFromOutput = $hideFromOutput;
-        $this->setStatus = $setStatus;
+        $this->isFinished = $isFinished;
+        $this->ignoreErrors = $ignoreErrors;
     }
 
     public function __invoke(): ProcessResult
     {
-        $this->activity->properties = $this->activity->properties->merge([
-            'status' => ProcessStatus::IN_PROGRESS,
-        ]);
         $this->timeStart = hrtime(true);
+
+        $status = ProcessStatus::IN_PROGRESS;
 
         $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
 
-        $status = $processResult->exitCode() != 0 ? ProcessStatus::ERROR : ($this->setStatus ? ProcessStatus::FINISHED : null);
+        if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
+            $status = ProcessStatus::ERROR;
+        } else {
+            if (($processResult->exitCode() == 0 && $this->isFinished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
+                $status = ProcessStatus::FINISHED;
+            }
+            if ($processResult->exitCode() != 0 && !$this->ignoreErrors) {
+                $status = ProcessStatus::ERROR;
+            }
+        }
 
         $this->activity->properties = $this->activity->properties->merge([
             'exitCode' => $processResult->exitCode(),
-            'stdout' => $this->hideFromOutput || $processResult->output(),
+            'stdout' => $processResult->output(),
             'stderr' => $processResult->errorOutput(),
+            'status' => $status->value,
         ]);
-        if (isset($status)) {
-            $this->activity->properties = $this->activity->properties->merge([
-                'status' => $status->value,
-            ]);
-        }
-
         $this->activity->save();
 
-        if ($processResult->exitCode() != 0 && $processResult->errorOutput()) {
-            throw new \RuntimeException('Remote command failed');
+        if ($processResult->exitCode() != 0 && !$this->ignoreErrors) {
+            throw new \RuntimeException($processResult->errorOutput());
         }
+
         return $processResult;
     }
 
@@ -98,9 +105,7 @@ class RunRemoteProcess
         if ($this->hideFromOutput) {
             return;
         }
-
         $this->currentTime = $this->elapsedTime();
-
         $this->activity->description = $this->encodeOutput($type, $output);
 
         if ($this->isAfterLastThrottle()) {

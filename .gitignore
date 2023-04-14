@@ -20,3 +20,6 @@ yarn-error.log
 /.npm
 /.bash_history
 /_volumes
+
+.lesshst
+psysh_history

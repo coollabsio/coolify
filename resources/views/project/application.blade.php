@@ -1,7 +1,7 @@
 <x-layout>
     <h1>Application</h1>
-    <p>Name: {{ $application->name }}</p>
-    <livewire:deploy-application :application_uuid="$application->uuid" />
+    <livewire:deploy-application :applicationId="$application->id" />
+    <livewire:application-form :applicationId="$application->id" />
     <div>
         <h2>Deployments</h2>
         @foreach ($deployments as $deployment)

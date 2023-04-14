@@ -75,38 +75,39 @@ class DeployApplicationJob implements ShouldQueue
      */
     public function handle(): void
     {
-        $coolify_instance_settings = CoolifyInstanceSettings::find(1);
-        $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+        try {
+            $coolify_instance_settings = CoolifyInstanceSettings::find(1);
+            $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
-        // Get Wildcard Domain
-        $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
-        $global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
-        $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
+            // Get Wildcard Domain
+            $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
+            $global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
+            $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
 
-        // Set wildcard domain
-        if (!$this->application->settings->is_bot && !$this->application->fqdn && $wildcard_domain) {
-            $this->application->fqdn = $this->application->uuid . '.' . $wildcard_domain;
-            $this->application->save();
-        }
-        $this->workdir = "/artifacts/{$this->deployment_uuid}";
+            // Set wildcard domain
+            if (!$this->application->settings->is_bot && !$this->application->fqdn && $wildcard_domain) {
+                $this->application->fqdn = $this->application->uuid . '.' . $wildcard_domain;
+                $this->application->save();
+            }
+            $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
-        $this->executeNow([
-            "docker inspect {$this->application->uuid} >/dev/null 2>&1",
-            "echo $?"
-        ], 'stopped_container_check', hideFromOutput: true);
+            // $this->executeNow([
+            //     "docker inspect {$this->application->uuid} >/dev/null 2>&1",
+            //     "echo $?"
+            // ], 'stopped_container_check', hideFromOutput: true, ignoreErrors: true);
 
-        if ($this->activity->properties->get('stopped_container_check') == 0) {
-            $this->executeNow([
-                "echo -n 'Container {$this->application->uuid} was stopped, starting it...'"
-            ]);
-            $this->executeNow([
-                "docker start {$this->application->uuid}"
-            ], hideFromOutput: true);
+            // if ($this->activity->properties->get('stopped_container_check') == 0) {
+            //     $this->executeNow([
+            //         "echo 'Application is already available. Starting it...'"
+            //     ]);
+            //     $this->executeNow([
+            //         "docker start {$this->application->uuid}"
+            //     ], hideFromOutput: true);
 
-            $this->executeNow([
-                "echo 'Started! 🎉'"
-            ], setStatus: true);
-        } else {
+            //     $this->executeNow([
+            //         "echo 'Done. 🎉'",
+            //     ], isFinished: true);
+            // } else {
             // Pull builder image
             $this->executeNow([
                 "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
@@ -132,6 +133,26 @@ class DeployApplicationJob implements ShouldQueue
             $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
             $this->git_commit = $this->activity->properties->get('commit_sha');
 
+            $this->executeNow([
+                "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
+            ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
+            $image = $this->activity->properties->get('stopped_container_image');
+            if (isset($image)) {
+                $image = explode(':', str_replace('"', '', $image))[1];
+                if ($image == $this->git_commit) {
+                    $this->executeNow([
+                        "echo 'Application found locally with the same Git Commit SHA. Starting it...'"
+                    ]);
+                    $this->executeNow([
+                        "docker start {$this->application->uuid}"
+                    ], hideFromOutput: true);
+
+                    $this->executeNow([
+                        "echo 'Done. 🎉'",
+                    ], isFinished: true);
+                    return;
+                }
+            }
             $this->executeNow([
                 $this->execute_in_builder("rm -fr {$this->workdir}/.git")
             ], hideFromOutput: true);
@@ -173,14 +194,21 @@ class DeployApplicationJob implements ShouldQueue
 
             $this->executeNow([
                 "echo 'Done. 🎉'",
-                "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
-            ], setStatus: true);
+            ], isFinished: true);
+            // Saving docker-compose.yml
+            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $docker_compose);
+            // }
+
+        } catch (\Exception $e) {
+            $this->executeNow([
+                "echo 'Oops something is not okay, are you okay? 😢'",
+                "echo '\n\n{$e->getMessage()}'",
+            ]);
+            throw new \Exception('Deployment finished');
+        } finally {
+            $this->executeNow(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
+            dispatch(new ContainerStatusJob($this->application_uuid));
         }
-
-        dispatch(new ContainerStatusJob($this->application_uuid));
-
-        // Saving docker-compose.yml
-        Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $docker_compose);
     }
 
     private function execute_in_builder(string $command)
@@ -314,8 +342,14 @@ class DeployApplicationJob implements ShouldQueue
         return $labels;
     }
 
-    private function executeNow(array|Collection $command, string $propertyName = null, bool $hideFromOutput = false, $setStatus = false, bool $isDebuggable = false)
-    {
+    private function executeNow(
+        array|Collection $command,
+        string $propertyName = null,
+        bool $isFinished = false,
+        bool $hideFromOutput = false,
+        bool $isDebuggable = false,
+        bool $ignoreErrors = false
+    ) {
         static::$batch_counter++;
 
         if ($command instanceof Collection) {
@@ -334,15 +368,19 @@ class DeployApplicationJob implements ShouldQueue
         $remoteProcess = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'hideFromOutput' => $hideFromOutput,
-            'setStatus' => $setStatus,
+            'isFinished' => $isFinished,
+            'ignoreErrors' => $ignoreErrors,
         ]);
         $result = $remoteProcess();
-
         if ($propertyName) {
             $this->activity->properties = $this->activity->properties->merge([
                 $propertyName => trim($result->output()),
             ]);
             $this->activity->save();
+        }
+
+        if ($result->exitCode() != 0 && $result->errorOutput() && !$ignoreErrors) {
+            throw new \RuntimeException($result->errorOutput());
         }
     }
     private function gitImport()
