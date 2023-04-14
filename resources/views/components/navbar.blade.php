@@ -6,7 +6,9 @@
     @endguest
     @auth
         <a href="/">Home</a>
+        @env('local')
         <a href="/demo">Demo</a>
+        @endenv
         <a href="/profile">Profile</a>
         <form action="/logout" method="POST">
             @csrf
