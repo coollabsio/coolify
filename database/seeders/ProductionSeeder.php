@@ -12,16 +12,19 @@ class ProductionSeeder extends Seeder
 {
     public function run(): void
     {
-        $coolify_key = Storage::disk('local')->get('ssh-keys/coolify.dsa');
-        if (PrivateKey::where('name', 'Coolify Host')->doesntExist()) {
+        $coolify_key_name = "id.root@host.docker.internal";
+        $coolify_key = Storage::disk('local')->get("ssh-keys/{$coolify_key_name}");
+        $coolify_key_in_database = PrivateKey::where('name', 'Coolify Host');
+
+        if (!$coolify_key && $coolify_key_in_database->exists()) {
+            Storage::disk('local')->put("ssh-keys/{$coolify_key_name}", $coolify_key_in_database->first()->private_key);
+        }
+        if ($coolify_key && !$coolify_key_in_database->exists()) {
             PrivateKey::create([
-                "id" => 0,
-                "name" => "Coolify Host",
-                "description" => "This is the private key for the server where Coolify is hosted.",
-                "private_key" => $coolify_key,
+                'name' => 'Coolify Host',
+                'description' => 'The private key for the Coolify host machine.',
+                'private_key' => $coolify_key,
             ]);
-        } else {
-            dump('Coolify SSH Key already exists.');
         }
     }
 }

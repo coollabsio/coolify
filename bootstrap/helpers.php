@@ -59,9 +59,9 @@ if (!function_exists('remoteProcess')) {
 if (!function_exists('savePrivateKeyForServer')) {
     function savePrivateKeyForServer(Server $server)
     {
-        $temp_file = 'id.rsa_' . 'root' . '@' . $server->ip;
-        Storage::disk('local')->put($temp_file, $server->privateKey->private_key, 'private');
-        return '/var/www/html/storage/app/' . $temp_file;
+        $temp_file = "id.root@{$server->ip}";
+        Storage::disk('ssh-keys')->put($temp_file, $server->privateKey->private_key, 'private');
+        return '/var/www/html/storage/app/ssh-keys/' . $temp_file;
     }
 }
 
