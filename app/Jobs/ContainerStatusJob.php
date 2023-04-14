@@ -20,11 +20,11 @@ class ContainerStatusJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct()
-    {
-        //
+    public function __construct(
+        public string|null $container_id = null,
+    ) {
     }
-    public function handle(): void
+    protected function checkAllServers()
     {
         try {
             $servers = Server::all()->reject(fn (Server $server) => $server->settings->is_build_server);
@@ -55,6 +55,31 @@ class ContainerStatusJob implements ShouldQueue
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
+        }
+    }
+    protected function checkContainerStatus()
+    {
+        try {
+            $application = Application::where('uuid', $this->container_id)->firstOrFail();
+            if (!$application) {
+                return;
+            }
+            if ($application->destination->server) {
+                $container = runRemoteCommandSync($application->destination->server, ["docker inspect --format '{{json .State}}' {$this->container_id}"]);
+                $container = formatDockerCmdOutputToJson($container);
+                $application->status = $container[0]['Status'];
+                $application->save();
+            }
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
+        }
+    }
+    public function handle(): void
+    {
+        if ($this->container_id) {
+            $this->checkContainerStatus();
+        } else {
+            $this->checkAllServers();
         }
     }
 }
