@@ -9,13 +9,13 @@ use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
 use DateTimeImmutable;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
@@ -23,6 +23,7 @@ use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Str;
 
 class DeployApplicationJob implements ShouldQueue
 {
@@ -118,7 +119,8 @@ class DeployApplicationJob implements ShouldQueue
             $this->execute_in_builder("rm -fr {$this->workdir}/.git")
         ], hideFromOutput: true);
 
-        $docker_compose_base64 = base64_encode($this->generate_docker_compose());
+        $docker_compose = $this->generate_docker_compose();
+        $docker_compose_base64 = base64_encode($docker_compose);
         $this->executeNow([
             $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
         ], hideFromOutput: true);
@@ -146,6 +148,11 @@ class DeployApplicationJob implements ShouldQueue
             "echo 'Done. 🎉'",
             "docker stop -t 0 {$this->deployment_uuid} >/dev/null"
         ], setStatus: true);
+
+        dispatch(new ContainerStatusJob($this->application_uuid));
+
+        // Saving docker-compose.yml
+        Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', Yaml::dump($docker_compose, 10));
     }
 
     private function execute_in_builder(string $command)

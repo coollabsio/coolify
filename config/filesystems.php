@@ -47,7 +47,6 @@ return [
         'ssh-keys' => [
             'driver' => 'local',
             'root' => storage_path('app/ssh-keys'),
-            'url' => env('APP_URL').'/storage',
             'visibility' => 'private',
             'throw' => false,
         ],
@@ -55,7 +54,6 @@ return [
         'deployments' => [
             'driver' => 'local',
             'root' => storage_path('app/deployments'),
-            'url' => env('APP_URL').'/storage',
             'visibility' => 'private',
             'throw' => false,
         ],
