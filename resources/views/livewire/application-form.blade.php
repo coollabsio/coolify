@@ -1,15 +1,12 @@
 <div>
-    <form class="flex flex-col">
-        <label>Name</label>
-        <input wire:model="name" type="text" name="name" />
-        <label>Fqdn</label>
-        <input wire:model="fqdn" type="text" name="fqdn" />
-        <label>Repository</label>
-        <input wire:model="git_repository" type="text" name="git_repository" />
-        <label>Branch</label>
-        <input wire:model="git_branch" type="text" name="git_branch" />
-        <label>Commit SHA</label>
-        <input wire:model="git_commit_sha" type="text" name="git_commit_sha" />
-        
+    <form wire:submit.prevent='submit' class="flex flex-col">
+        <x-input name="name" required="true" />
+        <x-input name="fqdn" />
+        <x-input name="git_repository" />
+        <x-input name="git_branch" />
+        <x-input name="git_commit_sha" />
+        <button type="submit">
+            Submit
+        </button>
     </form>
 </div>

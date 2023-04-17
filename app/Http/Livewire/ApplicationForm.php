@@ -15,7 +15,11 @@ class ApplicationForm extends Component
     public string $git_branch;
     public string|null $git_commit_sha;
 
-    public function mount() {
+    protected $rules = [
+        'name' => 'required|min:6'
+    ];
+    public function mount()
+    {
         $this->application = Application::find($this->applicationId);
         $this->fill([
             'name' => $this->application->name,
@@ -25,5 +29,9 @@ class ApplicationForm extends Component
             'git_commit_sha' => $this->application->git_commit_sha,
         ]);
     }
-
+    public function submit()
+    {
+        $this->validate();
+        dd($this->name);
+    }
 }
