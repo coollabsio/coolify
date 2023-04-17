@@ -91,23 +91,6 @@ class DeployApplicationJob implements ShouldQueue
             }
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
-            // $this->executeNow([
-            //     "docker inspect {$this->application->uuid} >/dev/null 2>&1",
-            //     "echo $?"
-            // ], 'stopped_container_check', hideFromOutput: true, ignoreErrors: true);
-
-            // if ($this->activity->properties->get('stopped_container_check') == 0) {
-            //     $this->executeNow([
-            //         "echo 'Application is already available. Starting it...'"
-            //     ]);
-            //     $this->executeNow([
-            //         "docker start {$this->application->uuid}"
-            //     ], hideFromOutput: true);
-
-            //     $this->executeNow([
-            //         "echo 'Done. 🎉'",
-            //     ], isFinished: true);
-            // } else {
             // Pull builder image
             $this->executeNow([
                 "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
