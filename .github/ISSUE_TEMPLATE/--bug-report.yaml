@@ -2,9 +2,6 @@ name: 🐞 Bug report
 description: Create a bug report to help us improve coolify
 title: "[Bug]: "
 labels: [Bug]
-assignees:
-- andrasbacsai
-- vasani-arpit
 body:
 - type: markdown
   attributes:

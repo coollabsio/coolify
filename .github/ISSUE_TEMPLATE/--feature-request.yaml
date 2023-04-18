@@ -2,9 +2,6 @@ name: 🛠️ Feature request
 description: Suggest an idea to improve coolify
 title: '[Feature]: '
 labels: [Enhancement]
-assignees:
-  - andrasbacsai
-  - vasani-arpit
 body:
   - type: markdown
     attributes:
