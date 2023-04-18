@@ -412,22 +412,23 @@ export async function saveServiceType(
 			if (foundTemplate.variables) {
 				if (foundTemplate.variables.length > 0) {
 					for (const variable of foundTemplate.variables) {
-						const { defaultValue } = variable;
+						let { defaultValue } = variable;
+						defaultValue = defaultValue.toString();
 						const regex = /^\$\$.*\((\d+)\)$/g;
 						const length = Number(regex.exec(defaultValue)?.[1]) || undefined;
-						if (variable.defaultValue.startsWith('$$generate_password')) {
+						if (defaultValue.startsWith('$$generate_password')) {
 							variable.value = generatePassword({ length });
-						} else if (variable.defaultValue.startsWith('$$generate_hex')) {
+						} else if (defaultValue.startsWith('$$generate_hex')) {
 							variable.value = generatePassword({ length, isHex: true });
-						} else if (variable.defaultValue.startsWith('$$generate_username')) {
+						} else if (defaultValue.startsWith('$$generate_username')) {
 							variable.value = cuid();
-						} else if (variable.defaultValue.startsWith('$$generate_token')) {
+						} else if (defaultValue.startsWith('$$generate_token')) {
 							variable.value = generateToken();
 						} else {
-							variable.value = variable.defaultValue || '';
+							variable.value = defaultValue || '';
 						}
 						const foundVariableSomewhereElse = foundTemplate.variables.find((v) =>
-							v.defaultValue.includes(variable.id)
+							v.defaultValue.toString().includes(variable.id)
 						);
 						if (foundVariableSomewhereElse) {
 							foundVariableSomewhereElse.value = foundVariableSomewhereElse.value.replaceAll(
@@ -746,7 +747,10 @@ export async function saveService(request: FastifyRequest<SaveService>, reply: F
 			let { id: settingId, name, value, changed = false, isNew = false, variableName } = setting;
 			if (value) {
 				if (changed) {
-					await prisma.serviceSetting.update({ where: { id: settingId }, data: { value: value.replace(/\n/, "\\n") } });
+					await prisma.serviceSetting.update({
+						where: { id: settingId },
+						data: { value: value.replace(/\n/, '\\n') }
+					});
 				}
 				if (isNew) {
 					if (!variableName) {
@@ -1101,14 +1105,17 @@ export async function activateWordpressFtp(
 							shell: true
 						});
 					}
-				} catch (error) { }
+				} catch (error) {}
 				const volumes = [
 					`${id}-wordpress-data:/home/${ftpUser}/wordpress`,
-					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${
+						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
-					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${
+						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`,
-					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${
+						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.sh:/etc/sftp.d/chmod.sh`
 				];
 
@@ -1178,6 +1185,6 @@ export async function activateWordpressFtp(
 			await executeCommand({
 				command: `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
 			});
-		} catch (error) { }
+		} catch (error) {}
 	}
 }

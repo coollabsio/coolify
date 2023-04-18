@@ -86,19 +86,20 @@ export async function migrateServicesToNewTemplate() {
                     if (template.variables) {
                         if (template.variables.length > 0) {
                             for (const variable of template.variables) {
-                                const { defaultValue } = variable;
+                                let { defaultValue } = variable;
+                                defaultValue = defaultValue.toString();
                                 const regex = /^\$\$.*\((\d+)\)$/g;
                                 const length = Number(regex.exec(defaultValue)?.[1]) || undefined
-                                if (variable.defaultValue.startsWith('$$generate_password')) {
+                                if (defaultValue.startsWith('$$generate_password')) {
                                     variable.value = generatePassword({ length });
-                                } else if (variable.defaultValue.startsWith('$$generate_hex')) {
+                                } else if (defaultValue.startsWith('$$generate_hex')) {
                                     variable.value = generatePassword({ length, isHex: true });
-                                } else if (variable.defaultValue.startsWith('$$generate_username')) {
+                                } else if (defaultValue.startsWith('$$generate_username')) {
                                     variable.value = cuid();
-                                } else if (variable.defaultValue.startsWith('$$generate_token')) {
+                                } else if (defaultValue.startsWith('$$generate_token')) {
                                     variable.value = generateToken()
                                 } else {
-                                    variable.value = variable.defaultValue || '';
+                                    variable.value = defaultValue || '';
                                 }
                             }
                         }
