@@ -43,6 +43,7 @@
 			return true;
 		}
 	});
+	let customVersion: string;
 	$: isDisabled =
 		!$appSession.isAdmin ||
 		$status.service.overallStatus === 'degraded' ||
@@ -111,6 +112,7 @@
 			setLocation(service);
 			forceSave = false;
 			$isDeploymentEnabled = checkIfDeploymentEnabledServices(service);
+			customVersion = null;
 			return addToast({
 				message: 'Configuration saved.',
 				type: 'success'
@@ -196,26 +198,12 @@
 	async function selectTag(event: any) {
 		service.version = event.detail.value;
 	}
+	async function setCustomVersion() {
+		service.version = customVersion;
+	}
 	onMount(async () => {
 		if (browser && window.location.hostname === 'demo.coolify.io' && !service.fqdn) {
 			service.fqdn = `http://${cuid()}.demo.coolify.io`;
-			// if (service.type === 'wordpress') {
-			// 	service.wordpress.mysqlDatabase = 'db';
-			// }
-			// if (service.type === 'plausibleanalytics') {
-			// 	service.plausibleAnalytics.email = 'noreply@demo.com';
-			// 	service.plausibleAnalytics.username = 'admin';
-			// }
-			// if (service.type === 'minio') {
-			// 	service.minio.apiFqdn = `http://${cuid()}.demo.coolify.io`;
-			// }
-			// if (service.type === 'ghost') {
-			// 	service.ghost.mariadbDatabase = 'db';
-			// }
-			// if (service.type === 'fider') {
-			// 	service.fider.emailNoreply = 'noreply@demo.com';
-			// }
-			// await handleSubmit();
 		}
 	});
 </script>
@@ -224,7 +212,7 @@
 	<form id="saveForm" on:submit|preventDefault={handleSubmit}>
 		<div class="mx-auto w-full">
 			<div class="flex flex-row border-b border-coolgray-500 mb-6 space-x-2">
-				<div class="title font-bold pb-3 ">General</div>
+				<div class="title font-bold pb-3">General</div>
 				{#if $appSession.isAdmin}
 					<button
 						type="submit"
@@ -289,6 +277,7 @@
 			</div>
 			<div class="grid grid-cols-2 items-center">
 				<label for="version">Version / Tag</label>
+				<div class="flex gap-2">
 				{#if tags.tags?.length > 0}
 					<div class="custom-select-wrapper w-full">
 						<Select
@@ -303,9 +292,11 @@
 							isClearable={false}
 						/>
 					</div>
-				{:else}
+					{:else}
 					<input class="w-full border-red-500" disabled placeholder="Error getting tags..." />
-				{/if}
+					{/if}
+					<input class="w-full" placeholder="Custom version" on:change={setCustomVersion} bind:value={customVersion} />
+					</div>
 			</div>
 
 			<div class="grid grid-cols-2 items-center">
