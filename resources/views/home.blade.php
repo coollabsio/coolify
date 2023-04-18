@@ -3,7 +3,7 @@
     @forelse ($servers as $server)
         <a href="{{ route('project.environments', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
     @empty
-        <p>No projects found.</p>
+        <p>No servers found.</p>
     @endforelse
     <h1>Projects</h1>
     @forelse ($projects as $project)
