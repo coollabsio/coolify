@@ -27,19 +27,39 @@ class DeployApplication extends Component
         $this->application = Application::find($this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
-
-    public function start()
+    protected function setDeploymentUuid()
     {
         // Create Deployment ID
         $this->deployment_uuid = new Cuid2(7);
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+    protected function redirectToDeployment()
+    {
+        return redirect()->route('project.applications.deployment', $this->parameters);
+    }
+    public function start()
+    {
+        $this->setDeploymentUuid();
 
         dispatch(new DeployApplicationJob(
             deployment_uuid: $this->deployment_uuid,
             application_uuid: $this->application->uuid,
+            force_rebuild: false,
         ));
 
-        return redirect()->route('project.applications.deployment', $this->parameters);
+        return $this->redirectToDeployment();
+    }
+    public function forceRebuild()
+    {
+        $this->setDeploymentUuid();
+
+        dispatch(new DeployApplicationJob(
+            deployment_uuid: $this->deployment_uuid,
+            application_uuid: $this->application->uuid,
+            force_rebuild: true,
+        ));
+
+        return $this->redirectToDeployment();
     }
 
     public function stop()

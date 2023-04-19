@@ -13,7 +13,7 @@
             <livewire:application.general :applicationId="$application->id" />
         </div>
         <div x-cloak x-show="tab === 'secrets'">
-            <livewire:application.secrets  />
+            <livewire:application.secrets />
         </div>
         <div x-cloak x-show="tab === 'source'">
             <livewire:application.source :applicationId="$application->id" />

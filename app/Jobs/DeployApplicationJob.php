@@ -43,6 +43,7 @@ class DeployApplicationJob implements ShouldQueue
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,
+        public bool $force_rebuild = false,
     ) {
         $this->application = Application::query()
             ->where('uuid', $this->application_uuid)
@@ -86,7 +87,7 @@ class DeployApplicationJob implements ShouldQueue
 
             // Set wildcard domain
             if (!$this->application->settings->is_bot && !$this->application->fqdn && $wildcard_domain) {
-                $this->application->fqdn = $this->application->uuid . '.' . $wildcard_domain;
+                $this->application->fqdn = 'http://' . $this->application->uuid . '.' . $wildcard_domain;
                 $this->application->save();
             }
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
@@ -116,24 +117,28 @@ class DeployApplicationJob implements ShouldQueue
             $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
             $this->git_commit = $this->activity->properties->get('commit_sha');
 
-            $this->executeNow([
-                "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
-            ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
-            $image = $this->activity->properties->get('stopped_container_image');
-            if (isset($image)) {
-                $image = explode(':', str_replace('"', '', $image))[1];
-                if ($image == $this->git_commit) {
-                    $this->executeNow([
-                        "echo -n 'Application found locally with the same Git Commit SHA. Starting it... '"
-                    ]);
-                    $this->executeNow([
-                        "docker start {$this->application->uuid}"
-                    ], hideFromOutput: true);
+            if (!$this->force_rebuild) {
 
-                    $this->executeNow([
-                        "echo 'Done. 🎉'",
-                    ], isFinished: true);
-                    return;
+
+                $this->executeNow([
+                    "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
+                ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
+                $image = $this->activity->properties->get('stopped_container_image');
+                if (isset($image)) {
+                    $image = explode(':', str_replace('"', '', $image))[1];
+                    if ($image == $this->git_commit) {
+                        $this->executeNow([
+                            "echo -n 'Application found locally with the same Git Commit SHA. Starting it... '"
+                        ]);
+                        $this->executeNow([
+                            "docker start {$this->application->uuid}"
+                        ], hideFromOutput: true);
+
+                        $this->executeNow([
+                            "echo 'Done. 🎉'",
+                        ], isFinished: true);
+                        return;
+                    }
                 }
             }
             $this->executeNow([
