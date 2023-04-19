@@ -1,13 +1,13 @@
 <x-applications.layout :applicationId="$application->id" title="Configurations">
     <div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
         <div class="flex gap-4">
-            <button @click.prevent="tab = 'general'; window.location.hash = 'general'" href="#">General</button>
-            <button @click.prevent="tab = 'secrets'; window.location.hash = 'secrets'" href="#">Secrets</button>
-            <button @click.prevent="tab = 'source'; window.location.hash = 'source'" href="#">Source</button>
-            <button @click.prevent="tab = 'destination'; window.location.hash = 'destination'" href="#">Destination
-            </button>
-            <button @click.prevent="tab = 'storages'; window.location.hash = 'storages'" href="#">Storage
-            </button>
+            <a @click.prevent="tab = 'general'; window.location.hash = 'general'" href="#">General</a>
+            <a @click.prevent="tab = 'secrets'; window.location.hash = 'secrets'" href="#">Secrets</a>
+            <a @click.prevent="tab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+            <a @click.prevent="tab = 'destination'; window.location.hash = 'destination'" href="#">Destination
+            </a>
+            <a @click.prevent="tab = 'storages'; window.location.hash = 'storages'" href="#">Storage
+            </a>
         </div>
         <div x-cloak x-show="tab === 'general'">
             <livewire:application.general :applicationId="$application->id" />
