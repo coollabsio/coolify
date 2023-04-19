@@ -20,10 +20,5 @@ class EnvironmentSeeder extends Seeder
             'name' => 'production',
             'project_id' => $project_1->id,
         ]);
-        Environment::create([
-            'id' => 2,
-            'name' => 'staging',
-            'project_id' => $project_1->id,
-        ]);
     }
 }

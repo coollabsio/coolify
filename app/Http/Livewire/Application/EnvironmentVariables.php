@@ -4,7 +4,7 @@ namespace App\Http\Livewire\Application;
 
 use Livewire\Component;
 
-class Secrets extends Component
+class EnvironmentVariables extends Component
 {
-    public array $secrets = [];
+    public array $envs = [];
 }

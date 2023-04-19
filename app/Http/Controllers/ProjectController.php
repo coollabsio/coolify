@@ -13,6 +13,9 @@ class ProjectController extends Controller
             return redirect()->route('home');
         }
         $project->load(['environments']);
+        if (count($project->environments) == 1) {
+            return redirect()->route('project.resources', ['project_uuid' => $project->uuid, 'environment_name' => $project->environments->first()->name]);
+        }
         return view('project.environments', ['project' => $project]);
     }
 
