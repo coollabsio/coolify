@@ -1,3 +1,7 @@
 <div>
-    {{-- Nothing in the world is as soft and yielding as water. --}}
+    @forelse ($secrets as $secret)
+        {{ dump($secret) }}
+    @empty
+        <p>There are no secrets for this application.</p>
+    @endforelse
 </div>

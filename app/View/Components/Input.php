@@ -16,6 +16,8 @@ class Input extends Component
         public bool $required = false,
         public bool $readonly = false,
         public string|null $label = null,
+        public string|null $type = 'text',
+        public bool $instantSave = false,
     ) {
         //
     }
