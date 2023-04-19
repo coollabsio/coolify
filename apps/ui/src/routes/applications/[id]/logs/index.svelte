@@ -51,16 +51,22 @@
 	async function loadLogs() {
 		if (logsLoading) return;
 		try {
-			const newLogs: any = await get(
-				`/applications/${id}/logs/${selectedService}?since=${lastLog?.split(' ')[0] || 0}`
-			);
+			const since = lastLog?.split(' ')[0] || 0;
+			const newLogs: any = await get(`/applications/${id}/logs/${selectedService}?since=${since}`);
 			if (newLogs.noContainer) {
 				noContainer = true;
 			} else {
 				noContainer = false;
 			}
 			if (newLogs?.logs && newLogs.logs[newLogs.logs.length - 1] !== logs[logs.length - 1]) {
-				logs = logs.concat(newLogs.logs);
+				if (since === 0) {
+					logs = logs.concat(newLogs.logs);
+				} else {
+					const newParsedLogs = newLogs.logs.filter((log: any) => {
+						return log !== logs[logs.length - 1];
+					});
+					logs = logs.concat(newParsedLogs);
+				}
 				lastLog = newLogs.logs[newLogs.logs.length - 1];
 			}
 		} catch (error) {
@@ -135,7 +141,7 @@
 		{:else}
 			<div class="relative w-full">
 				<div class="flex justify-start sticky space-x-2 pb-2">
-					<button on:click={followBuild} class="btn btn-sm " class:bg-coollabs={followingLogs}>
+					<button on:click={followBuild} class="btn btn-sm" class:bg-coollabs={followingLogs}>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							class="w-6 h-6 mr-2"
