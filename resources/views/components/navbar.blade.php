@@ -1,4 +1,4 @@
-<nav>
+<nav class="flex gap-2 ">
     <div>v{{ config('coolify.version') }}</div>
     @guest
         <a href="/login">Login</a>
@@ -14,6 +14,6 @@
             @csrf
             <button type="submit">Logout</button>
         </form>
-        <livewire:check-update>
+        {{-- <livewire:check-update> --}}
     @endauth
 </nav>

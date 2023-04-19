@@ -124,7 +124,7 @@ class DeployApplicationJob implements ShouldQueue
                 $image = explode(':', str_replace('"', '', $image))[1];
                 if ($image == $this->git_commit) {
                     $this->executeNow([
-                        "echo 'Application found locally with the same Git Commit SHA. Starting it...'"
+                        "echo -n 'Application found locally with the same Git Commit SHA. Starting it... '"
                     ]);
                     $this->executeNow([
                         "docker start {$this->application->uuid}"

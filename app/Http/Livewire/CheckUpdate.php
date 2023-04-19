@@ -22,8 +22,4 @@ class CheckUpdate extends Component
         $this->currentVersion = config('coolify.version');
         version_compare($this->currentVersion, $this->latestVersion, '<') ? $this->updateAvailable = true : $this->updateAvailable = false;
     }
-    public function render()
-    {
-        return view('livewire.check-update');
-    }
 }

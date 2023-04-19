@@ -11,8 +11,12 @@ class Input extends Component
     /**
      * Create a new component instance.
      */
-    public function __construct(public string $name, public bool $required = false)
-    {
+    public function __construct(
+        public string $name,
+        public bool $required = false,
+        public bool $readonly = false,
+        public string|null $label = null,
+    ) {
         //
     }
 

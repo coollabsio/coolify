@@ -19,8 +19,4 @@ class SwitchTeam extends Component
         session(['currentTeam' => $team_to_switch_to]);
         return redirect(request()->header('Referer'));
     }
-    public function render()
-    {
-        return view('livewire.switch-team');
-    }
 }

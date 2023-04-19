@@ -27,10 +27,6 @@ class RunCommand extends Component
         $this->servers = Server::all();
         $this->server = $this->servers[0]->uuid;
     }
-    public function render()
-    {
-        return view('livewire.run-command');
-    }
 
     public function runCommand()
     {
