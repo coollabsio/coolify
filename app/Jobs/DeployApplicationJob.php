@@ -371,6 +371,19 @@ class DeployApplicationJob implements ShouldQueue
             throw new \RuntimeException($result->errorOutput());
         }
     }
+    private function setGitImportSettings($git_clone_command)
+    {
+        if ($this->application->git_commit_sha) {
+            $git_clone_command = "{$git_clone_command} && git checkout {$this->application->git_commit_sha}";
+        }
+        if ($this->application->settings->is_git_submodules_allowed) {
+            $git_clone_command = "{$git_clone_command} && git submodule update --init --recursive";
+        }
+        if ($this->application->settings->is_git_lfs_allowed) {
+            $git_clone_command = "{$git_clone_command} && git lfs pull";
+        }
+        return $git_clone_command;
+    }
     private function gitImport()
     {
         $source_html_url = data_get($this->application, 'source.html_url');
@@ -378,19 +391,27 @@ class DeployApplicationJob implements ShouldQueue
         $source_html_url_host = $url['host'];
         $source_html_url_scheme = $url['scheme'];
 
+        $git_clone_command = "git clone -q -b {$this->application->git_branch}";
+
         if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
             if ($this->source->is_public) {
+                $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}";
+                $git_clone_command = $this->setGitImportSettings($git_clone_command);
                 return [
-                    $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}")
+                    $this->execute_in_builder($git_clone_command)
                 ];
             } else {
                 if (!$this->application->source->app_id) {
                     $private_key = base64_encode($this->application->source->privateKey->private_key);
+
+                    $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}";
+                    $git_clone_command = $this->setGitImportSettings($git_clone_command);
+
                     return [
                         $this->execute_in_builder("mkdir -p /root/.ssh"),
                         $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
                         $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
-                        $this->execute_in_builder("GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git clone -q -b {$this->application->git_branch} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}")
+                        $this->execute_in_builder($git_clone_command)
                     ];
                 } else {
                     $github_access_token = $this->generate_jwt_token_for_github();
