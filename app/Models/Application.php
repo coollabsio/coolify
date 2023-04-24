@@ -37,23 +37,23 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function portsMappings(): Attribute
+    public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn (string|null $portsMappings) =>
-            is_null($portsMappings)
+            get: fn () =>
+            is_null($this->ports_mappings)
                 ? []
-                : explode(',', $portsMappings)
+                : explode(',', $this->ports_mappings)
 
         );
     }
-    public function portsExposes(): Attribute
+    public function portsExposesArray(): Attribute
     {
         return Attribute::make(
-            get: fn (string|null $portsExposes) =>
-            is_null($portsExposes)
+            get: fn () =>
+            is_null($this->ports_exposes)
                 ? []
-                : explode(',', $portsExposes)
+                : explode(',', $this->ports_exposes)
 
         );
     }

@@ -1,6 +1,5 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
-
         <div class="flex flex-col xl:flex-row gap-2">
             <div class="flex-col flex w-96">
                 <x-input name="application.name" label="Name" required />
@@ -16,10 +15,10 @@
                 <x-input name="application.base_directory" label="Base Directory" />
                 <x-input name="application.publish_directory" label="Publish Directory" />
             </div>
-
+            <div class="flex-col flex w-96">
+                <x-input name="application.ports_exposes" label="Ports Exposes" />
+            </div>
         </div>
-
-
         <button class="flex mx-auto mt-4" type="submit">
             Submit
         </button>

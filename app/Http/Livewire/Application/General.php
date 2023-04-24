@@ -36,6 +36,7 @@ class General extends Component
         'application.build_pack' => 'required',
         'application.base_directory' => 'required',
         'application.publish_directory' => 'nullable',
+        'application.ports_exposes' => 'nullable',
     ];
     public function instantSave()
     {

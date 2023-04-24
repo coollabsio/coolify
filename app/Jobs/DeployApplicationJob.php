@@ -118,8 +118,6 @@ class DeployApplicationJob implements ShouldQueue
             $this->git_commit = $this->activity->properties->get('commit_sha');
 
             if (!$this->force_rebuild) {
-
-
                 $this->executeNow([
                     "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
                 ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
@@ -216,10 +214,10 @@ class DeployApplicationJob implements ShouldQueue
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'environment' => [
-                        'PORT' => $this->application->ports_exposes[0]
+                        'PORT' => $this->application->ports_exposes_array[0]
                     ],
                     'labels' => $this->set_labels_for_applications(),
-                    'expose' => $this->application->ports_exposes,
+                    'expose' => $this->application->ports_exposes_array,
                     'networks' => [
                         $this->destination->network,
                     ],
@@ -243,8 +241,8 @@ class DeployApplicationJob implements ShouldQueue
                 ]
             ]
         ];
-        if (count($this->application->ports_mappings) > 0) {
-            $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings;
+        if (count($this->application->ports_mappings_array) > 0) {
+            $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings_array;
         }
         if (count($persistentStorages) > 0) {
             $docker_compose['services'][$this->application->uuid]['volumes'] = $persistentStorages;
@@ -279,7 +277,7 @@ class DeployApplicationJob implements ShouldQueue
     private function generate_healthcheck_commands()
     {
         if (!$this->application->health_check_port) {
-            $this->application->health_check_port = $this->application->ports_exposes[0];
+            $this->application->health_check_port = $this->application->ports_exposes_array[0];
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
@@ -374,13 +372,13 @@ class DeployApplicationJob implements ShouldQueue
     private function setGitImportSettings($git_clone_command)
     {
         if ($this->application->git_commit_sha) {
-            $git_clone_command = "{$git_clone_command} && git checkout {$this->application->git_commit_sha}";
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git checkout {$this->application->git_commit_sha}";
         }
         if ($this->application->settings->is_git_submodules_allowed) {
-            $git_clone_command = "{$git_clone_command} && git submodule update --init --recursive";
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
         }
         if ($this->application->settings->is_git_lfs_allowed) {
-            $git_clone_command = "{$git_clone_command} && git lfs pull";
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
         }
         return $git_clone_command;
     }
@@ -397,6 +395,7 @@ class DeployApplicationJob implements ShouldQueue
             if ($this->source->is_public) {
                 $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}";
                 $git_clone_command = $this->setGitImportSettings($git_clone_command);
+                dump($git_clone_command);
                 return [
                     $this->execute_in_builder($git_clone_command)
                 ];
