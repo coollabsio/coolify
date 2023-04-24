@@ -7,6 +7,7 @@
     <title>{{ $title ?? 'Coolify' }}</title>
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
+    <style>[x-cloak] { display: none !important; }</style>
     @livewireStyles
 </head>
 

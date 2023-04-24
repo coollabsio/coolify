@@ -43,6 +43,7 @@ class DeployApplicationJob implements ShouldQueue
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,
+        public bool $force_rebuild = false,
     ) {
         $this->application = Application::query()
             ->where('uuid', $this->application_uuid)
@@ -86,7 +87,7 @@ class DeployApplicationJob implements ShouldQueue
 
             // Set wildcard domain
             if (!$this->application->settings->is_bot && !$this->application->fqdn && $wildcard_domain) {
-                $this->application->fqdn = $this->application->uuid . '.' . $wildcard_domain;
+                $this->application->fqdn = 'http://' . $this->application->uuid . '.' . $wildcard_domain;
                 $this->application->save();
             }
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
@@ -116,24 +117,26 @@ class DeployApplicationJob implements ShouldQueue
             $this->executeNow([$this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD")], 'commit_sha', hideFromOutput: true);
             $this->git_commit = $this->activity->properties->get('commit_sha');
 
-            $this->executeNow([
-                "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
-            ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
-            $image = $this->activity->properties->get('stopped_container_image');
-            if (isset($image)) {
-                $image = explode(':', str_replace('"', '', $image))[1];
-                if ($image == $this->git_commit) {
-                    $this->executeNow([
-                        "echo 'Application found locally with the same Git Commit SHA. Starting it...'"
-                    ]);
-                    $this->executeNow([
-                        "docker start {$this->application->uuid}"
-                    ], hideFromOutput: true);
+            if (!$this->force_rebuild) {
+                $this->executeNow([
+                    "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
+                ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
+                $image = $this->activity->properties->get('stopped_container_image');
+                if (isset($image)) {
+                    $image = explode(':', str_replace('"', '', $image))[1];
+                    if ($image == $this->git_commit) {
+                        $this->executeNow([
+                            "echo -n 'Application found locally with the same Git Commit SHA. Starting it... '"
+                        ]);
+                        $this->executeNow([
+                            "docker start {$this->application->uuid}"
+                        ], hideFromOutput: true);
 
-                    $this->executeNow([
-                        "echo 'Done. 🎉'",
-                    ], isFinished: true);
-                    return;
+                        $this->executeNow([
+                            "echo 'Done. 🎉'",
+                        ], isFinished: true);
+                        return;
+                    }
                 }
             }
             $this->executeNow([
@@ -211,10 +214,10 @@ class DeployApplicationJob implements ShouldQueue
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'environment' => [
-                        'PORT' => $this->application->ports_exposes[0]
+                        'PORT' => $this->application->ports_exposes_array[0]
                     ],
                     'labels' => $this->set_labels_for_applications(),
-                    'expose' => $this->application->ports_exposes,
+                    'expose' => $this->application->ports_exposes_array,
                     'networks' => [
                         $this->destination->network,
                     ],
@@ -238,8 +241,8 @@ class DeployApplicationJob implements ShouldQueue
                 ]
             ]
         ];
-        if (count($this->application->ports_mappings) > 0) {
-            $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings;
+        if (count($this->application->ports_mappings_array) > 0) {
+            $docker_compose['services'][$this->application->uuid]['ports'] = $this->application->ports_mappings_array;
         }
         if (count($persistentStorages) > 0) {
             $docker_compose['services'][$this->application->uuid]['volumes'] = $persistentStorages;
@@ -274,7 +277,7 @@ class DeployApplicationJob implements ShouldQueue
     private function generate_healthcheck_commands()
     {
         if (!$this->application->health_check_port) {
-            $this->application->health_check_port = $this->application->ports_exposes[0];
+            $this->application->health_check_port = $this->application->ports_exposes_array[0];
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
@@ -366,6 +369,19 @@ class DeployApplicationJob implements ShouldQueue
             throw new \RuntimeException($result->errorOutput());
         }
     }
+    private function setGitImportSettings($git_clone_command)
+    {
+        if ($this->application->git_commit_sha) {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git checkout {$this->application->git_commit_sha}";
+        }
+        if ($this->application->settings->is_git_submodules_allowed) {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
+        }
+        if ($this->application->settings->is_git_lfs_allowed) {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
+        }
+        return $git_clone_command;
+    }
     private function gitImport()
     {
         $source_html_url = data_get($this->application, 'source.html_url');
@@ -373,19 +389,28 @@ class DeployApplicationJob implements ShouldQueue
         $source_html_url_host = $url['host'];
         $source_html_url_scheme = $url['scheme'];
 
+        $git_clone_command = "git clone -q -b {$this->application->git_branch}";
+
         if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
             if ($this->source->is_public) {
+                $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}";
+                $git_clone_command = $this->setGitImportSettings($git_clone_command);
+                dump($git_clone_command);
                 return [
-                    $this->execute_in_builder("git clone -q -b {$this->application->git_branch} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}")
+                    $this->execute_in_builder($git_clone_command)
                 ];
             } else {
                 if (!$this->application->source->app_id) {
                     $private_key = base64_encode($this->application->source->privateKey->private_key);
+
+                    $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}";
+                    $git_clone_command = $this->setGitImportSettings($git_clone_command);
+
                     return [
                         $this->execute_in_builder("mkdir -p /root/.ssh"),
                         $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
                         $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
-                        $this->execute_in_builder("GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git clone -q -b {$this->application->git_branch} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}")
+                        $this->execute_in_builder($git_clone_command)
                     ];
                 } else {
                     $github_access_token = $this->generate_jwt_token_for_github();

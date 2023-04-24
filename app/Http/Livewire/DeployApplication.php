@@ -4,6 +4,7 @@ namespace App\Http\Livewire;
 
 use App\Jobs\DeployApplicationJob;
 use App\Models\Application;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -14,36 +15,51 @@ class DeployApplication extends Component
     public $status;
     public Application $application;
     public $destination;
+    public array $parameters;
 
     protected string $deployment_uuid;
     protected array $command = [];
     protected $source;
 
-    public function mount($applicationId)
+    public function mount()
     {
-        $this->application = Application::find($applicationId)->first();
+        $this->parameters = Route::current()->parameters();
+        $this->application = Application::find($this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
-
-    public function render()
-    {
-        return view('livewire.deploy-application');
-    }
-
-
-    public function start()
+    protected function setDeploymentUuid()
     {
         // Create Deployment ID
         $this->deployment_uuid = new Cuid2(7);
+        $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+    protected function redirectToDeployment()
+    {
+        return redirect()->route('project.applications.deployment', $this->parameters);
+    }
+    public function start()
+    {
+        $this->setDeploymentUuid();
 
         dispatch(new DeployApplicationJob(
             deployment_uuid: $this->deployment_uuid,
             application_uuid: $this->application->uuid,
+            force_rebuild: false,
         ));
 
-        $currentUrl = url()->previous();
-        $deploymentUrl = "$currentUrl/deployment/$this->deployment_uuid";
-        return redirect($deploymentUrl);
+        return $this->redirectToDeployment();
+    }
+    public function forceRebuild()
+    {
+        $this->setDeploymentUuid();
+
+        dispatch(new DeployApplicationJob(
+            deployment_uuid: $this->deployment_uuid,
+            application_uuid: $this->application->uuid,
+            force_rebuild: true,
+        ));
+
+        return $this->redirectToDeployment();
     }
 
     public function stop()
