@@ -1,10 +1,8 @@
 version: '3.8'
 services:
   coolify:
+    image: "ghcr.io/coollabsio/coolify:${APP_TAG:-v4.0.0-nightly.1}"
     container_name: coolify
-    build:
-      context: .
-      dockerfile: ./docker/prod-ssu/Dockerfile
     environment:
       - APP_ENV=production
       - APP_DEBUG
