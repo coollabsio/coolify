@@ -26,7 +26,7 @@ function queue {
 function reset-db {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
-function coolify {g
+function coolify {
     bash vendor/bin/spin exec -u webuser coolify bash
 }
 function coolify-root {
@@ -34,6 +34,16 @@ function coolify-root {
 }
 function vite {
     bash vendor/bin/spin exec vite bash
+}
+
+function build-prod {
+    if [ "$1" ]; then
+        echo "Building version $1"
+        docker build -t ghcr.io/coollabsio/coolify:$1 -f docker/prod-ssu/Dockerfile .
+    else
+        echo "Building version v4.0.0-nightly.1"
+        docker build -t ghcr.io/coollabsio/coolify:v4.0.0-nightly.1 -f docker/prod-ssu/Dockerfile .
+    fi
 }
 
 function default {
