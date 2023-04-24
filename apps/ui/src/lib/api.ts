@@ -72,17 +72,19 @@ async function send({
 			...headers
 		};
 	}
-	if (token && !path.startsWith('https://')) {
+
+	if (token && !path.startsWith('https://') && !path.startsWith('http://')) {
 		opts.headers = {
 			...opts.headers,
 			Authorization: `Bearer ${token}`
 		};
 	}
-	if (!path.startsWith('https://')) {
+
+	if (!path.startsWith('https://') && !path.startsWith('http://')) {
 		path = `/api/v1${path}`;
 	}
 
-	if (dev && !path.startsWith('https://')) {
+	if (dev && !path.startsWith('https://') && !path.startsWith('http://')) {
 		path = `${getAPIUrl()}${path}`;
 	}
 	if (method === 'POST' && data && !opts.body) {
