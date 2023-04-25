@@ -52,7 +52,9 @@ class User extends Authenticatable
             $model->uuid = (string) new Cuid2(7);
         });
     }
-
+    public function isRoot() {
+        return $this->id == 0;
+    }
     public function teams()
     {
         return $this->belongsToMany(Team::class);

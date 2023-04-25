@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('coolify_instance_settings', function (Blueprint $table) {
+        Schema::create('instance_settings', function (Blueprint $table) {
             $table->id();
             $table->string('fqdn')->nullable();
             $table->string('wildcard_domain')->nullable();
@@ -36,6 +36,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('coolify_instance_settings');
+        Schema::dropIfExists('instance_settings');
     }
 };

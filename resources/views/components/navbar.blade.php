@@ -10,6 +10,9 @@
         <a href="/demo">Demo</a>
         @endenv
         <a href="/profile">Profile</a>
+        @if (auth()->user()->isRoot())
+            <a href="/settings">Settings</a>
+        @endif
         <form action="/logout" method="POST">
             @csrf
             <button type="submit">Logout</button>

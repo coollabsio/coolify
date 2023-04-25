@@ -6,7 +6,7 @@ use App\Actions\RemoteProcess\RunRemoteProcess;
 use App\Data\RemoteProcessArgs;
 use App\Enums\ActivityTypes;
 use App\Models\Application;
-use App\Models\CoolifyInstanceSettings;
+use App\Models\InstanceSettings;
 use DateTimeImmutable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -77,7 +77,7 @@ class DeployApplicationJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $coolify_instance_settings = CoolifyInstanceSettings::find(1);
+            $coolify_instance_settings = InstanceSettings::find(0);
             $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
 
             // Get Wildcard Domain
