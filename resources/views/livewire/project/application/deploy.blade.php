@@ -8,9 +8,8 @@
         <button wire:click='forceRebuild'>Start (no cache)</button>
     @endif
     <button wire:click='kill'>Kill</button>
-    <span wire:poll='pollingStatus'>
+    <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')
-            <span class="text-green-500">{{ $application->status }}</span>
             @if (!data_get($application, 'settings.is_bot') && data_get($application, 'fqdn'))
                 <a target="_blank" href="{{ data_get($application, 'fqdn') }}">Open URL</a>
             @endif
@@ -27,8 +26,12 @@
                     @endif
                 @endforeach
             @endif
+            <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
+            <span class="text-green-500" wire:loading.remove.delay.longer>{{ $application->status }}</span>
         @else
-            <span class="text-red-500">{{ $application->status }}</span>
+            <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
+            <span class="text-red-500" wire:loading.remove.delay.longer>{{ $application->status }}</span>
         @endif
+
     </span>
 </div>
