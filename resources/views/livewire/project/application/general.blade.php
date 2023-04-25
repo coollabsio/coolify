@@ -10,6 +10,9 @@
                 <x-form-input id="application.build_command" label="Build Command" />
                 <x-form-input id="application.start_command" label="Start Command" />
                 <x-form-input id="application.build_pack" label="Build Pack" />
+                @if ($application->settings->is_static)
+                    <x-form-input id="application.static_image" label="Static Image" />
+                @endif
             </div>
             <div class="flex flex-col w-96">
                 <x-form-input id="application.base_directory" label="Base Directory" />
@@ -25,6 +28,7 @@
         </button>
     </form>
     <div class="flex flex-col pt-4 text-right w-52">
+        <x-form-input instantSave type="checkbox" id="is_static" label="Static website?" />
         <x-form-input instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
         <x-form-input instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
         <x-form-input instantSave type="checkbox" id="is_previews" label="Previews?" />

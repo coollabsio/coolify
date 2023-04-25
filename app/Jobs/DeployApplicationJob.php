@@ -163,10 +163,26 @@ class DeployApplicationJob implements ShouldQueue
                 "echo -n 'Building image... '",
             ]);
 
-            $this->executeNow([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
-            ], isDebuggable: true);
+            if ($this->application->settings->is_static) {
+                $this->executeNow([
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit}-build {$this->workdir}"),
+                ], isDebuggable: true);
 
+                $dockerfile = "FROM {$this->application->static_image}
+WORKDIR /usr/share/nginx/html/
+LABEL coolify.deploymentId={$this->deployment_uuid}
+COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->application->publish_directory} .";
+                $docker_file = base64_encode($dockerfile);
+
+                $this->executeNow([
+                    $this->execute_in_builder("echo '{$docker_file}' | base64 -d > {$this->workdir}/Dockerfile-prod"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                ], hideFromOutput: true);
+            } else {
+                $this->executeNow([
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                ], isDebuggable: true);
+            }
             $this->executeNow([
                 "echo 'Done.'",
                 "echo -n 'Removing old instance... '",
@@ -422,21 +438,17 @@ class DeployApplicationJob implements ShouldQueue
     }
     private function nixpacks_build_cmd()
     {
-        if (str_starts_with($this->application->base_image, 'apache') || str_starts_with($this->application->base_image, 'nginx')) {
-            // @TODO: Add static site builds
-        } else {
-            $nixpacks_command = "nixpacks build -o {$this->workdir} --no-error-without-start";
-            if ($this->application->install_command) {
-                $nixpacks_command .= " --install-cmd '{$this->application->install_command}'";
-            }
-            if ($this->application->build_command) {
-                $nixpacks_command .= " --build-cmd '{$this->application->build_command}'";
-            }
-            if ($this->application->start_command) {
-                $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
-            }
-            $nixpacks_command .= " {$this->workdir}";
+        $nixpacks_command = "nixpacks build -o {$this->workdir} --no-error-without-start";
+        if ($this->application->install_command) {
+            $nixpacks_command .= " --install-cmd '{$this->application->install_command}'";
         }
+        if ($this->application->build_command) {
+            $nixpacks_command .= " --build-cmd '{$this->application->build_command}'";
+        }
+        if ($this->application->start_command) {
+            $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
+        }
+        $nixpacks_command .= " {$this->workdir}";
         return $this->execute_in_builder($nixpacks_command);
     }
 }

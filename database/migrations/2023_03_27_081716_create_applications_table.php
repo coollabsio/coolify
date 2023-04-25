@@ -27,8 +27,7 @@ return new class extends Migration
             $table->string('docker_registry_image_tag')->nullable();
 
             $table->string('build_pack');
-            $table->string('base_image')->nullable();
-            $table->string('build_image')->nullable();
+            $table->string('static_image')->default('nginx:alpine');
 
             $table->string('install_command')->nullable();
             $table->string('build_command')->nullable();

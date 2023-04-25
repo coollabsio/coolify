@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('application_settings', function (Blueprint $table) {
             $table->id();
+            $table->boolean('is_static')->default(false);
             $table->boolean('is_git_submodules_allowed')->default(true);
             $table->boolean('is_git_lfs_allowed')->default(true);
             $table->boolean('is_auto_deploy')->default(true);
