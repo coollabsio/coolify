@@ -23,8 +23,8 @@
             *
         @endif
     </label>
-    <input type="text" id={{ $name }} wire:model.defer={{ $name }} name={{ $name }}
-        @if ($required) required @endif
+    <input type={{ $type }} id={{ $name }} wire:model.defer={{ $name }}
+        name={{ $name }} @if ($required) required @endif
         @if ($readonly) readOnly=true disabled=true @endif />
 @endif
 

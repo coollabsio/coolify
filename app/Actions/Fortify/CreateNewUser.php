@@ -2,6 +2,7 @@
 
 namespace App\Actions\Fortify;
 
+use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,11 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
+        $settings = InstanceSettings::find(0);
+        if (!$settings->is_registration_enabled) {
+            Log::info('Registration is disabled');
+            abort(403);
+        }
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => [

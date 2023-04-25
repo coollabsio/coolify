@@ -6,6 +6,7 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,8 +30,21 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Fortify::loginView(fn () => view('auth.login'));
-        Fortify::registerView(fn () => view('auth.register'));
+        Fortify::registerView(function () {
+            $settings = InstanceSettings::find(0);
+            if (!$settings->is_registration_enabled) {
+                abort(403);
+            }
+            return view('auth.register');
+        });
+
+        Fortify::loginView(function () {
+            $settings = InstanceSettings::find(0);
+            return view('auth.login', [
+                'is_registration_enabled' => $settings->is_registration_enabled
+            ]);
+        });
+
         Fortify::authenticateUsing(function (Request $request) {
             $user = User::where('email', $request->email)->with('teams')->first();
             if (
@@ -49,12 +63,11 @@ class FortifyServiceProvider extends ServiceProvider
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->email;
 
-            return Limit::perMinute(5)->by($email.$request->ip());
+            return Limit::perMinute(5)->by($email . $request->ip());
         });
 
         RateLimiter::for('two-factor', function (Request $request) {
             return Limit::perMinute(5)->by($request->session()->get('login.id'));
         });
-
     }
 }
