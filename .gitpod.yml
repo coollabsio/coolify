@@ -4,7 +4,7 @@ tasks:
     before: sudo curl -o /usr/local/bin/docker-compose -fsSL https://github.com/docker/compose/releases/download/v2.16.0/docker-compose-linux-$(uname -m)
     init: |
       cp .env.example .env &&
-      sed -i "s#APP_URL=http://localhost#APP_URL=$(gp url 80)#g" .env
+      sed -i "s#APP_URL=http://localhost#APP_URL=$(gp url 8000)#g" .env
       sed -i "s#USERID=#USERID=33333#g" .env
       sed -i "s#GROUPID=#GROUPID=33333#g" .env
       composer install --ignore-platform-reqs
