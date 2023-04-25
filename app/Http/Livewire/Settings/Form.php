@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Settings;
 
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use Livewire\Component;
 
-class InstanceSettings extends Component
+class Form extends Component
 {
     public ModelsInstanceSettings $settings;
     public $do_not_track;
@@ -41,6 +41,7 @@ class InstanceSettings extends Component
             $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
             return;
         }
+        $this->validate();
         $this->settings->save();
     }
 }

@@ -10,7 +10,7 @@
                 <x-input type="number" name="settings.public_port_max" label="Public Port Max" />
             </div>
         </div>
-        <button class="flex mx-auto mt-4" type="submit">
+        <button class="w-16 mt-4" type="submit">
             Submit
         </button>
     </form>

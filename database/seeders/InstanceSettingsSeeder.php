@@ -14,7 +14,6 @@ class InstanceSettingsSeeder extends Seeder
     {
         InstanceSettings::create([
             'id' => 0,
-            'wildcard_domain' => 'coolify.io',
             'is_https_forced' => false,
             'is_registration_enabled' => true,
         ]);

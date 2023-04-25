@@ -395,7 +395,6 @@ class DeployApplicationJob implements ShouldQueue
             if ($this->source->is_public) {
                 $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository}.git {$this->workdir}";
                 $git_clone_command = $this->setGitImportSettings($git_clone_command);
-                dump($git_clone_command);
                 return [
                     $this->execute_in_builder($git_clone_command)
                 ];

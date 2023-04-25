@@ -24,8 +24,8 @@ Route::middleware(['auth'])->group(function () {
         $projects = session('currentTeam')->load(['projects'])->projects;
         $servers = session('currentTeam')->load(['servers'])->servers;
         return view('home', [
-            'servers' => $servers,
-            'projects' => $projects
+            'servers' => $servers->sortBy('name'),
+            'projects' => $projects->sortBy('name')
         ]);
     })->name('home');
 
@@ -52,6 +52,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/demo', function () {
         return view('demo');
     })->name('demo');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/server/{server_uuid}', function () {
+        $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
+        if (!$server) {
+            abort(404);
+        }
+        return view('server.dashboard', [
+            'server_id' => $server->id,
+        ]);
+    })->name('server.dashboard');
 });
 
 Route::middleware(['auth'])->group(function () {

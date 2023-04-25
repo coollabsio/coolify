@@ -68,6 +68,7 @@ class General extends Component
     }
     public function submit()
     {
+        $this->validate();
         $this->application->save();
     }
 }
