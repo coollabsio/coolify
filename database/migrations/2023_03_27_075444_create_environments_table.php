@@ -13,10 +13,10 @@ return new class extends Migration
     {
         Schema::create('environments', function (Blueprint $table) {
             $table->id();
-            $table->string('uuid')->unique();
-            $table->string('name')->unique();
+            $table->string('name');
             $table->foreignId('project_id');
             $table->timestamps();
+            $table->unique(['name', 'project_id']);
         });
     }
 

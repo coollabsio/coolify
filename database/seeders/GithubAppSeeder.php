@@ -38,13 +38,5 @@ class GithubAppSeeder extends Seeder
             'private_key_id' => $private_key_2->id,
             'team_id' => $root_team->id,
         ]);
-        GithubApp::create([
-            'name' => 'Private GitHub (deployment key)',
-            'api_url' => 'https://api.github.com',
-            'html_url' => 'https://github.com',
-            'is_public' => false,
-            'private_key_id' => $private_key_1->id,
-            'team_id' => $root_team->id,
-        ]);
     }
 }

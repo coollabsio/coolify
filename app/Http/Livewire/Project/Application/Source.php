@@ -17,6 +17,6 @@ class Source extends Component
     ];
     public function mount()
     {
-        $this->application = Application::find($this->applicationId)->first();
+        $this->application = Application::where('id', $this->applicationId)->first();
     }
 }

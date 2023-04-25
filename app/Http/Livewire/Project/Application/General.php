@@ -36,7 +36,8 @@ class General extends Component
         'application.build_pack' => 'required',
         'application.base_directory' => 'required',
         'application.publish_directory' => 'nullable',
-        'application.ports_exposes' => 'nullable',
+        'application.ports_exposes' => 'required',
+        'application.ports_mappings' => 'nullable',
     ];
     public function instantSave()
     {
@@ -54,7 +55,7 @@ class General extends Component
     }
     public function mount()
     {
-        $this->application = Application::find($this->applicationId)->with('destination', 'settings')->first();
+        $this->application = Application::where('id', $this->applicationId)->with('destination', 'settings')->firstOrFail();
         $this->is_git_submodules_allowed = $this->application->settings->is_git_submodules_allowed;
         $this->is_git_lfs_allowed = $this->application->settings->is_git_lfs_allowed;
         $this->is_debug = $this->application->settings->is_debug;
@@ -64,7 +65,6 @@ class General extends Component
         $this->is_http2 = $this->application->settings->is_http2;
         $this->is_auto_deploy = $this->application->settings->is_auto_deploy;
         $this->is_dual_cert = $this->application->settings->is_dual_cert;
-
     }
     public function submit()
     {

@@ -2,8 +2,21 @@
 
 namespace App\Models;
 
-class Environment extends BaseModel
+use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
+
+class Environment extends Model
 {
+    protected $fillable = [
+        'name',
+        'project_id',
+    ];
+    protected function name(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => strtolower($value),
+        );
+    }
     public function project()
     {
         return $this->belongsTo(Project::class);
@@ -21,4 +34,3 @@ class Environment extends BaseModel
         return $this->hasMany(Service::class);
     }
 }
-

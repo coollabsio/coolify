@@ -11,15 +11,15 @@ class ApplicationController extends Controller
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
         if (!$environment) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (!$application) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         return view('project.application.configuration', ['application' => $application]);
     }
@@ -27,15 +27,15 @@ class ApplicationController extends Controller
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
         if (!$environment) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (!$application) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         return view('project.application.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
     }
@@ -46,15 +46,15 @@ class ApplicationController extends Controller
 
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
         if (!$environment) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (!$application) {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
         $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
 

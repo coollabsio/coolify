@@ -14,11 +14,5 @@ class EnvironmentSeeder extends Seeder
      */
     public function run(): void
     {
-        $project_1 = Project::find(1);
-        Environment::create([
-            'id' => 1,
-            'name' => 'production',
-            'project_id' => $project_1->id,
-        ]);
     }
 }

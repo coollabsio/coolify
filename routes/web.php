@@ -41,7 +41,7 @@ Route::middleware(['auth'])->group(function () {
                 'settings' => $settings
             ]);
         } else {
-            return redirect()->route('home');
+            return redirect()->route('dashboard');
         }
     })->name('settings');
 

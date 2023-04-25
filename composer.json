@@ -16,6 +16,7 @@
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
         "spatie/laravel-ray": "^1.32.4",
+        "spatie/url": "^2.2",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0"
     },

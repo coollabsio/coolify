@@ -54,7 +54,7 @@ return new class extends Migration
 
             $table->string('status')->default('exited');
 
-            $table->morphs('destination');
+            $table->nullableMorphs('destination');
             $table->morphs('source');
 
             $table->foreignId('environment_id');

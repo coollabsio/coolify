@@ -12,6 +12,10 @@ class Server extends BaseModel
             ]);
         });
     }
+    public function destinations()
+    {
+        return $this->hasMany(PrivateKey::class);
+    }
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);

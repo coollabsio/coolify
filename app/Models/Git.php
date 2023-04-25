@@ -2,14 +2,12 @@
 
 namespace App\Models;
 
-class GitlabApp extends BaseModel
+use Illuminate\Database\Eloquent\Model;
+
+class Git extends Model
 {
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');
-    }
-    public function privateKey()
-    {
-        return $this->belongsTo(PrivateKey::class);
     }
 }

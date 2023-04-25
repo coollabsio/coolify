@@ -10,15 +10,28 @@ class Project extends BaseModel
             ProjectSetting::create([
                 'project_id' => $project->id,
             ]);
+            Environment::create([
+                'name' => 'Production',
+                'project_id' => $project->id,
+            ]);
         });
     }
-    public function environments() {
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'project_id'
+    ];
+    public function environments()
+    {
         return $this->hasMany(Environment::class);
     }
-    public function settings() {
+    public function settings()
+    {
         return $this->hasOne(ProjectSetting::class);
     }
-    public function applications() {
+    public function applications()
+    {
         return $this->hasManyThrough(Application::class, Environment::class);
     }
 }

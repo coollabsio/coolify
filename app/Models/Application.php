@@ -16,6 +16,20 @@ class Application extends BaseModel
         });
     }
 
+    protected $fillable = [
+        'name',
+        'description',
+        'git_repository',
+        'git_branch',
+        'build_pack',
+        'environment_id',
+        'destination_id',
+        'destination_type',
+        'source_id',
+        'source_type',
+        'ports_mappings',
+        'ports_exposes',
+    ];
     public function environment()
     {
         return $this->belongsTo(Environment::class);
