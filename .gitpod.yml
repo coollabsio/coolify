@@ -56,3 +56,10 @@ vscode:
     - streetsidesoftware.code-spell-checker
     - rangav.vscode-thunder-client
     - PKief.material-icon-theme
+    - cierra.livewire-vscode
+    - lennardv.livewire-goto-updated
+    - bradlc.vscode-tailwindcss
+    - heybourn.headwind
+    - adrianwilczynski.alpine-js-intellisense
+    - amiralizadeh9480.laravel-extra-intellisense
+    - shufo.vscode-blade-formatter
