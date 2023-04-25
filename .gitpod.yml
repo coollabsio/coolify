@@ -55,3 +55,4 @@ vscode:
     - EditorConfig.EditorConfig
     - streetsidesoftware.code-spell-checker
     - rangav.vscode-thunder-client
+    - PKief.material-icon-theme
