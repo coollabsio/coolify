@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Application;
+namespace App\Http\Livewire\Project\Application;
 
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;

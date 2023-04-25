@@ -21,7 +21,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        return view('project.applications.configuration', ['application' => $application]);
+        return view('project.application.configuration', ['application' => $application]);
     }
     public function deployments()
     {
@@ -37,7 +37,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        return view('project.applications.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
+        return view('project.application.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
     }
 
     public function deployment()
@@ -58,7 +58,7 @@ class ApplicationController extends Controller
         }
         $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
 
-        return view('project.applications.deployment', [
+        return view('project.application.deployment', [
             'application' => $application,
             'activity' => $activity,
             'deployment_uuid' => $deployment_uuid,

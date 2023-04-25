@@ -10,19 +10,19 @@
             </a>
         </div>
         <div x-cloak x-show="tab === 'general'">
-            <livewire:application.general :applicationId="$application->id" />
+            <livewire:project.application.general :applicationId="$application->id" />
         </div>
         <div x-cloak x-show="tab === 'envs'">
-            <livewire:application.environment-variables />
+            <livewire:project.application.environment-variables />
         </div>
         <div x-cloak x-show="tab === 'source'">
-            <livewire:application.source :applicationId="$application->id" />
+            <livewire:project.application.source :applicationId="$application->id" />
         </div>
         <div x-cloak x-show="tab === 'destination'">
-            <livewire:application.destination :destination="$application->destination" />
+            <livewire:project.application.destination :destination="$application->destination" />
         </div>
         <div x-cloak x-show="tab === 'storages'">
-            <livewire:application.storages :storages="$application->persistentStorages" />
+            <livewire:project.application.storages :storages="$application->persistentStorages" />
         </div>
     </div>
 </x-applications.layout>

@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Project\Application;
 
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
-class PollDeployment extends Component
+class GetDeployments extends Component
 {
     public string $deployment_uuid;
     public string $created_at;

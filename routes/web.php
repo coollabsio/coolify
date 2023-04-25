@@ -23,11 +23,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', function () {
         $projects = session('currentTeam')->load(['projects'])->projects;
         $servers = session('currentTeam')->load(['servers'])->servers;
-        return view('home', [
+        return view('dashboard', [
             'servers' => $servers->sortBy('name'),
             'projects' => $projects->sortBy('name')
         ]);
-    })->name('home');
+    })->name('dashboard');
 
     Route::get('/profile', function () {
         return view('profile');
@@ -67,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/project/new', fn () => view('project.new'))->name('project.new');
     Route::get(
         '/project/{project_uuid}',
         [ProjectController::class, 'environments']
@@ -80,15 +81,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}',
         [ApplicationController::class, 'configuration']
-    )->name('project.applications.configuration');
+    )->name('project.application.configuration');
 
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment',
         [ApplicationController::class, 'deployments']
-    )->name('project.applications.deployments');
+    )->name('project.application.deployments');
 
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
         [ApplicationController::class, 'deployment']
-    )->name('project.applications.deployment');
+    )->name('project.application.deployment');
 });

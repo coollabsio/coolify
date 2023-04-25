@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Project\Application;
 
 use App\Jobs\DeployApplicationJob;
 use App\Models\Application;
@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
-class DeployApplication extends Component
+class Deploy extends Component
 {
     public string $applicationId;
     public $activity;
@@ -35,7 +35,7 @@ class DeployApplication extends Component
     }
     protected function redirectToDeployment()
     {
-        return redirect()->route('project.applications.deployment', $this->parameters);
+        return redirect()->route('project.application.deployment', $this->parameters);
     }
     public function start()
     {

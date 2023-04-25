@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Project\Application;
 
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
-class PollActivity extends Component
+class PollDeployment extends Component
 {
     public $activity;
     public $isKeepAliveOn = true;

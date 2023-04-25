@@ -3,7 +3,7 @@
     <div>
         @foreach ($environment->applications as $application)
             <p>
-                <a href="{{ route('project.applications.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
+                <a href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                     {{ $application->name }}
                 </a>
             </p>
