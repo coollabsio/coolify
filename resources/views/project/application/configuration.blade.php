@@ -1,4 +1,6 @@
-<x-applications.layout :applicationId="$application->id" title="Configurations">
+<x-layout>
+    <h1>Configuration</h1>
+    <x-applications.navbar :applicationId="$application->id" />
     <div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
         <div class="flex gap-4">
             <a @click.prevent="tab = 'general'; window.location.hash = 'general'" href="#">General</a>
@@ -25,4 +27,4 @@
             <livewire:project.application.storages :storages="$application->persistentStorages" />
         </div>
     </div>
-</x-applications.layout>
+</x-layout>

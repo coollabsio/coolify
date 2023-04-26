@@ -222,6 +222,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     {
         $persistentStorages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
+        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -230,10 +231,10 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
                     'environment' => [
-                        'PORT' => $this->application->ports_exposes_array[0]
+                        'PORT' => $ports[0]
                     ],
                     'labels' => $this->set_labels_for_applications(),
-                    'expose' => $this->application->ports_exposes_array,
+                    'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
                     ],

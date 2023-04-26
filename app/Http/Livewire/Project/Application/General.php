@@ -55,6 +55,7 @@ class General extends Component
         $this->application->settings->is_auto_deploy = $this->is_auto_deploy;
         $this->application->settings->is_dual_cert = $this->is_dual_cert;
         $this->application->settings->save();
+        $this->application->refresh();
     }
     public function mount()
     {

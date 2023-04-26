@@ -26,8 +26,8 @@
         @endif
     </label>
     <input type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-        @if ($required) required @endif
-        @if ($readonly) readOnly=true disabled=true @endif />
+        @if ($required) required @endif @if ($disabled) disabled @endif
+        @if ($readonly) readOnly disabled @endif />
     @error($id)
         <div class="text-red-500">{{ $message }}</div>
     @enderror

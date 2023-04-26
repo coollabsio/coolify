@@ -33,7 +33,9 @@ class Application extends BaseModel
         'source_type',
         'ports_mappings',
         'ports_exposes',
+        'publish_directory',
     ];
+
     public function environment()
     {
         return $this->belongsTo(Environment::class);
@@ -55,6 +57,18 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
+    public function publishDirectory(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
+        );
+    }
+    public function baseDirectory(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => '/' . ltrim($value, '/'),
+        );
+    }
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(

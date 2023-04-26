@@ -17,11 +17,11 @@
                 <a target="_blank" href="{{ data_get($application, 'fqdn') }}">Open URL</a>
             @endif
 
-            @if (data_get($application, 'ports_exposes_array'))
-                @foreach ($application->ports_exposes_array as $port)
+            @if (data_get($application, 'ports_mappings_array'))
+                @foreach ($application->ports_mappings_array as $port)
                     @if (env('APP_ENV') === 'local')
-                        <a target="_blank" href="http://localhost:{{ $port }}">Open
-                            {{ $port }}</a>
+                        <a target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Open
+                            {{ explode(':', $port)[0] }}</a>
                     @else
                         <a target="_blank"
                             href="http://{{ $application->destination->server->ip }}:{{ $port }}">Open

@@ -11,15 +11,26 @@
                 <x-form-input id="application.start_command" label="Start Command" />
                 <x-form-input id="application.build_pack" label="Build Pack" />
                 @if ($application->settings->is_static)
-                    <x-form-input id="application.static_image" label="Static Image" />
+                    <x-form-input id="application.static_image" label="Static Image" required />
                 @endif
             </div>
             <div class="flex flex-col w-96">
+
                 <x-form-input id="application.base_directory" label="Base Directory" />
-                <x-form-input id="application.publish_directory" label="Publish Directory" />
+                @if ($application->settings->is_static)
+                    <x-form-input id="application.publish_directory" label="Publish Directory" required />
+                @else
+                    <x-form-input id="application.publish_directory" label="Publish Directory" />
+                @endif
+
             </div>
             <div class="flex flex-col w-96">
-                <x-form-input id="application.ports_exposes" label="Ports Exposes" />
+                @if ($application->settings->is_static)
+                    <x-form-input id="application.ports_exposes" label="Ports Exposes" disabled />
+                @else
+                    <x-form-input id="application.ports_exposes" label="Ports Exposes" />
+                @endif
+
                 <x-form-input id="application.ports_mappings" label="Ports Mappings" />
             </div>
         </div>

@@ -24,14 +24,17 @@ class PublicGitRepository extends Component
     public $swarm_docker;
     public $chosenServer;
     public $chosenDestination;
-    public $is_static = false;
     public $github_apps;
     public $gitlab_apps;
+
+    public bool $is_static = false;
+    public string $publish_directory = '';
 
     protected $rules = [
         'public_repository_url' => 'required|url',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
+        'publish_directory' => 'string',
     ];
     public function mount()
     {
@@ -54,10 +57,20 @@ class PublicGitRepository extends Component
         $this->chosenDestination = $instance::where('uuid', $destination_uuid)->first();
     }
 
+    public function instantSave()
+    {
+        if ($this->is_static) {
+            $this->port = 80;
+            $this->publish_directory = '/dist';
+        } else {
+            $this->port = 3000;
+            $this->publish_directory = null;
+        }
+    }
+
     public function submit()
     {
         $this->validate();
-
         $url = Url::fromString($this->public_repository_url);
         $git_host = $url->getHost();
         $git_repository = $url->getSegment(1) . '/' . $url->getSegment(2);
@@ -75,6 +88,7 @@ class PublicGitRepository extends Component
             'git_branch' => $git_branch,
             'build_pack' => 'nixpacks',
             'ports_exposes' => $this->port,
+            'publish_directory' => $this->publish_directory,
             'environment_id' => $environment->id,
             'destination_id' => $this->chosenDestination->id,
             'destination_type' => $this->chosenDestination->getMorphClass(),
@@ -88,6 +102,8 @@ class PublicGitRepository extends Component
         } elseif ($git_host == 'bitbucket.org') {
         }
         $application = Application::create($application_init);
+        $application->settings->is_static = $this->is_static;
+        $application->settings->save();
 
         return redirect()->route('project.application.configuration', [
             'project_uuid' => $project->uuid,
