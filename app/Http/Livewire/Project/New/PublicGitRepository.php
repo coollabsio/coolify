@@ -24,11 +24,14 @@ class PublicGitRepository extends Component
     public $swarm_docker;
     public $chosenServer;
     public $chosenDestination;
+    public $is_static = false;
     public $github_apps;
     public $gitlab_apps;
 
     protected $rules = [
         'public_repository_url' => 'required|url',
+        'port' => 'required|numeric',
+        'is_static' => 'required|boolean',
     ];
     public function mount()
     {
@@ -65,13 +68,14 @@ class PublicGitRepository extends Component
             'description' => fake()->sentence(),
             'team_id' => session('currentTeam')->id,
         ]);
+        $environment = $project->environments->first();
         $application_init = [
             'name' => fake()->words(2, true),
             'git_repository' => $git_repository,
             'git_branch' => $git_branch,
             'build_pack' => 'nixpacks',
             'ports_exposes' => $this->port,
-            'environment_id' => $project->environments->first()->id,
+            'environment_id' => $environment->id,
             'destination_id' => $this->chosenDestination->id,
             'destination_type' => $this->chosenDestination->getMorphClass(),
         ];
@@ -82,9 +86,13 @@ class PublicGitRepository extends Component
             $application_init['source_id'] = GitlabApp::where('name', 'Public GitLab')->first()->id;
             $application_init['source_type'] = GitlabApp::class;
         } elseif ($git_host == 'bitbucket.org') {
-            // $application_init['source_id'] = GithubApp::where('name', 'Public Bitbucket')->first()->id;
-            // $application_init['source_type'] = GithubApp::class;
         }
-        Application::create($application_init);
+        $application = Application::create($application_init);
+
+        return redirect()->route('project.application.configuration', [
+            'project_uuid' => $project->uuid,
+            'environment_name' => $environment->name,
+            'application_uuid' => $application->uuid,
+        ]);
     }
 }

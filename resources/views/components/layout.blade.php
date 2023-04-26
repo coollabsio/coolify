@@ -15,12 +15,13 @@
     @livewireStyles
 </head>
 
-<body>
+<body x-data="confirmModal" x-on:keydown.escape="toggleConfirmModal">
     <x-navbar />
     <main>
         {{ $slot }}
     </main>
 
+    <x-confirm-modal />
     @livewireScripts
 </body>
 

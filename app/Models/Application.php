@@ -14,6 +14,10 @@ class Application extends BaseModel
                 'application_id' => $application->id,
             ]);
         });
+        static::deleting(function ($application) {
+            $application->settings()->delete();
+            $application->persistentStorages()->delete();
+        });
     }
 
     protected $fillable = [

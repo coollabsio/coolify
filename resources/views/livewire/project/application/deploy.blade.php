@@ -1,4 +1,7 @@
 <div>
+    <button class="bg-red-500" @confirm.window="$wire.delete()"
+        x-on:click="toggleConfirmModal('Are you sure you would like to delete this application?')">
+        Delete</button>
     @if ($application->status === 'running')
         <button wire:click='start'>Restart</button>
         <button wire:click='forceRebuild'>Force Rebuild</button>

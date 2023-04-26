@@ -21,6 +21,7 @@
     @isset($chosenDestination)
         <form wire:submit.prevent='submit'>
             <x-form-input id="public_repository_url" label="Repository URL" />
+            <x-form-input type="checkbox" id="is_static" label="Static Site?" />
             <x-form-input type="number" id="port" label="Port" />
             <button type="submit">
                 Submit
