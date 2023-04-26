@@ -67,11 +67,16 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/project/new', fn () => view('project.new'))->name('project.new');
+    Route::get('/project/new', fn () => view('project.new', ['type' => 'project']))->name('project.new');
     Route::get(
         '/project/{project_uuid}',
         [ProjectController::class, 'environments']
     )->name('project.environments');
+
+    Route::get(
+        '/project/{project_uuid}/{environment_name}/new',
+        [ProjectController::class, 'resources_new']
+    )->name('project.resources.new');
 
     Route::get(
         '/project/{project_uuid}/{environment_name}',

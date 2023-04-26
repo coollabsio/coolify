@@ -19,6 +19,18 @@ class ProjectController extends Controller
         return view('project.environments', ['project' => $project]);
     }
 
+    public function resources_new()
+    {
+        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        if (!$project) {
+            return redirect()->route('dashboard');
+        }
+        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first();
+        if (!$environment) {
+            return redirect()->route('dashboard');
+        }
+        return view('project.new', ['project' => $project, 'environment' => $environment, 'type' => 'resource']);
+    }
     public function resources()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();

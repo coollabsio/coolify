@@ -2,15 +2,13 @@
 
 namespace App\Http\Livewire\Project\New;
 
-use App\Http\Livewire\Application\Destination;
 use App\Models\Application;
-use App\Models\Git;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -18,6 +16,8 @@ class PublicGitRepository extends Component
 {
     public string $public_repository_url;
     public int $port;
+    public string $type;
+    public $parameters;
 
     public $servers;
     public $standalone_docker;
@@ -42,6 +42,7 @@ class PublicGitRepository extends Component
             $this->public_repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
             $this->port = 3000;
         }
+        $this->parameters = Route::current()->parameters();
         $this->servers = session('currentTeam')->load(['servers'])->servers;
     }
     public function chooseServer($server_id)
@@ -76,12 +77,17 @@ class PublicGitRepository extends Component
         $git_repository = $url->getSegment(1) . '/' . $url->getSegment(2);
         $git_branch = $url->getSegment(4) ?? 'main';
 
-        $project = Project::create([
-            'name' => fake()->company(),
-            'description' => fake()->sentence(),
-            'team_id' => session('currentTeam')->id,
-        ]);
-        $environment = $project->environments->first();
+        if ($this->type === 'project') {
+            $project = Project::create([
+                'name' => fake()->company(),
+                'description' => fake()->sentence(),
+                'team_id' => session('currentTeam')->id,
+            ]);
+            $environment = $project->environments->first();
+        } else {
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->firstOrFail();
+            $environment = $project->environments->where('name', $this->parameters['environment_name'])->firstOrFail();
+        }
         $application_init = [
             'name' => fake()->words(2, true),
             'git_repository' => $git_repository,

@@ -1,9 +1,11 @@
 <x-layout>
-    <h1>Resources</h1>
+    <h1>Resources <a href="{{ route('project.resources.new', Route::current()->parameters()) }}"><button>New</button></a>
+    </h1>
     <div>
         @foreach ($environment->applications as $application)
             <p>
-                <a href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
+                <a
+                    href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                     {{ $application->name }}
                 </a>
             </p>
