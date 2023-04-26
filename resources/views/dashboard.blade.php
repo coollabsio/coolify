@@ -5,9 +5,9 @@
     @empty
         <p>No projects found.</p>
     @endforelse
-    <h1>Servers</h1>
+    <h1>Servers <a href="{{ route('server.new') }}"><button>New</button></a></h1>
     @forelse ($servers as $server)
-        <a href="{{ route('server.dashboard', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
+        <a href="{{ route('server.show', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
     @empty
         <p>No servers found.</p>
     @endforelse

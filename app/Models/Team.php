@@ -12,13 +12,16 @@ class Team extends BaseModel
         'name',
         'personal_team'
     ];
-    public function projects() {
+    public function projects()
+    {
         return $this->hasMany(Project::class);
     }
-    public function servers() {
+    public function servers()
+    {
         return $this->hasMany(Server::class);
     }
-    public function applications() {
+    public function applications()
+    {
         return $this->hasManyThrough(Application::class, Project::class);
     }
 }

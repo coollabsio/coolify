@@ -10,6 +10,7 @@ class Form extends Component
 {
     public $server_id;
     public Server $server;
+    public $uptime;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -21,6 +22,10 @@ class Form extends Component
     public function mount()
     {
         $this->server = Server::find($this->server_id);
+    }
+    public function checkConnection()
+    {
+        $this->uptime = runRemoteCommandSync($this->server, ['uptime']);
     }
     public function submit()
     {

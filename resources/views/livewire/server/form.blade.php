@@ -11,8 +11,15 @@
                 <x-form-input type="number" id="server.port" label="Port" required />
             </div>
         </div>
-        <button class="w-16 mt-4" type="submit">
-            Submit
-        </button>
+        <div>
+            <button class="w-16 mt-4" type="submit">
+                Submit
+            </button>
+            <button wire:click.prevent='checkConnection'>Check Connection</button>
+        </div>
     </form>
+    @isset($uptime)
+        <p>Connection OK</p>
+        <p>Uptime: {{ $uptime }}</p>
+    @endisset
 </div>

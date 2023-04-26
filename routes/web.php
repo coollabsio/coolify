@@ -55,15 +55,16 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/server/new', fn () => view('server.new'))->name('server.new');
     Route::get('/server/{server_uuid}', function () {
         $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
         if (!$server) {
             abort(404);
         }
-        return view('server.dashboard', [
+        return view('server.show', [
             'server_id' => $server->id,
         ]);
-    })->name('server.dashboard');
+    })->name('server.show');
 });
 
 Route::middleware(['auth'])->group(function () {

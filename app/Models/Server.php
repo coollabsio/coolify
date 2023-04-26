@@ -12,6 +12,14 @@ class Server extends BaseModel
             ]);
         });
     }
+    protected $fillable = [
+        'name',
+        'ip',
+        'user',
+        'port',
+        'team_id',
+        'private_key_id',
+    ];
     public function destinations()
     {
         return $this->hasMany(PrivateKey::class);

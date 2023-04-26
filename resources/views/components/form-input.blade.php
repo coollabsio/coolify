@@ -25,9 +25,16 @@
             *
         @endif
     </label>
-    <input type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-        @if ($required) required @endif @if ($disabled) disabled @endif
-        @if ($readonly) readOnly disabled @endif />
+    @if ($type === 'textarea')
+        <textarea type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
+            @if ($required) required @endif @if ($disabled) disabled @endif
+            @if ($readonly) readOnly disabled @endif></textarea>
+    @else
+        <input type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
+            @if ($required) required @endif @if ($disabled) disabled @endif
+            @if ($readonly) readOnly disabled @endif />
+    @endif
+
     @error($id)
         <div class="text-red-500">{{ $message }}</div>
     @enderror
