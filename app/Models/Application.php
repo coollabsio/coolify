@@ -36,6 +36,43 @@ class Application extends BaseModel
         'publish_directory',
     ];
 
+    public function publishDirectory(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
+        );
+    }
+    public function baseDirectory(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => '/' . ltrim($value, '/'),
+        );
+    }
+    public function portsMappings(): Attribute
+    {
+        return Attribute::make(
+            set: fn ($value) => $value === "" ? null : $value,
+        );
+    }
+    public function portsMappingsArray(): Attribute
+    {
+        return Attribute::make(
+            get: fn () =>
+            is_null($this->ports_mappings)
+                ? []
+                : explode(',', $this->ports_mappings),
+
+        );
+    }
+    public function portsExposesArray(): Attribute
+    {
+        return Attribute::make(
+            get: fn () =>
+            is_null($this->ports_exposes)
+                ? []
+                : explode(',', $this->ports_exposes)
+        );
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);
@@ -57,38 +94,7 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function publishDirectory(): Attribute
-    {
-        return Attribute::make(
-            set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
-        );
-    }
-    public function baseDirectory(): Attribute
-    {
-        return Attribute::make(
-            set: fn ($value) => '/' . ltrim($value, '/'),
-        );
-    }
-    public function portsMappingsArray(): Attribute
-    {
-        return Attribute::make(
-            get: fn () =>
-            is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings)
 
-        );
-    }
-    public function portsExposesArray(): Attribute
-    {
-        return Attribute::make(
-            get: fn () =>
-            is_null($this->ports_exposes)
-                ? []
-                : explode(',', $this->ports_exposes)
-
-        );
-    }
     public function deployments()
     {
         return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '!=', null)->orderBy('created_at', 'desc')->get();

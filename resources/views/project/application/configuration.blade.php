@@ -1,29 +1,34 @@
 <x-layout>
     <h1>Configuration</h1>
     <x-applications.navbar :applicationId="$application->id" />
-    <div x-data="{ tab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
+    <div x-data="{ activeTab: 'general' }">
         <div class="flex gap-4">
-            <a @click.prevent="tab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a @click.prevent="tab = 'envs'; window.location.hash = 'envs'" href="#">Environment Variables</a>
-            <a @click.prevent="tab = 'source'; window.location.hash = 'source'" href="#">Source</a>
-            <a @click.prevent="tab = 'destination'; window.location.hash = 'destination'" href="#">Destination
+            <a :class="activeTab === 'general' && 'text-green-500'" @click.prevent="activeTab = 'general'"
+                href="#">General</a>
+            <a :class="activeTab === 'envs' && 'text-green-500'" @click.prevent="activeTab = 'envs'"
+                href="#">Environment Variables</a>
+            <a :class="activeTab === 'source' && 'text-green-500'" @click.prevent="activeTab = 'source'"
+                href="#">Source</a>
+            <a :class="activeTab === 'destination' && 'text-green-500'" @click.prevent="activeTab = 'destination'"
+                href="#">Destination
             </a>
-            <a @click.prevent="tab = 'storages'; window.location.hash = 'storages'" href="#">Storage
+            <a :class="activeTab === 'storages' && 'text-green-500'" @click.prevent="activeTab = 'storages'"
+                href="#">Storage
             </a>
         </div>
-        <div x-cloak x-show="tab === 'general'">
+        <div x-cloak x-show="activeTab === 'general'">
             <livewire:project.application.general :applicationId="$application->id" />
         </div>
-        <div x-cloak x-show="tab === 'envs'">
+        <div x-cloak x-show="activeTab === 'envs'">
             <livewire:project.application.environment-variables />
         </div>
-        <div x-cloak x-show="tab === 'source'">
+        <div x-cloak x-show="activeTab === 'source'">
             <livewire:project.application.source :applicationId="$application->id" />
         </div>
-        <div x-cloak x-show="tab === 'destination'">
+        <div x-cloak x-show="activeTab === 'destination'">
             <livewire:project.application.destination :destination="$application->destination" />
         </div>
-        <div x-cloak x-show="tab === 'storages'">
+        <div x-cloak x-show="activeTab === 'storages'">
             <livewire:project.application.storages :storages="$application->persistentStorages" />
         </div>
     </div>

@@ -20,7 +20,6 @@ return new class extends Migration
             $table->boolean('is_dual_cert')->default(false);
             $table->boolean('is_debug')->default(false);
             $table->boolean('is_previews')->default(false);
-            $table->boolean('is_bot')->default(false);
             $table->boolean('is_custom_ssl')->default(false);
             $table->boolean('is_http2')->default(false);
             $table->foreignId('application_id');

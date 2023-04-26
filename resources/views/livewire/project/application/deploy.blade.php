@@ -5,15 +5,14 @@
     @if ($application->status === 'running')
         <button wire:click='start'>Restart</button>
         <button wire:click='forceRebuild'>Force Rebuild</button>
-        <button wire:click='stop'>Stop</button>
     @else
         <button wire:click='start'>Start</button>
         <button wire:click='forceRebuild'>Start (no cache)</button>
     @endif
-    <button wire:click='kill'>Kill</button>
+    <button wire:click='stop'>Stop</button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')
-            @if (!data_get($application, 'settings.is_bot') && data_get($application, 'fqdn'))
+            @if (data_get($application, 'fqdn'))
                 <a target="_blank" href="{{ data_get($application, 'fqdn') }}">Open URL</a>
             @endif
 

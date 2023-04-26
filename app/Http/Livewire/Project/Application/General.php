@@ -22,7 +22,6 @@ class General extends Component
     public bool $is_git_lfs_allowed;
     public bool $is_debug;
     public bool $is_previews;
-    public bool $is_bot;
     public bool $is_custom_ssl;
     public bool $is_http2;
     public bool $is_auto_deploy;
@@ -49,7 +48,6 @@ class General extends Component
         $this->application->settings->is_git_lfs_allowed = $this->is_git_lfs_allowed;
         $this->application->settings->is_debug = $this->is_debug;
         $this->application->settings->is_previews = $this->is_previews;
-        $this->application->settings->is_bot = $this->is_bot;
         $this->application->settings->is_custom_ssl = $this->is_custom_ssl;
         $this->application->settings->is_http2 = $this->is_http2;
         $this->application->settings->is_auto_deploy = $this->is_auto_deploy;
@@ -65,7 +63,6 @@ class General extends Component
         $this->is_git_lfs_allowed = $this->application->settings->is_git_lfs_allowed;
         $this->is_debug = $this->application->settings->is_debug;
         $this->is_previews = $this->application->settings->is_previews;
-        $this->is_bot = $this->application->settings->is_bot;
         $this->is_custom_ssl = $this->application->settings->is_custom_ssl;
         $this->is_http2 = $this->application->settings->is_http2;
         $this->is_auto_deploy = $this->application->settings->is_auto_deploy;

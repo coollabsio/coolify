@@ -28,7 +28,7 @@
                 @if ($application->settings->is_static)
                     <x-form-input id="application.ports_exposes" label="Ports Exposes" disabled />
                 @else
-                    <x-form-input id="application.ports_exposes" label="Ports Exposes" />
+                    <x-form-input id="application.ports_exposes" label="Ports Exposes" required />
                 @endif
 
                 <x-form-input id="application.ports_mappings" label="Ports Mappings" />
@@ -43,7 +43,6 @@
         <x-form-input instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
         <x-form-input instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
         <x-form-input instantSave type="checkbox" id="is_previews" label="Previews?" />
-        <x-form-input instantSave type="checkbox" id="is_bot" label="Is Bot?" />
         <x-form-input instantSave type="checkbox" id="is_custom_ssl" label="Is Custom SSL?" />
         <x-form-input instantSave type="checkbox" id="is_http2" label="Is Http2?" />
         <x-form-input instantSave type="checkbox" id="is_git_submodules_allowed" label="Git Submodules Allowed?" />

@@ -64,7 +64,7 @@ class Deploy extends Component
 
     public function delete()
     {
-        $this->kill();
+        $this->stop();
         Application::find($this->applicationId)->delete();
         return redirect()->route('project.resources', [
             'project_uuid' => $this->parameters['project_uuid'],
@@ -72,12 +72,6 @@ class Deploy extends Component
         ]);
     }
     public function stop()
-    {
-        runRemoteCommandSync($this->destination->server, ["docker stop -t 0 {$this->application->uuid} >/dev/null 2>&1"]);
-        $this->application->status = 'stopped';
-        $this->application->save();
-    }
-    public function kill()
     {
         runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application->uuid}"]);
         if ($this->application->status != 'exited') {

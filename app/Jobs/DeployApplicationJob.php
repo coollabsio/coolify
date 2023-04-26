@@ -35,6 +35,7 @@ class DeployApplicationJob implements ShouldQueue
     protected Activity $activity;
     protected string $git_commit;
     protected string $workdir;
+    protected string $docker_compose;
     public static int $batch_counter = 0;
 
     /**
@@ -70,7 +71,33 @@ class DeployApplicationJob implements ShouldQueue
             ->event(ActivityTypes::DEPLOYMENT->value)
             ->log("[]");
     }
+    protected function stopRunningContainer()
+    {
+        $this->executeNow([
 
+            "echo -n 'Removing old instance... '",
+            $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
+            "echo 'Done.'",
+            "echo -n 'Starting your application... '",
+        ]);
+    }
+    protected function startByComposeFile()
+    {
+        $this->executeNow([
+            $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
+        ], isDebuggable: true);
+        $this->executeNow([
+            "echo 'Done. 🎉'",
+        ], isFinished: true);
+    }
+    protected function generateComposeFile()
+    {
+        $this->docker_compose = $this->generate_docker_compose();
+        $docker_compose_base64 = base64_encode($this->docker_compose);
+        $this->executeNow([
+            $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
+        ], hideFromOutput: true);
+    }
     /**
      * Execute the job.
      */
@@ -86,7 +113,7 @@ class DeployApplicationJob implements ShouldQueue
             $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
 
             // Set wildcard domain
-            if (!$this->application->settings->is_bot && !$this->application->fqdn && $wildcard_domain) {
+            if (!$this->application->fqdn && $wildcard_domain) {
                 $this->application->fqdn = 'http://' . $this->application->uuid . '.' . $wildcard_domain;
                 $this->application->save();
             }
@@ -119,35 +146,30 @@ class DeployApplicationJob implements ShouldQueue
 
             if (!$this->force_rebuild) {
                 $this->executeNow([
-                    "docker inspect {$this->application->uuid} --format '{{json .Config.Image}}' 2>&1",
-                ], 'stopped_container_image', hideFromOutput: true, ignoreErrors: true);
-                $image = $this->activity->properties->get('stopped_container_image');
-                if (isset($image)) {
-                    $image = explode(':', str_replace('"', '', $image))[1];
-                    if ($image == $this->git_commit) {
-                        $this->executeNow([
-                            "echo -n 'Application found locally with the same Git Commit SHA. Starting it... '"
-                        ]);
-                        $this->executeNow([
-                            "docker start {$this->application->uuid}"
-                        ], hideFromOutput: true);
+                    "docker images -q {$this->application->uuid}:{$this->git_commit} 2>/dev/null",
+                ], 'local_image_found', hideFromOutput: true, ignoreErrors: true);
+                $image_found = Str::of($this->activity->properties->get('local_image_found'))->trim()->isNotEmpty();
+                if ($image_found) {
+                    $this->executeNow([
+                        "echo 'Docker Image found locally with the same Git Commit SHA. Build skipped...'"
+                    ]);
+                    // Generate docker-compose.yml
+                    $this->generateComposeFile();
 
-                        $this->executeNow([
-                            "echo 'Done. 🎉'",
-                        ], isFinished: true);
-                        return;
-                    }
+                    // Stop running container
+                    $this->stopRunningContainer();
+
+                    // Start application
+                    $this->startByComposeFile();
+                    return;
                 }
             }
             $this->executeNow([
                 $this->execute_in_builder("rm -fr {$this->workdir}/.git")
             ], hideFromOutput: true);
 
-            $docker_compose = $this->generate_docker_compose();
-            $docker_compose_base64 = base64_encode($docker_compose);
-            $this->executeNow([
-                $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
-            ], hideFromOutput: true);
+            // Generate docker-compose.yml
+            $this->generateComposeFile();
 
             $this->executeNow([
                 "echo -n 'Generating nixpacks configuration... '",
@@ -183,24 +205,18 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                     $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
                 ], isDebuggable: true);
             }
+
             $this->executeNow([
                 "echo 'Done.'",
-                "echo -n 'Removing old instance... '",
-                $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
-                "echo 'Done.'",
-                "echo -n 'Starting your application... '",
             ]);
-            $this->executeNow([
-                $this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"),
-            ], isDebuggable: true);
+            // Stop running container
+            $this->stopRunningContainer();
 
-            $this->executeNow([
-                "echo 'Done. 🎉'",
-            ], isFinished: true);
+            // Start application
+            $this->startByComposeFile();
+
             // Saving docker-compose.yml
-            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $docker_compose);
-            // }
-
+            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
         } catch (\Exception $e) {
             $this->executeNow([
                 "echo 'Oops something is not okay, are you okay? 😢'",
