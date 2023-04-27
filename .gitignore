@@ -7,7 +7,7 @@
 /vendor
 .env
 .env.backup
-.env.production
+.env.secrets
 .phpunit.result.cache
 Homestead.json
 Homestead.yaml
@@ -20,7 +20,6 @@ yarn-error.log
 /.npm
 /.bash_history
 /_volumes
-.env.secrets
 
 .lesshst
 psysh_history
