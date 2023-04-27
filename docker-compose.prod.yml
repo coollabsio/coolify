@@ -42,7 +42,7 @@ services:
           "-d",
           "${DB_DATABASE}"
         ]
-      interval: 2s
+      interval: 3s
       retries: 5
       timeout: 2s
 volumes:
