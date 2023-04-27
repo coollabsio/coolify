@@ -3,6 +3,8 @@ services:
   coolify:
     image: "ghcr.io/coollabsio/coolify:${APP_TAG:-v4.0.0-nightly.0}"
     container_name: coolify
+    volumes:
+      - coolify:/var/www/html/storage/app
     environment:
       - APP_ENV=production
       - APP_DEBUG
@@ -42,5 +44,7 @@ services:
       retries: 5
       timeout: 2s
 volumes:
+  coolify:
+    name: coolify
   coolify-db:
     name: coolify-db
