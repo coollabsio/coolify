@@ -22,6 +22,7 @@ mkdir -p /data/coolify/deployments
 mkdir -p /data/coolify/ssh-keys
 mkdir -p /data/coolify/proxy
 mkdir -p /data/coolify/source
+mkdir -p /data/coolify/coolify-db
 
 chown -R 9999:root /data
 chmod -R 700 /data
