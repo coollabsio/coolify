@@ -23,23 +23,17 @@ mkdir -p /data/coolify/source
 chown -R 9999:root /data
 chmod -R 700 /data
 
-if [ ! -f /data/coolify/source/docker-compose.yml ]; then
-    echo "Downloading docker-compose.yml..."
-    curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-    echo "docker-compose.yml downloaded successfully"
-fi
+echo "Downloading docker-compose.yml..."
+curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+echo "docker-compose.yml downloaded successfully"
 
-if [ ! -f /data/coolify/source/docker-compose.prod.yml ]; then
-    echo "Downloading docker-compose.prod.yml..."
-    curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-    echo "docker-compose.prod.yml downloaded successfully"
-fi
+echo "Downloading docker-compose.prod.yml..."
+curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+echo "docker-compose.prod.yml downloaded successfully"
 
-if [ ! -f /data/coolify/source/.env.example ]; then
-    echo "Downloading .env.example..."
-    curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/.env.example -o /data/coolify/source/.env.example
-    echo ".env.example downloaded successfully"
-fi
+echo "Downloading .env.example..."
+curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/.env.example -o /data/coolify/source/.env.example
+echo ".env.example downloaded successfully"
 
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
