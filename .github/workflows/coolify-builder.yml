@@ -1,0 +1,30 @@
+name: Coolify Builder (v4)
+
+on:
+  push:
+    branches: ["v4"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: "coollabsio/coolify-builder"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to ghcr.io
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Build imaged and push to registry
+        uses: docker/build-push-action@v3
+        with:
+          no-cache: true
+          context: .
+          file: docker/builder/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
