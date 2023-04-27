@@ -16,7 +16,9 @@
 </head>
 
 <body x-data="confirmModal">
-    <x-navbar />
+    @auth
+        <x-navbar />
+    @endauth
     <main>
         {{ $slot }}
     </main>

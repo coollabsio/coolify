@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -13,6 +14,21 @@ class ProductionSeeder extends Seeder
 {
     public function run(): void
     {
+        if (InstanceSettings::find(0) == null) {
+            InstanceSettings::create([
+                'id' => 0
+            ]);
+        }
+
+        // Add first Team if it doesn't exist
+        if (Team::find(0) == null) {
+            Team::create([
+                'id' => 0,
+                'name' => "Root's Team",
+                'personal_team' => true,
+            ]);
+        }
+
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";
         $coolify_key = Storage::disk('local')->get("ssh-keys/{$coolify_key_name}");
@@ -27,17 +43,11 @@ class ProductionSeeder extends Seeder
                 'name' => 'localhost\'s key',
                 'description' => 'The private key for the Coolify host machine (localhost).',
                 'private_key' => $coolify_key,
+                'team_id' => 0,
             ]);
         }
 
-        // Add first Team if it doesn't exist
-        if (Team::find(0) == null) {
-            Team::create([
-                'id' => 0,
-                'name' => "Root's Team",
-                'personal_team' => true,
-            ]);
-        }
+
         // Add Coolify host (localhost) as Server if it doesn't exist
         if (Server::find(0) == null) {
             Server::create([

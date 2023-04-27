@@ -1,0 +1,29 @@
+name: Production Build (v4)
+
+on:
+  push:
+    branches: ["v4"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: "coollabsio/coolify"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Login to ghcr.io
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN  }}
+      - name: Build imaged and push to registry
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          file: docker/prod-ssu/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v4.0.0-nightly.0

@@ -1,4 +1,7 @@
 <x-layout>
+    <div>v{{ config('coolify.version') }}</div>
+    <a href="/login">Login</a>
+    <a href="/register">Register</a>
     <form action="/register" method="POST">
         @csrf
         <input type="text" name="name" placeholder="name" @env('local') value="Root" @endenv />

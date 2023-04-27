@@ -17,7 +17,6 @@ services:
       - DB_PASSWORD
       - QUEUE_CONNECTION
       - SSL_MODE=off
-      - AUTORUN_LARAVEL_MIGRATION=true
     ports:
       - "${APP_PORT:-8000}:80"
     depends_on:
