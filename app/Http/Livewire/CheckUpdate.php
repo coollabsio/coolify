@@ -24,6 +24,7 @@ class CheckUpdate extends Component
     }
     public function forceUpgrade()
     {
+        $this->checkUpdate();
         $this->upgrade();
     }
     public function checkUpdate()
