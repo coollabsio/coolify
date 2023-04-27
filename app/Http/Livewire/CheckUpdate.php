@@ -9,7 +9,7 @@ use Livewire\Component;
 class CheckUpdate extends Component
 {
     public $updateAvailable = false;
-    public $latestVersion = '4.0.0-nightly.1';
+    public $latestVersion = 'latest';
     protected $currentVersion;
     protected $image = 'ghcr.io/coollabsio/coolify';
 
@@ -20,7 +20,7 @@ class CheckUpdate extends Component
             return;
         }
         runRemoteCommandSync($server, ['curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/v4/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh']);
-        runRemoteCommandSync($server, ['bash /data/coolify/source/upgrade.sh']);
+        runRemoteCommandSync($server, ["bash /data/coolify/source/upgrade.sh $this->latestVersion"]);
     }
     public function forceUpgrade()
     {
@@ -30,8 +30,12 @@ class CheckUpdate extends Component
     {
         $response = Http::get('https://get.coollabs.io/versions.json');
         $versions = $response->json();
-        // $this->latestVersion = data_get($versions, 'coolify.main.version');
+        $this->latestVersion = data_get($versions, 'coolify.v4.version');
         $this->currentVersion = config('coolify.version');
+        if ($this->latestVersion === 'latest') {
+            $this->updateAvailable = true;
+            return;
+        }
         version_compare($this->currentVersion, $this->latestVersion, '<') ? $this->updateAvailable = true : $this->updateAvailable = false;
     }
 }
