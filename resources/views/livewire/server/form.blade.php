@@ -6,9 +6,15 @@
                 <x-form-input id="server.description" label="Description" />
             </div>
             <div class="flex flex-col w-96">
-                <x-form-input id="server.ip" label="IP Address" required />
-                <x-form-input id="server.user" label="User" required />
-                <x-form-input type="number" id="server.port" label="Port" required />
+                @if ($server->id === 0)
+                    <x-form-input id="server.ip" label="IP Address" readonly />
+                    <x-form-input id="server.user" label="User" readonly />
+                    <x-form-input type="number" id="server.port" label="Port" readonly />
+                @else
+                    <x-form-input id="server.ip" label="IP Address" required />
+                    <x-form-input id="server.user" label="User" required />
+                    <x-form-input type="number" id="server.port" label="Port" required />
+                @endif
             </div>
         </div>
         <div>
