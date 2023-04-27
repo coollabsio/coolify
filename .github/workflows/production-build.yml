@@ -13,6 +13,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: |
+            /usr/local/share/ca-certificates
+            /var/cache/apt/archives
+            /var/lib/apt/lists
+            ~/.cache
+          key: ${{ runner.os }}-docker-${{ hashFiles('**/Dockerfile') }}
+          restore-keys: |
+            ${{ runner.os }}-docker-
       - name: Login to ghcr.io
         uses: docker/login-action@v2
         with:
