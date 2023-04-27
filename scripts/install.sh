@@ -41,7 +41,6 @@ fi
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh-keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh-keys/id.root@host.docker.internal ]; then
-    # Add date to the end of the key to prevent collisions
     ssh-keygen -t ed25519 -f /data/coolify/ssh-keys/id.root@host.docker.internal -q -N "" -C root@coolify
     chown 9999 /data/coolify/ssh-keys/id.root@host.docker.internal
 fi
