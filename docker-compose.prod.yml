@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${APP_TAG:-v4.0.0-nightly.0}"
+    image: "ghcr.io/coollabsio/coolify:${APP_TAG:-4.0.0-nightly.0}"
     container_name: coolify
     volumes:
       - /data/coolify/deployments:/var/www/html/storage/app/deployments

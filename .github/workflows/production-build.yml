@@ -26,4 +26,4 @@ jobs:
           file: docker/prod-ssu/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:v4.0.0-nightly.0
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:4.0.0-nightly.0

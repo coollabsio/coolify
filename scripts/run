@@ -41,8 +41,8 @@ function build-prod {
         echo "Building version $1"
         docker build -t ghcr.io/coollabsio/coolify:$1 -f docker/prod-ssu/Dockerfile .
     else
-        echo "Building version v4.0.0-nightly.1"
-        docker build -t ghcr.io/coollabsio/coolify:v4.0.0-nightly.1 -f docker/prod-ssu/Dockerfile .
+        echo "Building version 4.0.0-nightly.1"
+        docker build -t ghcr.io/coollabsio/coolify:4.0.0-nightly.1 -f docker/prod-ssu/Dockerfile .
     fi
 }
 
