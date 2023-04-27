@@ -38,8 +38,8 @@ echo ".env.example downloaded successfully"
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.example /data/coolify/source/.env
-    sed -i 's/APP_ENV=.*/APP_ENV=local/g' /data/coolify/source/.env
-    sed -i 's/APP_DEBUG=.*/APP_DEBUG=true/g' /data/coolify/source/.env
+    sed -i 's/APP_ENV=.*/APP_ENV=production/g' /data/coolify/source/.env
+    sed -i 's/APP_DEBUG=.*/APP_DEBUG=false/g' /data/coolify/source/.env
     sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
