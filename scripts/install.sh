@@ -20,7 +20,7 @@ mkdir -p /data/coolify/ssh-keys
 mkdir -p /data/coolify/proxy
 mkdir -p /data/coolify/source
 
-chown -R root:root /data
+chown -R 9999:root /data
 chmod -R 700 /data
 
 if [ ! -z "$(ls -A /data/coolify/source/.gitignore)" ]; then
@@ -42,6 +42,7 @@ fi
 # Generate an ssh key (ed25519) at /data/coolify/ssh-keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh-keys/id.root@host.docker.internal ]; then
     ssh-keygen -t ed25519 -f /data/coolify/ssh-keys/id.root@host.docker.internal -q -N "" -C root@coolify
+    chown 9999 /data/coolify/ssh-keys/id.root@host.docker.internal
 fi
 
 addSshKey() {
@@ -63,4 +64,4 @@ if [ -z "$(grep -w "root@coolify" ~/.ssh/authorized_keys)" ]; then
     addSshKey
 fi
 
-docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d
+docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up --pull always

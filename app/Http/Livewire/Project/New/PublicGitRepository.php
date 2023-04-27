@@ -28,13 +28,13 @@ class PublicGitRepository extends Component
     public $gitlab_apps;
 
     public bool $is_static = false;
-    public string $publish_directory = '';
+    public null|string $publish_directory = null;
 
     protected $rules = [
         'public_repository_url' => 'required|url',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
-        'publish_directory' => 'string',
+        'publish_directory' => 'nullable|string',
     ];
     public function mount()
     {

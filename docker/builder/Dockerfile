@@ -22,5 +22,5 @@ RUN curl -sSL https://nixpacks.com/install.sh | bash
 RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "while true; do sleep 69420; done"]
+CMD ["sh", "-c", "while true; do sleep 3600; done"]
 

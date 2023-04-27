@@ -32,21 +32,26 @@ class ProductionSeeder extends Seeder
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";
         $coolify_key = Storage::disk('local')->get("ssh-keys/{$coolify_key_name}");
-        $coolify_key_in_database = PrivateKey::where('name', 'Coolify Host');
 
-        if (!$coolify_key && $coolify_key_in_database->exists()) {
-            Storage::disk('local')->put("ssh-keys/{$coolify_key_name}", $coolify_key_in_database->first()->private_key);
+        if ($coolify_key) {
+            $private_key = PrivateKey::find(0);
+            if ($private_key == null) {
+                PrivateKey::create([
+                    'id' => 0,
+                    'name' => 'localhost\'s key',
+                    'description' => 'The private key for the Coolify host machine (localhost).',
+                    'private_key' => $coolify_key,
+                    'team_id' => 0,
+                ]);
+            } else {
+                $private_key->private_key = $coolify_key;
+                $private_key->save();
+            }
+        } else {
+            echo "No SSH key found for the Coolify host machine (localhost).\n";
+            echo "Please generate one and save it in storage/app/ssh-keys/{$coolify_key_name}\n";
+            exit(1);
         }
-        if ($coolify_key && !$coolify_key_in_database->exists()) {
-            PrivateKey::create([
-                'id' => 0,
-                'name' => 'localhost\'s key',
-                'description' => 'The private key for the Coolify host machine (localhost).',
-                'private_key' => $coolify_key,
-                'team_id' => 0,
-            ]);
-        }
-
 
         // Add Coolify host (localhost) as Server if it doesn't exist
         if (Server::find(0) == null) {
