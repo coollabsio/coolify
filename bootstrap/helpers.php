@@ -128,7 +128,7 @@ if (!function_exists('runRemoteCommandSync')) {
         $exitCode = $process->exitCode();
         if ($exitCode !== 0) {
             Log::error($output);
-            // throw new \RuntimeException('There was an error running the command.');
+            throw new \RuntimeException('There was an error running the command.');
         }
         return $output;
     }
