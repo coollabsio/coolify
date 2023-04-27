@@ -29,12 +29,12 @@ chmod -R 700 /data
 echo "Downloading required files from GitHub..."
 curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/.env.production.example -o /data/coolify/source/.env.production.example
+curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/.env.production -o /data/coolify/source/.env.production
 curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/v4/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
-    cp /data/coolify/source/.env.production.example /data/coolify/source/.env
+    cp /data/coolify/source/.env.production /data/coolify/source/.env
     sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
