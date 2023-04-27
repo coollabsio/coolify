@@ -1,2 +1,2 @@
 #!/command/execlineb -P
-su - webuser -c "php /var/www/html/artisan migrate --force --isolated"
+php /var/www/html/artisan migrate --force --isolated
