@@ -29,7 +29,7 @@ services:
   postgres:
     container_name: coolify-db
     volumes:
-      - /data/coolify/coolify-db:/var/lib/postgresql/data
+      - coolify-db:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
@@ -45,3 +45,6 @@ services:
       interval: 2s
       retries: 5
       timeout: 2s
+volumes:
+  coolify-db:
+    name: coolify-db
