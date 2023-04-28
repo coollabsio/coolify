@@ -25,6 +25,25 @@
 
     <x-confirm-modal />
     @livewireScripts
+    @auth
+        <script>
+            Livewire.on('updateInitiated', () => {
+                let checkStatus = null;
+                console.log('Update initiated')
+                setInterval(async () => {
+                    const res = await fetch('/api/health');
+                    if (res.ok) {
+                        console.log('Server is back online')
+                        clearInterval(checkStatus);
+                        window.location.reload();
+                    } else {
+                        console.log('Waiting for server to come back online...');
+                    }
+                    return;
+                }, 2000);
+            })
+        </script>
+    @endauth
 </body>
 
 </html>

@@ -15,12 +15,22 @@ class CheckUpdate extends Component
 
     protected function upgrade()
     {
+        $branch = 'v4';
+        $location = "https://github.com/coollabsio/coolify/tree/$branch";
+
         $server = Server::where('ip', 'host.docker.internal')->first();
         if (!$server) {
             return;
         }
-        runRemoteCommandSync($server, ['curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/v4/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh']);
-        runRemoteCommandSync($server, ["bash /data/coolify/source/upgrade.sh $this->latestVersion"]);
+
+        runRemoteCommandSync($server, [
+            "curl -fsSL $location/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
+            "curl -fsSL $location/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
+            "curl -fsSL $location/.env.production -o /data/coolify/source/.env.production",
+            "curl -fsSL $location/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh",
+            "nohup bash /data/coolify/source/upgrade.sh $this->latestVersion &"
+        ]);
+        $this->emit('updateInitiated');
     }
     public function forceUpgrade()
     {
