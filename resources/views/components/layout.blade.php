@@ -28,15 +28,17 @@
     @auth
         <script>
             function checkIfIamDead() {
+                console.log('Checking server\'s pulse...')
                 checkIfIamDeadInterval = setInterval(async () => {
-                    console.log('Checking server\'s pulse...')
-                    const res = await fetch('/api/health');
-                    if (!res.ok) {
+                    try {
+                        const res = await fetch('/api/health');
+                        if (res.ok) {
+                            console.log('I\'m alive. Waiting for server to be dead...');
+                        }
+                    } catch (error) {
                         console.log('I\'m dead. Charging... Standby... Bzz... Bzz...')
                         checkHealth();
                         if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
-                    } else {
-                        console.log('I\'m alive. Waiting for server to be dead...');
                     }
 
                     return;
@@ -44,16 +46,19 @@
             }
 
             function checkHealth() {
+                console.log('Checking server\'s health...')
                 checkHealthInterval = setInterval(async () => {
-                    console.log('Checking server\'s health...')
-                    const res = await fetch('/api/health');
-                    if (res.ok) {
-                        console.log('Server is back online. Reloading...')
-                        if (checkHealthInterval) clearInterval(checkHealthInterval);
-                        window.location.reload();
-                    } else {
+                    try {
+                        const res = await fetch('/api/health');
+                        if (res.ok) {
+                            console.log('Server is back online. Reloading...')
+                            if (checkHealthInterval) clearInterval(checkHealthInterval);
+                            window.location.reload();
+                        }
+                    } catch (error) {
                         console.log('Waiting for server to come back from dead...');
                     }
+
                     return;
                 }, 2000);
             }
