@@ -27,20 +27,41 @@
     @livewireScripts
     @auth
         <script>
-            Livewire.on('updateInitiated', () => {
-                let checkStatus = null;
-                console.log('Update initiated')
-                setInterval(async () => {
+            function checkIfIamDead() {
+                checkIfIamDeadInterval = setInterval(async () => {
+                    console.log('Checking server\'s pulse...')
+                    const res = await fetch('/api/health');
+                    if (!res.ok) {
+                        console.log('I\'m dead. Charging... Standby... Bzz... Bzz...')
+                    } else {
+                        console.log('I\'m alive!');
+                        checkHealth();
+                        if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                    }
+
+                    return;
+                }, 2000);
+            }
+
+            function checkHealth() {
+                checkHealthInterval = setInterval(async () => {
+                    console.log('Checking server\'s health...')
                     const res = await fetch('/api/health');
                     if (res.ok) {
-                        console.log('Server is back online')
-                        clearInterval(checkStatus);
+                        console.log('Server is back online. Reloading...')
+                        if (checkHealthInterval) clearInterval(checkHealthInterval);
                         window.location.reload();
                     } else {
-                        console.log('Waiting for server to come back online...');
+                        console.log('Waiting for server to come back from dead...');
                     }
                     return;
                 }, 2000);
+            }
+            Livewire.on('updateInitiated', () => {
+                let checkHealthInterval = null;
+                let checkIfIamDeadInterval = null;
+                console.log('Update initiated. Waiting for server to be dead...')
+                checkIfIamDead();
             })
         </script>
     @endauth

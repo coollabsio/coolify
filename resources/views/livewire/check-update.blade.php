@@ -1,14 +1,6 @@
 <div>
-    <button wire:click='checkUpdate'>Updates</button>
-    <div wire:loading wire:target="checkUpdate">
-        Checking for updates...
-    </div>
-    @if (auth()->user()->teams->contains(0))
-        <button wire:click='forceUpgrade'>Force Upgrade</button>
-        <div wire:loading wire:target="forceUpgrade">
-            Updating Coolify...
-        </div>
-    @endif
+    <button wire:loading.class="text-black bg-green-500" wire:loading.attr="disabled" wire:click='checkUpdate'>Check for
+        updates</button>
     @if ($updateAvailable)
         Update available
     @endif

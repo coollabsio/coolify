@@ -13,6 +13,7 @@
             @csrf
             <button type="submit">Logout</button>
         </form>
-        <livewire:check-update>
-        @endauth
+        <livewire:check-update />
+        <livewire:force-upgrade />
+    @endauth
 </nav>

@@ -13,28 +13,6 @@ class CheckUpdate extends Component
     protected $currentVersion;
     protected $image = 'ghcr.io/coollabsio/coolify';
 
-    protected function upgrade()
-    {
-        $cdn = "https://coolify-cdn.b-cdn.net/files";
-        $server = Server::where('ip', 'host.docker.internal')->first();
-        if (!$server) {
-            return;
-        }
-
-        runRemoteCommandSync($server, [
-            "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
-            "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
-            "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
-            "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
-            "bash /data/coolify/source/upgrade.sh $this->latestVersion &"
-        ]);
-        $this->emit('updateInitiated');
-    }
-    public function forceUpgrade()
-    {
-        $this->checkUpdate();
-        $this->upgrade();
-    }
     public function checkUpdate()
     {
         $response = Http::get('https://get.coollabs.io/versions.json');
