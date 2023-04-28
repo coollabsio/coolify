@@ -5,6 +5,7 @@ ARG TARGETPLATFORM
 ARG DOCKER_VERSION=23.0.5
 # https://github.com/docker/compose/releases
 # Reverted to 2.6.1 because of this https://github.com/docker/compose/issues/9704. 2.9.0 still has a bug.
+# Using the latest now
 ARG DOCKER_COMPOSE_VERSION=2.17.3
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.27.0
