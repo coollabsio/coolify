@@ -26,7 +26,7 @@ class CheckUpdate extends Component
             "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
             "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
             "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
-            "nohup bash /data/coolify/source/upgrade.sh $this->latestVersion &"
+            "bash /data/coolify/source/upgrade.sh $this->latestVersion &"
         ]);
         $this->emit('updateInitiated');
     }
