@@ -27,6 +27,13 @@ services:
       - SSL_MODE=off
     ports:
       - "${APP_PORT:-8000}:80"
+    expose:
+      - "${APP_PORT:-8000}"
+    healthcheck:
+      test: curl --fail http://localhost:80/api/health || exit 1
+      interval: 4s
+      retries: 5
+      timeout: 2s
     depends_on:
       postgres:
         condition: service_healthy
