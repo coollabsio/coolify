@@ -20,6 +20,10 @@ function help {
     echo "Tasks:"
     compgen -A function | cat -n
 }
+function sync-bunny {
+    bash vendor/bin/spin exec -u webuser coolify php artisan sync:bunny --env=secret ||
+        php artisan sync:bunny --env=secrets
+}
 function queue {
     bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
 }
@@ -40,16 +44,6 @@ function coolify-root {
 }
 function vite {
     bash vendor/bin/spin exec vite bash
-}
-
-function build-prod {
-    if [ "$1" ]; then
-        echo "Building version $1"
-        docker build -t ghcr.io/coollabsio/coolify:$1 -f docker/prod-ssu/Dockerfile .
-    else
-        echo "Building version 4.0.0-nightly.1"
-        docker build -t ghcr.io/coollabsio/coolify:4.0.0-nightly.1 -f docker/prod-ssu/Dockerfile .
-    fi
 }
 
 function default {

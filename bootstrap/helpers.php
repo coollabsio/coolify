@@ -6,6 +6,7 @@ use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -131,5 +132,14 @@ if (!function_exists('runRemoteCommandSync')) {
             throw new \RuntimeException('There was an error running the command.');
         }
         return $output;
+    }
+}
+
+if (!function_exists('getLatestVersionOfCoolify')) {
+    function getLatestVersionOfCoolify()
+    {
+        $response = Http::get('https://get.coollabs.io/versions.json');
+        $versions = $response->json();
+        return data_get($versions, 'coolify.v4.version');
     }
 }

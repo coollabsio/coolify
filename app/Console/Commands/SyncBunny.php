@@ -7,21 +7,21 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Pool;
 
-class SyncToBunnyCDN extends Command
+class SyncBunny extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'app:sync-to-bunny-cdn';
+    protected $signature = 'sync:bunny';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Command description';
+    protected $description = 'Sync files to BunnyCDN';
 
     /**
      * Execute the console command.
@@ -67,10 +67,10 @@ class SyncToBunnyCDN extends Command
                 "url" => "$bunny_cdn/$bunny_cdn_path/$production_env"
             ]);
             if ($res->ok()) {
-                echo 'All files uploaded & purged...';
+                echo "All files uploaded & purged...\n";
             }
         } catch (\Exception $e) {
-            echo 'Something went wrong.';
+            echo "Something went wrong.\n";
             echo $e->getMessage();
         }
     }

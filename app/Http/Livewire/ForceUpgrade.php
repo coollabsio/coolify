@@ -3,6 +3,7 @@
 namespace App\Http\Livewire;
 
 use App\Models\Server;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class ForceUpgrade extends Component
@@ -22,6 +23,8 @@ class ForceUpgrade extends Component
             ], $server);
             $this->emit('updateInitiated');
         } else {
+            $latestVersion = getLatestVersionOfCoolify();
+
             $cdn = "https://coolify-cdn.b-cdn.net/files";
             $server = Server::where('ip', 'host.docker.internal')->first();
             if (!$server) {
@@ -39,7 +42,7 @@ class ForceUpgrade extends Component
             ]);
 
             remoteProcess([
-                "bash /data/coolify/source/upgrade.sh $this->latestVersion"
+                "bash /data/coolify/source/upgrade.sh $latestVersion"
             ], $server);
 
             $this->emit('updateInitiated');
