@@ -1,6 +1,11 @@
 #!/bin/bash
 ## Do not modify this file. You will lost the ability to installation and autoupdate!
-VERSION="0.1.0"
+
+###########
+## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" if you update this file.
+###########
+
+VERSION="1.0.0"
 CDN="https://coolify-cdn.b-cdn.net/files"
 
 if [ "$EUID" -ne 0 ]; then
