@@ -33,10 +33,10 @@
                     const res = await fetch('/api/health');
                     if (!res.ok) {
                         console.log('I\'m dead. Charging... Standby... Bzz... Bzz...')
-                    } else {
-                        console.log('I\'m alive!');
                         checkHealth();
                         if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                    } else {
+                        console.log('I\'m alive. Waiting for server to be dead...');
                     }
 
                     return;
