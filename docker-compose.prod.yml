@@ -4,6 +4,10 @@ services:
     image: "ghcr.io/coollabsio/coolify:${APP_TAG:-4.0.0-nightly.0}"
     container_name: coolify
     volumes:
+      - type: bind
+        source: /data/coolify/source/.env
+        target: /var/www/html/.env
+        read_only: true
       - /data/coolify/deployments:/var/www/html/storage/app/deployments
       - /data/coolify/ssh-keys:/var/www/html/storage/app/ssh-keys
       - /data/coolify/proxy:/var/www/html/storage/app/proxy
