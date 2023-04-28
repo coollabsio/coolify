@@ -23,6 +23,12 @@ function help {
 function queue {
     bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
 }
+function schedule {
+    bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
+}
+function schedule-run {
+    bash vendor/bin/spin exec -u webuser coolify php artisan schedule:run
+}
 function reset-db {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
