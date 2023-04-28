@@ -15,19 +15,17 @@ class CheckUpdate extends Component
 
     protected function upgrade()
     {
-        $branch = 'v4';
-        $location = "https://raw.githubusercontent.com/coollabsio/coolify/$branch";
-
+        $cdn = "https://coolify-cdn.b-cdn.net/files";
         $server = Server::where('ip', 'host.docker.internal')->first();
         if (!$server) {
             return;
         }
 
         runRemoteCommandSync($server, [
-            "curl -fsSL $location/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
-            "curl -fsSL $location/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
-            "curl -fsSL $location/.env.production -o /data/coolify/source/.env.production",
-            "curl -fsSL $location/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh",
+            "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
+            "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
+            "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
+            "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
             "nohup bash /data/coolify/source/upgrade.sh $this->latestVersion &"
         ]);
         $this->emit('updateInitiated');

@@ -29,7 +29,9 @@
         "pestphp/pest": "^v2.4.0",
         "phpunit/phpunit": "^10.0.19",
         "serversideup/spin": "^v1.1.0",
-        "spatie/laravel-ignition": "^2.1.0"
+        "spatie/laravel-ignition": "^2.1.0",
+        "symfony/http-client": "^6.2",
+        "toshy/bunnynet-php": "^3.0"
     },
     "autoload": {
         "files": [

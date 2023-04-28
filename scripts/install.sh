@@ -1,6 +1,7 @@
 #!/bin/bash
 ## Do not modify this file. You will lost the ability to installation and autoupdate!
 VERSION="0.1.0"
+CDN="https://coolify-cdn.b-cdn.net/files"
 
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
@@ -27,10 +28,10 @@ chown -R 9999:root /data
 chmod -R 700 /data
 
 echo "Downloading required files from GitHub..."
-curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/${COOLIFY_VERSION_BRANCH}/.env.production -o /data/coolify/source/.env.production
-curl -fsSL https://raw.githubusercontent.com/coollabsio/coolify/v4/scripts/upgrade.sh -o /data/coolify/source/upgrade.sh
+curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
+curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
