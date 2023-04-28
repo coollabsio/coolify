@@ -61,10 +61,10 @@ class SyncToBunnyCDN extends Command
                 'AccessKey' => env('BUNNY_API_KEY'),
                 'Accept' => 'application/json',
             ])->get('https://api.bunny.net/purge', [
-                "url" => e("$bunny_cdn/$bunny_cdn_path/$compose_file"),
-                "url" => e("$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
-                "url" => e("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
-                "url" => e("$bunny_cdn/$bunny_cdn_path/$production_env")
+                "url" => "$bunny_cdn/$bunny_cdn_path/$compose_file",
+                "url" => "$bunny_cdn/$bunny_cdn_path/$compose_file_prod",
+                "url" => "$bunny_cdn/$bunny_cdn_path/$upgrade_script",
+                "url" => "$bunny_cdn/$bunny_cdn_path/$production_env"
             ]);
             if ($res->ok()) {
                 echo 'All files uploaded & purged...';
