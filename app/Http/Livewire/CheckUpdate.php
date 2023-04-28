@@ -16,7 +16,7 @@ class CheckUpdate extends Component
     protected function upgrade()
     {
         $branch = 'v4';
-        $location = "https://github.com/coollabsio/coolify/tree/$branch";
+        $location = "https://raw.githubusercontent.com/coollabsio/coolify/$branch";
 
         $server = Server::where('ip', 'host.docker.internal')->first();
         if (!$server) {
