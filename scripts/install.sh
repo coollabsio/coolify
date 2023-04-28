@@ -7,14 +7,14 @@
 
 VERSION="1.0.0"
 CDN="https://coolify-cdn.b-cdn.net/files"
+OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
+OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
+LATEST_VERSION=$(curl --silent https://get.coollabs.io/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 
 if [ "$EUID" -ne 0 ]; then
     echo "Please run as root"
     exit
 fi
-COOLIFY_VERSION_BRANCH="v4"
-OS=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
-VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
@@ -32,7 +32,7 @@ mkdir -p /data/coolify/source
 chown -R 9999:root /data
 chmod -R 700 /data
 
-echo "Downloading required files from GitHub..."
+echo "Downloading required files from CDN..."
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
@@ -67,4 +67,4 @@ if [ -z "$(grep -w "root@coolify" ~/.ssh/authorized_keys)" ]; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh
+bash /data/coolify/source/upgrade.sh ${LATEST_VERSION:-latest}
