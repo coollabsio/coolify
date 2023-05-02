@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Project;
@@ -63,6 +65,26 @@ class ProductionSeeder extends Seeder
                 'ip' => "host.docker.internal",
                 'team_id' => 0,
                 'private_key_id' => 0,
+            ]);
+        }
+        if (GithubApp::find(0) == null) {
+            GithubApp::create([
+                'id' => 0,
+                'name' => 'Public GitHub',
+                'api_url' => 'https://api.github.com',
+                'html_url' => 'https://github.com',
+                'is_public' => true,
+                'team_id' => 0,
+            ]);
+        }
+        if (GitlabApp::find(0) == null) {
+            GitlabApp::create([
+                'id' => 0,
+                'name' => 'Public GitLab',
+                'api_url' => 'https://gitlab.com/api/v4',
+                'html_url' => 'https://gitlab.com',
+                'is_public' => true,
+                'team_id' => 0,
             ]);
         }
     }
