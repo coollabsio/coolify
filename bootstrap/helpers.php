@@ -151,7 +151,7 @@ if (!function_exists('generateRandomName')) {
     {
         $generator = new \Nubs\RandomNameGenerator\All(
             [
-                new \Nubs\RandomNameGenerator\Vgng()
+                new \Nubs\RandomNameGenerator\Alliteration()
             ]
         );
         return $generator->getName();
