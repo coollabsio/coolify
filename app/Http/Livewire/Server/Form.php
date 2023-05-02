@@ -11,6 +11,8 @@ class Form extends Component
     public $server_id;
     public Server $server;
     public $uptime;
+    public $dockerVersion;
+    public $dockerComposeVersion;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -30,9 +32,11 @@ class Form extends Component
             "curl https://releases.rancher.com/install-docker/23.0.sh | sh"
         ]);
     }
-    public function checkConnection()
+    public function checkServer()
     {
         $this->uptime = runRemoteCommandSync($this->server, ['uptime']);
+        $this->dockerVersion = runRemoteCommandSync($this->server, ['docker version|head -2|grep -i version'], false);
+        $this->dockerComposeVersion = runRemoteCommandSync($this->server, ['docker compose version|head -2|grep -i version'], false);
     }
     public function submit()
     {

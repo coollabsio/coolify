@@ -21,12 +21,15 @@
             <button class="w-16 mt-4" type="submit">
                 Submit
             </button>
-            <button wire:click.prevent='checkConnection'>Check Connection</button>
+            <button wire:click.prevent='checkServer'>Check Server</button>
             <button wire:click.prevent='installDocker'>Install Docker</button>
         </div>
     </form>
     @isset($uptime)
         <p>Connection OK</p>
         <p>Uptime: {{ $uptime }}</p>
+        <p>{{ $dockerVersion }}</p>
+        <p>{{ $dockerComposeVersion }}</p>
     @endisset
+
 </div>
