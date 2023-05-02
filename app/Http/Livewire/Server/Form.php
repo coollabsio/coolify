@@ -23,6 +23,12 @@ class Form extends Component
     {
         $this->server = Server::find($this->server_id);
     }
+    public function installDocker()
+    {
+        $config = base64_encode('{ "live-restore": true }');
+        runRemoteCommandSync($this->server, ["mkdir -p /etc/docker/", "touch /etc/docker/daemon.json", "echo '{$config}' | base64 -d > /etc/docker/daemon.json"]);
+        runRemoteCommandSync($this->server, ['sh -c "$(curl --silent -fsSL https://get.docker.com)"']);
+    }
     public function checkConnection()
     {
         $this->uptime = runRemoteCommandSync($this->server, ['uptime']);

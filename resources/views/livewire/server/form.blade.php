@@ -22,6 +22,7 @@
                 Submit
             </button>
             <button wire:click.prevent='checkConnection'>Check Connection</button>
+            <button wire:click.prevent='installDocker'>Install Docker</button>
         </div>
     </form>
     @isset($uptime)

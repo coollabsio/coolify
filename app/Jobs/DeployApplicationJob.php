@@ -123,12 +123,15 @@ class DeployApplicationJob implements ShouldQueue
             $this->executeNow([
                 "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
                 "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
-                "echo 'Done.'",
             ]);
+
+            $this->executeNow([
+                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
+            ], isDebuggable: true);
 
             // Import git repository
             $this->executeNow([
+                "echo 'Done.'",
                 "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}... '"
             ]);
 

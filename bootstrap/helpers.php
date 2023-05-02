@@ -131,7 +131,7 @@ if (!function_exists('runRemoteCommandSync')) {
             if (!$throwError) {
                 return false;
             }
-            Log::error($output);
+            Log::error($process->errorOutput());
             throw new \RuntimeException('There was an error running the command.');
         }
         return $output;
