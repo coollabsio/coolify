@@ -45,7 +45,9 @@ function coolify-root {
 function vite {
     bash vendor/bin/spin exec vite bash
 }
-
+function build-builder {
+    act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
+}
 function default {
     help
 }

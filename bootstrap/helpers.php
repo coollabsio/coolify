@@ -78,6 +78,7 @@ if (!function_exists('generateSshCommand')) {
         $ssh_command .= "-i {$private_key_location} "
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
+            . '-o ConnectTimeout=3600 '
             . '-o RequestTTY=no '
             . '-o LogLevel=ERROR '
             . "-p {$port} "

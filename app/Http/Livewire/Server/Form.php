@@ -26,8 +26,9 @@ class Form extends Component
     public function installDocker()
     {
         $config = base64_encode('{ "live-restore": true }');
-        runRemoteCommandSync($this->server, ["mkdir -p /etc/docker/", "touch /etc/docker/daemon.json", "echo '{$config}' | base64 -d > /etc/docker/daemon.json"]);
-        runRemoteCommandSync($this->server, ['sh -c "$(curl --silent -fsSL https://get.docker.com)"']);
+        runRemoteCommandSync($this->server, [
+            "curl https://releases.rancher.com/install-docker/23.0.sh | sh"
+        ]);
     }
     public function checkConnection()
     {
