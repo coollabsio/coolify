@@ -13,6 +13,7 @@
         "laravel/tinker": "^v2.8.1",
         "lcobucci/jwt": "^5.0.0",
         "livewire/livewire": "^v2.12.3",
+        "nubs/random-name-generator": "^2.2",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
         "spatie/laravel-ray": "^1.32.4",

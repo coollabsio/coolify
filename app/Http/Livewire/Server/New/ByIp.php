@@ -43,7 +43,7 @@ class ByIp extends Component
     public function submit()
     {
         $server = Server::create([
-            'name' => fake()->company,
+            'name' => generateRandomName(),
             'ip' => $this->ip,
             'user' => $this->user,
             'port' => $this->port,

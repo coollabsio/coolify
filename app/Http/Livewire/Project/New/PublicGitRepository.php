@@ -79,8 +79,7 @@ class PublicGitRepository extends Component
 
         if ($this->type === 'project') {
             $project = Project::create([
-                'name' => fake()->company(),
-                'description' => fake()->sentence(),
+                'name' => generateRandomName(),
                 'team_id' => session('currentTeam')->id,
             ]);
             $environment = $project->environments->first();
@@ -89,7 +88,7 @@ class PublicGitRepository extends Component
             $environment = $project->environments->where('name', $this->parameters['environment_name'])->firstOrFail();
         }
         $application_init = [
-            'name' => fake()->words(2, true),
+            'name' => generateRandomName(),
             'git_repository' => $git_repository,
             'git_branch' => $git_branch,
             'build_pack' => 'nixpacks',

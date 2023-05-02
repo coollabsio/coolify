@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fe67e3799aed430897c4ad82f323abe1",
+    "content-hash": "edc1042455661505e65373a55fed9b81",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -2468,6 +2468,59 @@
                 "source": "https://github.com/nikic/PHP-Parser/tree/v4.15.4"
             },
             "time": "2023-03-05T19:49:14+00:00"
+        },
+        {
+            "name": "nubs/random-name-generator",
+            "version": "v2.2.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/nubs/random-name-generator.git",
+                "reference": "50abf24519badc5795a43c831f1d2a1faa45cb77"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/nubs/random-name-generator/zipball/50abf24519badc5795a43c831f1d2a1faa45cb77",
+                "reference": "50abf24519badc5795a43c831f1d2a1faa45cb77",
+                "shasum": ""
+            },
+            "require": {
+                "php": "~5.6 || ~7.0 || ~8.0"
+            },
+            "require-dev": {
+                "cinam/randomizer": ">=1.1.1,<2.0",
+                "php-coveralls/php-coveralls": "~2.4",
+                "phpunit/phpunit": "^5.0 || ^6.5 || ^7.0 || ^9.0",
+                "squizlabs/php_codesniffer": "~2.3"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Nubs\\RandomNameGenerator\\": "src"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Spencer Rinehart",
+                    "email": "anubis@overthemonkey.com",
+                    "role": "Developer"
+                }
+            ],
+            "description": "A library to create interesting, sometimes entertaining, random names.",
+            "keywords": [
+                "alliteration",
+                "generator",
+                "random",
+                "video game"
+            ],
+            "support": {
+                "issues": "https://github.com/nubs/random-name-generator/issues",
+                "source": "https://github.com/nubs/random-name-generator/tree/v2.2.0"
+            },
+            "time": "2021-01-12T13:46:08+00:00"
         },
         {
             "name": "nunomaduro/termwind",

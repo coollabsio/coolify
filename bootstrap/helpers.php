@@ -143,3 +143,14 @@ if (!function_exists('getLatestVersionOfCoolify')) {
         return data_get($versions, 'coolify.v4.version');
     }
 }
+if (!function_exists('generateRandomName')) {
+    function generateRandomName()
+    {
+        $generator = new \Nubs\RandomNameGenerator\All(
+            [
+                new \Nubs\RandomNameGenerator\Vgng()
+            ]
+        );
+        return $generator->getName();
+    }
+}
