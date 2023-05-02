@@ -4,6 +4,8 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProjectController;
 use App\Models\InstanceSettings;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,9 +25,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', function () {
         $projects = session('currentTeam')->load(['projects'])->projects;
         $servers = session('currentTeam')->load(['servers'])->servers;
+        $destinations = $servers->map(function ($server) {
+            return $server->standaloneDockers->merge($server->swarmDockers);
+        })->flatten();
         return view('dashboard', [
             'servers' => $servers->sortBy('name'),
-            'projects' => $projects->sortBy('name')
+            'projects' => $projects->sortBy('name'),
+            'destinations' => $destinations->sortBy('name'),
         ]);
     })->name('dashboard');
 
@@ -62,9 +68,24 @@ Route::middleware(['auth'])->group(function () {
             abort(404);
         }
         return view('server.show', [
-            'server_id' => $server->id,
+            'server' => $server,
         ]);
     })->name('server.show');
+});
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/destination/new', fn () => view('destination.new'))->name('destination.new');
+    Route::get('/destination/{destination_uuid}', function () {
+        $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
+        $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();
+        if (!$standalone_dockers && !$swarm_dockers) {
+            abort(404);
+        }
+        $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
+        return view('destination.show', [
+            'destination' => $destination,
+        ]);
+    })->name('destination.show');
 });
 
 Route::middleware(['auth'])->group(function () {

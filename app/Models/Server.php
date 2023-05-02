@@ -20,9 +20,13 @@ class Server extends BaseModel
         'team_id',
         'private_key_id',
     ];
-    public function destinations()
+    public function standaloneDockers()
     {
-        return $this->hasMany(PrivateKey::class);
+        return $this->hasMany(StandaloneDocker::class);
+    }
+    public function swarmDockers()
+    {
+        return $this->hasMany(SwarmDocker::class);
     }
     public function privateKey()
     {

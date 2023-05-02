@@ -119,7 +119,7 @@ if (!function_exists('formatDockerLabelsToJson')) {
     }
 }
 if (!function_exists('runRemoteCommandSync')) {
-    function runRemoteCommandSync($server, array $command)
+    function runRemoteCommandSync(Server $server, array $command, $throwError = true)
     {
         $command_string = implode("\n", $command);
         $private_key_location = savePrivateKeyForServer($server);
@@ -128,6 +128,9 @@ if (!function_exists('runRemoteCommandSync')) {
         $output = trim($process->output());
         $exitCode = $process->exitCode();
         if ($exitCode !== 0) {
+            if (!$throwError) {
+                return false;
+            }
             Log::error($output);
             throw new \RuntimeException('There was an error running the command.');
         }

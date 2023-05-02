@@ -11,4 +11,10 @@
     @empty
         <p>No servers found.</p>
     @endforelse
+    <h1>Destinations <a href="{{ route('destination.new') }}"><button>New</button></a></h1>
+    @forelse ($destinations as $destination)
+        <a href="{{ route('destination.show', [$destination->uuid]) }}">{{ data_get($destination, 'name') }}</a>
+    @empty
+        <p>No servers found.</p>
+    @endforelse
 </x-layout>

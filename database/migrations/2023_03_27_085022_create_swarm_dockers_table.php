@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('swarm_dockers', function (Blueprint $table) {
             $table->id();
+            $table->string('name');
             $table->string('uuid')->unique();
 
             $table->foreignId('server_id');
