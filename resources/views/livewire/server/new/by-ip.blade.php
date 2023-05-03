@@ -1,7 +1,7 @@
 <div>
     <form class="flex flex-col" wire:submit.prevent='submit'>
         <x-form-input id="name" label="Name" required />
-        <x-form-input id="description" label="Description" required />
+        <x-form-input id="description" label="Description" />
         <x-form-input id="ip" label="IP Address" required />
         <x-form-input id="user" label="User" />
         <x-form-input type="number" id="port" label="Port" />

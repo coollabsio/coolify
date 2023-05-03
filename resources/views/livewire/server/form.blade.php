@@ -11,7 +11,7 @@
                     <x-form-input id="server.user" label="User" readonly />
                     <x-form-input type="number" id="server.port" label="Port" readonly />
                 @else
-                    <x-form-input id="server.ip" label="IP Address" required />
+                    <x-form-input id="server.ip" label="IP Address" required readonly />
                     <x-form-input id="server.user" label="User" required />
                     <x-form-input type="number" id="server.port" label="Port" required />
                 @endif
