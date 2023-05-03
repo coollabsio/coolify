@@ -74,7 +74,16 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/destination/new', fn () => view('destination.new'))->name('destination.new');
+    Route::get('/destination/new', function () {
+        $query_params = request()->query();
+        $server_id = null;
+        if (isset($query_params['server_id'])) {
+            $server_id = $query_params['server_id'];
+        }
+        return view('destination.new', [
+            'server_id' => $server_id,
+        ]);
+    })->name('destination.new');
     Route::get('/destination/{destination_uuid}', function () {
         $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
         $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();

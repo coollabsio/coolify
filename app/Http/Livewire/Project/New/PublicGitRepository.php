@@ -43,17 +43,13 @@ class PublicGitRepository extends Component
             $this->port = 3000;
         }
         $this->parameters = Route::current()->parameters();
-        $this->servers = session('currentTeam')->load(['servers'])->servers->reject(function ($server) {
-            if ($server->standaloneDockers->count() === 0 && $server->swarmDockers->count() === 0) {
-                return true;
-            }
-        });
+        $this->servers = session('currentTeam')->load(['servers'])->servers;
     }
-    public function chooseServer($server_id)
+    public function chooseServer($server)
     {
-        $this->chosenServer = $server_id;
-        $this->standalone_docker = StandaloneDocker::where('server_id', $server_id)->get();
-        $this->swarm_docker = SwarmDocker::where('server_id', $server_id)->get();
+        $this->chosenServer = $server;
+        $this->standalone_docker = StandaloneDocker::where('server_id', $server['id'])->get();
+        $this->swarm_docker = SwarmDocker::where('server_id', $server['id'])->get();
     }
     public function setDestination($destination_uuid, $destination_type)
     {

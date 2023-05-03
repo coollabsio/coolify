@@ -4,24 +4,37 @@
     @endif
     @forelse ($servers as $server)
         <button @if ($chosenServer == $server->id) class="bg-blue-500" @endif
-            wire:click="chooseServer({{ $server->id }})">{{ $server->name }}</button>
+            wire:click="chooseServer({{ $server }})">{{ $server->name }}</button>
     @empty
         No servers found.
         <p>Did you forget to add a destination on the server?</p>
     @endforelse
 
     @isset($chosenServer)
-        <h1>Choose a destination</h1>
-        <div>
-            @foreach ($standalone_docker as $standalone)
-                <button @if ($chosenDestination?->uuid == $standalone->uuid) class="bg-blue-500" @endif
-                    wire:click="setDestination('{{ $standalone->uuid }}','StandaloneDocker')">{{ $standalone->network }}</button>
-            @endforeach
-            @foreach ($swarm_docker as $standalone)
-                <button @if ($chosenDestination?->uuid == $standalone->uuid) class="bg-blue-500" @endif
-                    wire:click="setDestination('{{ $standalone->uuid }}','SwarmDocker')">{{ $standalone->uuid }}</button>
-            @endforeach
-        </div>
+        @if ($standalone_docker->count() > 0 || $swarm_docker->count() > 0)
+            <h1>Choose a destination</h1>
+            <div>
+                @foreach ($standalone_docker as $standalone)
+                    <button @if ($chosenDestination?->uuid == $standalone->uuid) class="bg-blue-500" @endif
+                        wire:click="setDestination('{{ $standalone->uuid }}','StandaloneDocker')">{{ $standalone->network }}</button>
+                @endforeach
+                @foreach ($swarm_docker as $standalone)
+                    <button @if ($chosenDestination?->uuid == $standalone->uuid) class="bg-blue-500" @endif
+                        wire:click="setDestination('{{ $standalone->uuid }}','SwarmDocker')">{{ $standalone->uuid }}</button>
+                @endforeach
+            </div>
+            <div>
+                <a href="{{ route('destination.new', ['server_id' => $chosenServer['id']]) }}">Add
+                    a new
+                    destination</a>
+            </div>
+        @else
+            <h1>No destinations found on this server.</h1>
+            <a href="{{ route('destination.new', ['server_id' => $chosenServer['id']]) }}">Add
+                a
+                destination</a>
+        @endif
+
     @endisset
 
     @isset($chosenDestination)
