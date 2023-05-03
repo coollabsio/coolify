@@ -21,6 +21,9 @@ yarn-error.log
 /.bash_history
 /_volumes
 
+# Temp while developing Proxy deployment
+resources/recipes
+
 .lesshst
 psysh_history
 .psql_history

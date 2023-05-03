@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Data\ServerMetadata;
+use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;
@@ -16,6 +18,7 @@ class ServerSeeder extends Seeder
     {
         $root_team = Team::find(0);
         $private_key_1 = PrivateKey::find(1);
+
         Server::create([
             'id' => 1,
             'name' => "testing-local-docker-container",
@@ -23,6 +26,9 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
+            'extra_attributes' => ServerMetadata::from([
+                'proxy' => ProxyTypes::TRAEFIK_V2->value
+            ]),
         ]);
         Server::create([
             'id' => 2,
@@ -31,6 +37,9 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host-2",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
+            'extra_attributes' => ServerMetadata::from([
+                //
+            ]),
         ]);
 
     }

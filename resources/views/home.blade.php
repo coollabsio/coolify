@@ -1,7 +1,7 @@
 <x-layout>
     <h1>Servers</h1>
     @forelse ($servers as $server)
-        <a href="{{ route('project.environments', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
+        <a href="{{ route('server.show', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
     @empty
         <p>No servers found.</p>
     @endforelse
