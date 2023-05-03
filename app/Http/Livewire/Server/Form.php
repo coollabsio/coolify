@@ -38,12 +38,20 @@ class Form extends Component
     public function checkServer()
     {
         try {
-
-            $this->uptime = instantRemoteProcess(['uptime'], $this->server);
+            $this->uptime = instantRemoteProcess(['uptime'], $this->server, false);
+            if (!$this->uptime) {
+                $this->uptime = 'Server not reachable.';
+                throw new \Exception('Server not reachable.');
+            }
             $this->dockerVersion = instantRemoteProcess(['docker version|head -2|grep -i version'], $this->server, false);
+            if (!$this->dockerVersion) {
+                $this->dockerVersion = 'Not installed.';
+            }
             $this->dockerComposeVersion = instantRemoteProcess(['docker compose version|head -2|grep -i version'], $this->server, false);
+            if (!$this->dockerComposeVersion) {
+                $this->dockerComposeVersion = 'Not installed.';
+            }
         } catch (\Exception $e) {
-            $this->addError('server.ip', $e->getMessage());
         }
     }
     public function submit()

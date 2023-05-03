@@ -22,14 +22,17 @@
                 Submit
             </button>
             <button wire:click.prevent='checkServer'>Check Server</button>
-            <button wire:click.prevent='installDocker'>Install Docker</button>
+            {{-- <button wire:click.prevent='installDocker'>Install Docker</button> --}}
         </div>
     </form>
     @isset($uptime)
-        <p>Connection OK</p>
         <p>Uptime: {{ $uptime }}</p>
-        <p>{{ $dockerVersion }}</p>
-        <p>{{ $dockerComposeVersion }}</p>
+    @endisset
+    @isset($dockerVersion)
+        <p>Docker Engine: {{ $dockerVersion }}</p>
+    @endisset
+    @isset($dockerComposeVersion)
+        <p>Docker Compose: {{ $dockerComposeVersion }}</p>
     @endisset
 
 </div>
