@@ -18,7 +18,7 @@
 
             @if (data_get($application, 'ports_mappings_array'))
                 @foreach ($application->ports_mappings_array as $port)
-                    @if (env('APP_ENV') === 'local')
+                    @if (config('app.env') === 'local')
                         <a target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Open
                             {{ explode(':', $port)[0] }}</a>
                     @else
