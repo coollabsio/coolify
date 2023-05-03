@@ -9,7 +9,7 @@
 <button {{ $attributes }} @class([
     $defaultClass => !$confirm && !$isWarning,
     $defaultWarningClass => $confirm || $isWarning,
-]) @if ($attributes->has('wire:click'))
+]) @if ($attributes->whereStartsWith('wire:click'))
     wire:target="{{ explode('(', $attributes->whereStartsWith('wire:click')->first())[0] }}"
     wire:loading.delay.class="{{ $loadingClass }}" wire:loading.delay.attr="disabled"
     wire:loading.delay.class.remove="{{ $defaultClass }} {{ $attributes->whereStartsWith('class')->first() }}"
