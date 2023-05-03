@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server;
 
+use App\Actions\Proxy\InstallProxy;
 use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Livewire\Component;
@@ -19,7 +20,7 @@ class Proxy extends Component
 
     public function runInstallProxy()
     {
-        $activity = remoteProcess(['ls -alh'], $this->server, ActivityTypes::INLINE->value);
+        $activity = resolve(InstallProxy::class)($this->server);
 
         $this->emit('newMonitorActivity', $activity->id);
     }
