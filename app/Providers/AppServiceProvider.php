@@ -16,9 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        if (config('app.env') === 'production' && Str::contains(config('coolify.version'), ['nightly'])) {
-            Process::run('php artisan migrate:fresh --force --seed --seeder=ProductionSeeder');
-        }
+        // if (config('app.env') === 'production' && Str::contains(config('coolify.version'), ['nightly'])) {
+        //     Process::run('php artisan migrate:fresh --force --seed --seeder=ProductionSeeder');
+        // }
     }
 
     /**

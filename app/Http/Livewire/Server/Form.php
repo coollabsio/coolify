@@ -54,6 +54,11 @@ class Form extends Component
         } catch (\Exception $e) {
         }
     }
+    public function delete()
+    {
+        $this->server->delete();
+        redirect()->route('dashboard');
+    }
     public function submit()
     {
         $this->validate();

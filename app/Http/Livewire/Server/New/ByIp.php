@@ -45,6 +45,10 @@ class ByIp extends Component
     }
     public function submit()
     {
+        if (!$this->private_key_id) {
+            $this->addError('private_key_id', 'The private key field is required.');
+            return;
+        }
         $server = Server::create([
             'name' => $this->name,
             'description' => $this->description,

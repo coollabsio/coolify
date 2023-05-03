@@ -11,7 +11,7 @@
                     <x-form-input id="server.user" label="User" readonly />
                     <x-form-input type="number" id="server.port" label="Port" readonly />
                 @else
-                    <x-form-input id="server.ip" label="IP Address" required />
+                    <x-form-input id="server.ip" label="IP Address" required readonly />
                     <x-form-input id="server.user" label="User" required />
                     <x-form-input type="number" id="server.port" label="Port" required />
                 @endif
@@ -22,6 +22,9 @@
                 Submit
             </button>
             <button wire:click.prevent='checkServer'>Check Server</button>
+            <button class="bg-red-500" @confirm.window="$wire.delete()"
+                x-on:click="toggleConfirmModal('Are you sure you would like to delete this application?')">
+                Delete</button>
             {{-- <button wire:click.prevent='installDocker'>Install Docker</button> --}}
         </div>
     </form>
