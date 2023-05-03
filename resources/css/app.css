@@ -12,5 +12,5 @@ input, select, textarea {
     @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600;
 }
 button {
-    @apply border-none px-2 rounded cursor-pointer;
+    @apply border-none px-2 p-1 cursor-pointer;
 }
