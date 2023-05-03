@@ -10,7 +10,6 @@ class ForceUpgrade extends Component
 {
     public function upgrade()
     {
-        //if (env('APP_ENV') === 'local') {
         if (config('app.env') === 'local') {
             $server = Server::where('ip', 'coolify-testing-host')->first();
             if (!$server) {
