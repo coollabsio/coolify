@@ -20,6 +20,7 @@ if (!function_exists('remoteProcess')) {
     function remoteProcess(
         array   $command,
         Server  $server,
+        string $type,
         ?string $type_uuid = null,
         ?Model  $model = null,
     ): Activity {
@@ -40,7 +41,7 @@ if (!function_exists('remoteProcess')) {
                 EOT,
                 port: $server->port,
                 user: $server->user,
-                type: $type_uuid,
+                type: $type,
                 type_uuid: $type_uuid,
                 model: $model,
             ),

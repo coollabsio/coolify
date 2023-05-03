@@ -3,9 +3,14 @@
 namespace App\Actions\CoolifyTask;
 
 use App\Data\CoolifyTaskArgs;
-use App\Jobs\HandleCoolifyTaskInQueue;
+use App\Jobs\CoolifyTask;
 use Spatie\Activitylog\Models\Activity;
 
+/**
+ * The initial step to run a `CoolifyTask`: a remote SSH process
+ * with monitoring/tracking/trace feature. Such thing is made
+ * possible using an Activity model and some attributes.
+ */
 class PrepareCoolifyTask
 {
     protected Activity $activity;
@@ -31,7 +36,7 @@ class PrepareCoolifyTask
 
     public function __invoke(): Activity
     {
-        $job = new HandleCoolifyTaskInQueue($this->activity);
+        $job = new CoolifyTask($this->activity);
         dispatch($job);
         $this->activity->refresh();
         return $this->activity;
