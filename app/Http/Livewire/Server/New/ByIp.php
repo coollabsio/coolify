@@ -15,7 +15,7 @@ class ByIp extends Component
     public $new_private_key_value;
 
     public string $name;
-    public string $description;
+    public string|null $description = null;
     public string $ip;
     public string $user = 'root';
     public int $port = 22;
@@ -28,20 +28,6 @@ class ByIp extends Component
     public function setPrivateKey($private_key_id)
     {
         $this->private_key_id = $private_key_id;
-    }
-    public function addPrivateKey()
-    {
-        $this->new_private_key_value = trim($this->new_private_key_value);
-        if (!str_ends_with($this->new_private_key_value, "\n")) {
-            $this->new_private_key_value .= "\n";
-        }
-        PrivateKey::create([
-            'name' => $this->new_private_key_name,
-            'description' => $this->new_private_key_description,
-            'private_key' => $this->new_private_key_value,
-            'team_id' => session('currentTeam')->id
-        ]);
-        session('currentTeam')->privateKeys = $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
     }
     public function submit()
     {

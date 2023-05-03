@@ -15,6 +15,12 @@
     @forelse ($destinations as $destination)
         <a href="{{ route('destination.show', [$destination->uuid]) }}">{{ data_get($destination, 'name') }}</a>
     @empty
+        <p>No destinations found.</p>
+    @endforelse
+    <h1>Private Keys <a href="{{ route('private-key.new') }}"><button>New</button></a></h1>
+    @forelse ($private_keys as $private_key)
+        <a href="{{ route('private-key.show', [$private_key->uuid]) }}">{{ data_get($private_key, 'name') }}</a>
+    @empty
         <p>No servers found.</p>
     @endforelse
 </x-layout>

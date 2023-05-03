@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProjectController;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Illuminate\Support\Facades\Route;
@@ -28,10 +29,13 @@ Route::middleware(['auth'])->group(function () {
         $destinations = $servers->map(function ($server) {
             return $server->standaloneDockers->merge($server->swarmDockers);
         })->flatten();
+        $private_keys = session('currentTeam')->load(['privateKeys'])->privateKeys;
+
         return view('dashboard', [
             'servers' => $servers->sortBy('name'),
             'projects' => $projects->sortBy('name'),
             'destinations' => $destinations->sortBy('name'),
+            'private_keys' => $private_keys->sortBy('name'),
         ]);
     })->name('dashboard');
 
@@ -61,6 +65,15 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
+    Route::get('/private-key/{private_key_uuid}', function () {
+        $private_key = PrivateKey::where('uuid', request()->private_key_uuid)->first();
+        return view('private-key.show', [
+            'private_key' => $private_key,
+        ]);
+    })->name('private-key.show');
+});
+Route::middleware(['auth'])->group(function () {
     Route::get('/server/new', fn () => view('server.new'))->name('server.new');
     Route::get('/server/{server_uuid}', function () {
         $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
@@ -71,6 +84,9 @@ Route::middleware(['auth'])->group(function () {
             'server' => $server,
         ]);
     })->name('server.show');
+    Route::get('/server/{server_uuid}/private-key', function () {
+        return view('server.private-key');
+    })->name('server.private-key');
 });
 
 Route::middleware(['auth'])->group(function () {

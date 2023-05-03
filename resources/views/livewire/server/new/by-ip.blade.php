@@ -20,14 +20,7 @@
         </div>
         <div>
             <h2>Add a new One</h2>
-            <form class="flex flex-col gap-2" wire:submit.prevent='addPrivateKey'>
-                <x-form-input id="new_private_key_name" label="Name" required />
-                <x-form-input id="new_private_key_description" label="Longer Description" />
-                <x-form-input type="textarea" id="new_private_key_value" label="Private Key" required />
-                <button type="submit">
-                    Submit
-                </button>
-            </form>
+            <livewire:private-key.create />
         </div>
     </div>
 </div>

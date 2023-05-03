@@ -21,7 +21,8 @@
             <button class="w-16 mt-4" type="submit">
                 Submit
             </button>
-            <button wire:click.prevent='checkServer'>Check Server</button>
+            <button wire:loading.class="text-black bg-green-500" wire:loading.attr="disabled"
+                wire:click.prevent='checkServer'>Check Server</button>
             <button class="bg-red-500" @confirm.window="$wire.delete()"
                 x-on:click="toggleConfirmModal('Are you sure you would like to delete this application?')">
                 Delete</button>
