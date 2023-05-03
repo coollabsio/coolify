@@ -16,8 +16,8 @@
         <div class="flex flex-col items-center justify-center h-full">
             <div class="pb-5 text-white" x-text="message"></div>
             <div>
-                <button x-on:click="open = false">Cancel</button>
-                <button x-on:click="$dispatch('confirm')">Confirm</button>
+                <x-inputs.button x-on:click="$dispatch('confirm')">Confirm</x-inputs.button>
+                <x-inputs.button x-on:click="open = false">Cancel</x-inputs.button>
             </div>
         </div>
     </div>

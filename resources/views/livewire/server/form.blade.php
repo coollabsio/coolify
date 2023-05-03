@@ -2,31 +2,27 @@
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
-                <x-form-input id="server.name" label="Name" required />
-                <x-form-input id="server.description" label="Description" />
+                <x-inputs.input id="server.name" label="Name" required />
+                <x-inputs.input id="server.description" label="Description" />
             </div>
             <div class="flex flex-col w-96">
                 @if ($server->id === 0)
-                    <x-form-input id="server.ip" label="IP Address" readonly />
-                    <x-form-input id="server.user" label="User" readonly />
-                    <x-form-input type="number" id="server.port" label="Port" readonly />
+                    <x-inputs.input id="server.ip" label="IP Address" readonly />
+                    <x-inputs.input id="server.user" label="User" readonly />
+                    <x-inputs.input type="number" id="server.port" label="Port" readonly />
                 @else
-                    <x-form-input id="server.ip" label="IP Address" required readonly />
-                    <x-form-input id="server.user" label="User" required />
-                    <x-form-input type="number" id="server.port" label="Port" required />
+                    <x-inputs.input id="server.ip" label="IP Address" required readonly />
+                    <x-inputs.input id="server.user" label="User" required />
+                    <x-inputs.input type="number" id="server.port" label="Port" required />
                 @endif
             </div>
         </div>
         <div>
-            <button class="w-16 mt-4" type="submit">
-                Submit
-            </button>
-            <button wire:loading.class="text-black bg-green-500" wire:loading.attr="disabled"
-                wire:click.prevent='checkServer'>Check Server</button>
-            <button class="bg-red-500" @confirm.window="$wire.delete()"
-                x-on:click="toggleConfirmModal('Are you sure you would like to delete this application?')">
-                Delete</button>
-            {{-- <button wire:click.prevent='installDocker'>Install Docker</button> --}}
+            <x-inputs.button type="submit">Submit</x-inputs.button>
+            <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
+            <x-inputs.button class="bg-red-500" confirm="Are you sure you would like to delete this application?"
+                confirmAction="delete">Delete
+            </x-inputs.button>
         </div>
     </form>
     @isset($uptime)

@@ -1,5 +1,7 @@
 <x-layout>
-    <h1>Resources <a href="{{ route('project.resources.new', Route::current()->parameters()) }}"><button>New</button></a>
+    <h1>Resources <a href="{{ route('project.resources.new', Route::current()->parameters()) }}">
+            <x-inputs.button>New</x-inputs.button>
+        </a>
     </h1>
     <div>
         @foreach ($environment->applications as $application)

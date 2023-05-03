@@ -9,7 +9,7 @@
         <input type="password" name="password" placeholder="Password" @env('local') value="password" @endenv />
         <input type="password" name="password_confirmation" placeholder="Password"
             @env('local') value="password" @endenv />
-        <button type="submit">Register</button>
+        <x-inputs.button type="submit">Register</x-inputs.button>
     </form>
     @if ($errors->any())
         <div class="alert alert-danger">

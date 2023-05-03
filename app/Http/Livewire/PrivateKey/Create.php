@@ -16,12 +16,13 @@ class Create extends Component
         if (!str_ends_with($this->private_key_value, "\n")) {
             $this->private_key_value .= "\n";
         }
-        PrivateKey::create([
+        $new_private_key = PrivateKey::create([
             'name' => $this->private_key_name,
             'description' => $this->private_key_description,
             'private_key' => $this->private_key_value,
             'team_id' => session('currentTeam')->id
         ]);
         session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+        redirect()->route('private-key.show', $new_private_key->uuid);
     }
 }

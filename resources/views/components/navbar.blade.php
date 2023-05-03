@@ -11,7 +11,7 @@
         @endif
         <form action="/logout" method="POST">
             @csrf
-            <button type="submit">Logout</button>
+            <x-inputs.button type="submit">Logout</x-inputs.button>
         </form>
         <livewire:check-update />
         <livewire:force-upgrade />

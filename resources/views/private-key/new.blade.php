@@ -1,4 +1,4 @@
 <x-layout>
     <h1>New Private Key</h1>
-    <livewire:private-key.new.key />
+    <livewire:private-key.create />
 </x-layout>

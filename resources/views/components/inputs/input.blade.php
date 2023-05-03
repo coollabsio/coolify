@@ -1,3 +1,15 @@
+@props([
+    'id' => null,
+    'required' => false,
+    'readonly' => false,
+    'label' => null,
+    'type' => 'text',
+    'class' => '',
+    'instantSave' => false,
+    'disabled' => false,
+    'hidden' => false,
+])
+
 @if ($type === 'checkbox')
     <label for={{ $id }}>
         @if ($label)

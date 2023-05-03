@@ -6,8 +6,9 @@
     @endif
     <div x-data="{ activeTab: 'choose' }">
         <div class="flex flex-col w-64 gap-2 mb-10">
-            <button @click.prevent="activeTab = 'public-repo'">Public Repository</button>
-            <button @click.prevent="activeTab = 'github-private-repo'">Private Repository (GitHub App)</button>
+            <x-inputs.button @click.prevent="activeTab = 'public-repo'">Public Repository</x-inputs.button>
+            <x-inputs.button @click.prevent="activeTab = 'github-private-repo'">Private Repository (GitHub App)
+            </x-inputs.button>
             @if ($type === 'project')
                 <livewire:project.new.empty-project />
             @endif
