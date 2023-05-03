@@ -38,7 +38,7 @@ class PublicGitRepository extends Component
     ];
     public function mount()
     {
-        if (env('APP_ENV') === 'local') {
+        if (config('app.env') === 'local') {
             $this->public_repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
             $this->port = 3000;
         }
