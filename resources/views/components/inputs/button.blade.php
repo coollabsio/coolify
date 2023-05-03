@@ -1,5 +1,5 @@
 @props([
-    'defaultClass' => 'bg-indigo-500',
+    'defaultClass' => 'text-white bg-violet-500 hover:bg-violet-600',
     'confirm' => null,
     'confirmAction' => null,
 ])
