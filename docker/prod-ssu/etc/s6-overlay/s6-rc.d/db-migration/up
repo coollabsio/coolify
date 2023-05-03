@@ -1,7 +1,7 @@
 #!/command/execlineb -P
 VERSION=$(php bootstrap/getVersion.php)
 
-if echo "$VERSION" | grep -q "nightly"; then
+if [ echo "$VERSION" | grep -q "nightly" ]; then
     php /var/www/html/artisan migrate:fresh --force
     php /var/www/html/artisan db:seed --class ProductionSeeder --force
 else
