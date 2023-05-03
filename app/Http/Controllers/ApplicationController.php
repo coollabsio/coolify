@@ -56,7 +56,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
+        $activity = Activity::where('properties->type_uuid', '=', $deployment_uuid)->first();
 
         return view('project.application.deployment', [
             'application' => $application,

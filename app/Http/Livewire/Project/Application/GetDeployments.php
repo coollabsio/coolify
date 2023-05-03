@@ -12,7 +12,7 @@ class GetDeployments extends Component
     public string $status;
     public function polling()
     {
-        $activity = Activity::where('properties->deployment_uuid', '=', $this->deployment_uuid)->first();
+        $activity = Activity::where('properties->type_uuid', '=', $this->deployment_uuid)->first();
         $this->created_at = $activity->created_at;
         $this->status = data_get($activity, 'properties.status');
     }
