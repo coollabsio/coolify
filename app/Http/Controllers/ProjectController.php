@@ -93,6 +93,7 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
+
         $activity = Activity::query()
             ->where('properties->type', '=', 'deployment')
             ->where('properties->uuid', '=', $deployment_uuid)

@@ -5,9 +5,6 @@ x-testing-host: &testing-host-base
   build:
     dockerfile: Dockerfile
     context: ./docker/testing-host
-  volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    - ./docker/testing-host/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
   networks:
     - coolify
 
@@ -52,9 +49,14 @@ services:
   testing-host:
       <<: *testing-host-base
       container_name: coolify-testing-host
-  testing-host2:
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+  testing-host-2:
       <<: *testing-host-base
       container_name: coolify-testing-host-2
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+        - "./_testing_hosts/host_2_proxy:/root/projects/proxy"
 
 
 

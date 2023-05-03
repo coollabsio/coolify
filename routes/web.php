@@ -7,6 +7,7 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Http\Controllers\ServerController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -38,6 +39,15 @@ Route::middleware(['auth'])->group(function () {
             'private_keys' => $private_keys->sortBy('name'),
         ]);
     })->name('dashboard');
+    Route::get('/project/{project_uuid}', [ProjectController::class, 'environments'])->name('project.environments');
+
+    Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
+
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ProjectController::class, 'application'])->name('project.application');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}', [ProjectController::class, 'deployment'])->name('project.deployment');
+
+    Route::get('/server/{server:uuid}', [ServerController::class, 'show'])->name('server.show');
+
 
     Route::get('/profile', function () {
         return view('profile');

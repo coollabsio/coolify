@@ -6,6 +6,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^v1.16.0",
         "laravel/framework": "^v10.7.1",
@@ -18,6 +19,7 @@
         "spatie/laravel-data": "^3.4.3",
         "spatie/laravel-ray": "^1.32.4",
         "spatie/url": "^2.2",
+        "spatie/laravel-schemaless-attributes": "^2.4",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0"
     },
