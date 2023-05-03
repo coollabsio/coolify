@@ -222,10 +222,10 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
             Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
         } catch (\Exception $e) {
             $this->executeNow([
-                "echo 'Oops something is not okay, are you okay? 😢'",
+                "echo '\nOops something is not okay, are you okay? 😢'",
                 "echo '\n\n{$e->getMessage()}'",
             ]);
-            throw new \Exception('Deployment finished');
+            $this->fail($e->getMessage());
         } finally {
             $this->executeNow(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
             dispatch(new ContainerStatusJob($this->application_uuid));
