@@ -7,6 +7,7 @@ use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -15,14 +16,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // @TODO: Is this the best place to run the seeder?
-        // if (env('APP_ENV') === 'production') {
-        //     dump('Seed default data.');
-        //     Process::run('php artisan db:seed --class=ProductionSeeder --force');
-        // } else {
-        //     dump('Not in production environment.');
-        // }
-        //
+        if (config('app.env') === 'production' && Str::contains(config('coolify.version'), ['nightly'])) {
+            Process::run('php artisan migrate:fresh --force --seed --seeder=ProductionSeeder');
+        }
     }
 
     /**
@@ -31,9 +27,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Queue::after(function (JobProcessed $event) {
-             // @TODO: Remove `coolify-builder` container after the remoteProcess job is finishged and remoteProcess->type == `deployment`.
+            // @TODO: Remove `coolify-builder` container after the remoteProcess job is finishged and remoteProcess->type == `deployment`.
             if ($event->job->resolveName() === CoolifyTask::class) {
-
             }
         });
     }

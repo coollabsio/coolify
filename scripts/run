@@ -21,8 +21,7 @@ function help {
     compgen -A function | cat -n
 }
 function sync-bunny {
-    bash vendor/bin/spin exec -u webuser coolify php artisan sync:bunny --env=secret ||
-        php artisan sync:bunny --env=secrets
+    php artisan sync:bunny --env=secrets
 }
 function queue {
     bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen

@@ -2,10 +2,12 @@
 ## Do not modify this file. You will lost the ability to installation and autoupdate!
 
 ###########
-## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" if you update this file.
+## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
 ###########
 
 VERSION="1.0.0"
+DOCKER_VERSION="23.0"
+
 CDN="https://coolify-cdn.b-cdn.net/files"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
 OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
@@ -18,9 +20,7 @@ fi
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm get-docker.sh
+    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
     echo "Docker installed successfully"
 fi
 
