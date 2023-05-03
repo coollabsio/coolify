@@ -3,7 +3,7 @@
         <h1>Choose a server</h1>
     @endif
     @forelse ($servers as $server)
-        <button @if ($chosenServer == $server->id) class="bg-blue-500" @endif
+        <button @if ($chosenServer && $chosenServer['id'] === $server->id) class="bg-blue-500" @endif
             wire:click="chooseServer({{ $server }})">{{ $server->name }}</button>
     @empty
         No servers found.
