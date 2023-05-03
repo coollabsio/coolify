@@ -4,6 +4,7 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ProjectController;
 use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Http\Controllers\ServerController;
@@ -29,10 +30,13 @@ Route::middleware(['auth'])->group(function () {
         $destinations = $servers->map(function ($server) {
             return $server->standaloneDockers->merge($server->swarmDockers);
         })->flatten();
+        $private_keys = session('currentTeam')->load(['privateKeys'])->privateKeys;
+
         return view('dashboard', [
             'servers' => $servers->sortBy('name'),
             'projects' => $projects->sortBy('name'),
             'destinations' => $destinations->sortBy('name'),
+            'private_keys' => $private_keys->sortBy('name'),
         ]);
     })->name('dashboard');
     Route::get('/project/{project_uuid}', [ProjectController::class, 'environments'])->name('project.environments');
@@ -71,6 +75,15 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
+    Route::get('/private-key/{private_key_uuid}', function () {
+        $private_key = PrivateKey::where('uuid', request()->private_key_uuid)->first();
+        return view('private-key.show', [
+            'private_key' => $private_key,
+        ]);
+    })->name('private-key.show');
+});
+Route::middleware(['auth'])->group(function () {
     Route::get('/server/new', fn () => view('server.new'))->name('server.new');
     Route::get('/server/{server_uuid}', function () {
         $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
@@ -81,10 +94,22 @@ Route::middleware(['auth'])->group(function () {
             'server' => $server,
         ]);
     })->name('server.show');
+    Route::get('/server/{server_uuid}/private-key', function () {
+        return view('server.private-key');
+    })->name('server.private-key');
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/destination/new', fn () => view('destination.new'))->name('destination.new');
+    Route::get('/destination/new', function () {
+        $query_params = request()->query();
+        $server_id = null;
+        if (isset($query_params['server_id'])) {
+            $server_id = $query_params['server_id'];
+        }
+        return view('destination.new', [
+            'server_id' => $server_id,
+        ]);
+    })->name('destination.new');
     Route::get('/destination/{destination_uuid}', function () {
         $standalone_dockers = StandaloneDocker::where('uuid', request()->destination_uuid)->first();
         $swarm_dockers = SwarmDocker::where('uuid', request()->destination_uuid)->first();

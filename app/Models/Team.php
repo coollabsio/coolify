@@ -24,4 +24,8 @@ class Team extends BaseModel
     {
         return $this->hasManyThrough(Application::class, Project::class);
     }
+    public function privateKeys()
+    {
+        return $this->hasMany(PrivateKey::class);
+    }
 }

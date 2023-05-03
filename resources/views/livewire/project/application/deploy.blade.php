@@ -1,15 +1,15 @@
 <div>
-    <button class="bg-red-500" @confirm.window="$wire.delete()"
-        x-on:click="toggleConfirmModal('Are you sure you would like to delete this application?')">
-        Delete</button>
+
     @if ($application->status === 'running')
-        <button wire:click='start'>Restart</button>
-        <button wire:click='forceRebuild'>Force Rebuild</button>
+        <x-inputs.button wire:click='start'>Restart</x-inputs.button>
+        <x-inputs.button wire:click='forceRebuild'>Force Rebuild</x-inputs.button>
+        <x-inputs.button wire:click='stop'>Stop</x-inputs.button>
     @else
-        <button wire:click='start'>Start</button>
-        <button wire:click='forceRebuild'>Start (no cache)</button>
+        <x-inputs.button wire:click='start'>Start</x-inputs.button>
+        <x-inputs.button wire:click='forceRebuild'>Start (no cache)</x-inputs.button>
     @endif
-    <button wire:click='stop'>Stop</button>
+    <x-inputs.button confirmAction="delete" confirm='Are you sure you would like to delete this application?'>
+        Delete</x-inputs.button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')
             @if (data_get($application, 'fqdn'))
@@ -23,7 +23,7 @@
                             {{ explode(':', $port)[0] }}</a>
                     @else
                         <a target="_blank"
-                            href="http://{{ $application->destination->server->ip }}:{{ $port }}">Open
+                            href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Open
                             {{ $port }}</a>
                     @endif
                 @endforeach

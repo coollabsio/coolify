@@ -1,3 +1,15 @@
+@props([
+    'id' => null,
+    'required' => false,
+    'readonly' => false,
+    'label' => null,
+    'type' => 'text',
+    'class' => '',
+    'instantSave' => false,
+    'disabled' => false,
+    'hidden' => false,
+])
+
 @if ($type === 'checkbox')
     <label for={{ $id }}>
         @if ($label)
@@ -26,12 +38,13 @@
         @endif
     </label>
     @if ($type === 'textarea')
-        <textarea type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-            @if ($required) required @endif @if ($disabled) disabled @endif
-            @if ($readonly) readOnly disabled @endif></textarea>
+        <textarea class={{ $class }} type={{ $type }} id={{ $id }}
+            wire:model.defer={{ $id }} @if ($required) required @endif
+            @if ($disabled) disabled @endif @if ($readonly) readOnly disabled @endif></textarea>
     @else
-        <input type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-            @if ($required) required @endif @if ($disabled) disabled @endif
+        <input class={{ $class }} type={{ $type }} id={{ $id }}
+            wire:model.defer={{ $id }} @if ($required) required @endif
+            @if ($disabled) disabled @endif
             @if ($readonly) readOnly disabled @endif />
     @endif
 
