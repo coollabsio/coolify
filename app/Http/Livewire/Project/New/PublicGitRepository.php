@@ -43,7 +43,11 @@ class PublicGitRepository extends Component
             $this->port = 3000;
         }
         $this->parameters = Route::current()->parameters();
-        $this->servers = session('currentTeam')->load(['servers'])->servers;
+        $this->servers = session('currentTeam')->load(['servers'])->servers->reject(function ($server) {
+            if ($server->standaloneDockers->count() === 0 && $server->swarmDockers->count() === 0) {
+                return true;
+            }
+        });
     }
     public function chooseServer($server_id)
     {

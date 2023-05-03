@@ -19,8 +19,5 @@
         <div x-cloak x-show="activeTab === 'github-private-repo'">
             github-private-repo
         </div>
-        <div x-cloak x-show="activeTab === 'choose'">
-            Choose any option
-        </div>
     </div>
 </x-layout>

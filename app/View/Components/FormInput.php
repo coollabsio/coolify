@@ -17,6 +17,7 @@ class FormInput extends Component
         public bool $readonly = false,
         public string|null $label = null,
         public string|null $type = 'text',
+        public string|null $class = "",
         public bool $instantSave = false,
         public bool $disabled = false,
         public bool $hidden = false

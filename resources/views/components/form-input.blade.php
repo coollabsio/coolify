@@ -26,12 +26,13 @@
         @endif
     </label>
     @if ($type === 'textarea')
-        <textarea type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-            @if ($required) required @endif @if ($disabled) disabled @endif
-            @if ($readonly) readOnly disabled @endif></textarea>
+        <textarea class={{ $class }} type={{ $type }} id={{ $id }}
+            wire:model.defer={{ $id }} @if ($required) required @endif
+            @if ($disabled) disabled @endif @if ($readonly) readOnly disabled @endif></textarea>
     @else
-        <input type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}
-            @if ($required) required @endif @if ($disabled) disabled @endif
+        <input class={{ $class }} type={{ $type }} id={{ $id }}
+            wire:model.defer={{ $id }} @if ($required) required @endif
+            @if ($disabled) disabled @endif
             @if ($readonly) readOnly disabled @endif />
     @endif
 
