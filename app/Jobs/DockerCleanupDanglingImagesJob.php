@@ -31,7 +31,7 @@ class DockerCleanupDanglingImagesJob implements ShouldQueue
         try {
             $servers = Server::all();
             foreach ($servers as $server) {
-                instantRemoteProcess($server, ['docker image prune -f']);
+                instantRemoteProcess(['docker image prune -f'], $server);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());

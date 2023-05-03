@@ -120,7 +120,7 @@ if (!function_exists('formatDockerLabelsToJson')) {
     }
 }
 if (!function_exists('instantRemoteProcess')) {
-    function instantRemoteProcess(Server $server, array $command, $throwError = true)
+    function instantRemoteProcess(array $command, Server $server, $throwError = true)
     {
         $command_string = implode("\n", $command);
         $private_key_location = savePrivateKeyForServer($server);

@@ -73,7 +73,7 @@ class Deploy extends Component
     }
     public function stop()
     {
-        instantRemoteProcess($this->destination->server, ["docker rm -f {$this->application->uuid}"]);
+        instantRemoteProcess(["docker rm -f {$this->application->uuid}"], $this->destination->server);
         if ($this->application->status != 'exited') {
             $this->application->status = 'exited';
             $this->application->save();
