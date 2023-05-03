@@ -1,16 +1,16 @@
 <?php
 
-namespace App\Actions\RemoteProcess;
+namespace App\Actions\CoolifyTask;
 
-use App\Data\RemoteProcessArgs;
-use App\Jobs\ExecuteRemoteProcess;
+use App\Data\CoolifyTaskArgs;
+use App\Jobs\HandleCoolifyTaskInQueue;
 use Spatie\Activitylog\Models\Activity;
 
-class DispatchRemoteProcess
+class PrepareCoolifyTask
 {
     protected Activity $activity;
 
-    public function __construct(RemoteProcessArgs $remoteProcessArgs)
+    public function __construct(CoolifyTaskArgs $remoteProcessArgs)
     {
         if ($remoteProcessArgs->model) {
             $properties = $remoteProcessArgs->toArray();
@@ -31,7 +31,7 @@ class DispatchRemoteProcess
 
     public function __invoke(): Activity
     {
-        $job = new ExecuteRemoteProcess($this->activity);
+        $job = new HandleCoolifyTaskInQueue($this->activity);
         dispatch($job);
         $this->activity->refresh();
         return $this->activity;

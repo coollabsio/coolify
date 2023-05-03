@@ -21,5 +21,8 @@ yarn-error.log
 /.bash_history
 /_volumes
 
+resources/recipes
+
 .lesshst
 psysh_history
+.psql_history

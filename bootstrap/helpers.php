@@ -1,8 +1,7 @@
 <?php
 
-use App\Actions\RemoteProcess\DispatchRemoteProcess;
-use App\Data\RemoteProcessArgs;
-use App\Enums\ActivityTypes;
+use App\Actions\CoolifyTask\PrepareCoolifyTask;
+use App\Data\CoolifyTaskArgs;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -19,10 +18,10 @@ if (!function_exists('remoteProcess')) {
      *
      */
     function remoteProcess(
-        array           $command,
-        Server          $server,
-        ?string         $deployment_uuid = null,
-        ?Model          $model = null,
+        array   $command,
+        Server  $server,
+        ?string $type_uuid = null,
+        ?Model  $model = null,
     ): Activity {
 
         $command_string = implode("\n", $command);
@@ -32,17 +31,17 @@ if (!function_exists('remoteProcess')) {
 
         $private_key_location = savePrivateKeyForServer($server);
 
-        return resolve(DispatchRemoteProcess::class, [
-            'remoteProcessArgs' => new RemoteProcessArgs(
+        return resolve(PrepareCoolifyTask::class, [
+            'remoteProcessArgs' => new CoolifyTaskArgs(
                 server_ip: $server->ip,
                 private_key_location: $private_key_location,
-                deployment_uuid: $deployment_uuid,
                 command: <<<EOT
                 {$command_string}
                 EOT,
                 port: $server->port,
                 user: $server->user,
-                type: $deployment_uuid ? ActivityTypes::DEPLOYMENT->value : ActivityTypes::REMOTE_PROCESS->value,
+                type: $type_uuid,
+                type_uuid: $type_uuid,
                 model: $model,
             ),
         ])();
@@ -119,8 +118,8 @@ if (!function_exists('formatDockerLabelsToJson')) {
             })[0];
     }
 }
-if (!function_exists('runRemoteCommandSync')) {
-    function runRemoteCommandSync(Server $server, array $command, $throwError = true)
+if (!function_exists('instantRemoteProcess')) {
+    function instantRemoteProcess(Server $server, array $command, $throwError = true)
     {
         $command_string = implode("\n", $command);
         $private_key_location = savePrivateKeyForServer($server);
