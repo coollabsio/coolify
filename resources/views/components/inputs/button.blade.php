@@ -2,15 +2,16 @@
     'isWarning' => null,
     'defaultClass' => 'text-white bg-neutral-800 hover:bg-violet-600',
     'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600',
+    'loadingClass' => 'text-black bg-green-500',
     'confirm' => null,
     'confirmAction' => null,
 ])
 <button {{ $attributes }} @class([
     $defaultClass => !$confirm && !$isWarning,
     $defaultWarningClass => $confirm || $isWarning,
-]) @if ($attributes->whereStartsWith('wire:click'))
-    wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
-    wire:loading.delay.class="text-black bg-green-500" wire:loading.delay.attr="disabled"
+]) @if ($attributes->has('wire:click'))
+    wire:target="{{ explode('(', $attributes->whereStartsWith('wire:click')->first())[0] }}"
+    wire:loading.delay.class="{{ $loadingClass }}" wire:loading.delay.attr="disabled"
     wire:loading.delay.class.remove="{{ $defaultClass }} {{ $attributes->whereStartsWith('class')->first() }}"
     @endif
     @isset($confirm)
