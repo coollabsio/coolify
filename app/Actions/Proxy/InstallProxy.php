@@ -19,12 +19,14 @@ class InstallProxy
         );
 
         $activity = remoteProcess([
-            'mkdir -p proxy',
-            'mkdir -p proxy/letsencrypt',
-            'cd proxy',
+            'mkdir -p projects',
+            'mkdir -p projects/proxy',
+            'mkdir -p projects/proxy/letsencrypt',
+            'cd projects/proxy',
             "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
             "echo '$env_file_base64' | base64 -d > .env",
-            'cat .env',
+            'docker compose up -d --remove-orphans',
+            'docker ps',
         ], $server, ActivityTypes::INLINE->value);
 
         return $activity;
@@ -40,6 +42,12 @@ class InstallProxy
      */
     protected function getComposeData(): array
     {
+        $cwd = config('app.env') === 'local'
+            ? config('coolify.project_path_on_host') . '_testing_hosts/host_2_proxy'
+            : '.';
+
+        ray($cwd);
+
         return [
             "version" => "3.7",
             "networks" => [
@@ -64,8 +72,8 @@ class InstallProxy
                     ],
                     "volumes" => [
                         "/var/run/docker.sock:/var/run/docker.sock:ro",
-                        "./letsencrypt:/letsencrypt",
-                        "./traefik.auth:/auth/traefik.auth",
+                        "{$cwd}/letsencrypt:/letsencrypt",
+                        "{$cwd}/traefik.auth:/auth/traefik.auth",
                     ],
                     "command" => [
                         "--api.dashboard=true",
