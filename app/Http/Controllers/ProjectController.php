@@ -62,7 +62,10 @@ class ProjectController extends Controller
         if (!$application) {
             return redirect()->route('home');
         }
-        $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
+        $activity = Activity::query()
+            ->where('properties->type', '=', 'deployment')
+            ->where('properties->uuid', '=', $deployment_uuid)
+            ->first();
 
         return view('project.deployment', [
             'activity' => $activity,

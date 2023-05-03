@@ -2,8 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Actions\RemoteProcess\RunRemoteProcess;
-use App\Data\RemoteProcessArgs;
+use App\Actions\CoolifyTask\RunRemoteProcess;
+use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\CoolifyInstanceSettings;
@@ -53,14 +53,14 @@ class DeployApplicationJob implements ShouldQueue
 
         $private_key_location = savePrivateKeyForServer($server);
 
-        $remoteProcessArgs = new RemoteProcessArgs(
+        $remoteProcessArgs = new CoolifyTaskArgs(
             server_ip: $server->ip,
             private_key_location: $private_key_location,
-            deployment_uuid: $this->deployment_uuid,
             command: 'overwritten-later',
             port: $server->port,
             user: $server->user,
             type: ActivityTypes::DEPLOYMENT->value,
+            type_uuid: $this->deployment_uuid,
         );
 
         $this->activity = activity()
