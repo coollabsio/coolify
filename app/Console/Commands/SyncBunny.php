@@ -37,6 +37,7 @@ class SyncBunny extends Command
         $compose_file = "docker-compose.yml";
         $compose_file_prod = "docker-compose.prod.yml";
         $upgrade_script = "upgrade.sh";
+        $docker_install_script = "install-docker.sh";
         $production_env = ".env.production";
 
         PendingRequest::macro('storage', function ($file) {
@@ -53,8 +54,9 @@ class SyncBunny extends Command
             Http::pool(fn (Pool $pool) => [
                 $pool->storage(file: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
                 $pool->storage(file: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
-                $pool->storage(file: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
                 $pool->storage(file: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
+                $pool->storage(file: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
+                $pool->storage(file: "$parent_dir/scripts/$docker_install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$docker_install_script"),
             ]);
 
             $res = Http::withHeaders([
@@ -64,13 +66,15 @@ class SyncBunny extends Command
                 "url" => "$bunny_cdn/$bunny_cdn_path/$compose_file",
                 "url" => "$bunny_cdn/$bunny_cdn_path/$compose_file_prod",
                 "url" => "$bunny_cdn/$bunny_cdn_path/$upgrade_script",
-                "url" => "$bunny_cdn/$bunny_cdn_path/$production_env"
+                "url" => "$bunny_cdn/$bunny_cdn_path/$production_env",
+                "url" => "$bunny_cdn/$bunny_cdn_path/$docker_install_script"
             ]);
             if ($res->ok()) {
                 echo "All files uploaded & purged...\n";
+                return;
             }
+            throw new \Exception("Something went wrong.");
         } catch (\Exception $e) {
-            echo "Something went wrong.\n";
             echo $e->getMessage();
         }
     }
