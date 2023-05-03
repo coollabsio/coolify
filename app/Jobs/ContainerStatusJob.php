@@ -38,7 +38,7 @@ class ContainerStatusJob implements ShouldQueue
         $not_found_applications = $applications;
         $containers = collect();
         foreach ($servers as $server) {
-            $output = runRemoteCommandSync($server, ['docker ps -a -q --format \'{{json .}}\'']);
+            $output = instantRemoteProcess($server, ['docker ps -a -q --format \'{{json .}}\'']);
             $containers = $containers->concat(formatDockerCmdOutputToJson($output));
         }
         foreach ($containers as $container) {
@@ -67,7 +67,7 @@ class ContainerStatusJob implements ShouldQueue
             return;
         }
         if ($application->destination->server) {
-            $container = runRemoteCommandSync($application->destination->server, ["docker inspect --format '{{json .State}}' {$this->container_id}"]);
+            $container = instantRemoteProcess($application->destination->server, ["docker inspect --format '{{json .State}}' {$this->container_id}"]);
             $container = formatDockerCmdOutputToJson($container);
             $application->status = $container[0]['Status'];
             $application->save();

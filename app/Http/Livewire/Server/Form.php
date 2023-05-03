@@ -28,15 +28,15 @@ class Form extends Component
     public function installDocker()
     {
         $config = base64_encode('{ "live-restore": true }');
-        runRemoteCommandSync($this->server, [
+        instantRemoteProcess($this->server, [
             "curl https://releases.rancher.com/install-docker/23.0.sh | sh"
         ]);
     }
     public function checkServer()
     {
-        $this->uptime = runRemoteCommandSync($this->server, ['uptime']);
-        $this->dockerVersion = runRemoteCommandSync($this->server, ['docker version|head -2|grep -i version'], false);
-        $this->dockerComposeVersion = runRemoteCommandSync($this->server, ['docker compose version|head -2|grep -i version'], false);
+        $this->uptime = instantRemoteProcess($this->server, ['uptime']);
+        $this->dockerVersion = instantRemoteProcess($this->server, ['docker version|head -2|grep -i version'], false);
+        $this->dockerComposeVersion = instantRemoteProcess($this->server, ['docker compose version|head -2|grep -i version'], false);
     }
     public function submit()
     {

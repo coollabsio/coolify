@@ -1,6 +1,6 @@
 <?php
 
-use App\Actions\RemoteProcess\RunRemoteProcess;
+use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Models\Server;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;

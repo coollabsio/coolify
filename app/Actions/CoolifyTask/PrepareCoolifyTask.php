@@ -1,16 +1,21 @@
 <?php
 
-namespace App\Actions\RemoteProcess;
+namespace App\Actions\CoolifyTask;
 
-use App\Data\RemoteProcessArgs;
-use App\Jobs\ExecuteRemoteProcess;
+use App\Data\CoolifyTaskArgs;
+use App\Jobs\CoolifyTask;
 use Spatie\Activitylog\Models\Activity;
 
-class DispatchRemoteProcess
+/**
+ * The initial step to run a `CoolifyTask`: a remote SSH process
+ * with monitoring/tracking/trace feature. Such thing is made
+ * possible using an Activity model and some attributes.
+ */
+class PrepareCoolifyTask
 {
     protected Activity $activity;
 
-    public function __construct(RemoteProcessArgs $remoteProcessArgs)
+    public function __construct(CoolifyTaskArgs $remoteProcessArgs)
     {
         if ($remoteProcessArgs->model) {
             $properties = $remoteProcessArgs->toArray();
@@ -31,7 +36,7 @@ class DispatchRemoteProcess
 
     public function __invoke(): Activity
     {
-        $job = new ExecuteRemoteProcess($this->activity);
+        $job = new CoolifyTask($this->activity);
         dispatch($job);
         $this->activity->refresh();
         return $this->activity;

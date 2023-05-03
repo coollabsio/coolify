@@ -1,7 +1,7 @@
 <?php
 
-use App\Actions\RemoteProcess\RunRemoteProcess;
-use App\Actions\RemoteProcess\TidyOutput;
+use App\Actions\CoolifyTask\RunRemoteProcess;
+use App\Actions\CoolifyTask\TidyOutput;
 use App\Models\User;
 use App\Models\Server;
 use Database\Seeders\DatabaseSeeder;

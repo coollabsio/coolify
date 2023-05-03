@@ -45,7 +45,7 @@ class StandaloneDocker extends Component
 
         $server = Server::find($this->server_id);
 
-        runRemoteCommandSync($server, ['docker network create --attachable ' . $this->network], throwError: false);
+        instantRemoteProcess($server, ['docker network create --attachable ' . $this->network], throwError: false);
         return redirect()->route('destination.show', $docker->uuid);
     }
 }

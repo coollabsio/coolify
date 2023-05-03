@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Jobs\CoolifyTask;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
@@ -31,7 +32,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Queue::after(function (JobProcessed $event) {
              // @TODO: Remove `coolify-builder` container after the remoteProcess job is finishged and remoteProcess->type == `deployment`.
-            if ($event->job->resolveName() === 'App\Jobs\ExecuteRemoteProcess') {
+            if ($event->job->resolveName() === CoolifyTask::class) {
 
             }
         });

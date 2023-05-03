@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -31,19 +32,19 @@ class RunCommand extends Component
     public function runCommand()
     {
         $this->isKeepAliveOn = true;
-        $this->activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first());
+        $this->activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
     }
 
     public function runSleepingBeauty()
     {
         $this->isKeepAliveOn = true;
-        $this->activity = remoteProcess(['x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done'], Server::where('uuid', $this->server)->first());
+        $this->activity = remoteProcess(['x=1; while  [ $x -le 40 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done'], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
     }
 
     public function runDummyProjectBuild()
     {
         $this->isKeepAliveOn = true;
-        $this->activity = remoteProcess([' cd projects/dummy-project', 'docker-compose build --no-cache'], Server::where('uuid', $this->server)->first());
+        $this->activity = remoteProcess([' cd projects/dummy-project', 'docker-compose build --no-cache'], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
     }
 
     public function polling()

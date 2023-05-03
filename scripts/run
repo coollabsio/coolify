@@ -48,6 +48,12 @@ function vite {
 function build-builder {
     act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
 }
+function tinker {
+    bash vendor/bin/spin exec -u webuser coolify php artisan tinker
+}
+function db {
+    bash vendor/bin/spin exec -u webuser coolify php artisan db
+}
 function default {
     help
 }
