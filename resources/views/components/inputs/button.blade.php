@@ -1,14 +1,23 @@
 @props([
-    'class' => null,
-    'defaultClass' => 'text-white bg-violet-500 hover:bg-violet-600',
+    'isWarning' => null,
+    'defaultClass' => 'text-white bg-neutral-800 hover:bg-violet-600',
+    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600',
     'confirm' => null,
     'confirmAction' => null,
 ])
-
-<button {{ $attributes }} {{ $attributes->merge(['class' => "$defaultClass $class"]) }}
-    @if ($attributes->whereStartsWith('wire:click')) wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
-    wire:loading.class="text-black bg-green-500" wire:loading.attr="disabled" wire:loading.class.remove="{{ $defaultClass }} {{ $attributes->whereStartsWith('class')->first() }}" @endif
-    @isset($confirm) x-on:click="toggleConfirmModal('{{ $confirm }}')" @endisset
-    @isset($confirmAction) @confirm.window="$wire.{{ $confirmAction }}()" @endisset>
+<button {{ $attributes }} @class([
+    $defaultClass => !$confirm && !$isWarning,
+    $defaultWarningClass => $confirm || $isWarning,
+]) @if ($attributes->whereStartsWith('wire:click'))
+    wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}"
+    wire:loading.delay.class="text-black bg-green-500" wire:loading.delay.attr="disabled"
+    wire:loading.delay.class.remove="{{ $defaultClass }} {{ $attributes->whereStartsWith('class')->first() }}"
+    @endif
+    @isset($confirm)
+        x-on:click="toggleConfirmModal('{{ $confirm }}')"
+    @endisset
+    @isset($confirmAction)
+        @confirm.window="$wire.{{ $confirmAction }}()"
+    @endisset>
     {{ $slot }}
 </button>

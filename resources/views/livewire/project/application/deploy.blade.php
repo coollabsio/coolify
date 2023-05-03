@@ -8,8 +8,7 @@
         <x-inputs.button wire:click='start'>Start</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Start (no cache)</x-inputs.button>
     @endif
-    <x-inputs.button class="bg-red-500" confirmAction="delete"
-        confirm='Are you sure you would like to delete this application?'>
+    <x-inputs.button confirmAction="delete" confirm='Are you sure you would like to delete this application?'>
         Delete</x-inputs.button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')
@@ -24,7 +23,7 @@
                             {{ explode(':', $port)[0] }}</a>
                     @else
                         <a target="_blank"
-                            href="http://{{ $application->destination->server->ip }}:{{ $port }}">Open
+                            href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Open
                             {{ $port }}</a>
                     @endif
                 @endforeach

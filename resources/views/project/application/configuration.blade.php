@@ -3,16 +3,16 @@
     <x-applications.navbar :applicationId="$application->id" />
     <div x-data="{ activeTab: 'general' }">
         <div class="flex gap-4">
-            <a :class="activeTab === 'general' && 'text-green-500'" @click.prevent="activeTab = 'general'"
+            <a :class="activeTab === 'general' && 'text-purple-500'" @click.prevent="activeTab = 'general'"
                 href="#">General</a>
-            <a :class="activeTab === 'envs' && 'text-green-500'" @click.prevent="activeTab = 'envs'"
+            <a :class="activeTab === 'envs' && 'text-purple-500'" @click.prevent="activeTab = 'envs'"
                 href="#">Environment Variables</a>
-            <a :class="activeTab === 'source' && 'text-green-500'" @click.prevent="activeTab = 'source'"
+            <a :class="activeTab === 'source' && 'text-purple-500'" @click.prevent="activeTab = 'source'"
                 href="#">Source</a>
-            <a :class="activeTab === 'destination' && 'text-green-500'" @click.prevent="activeTab = 'destination'"
+            <a :class="activeTab === 'destination' && 'text-purple-500'" @click.prevent="activeTab = 'destination'"
                 href="#">Destination
             </a>
-            <a :class="activeTab === 'storages' && 'text-green-500'" @click.prevent="activeTab = 'storages'"
+            <a :class="activeTab === 'storages' && 'text-purple-500'" @click.prevent="activeTab = 'storages'"
                 href="#">Storage
             </a>
         </div>
