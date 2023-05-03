@@ -21,7 +21,7 @@ class ForceUpgrade extends Component
             ]);
             remoteProcess([
                 "sleep 10"
-            ], $server, ActivityTypes::INSTANT->value);
+            ], $server, ActivityTypes::INLINE->value);
             $this->emit('updateInitiated');
         } else {
             $latestVersion = getLatestVersionOfCoolify();
@@ -44,7 +44,7 @@ class ForceUpgrade extends Component
 
             remoteProcess([
                 "bash /data/coolify/source/upgrade.sh $latestVersion"
-            ], $server, ActivityTypes::INSTANT->value);
+            ], $server, ActivityTypes::INLINE->value);
 
             $this->emit('updateInitiated');
         }

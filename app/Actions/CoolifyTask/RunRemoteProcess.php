@@ -36,7 +36,7 @@ class RunRemoteProcess
     public function __construct(Activity $activity, bool $hideFromOutput = false, bool $isFinished = false, bool $ignoreErrors = false)
     {
 
-        if ($activity->getExtraProperty('type') !== ActivityTypes::INSTANT->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
+        if ($activity->getExtraProperty('type') !== ActivityTypes::INLINE->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
             throw new \RuntimeException('Incompatible Activity to run a remote command.');
         }
 

@@ -4,6 +4,6 @@ namespace App\Enums;
 
 enum ActivityTypes: string
 {
-    case INSTANT = 'instant';
+    case INLINE = 'inline';
     case DEPLOYMENT = 'deployment';
 }
