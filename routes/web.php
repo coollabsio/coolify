@@ -8,6 +8,7 @@ use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Http\Controllers\ServerController;
+use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -92,13 +93,9 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/destination/new', function () {
-        $query_params = request()->query();
-        $server_id = 1;
-        if (isset($query_params['server_id'])) {
-            $server_id = $query_params['server_id'];
-        }
+        $servers = Server::where('team_id', session('currentTeam')->id)->get();
         return view('destination.new', [
-            'server_id' => $server_id,
+            "servers" => $servers,
         ]);
     })->name('destination.new');
     Route::get('/destination/{destination_uuid}', function () {
@@ -109,7 +106,7 @@ Route::middleware(['auth'])->group(function () {
         }
         $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
         return view('destination.show', [
-            'destination_uuid' => $destination->uuid,
+            'destination' => $destination->load(['server']),
         ]);
     })->name('destination.show');
 });
