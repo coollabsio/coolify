@@ -359,6 +359,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
         if ($this->application->fqdn) {
+            $labels[] = 'traefik.enable=true';
             $labels[] = "traefik.http.routers.container.rule=Host(`{$this->application->fqdn}`)";
         }
         return $labels;
