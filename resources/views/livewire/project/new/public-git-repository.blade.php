@@ -61,7 +61,7 @@
             @if ($is_static)
                 <x-inputs.input id="publish_directory" label="Publish Directory" />
             @else
-                <x-inputs.input type="number" id="port" label="Port" :disabled="$is_static" />
+                <x-inputs.input type="number" id="port" label="Port" :readonly="$is_static" />
             @endif
             <x-inputs.button type="submit">
                 Submit

@@ -8,9 +8,13 @@ body {
 a, a:visited {
     @apply text-neutral-300 hover:text-purple-500;
 }
-input, select, textarea {
-    @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600;
+input, textarea {
+    @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none
 }
+select {
+    @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600  read-only:select-none
+}
+
 button {
     @apply border-none px-2 p-1 cursor-pointer;
 }

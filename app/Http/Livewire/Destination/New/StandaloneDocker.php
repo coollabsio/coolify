@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Destination\New;
 use App\Models\Server;
 use App\Models\StandaloneDocker as ModelsStandaloneDocker;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class StandaloneDocker extends Component
 {
@@ -12,7 +13,7 @@ class StandaloneDocker extends Component
     public string $network;
 
     public $servers;
-    public int|null $server_id = null;
+    public int $server_id;
 
     protected $rules = [
         'name' => 'required|string',
@@ -21,13 +22,11 @@ class StandaloneDocker extends Component
     ];
     public function mount()
     {
-        $this->name = generateRandomName();
         $this->servers = Server::where('team_id', session('currentTeam')->id)->get();
+        $this->network = new Cuid2(7);
+        $this->name = generateRandomName();
     }
-    public function setServerId($server_id)
-    {
-        $this->server_id = $server_id;
-    }
+
     public function submit()
     {
         $this->validate();

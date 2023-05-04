@@ -2,7 +2,6 @@
     'id' => null,
     'type' => 'text',
     'required' => false,
-    'readonly' => false,
     'label' => null,
     'instantSave' => false,
     'disabled' => false,

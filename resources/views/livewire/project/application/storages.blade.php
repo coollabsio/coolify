@@ -5,6 +5,6 @@
         <p>HostPath:{{ data_get($storage, 'host_path') }}</p>
         <p>ContainerId:{{ data_get($storage, 'container_id') }}</p>
     @empty
-        <p>No storage found.</p>
+        <p>There are no storages added for this application.</p>
     @endforelse
 </div>

@@ -93,7 +93,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/destination/new', function () {
         $query_params = request()->query();
-        $server_id = null;
+        $server_id = 1;
         if (isset($query_params['server_id'])) {
             $server_id = $query_params['server_id'];
         }
@@ -109,7 +109,7 @@ Route::middleware(['auth'])->group(function () {
         }
         $destination = $standalone_dockers ? $standalone_dockers : $swarm_dockers;
         return view('destination.show', [
-            'destination' => $destination,
+            'destination_uuid' => $destination->uuid,
         ]);
     })->name('destination.show');
 });

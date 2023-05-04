@@ -15,18 +15,16 @@
                 @endif
             </div>
             <div class="flex flex-col w-96">
-
                 <x-inputs.input id="application.base_directory" label="Base Directory" />
                 @if ($application->settings->is_static)
                     <x-inputs.input id="application.publish_directory" label="Publish Directory" required />
                 @else
                     <x-inputs.input id="application.publish_directory" label="Publish Directory" />
                 @endif
-
             </div>
             <div class="flex flex-col w-96">
                 @if ($application->settings->is_static)
-                    <x-inputs.input id="application.ports_exposes" label="Ports Exposes" disabled />
+                    <x-inputs.input id="application.ports_exposes" label="Ports Exposes" readonly />
                 @else
                     <x-inputs.input id="application.ports_exposes" label="Ports Exposes" required />
                 @endif
@@ -34,7 +32,7 @@
                 <x-inputs.input id="application.ports_mappings" label="Ports Mappings" />
             </div>
         </div>
-        <x-inputs.button class="flex mx-auto mt-4" type="submit">
+        <x-inputs.button class="mx-auto mt-4 text-white bg-neutral-800 hover:bg-violet-600" type="submit">
             Submit
         </x-inputs.button>
     </form>
