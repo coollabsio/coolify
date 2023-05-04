@@ -20,8 +20,9 @@
         <div>
             <x-inputs.button type="submit">Submit</x-inputs.button>
             <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
-            <x-inputs.button class="bg-red-500" confirm="Are you sure you would like to delete this application?"
-                confirmAction="delete">Delete
+            <x-inputs.button wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
+            <x-inputs.button confirm="Are you sure you would like to delete this application?" confirmAction="delete">
+                Delete
             </x-inputs.button>
         </div>
     </form>
@@ -34,5 +35,4 @@
     @isset($dockerComposeVersion)
         <p>Docker Compose: {{ $dockerComposeVersion }}</p>
     @endisset
-
 </div>

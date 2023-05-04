@@ -3,6 +3,8 @@
 namespace App\Http\Livewire\PrivateKey;
 
 use App\Models\PrivateKey;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class Create extends Component
@@ -10,6 +12,12 @@ class Create extends Component
     public $private_key_value;
     public $private_key_name;
     public $private_key_description;
+    public string $currentRoute;
+
+    public function mount()
+    {
+        $this->currentRoute = Route::current()->uri();
+    }
     public function createPrivateKey()
     {
         $this->private_key_value = trim($this->private_key_value);
@@ -23,6 +31,8 @@ class Create extends Component
             'team_id' => session('currentTeam')->id
         ]);
         session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
-        redirect()->route('private-key.show', $new_private_key->uuid);
+        if ($this->currentRoute !== 'server/new') {
+            redirect()->route('private-key.show', $new_private_key->uuid);
+        }
     }
 }

@@ -2,9 +2,8 @@
 
 namespace App\Http\Livewire\Server;
 
-use App\Enums\ActivityTypes;
+use App\Actions\Server\InstallDocker;
 use App\Models\Server;
-use Illuminate\Support\Facades\Validator;
 use Livewire\Component;
 
 class Form extends Component
@@ -28,12 +27,9 @@ class Form extends Component
     }
     public function installDocker()
     {
-        $config = base64_encode('{ "live-restore": true }');
-        remoteProcess([
-            "curl https://releases.rancher.com/install-docker/23.0.sh | sh",
-            "echo '{$config}' | base64 -d > /etc/docker/daemon.json",
-            "systemctl restart docker"
-        ], $this->server, ActivityTypes::INLINE->value);
+        $activity = resolve(InstallDocker::class)($this->server);
+
+        $this->emit('newMonitorActivity', $activity->id);
     }
     public function checkServer()
     {

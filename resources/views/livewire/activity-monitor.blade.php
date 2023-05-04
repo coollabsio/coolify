@@ -1,4 +1,4 @@
-<div class="mt-8">
+<div>
     @isset($this->activity)
         <span>Activity: {{ $this->activity?->id }}</span>
         <span>Status: {{ $this->activity?->properties->get('status') }}</span>

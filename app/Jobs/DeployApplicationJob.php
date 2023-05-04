@@ -37,7 +37,7 @@ class DeployApplicationJob implements ShouldQueue
     protected string $workdir;
     protected string $docker_compose;
     public static int $batch_counter = 0;
-
+    public $timeout = 3600;
     /**
      * Create a new job instance.
      */
