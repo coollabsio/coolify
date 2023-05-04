@@ -19,9 +19,9 @@ class Change extends Component
     {
         $this->private_key = PrivateKey::where('uuid', $this->private_key_uuid)->first();
     }
-    public function delete($private_key_uuid)
+    public function delete()
     {
-        PrivateKey::where('uuid', $private_key_uuid)->delete();
+        PrivateKey::where('uuid', $this->private_key_uuid)->delete();
         session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
         redirect()->route('dashboard');
     }

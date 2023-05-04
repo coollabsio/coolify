@@ -9,8 +9,7 @@
             <x-inputs.button>
                 Submit
             </x-inputs.button>
-            <x-inputs.button confirm='Are you sure you would like to delete this private key?'
-                confirmAction="delete('{{ $destination->id }}')">
+            <x-inputs.button confirm='Are you sure you would like to delete this private key?' confirmAction="delete">
                 Delete
             </x-inputs.button>
         </div>

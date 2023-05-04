@@ -23,21 +23,26 @@ class Server extends BaseModel
         'team_id',
         'private_key_id',
     ];
+
+    public $casts = [
+        'extra_attributes' => SchemalessAttributes::class,
+    ];
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
     }
+
     public function swarmDockers()
     {
         return $this->hasMany(SwarmDocker::class);
     }
-    public $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
-    ];
+
     public function scopeWithExtraAttributes(): Builder
     {
         return $this->extra_attributes->modelScope();
     }
+
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);

@@ -2,11 +2,17 @@
     document.addEventListener('alpine:init', () => {
         Alpine.data('confirmModal', () => ({
             open: false,
+            confirmAction: null,
             message: 'Are you sure?',
-            toggleConfirmModal(customMessage) {
+            toggleConfirmModal(customMessage, confirmAction) {
+                this.confirmAction = confirmAction
                 this.message = customMessage
                 this.open = !this.open
             },
+            confirmed() {
+                this.open = false
+                this.$dispatch(this.confirmAction)
+            }
         }))
     })
 </script>
@@ -16,7 +22,7 @@
         <div class="flex flex-col items-center justify-center h-full">
             <div class="pb-5 text-white" x-text="message"></div>
             <div>
-                <x-inputs.button isWarning x-on:click="$dispatch('confirm')">Confirm</x-inputs.button>
+                <x-inputs.button isWarning x-on:click='confirmed()'>Confirm</x-inputs.button>
                 <x-inputs.button x-on:click="open = false">Cancel</x-inputs.button>
             </div>
         </div>

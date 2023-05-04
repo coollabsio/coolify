@@ -15,10 +15,10 @@
     wire:loading.delay.class.remove="{{ $defaultClass }} {{ $attributes->whereStartsWith('class')->first() }}"
     @endif
     @isset($confirm)
-        x-on:click="toggleConfirmModal('{{ $confirm }}')"
+        x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"
     @endisset
     @isset($confirmAction)
-        @confirm.window="$wire.{{ $confirmAction }}()"
+        x-on:{{ explode('(', $confirmAction)[0] }}.window="$wire.{{ explode('(', $confirmAction)[0] }}"
     @endisset>
     {{ $slot }}
 </button>

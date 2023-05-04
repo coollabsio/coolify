@@ -73,6 +73,9 @@
                 console.log('Update initiated. Waiting for server to be dead...')
                 checkIfIamDead();
             })
+            Livewire.on('reloadWindow', () => {
+                window.location.reload();
+            })
         </script>
     @endauth
 </body>

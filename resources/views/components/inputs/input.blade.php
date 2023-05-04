@@ -27,7 +27,7 @@
         <textarea {{ $attributes }} type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}></textarea>
     @else
         <input {{ $attributes }} type={{ $type }} id={{ $id }}
-            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $id }} @endif />
+            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     @endif
 
     @error($id)
