@@ -26,7 +26,8 @@
     @if ($type === 'textarea')
         <textarea {{ $attributes }} type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}></textarea>
     @else
-        <input {{ $attributes }} type={{ $type }} id={{ $id }}
+        <input wire:dirty.class="text-black bg-amber-300" {{ $attributes }} type={{ $type }}
+            id={{ $id }}
             @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     @endif
 

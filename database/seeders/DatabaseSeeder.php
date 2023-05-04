@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Environment;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -27,6 +28,7 @@ class DatabaseSeeder extends Seeder
             ApplicationSettingsSeeder::class,
             DBSeeder::class,
             ServiceSeeder::class,
+            EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
         ]);
     }

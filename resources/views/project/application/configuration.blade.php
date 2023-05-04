@@ -25,12 +25,13 @@
         </div>
         <div x-cloak x-show="activeTab === 'environment-variables'" class="flex flex-col gap-2">
             <h3>Environment Variables</h3>
-            @forelse ($application->environment_variables->all() as $keyName => $env)
-                <livewire:project.application.environment-variable :keyName="$keyName" :env="$env" />
+            @forelse ($application->environment_variables as $env)
+                <livewire:project.application.environment-variable.show :env="$env" />
             @empty
                 <p>There are no environment variables for this application.</p>
             @endforelse
-            <livewire:project.application.environment-variable />
+            <h4>Add new environment variable</h4>
+            <livewire:project.application.environment-variable.add />
         </div>
         <div x-cloak x-show="activeTab === 'source'">
             <h3>Source</h3>

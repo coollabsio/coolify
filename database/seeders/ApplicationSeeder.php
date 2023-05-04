@@ -35,16 +35,6 @@ class ApplicationSeeder extends Seeder
             'destination_type' => StandaloneDocker::class,
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class,
-            'environment_variables' => [
-                'NODE_ENV' => [
-                    'value' => 'production',
-                    'isBuildOnly' => true,
-                ],
-                'PORT' =>  [
-                    'value' => 3000,
-                    'isBuildOnly' => false,
-                ]
-            ]
         ]);
     }
 }

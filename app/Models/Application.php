@@ -4,8 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Models\Activity;
-use Illuminate\Database\Eloquent\Builder;
-use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Application extends BaseModel
 {
@@ -38,14 +37,6 @@ class Application extends BaseModel
         'ports_exposes',
         'publish_directory',
     ];
-    public $casts = [
-        'environment_variables' => SchemalessAttributes::class,
-    ];
-    public function scopeWithEnvironmentVariables(): Builder
-    {
-        return $this->environment_variables->modelScope();
-    }
-
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
@@ -82,6 +73,10 @@ class Application extends BaseModel
                 ? []
                 : explode(',', $this->ports_exposes)
         );
+    }
+    public function environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class);
     }
     public function environment()
     {
