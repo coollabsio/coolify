@@ -9,9 +9,15 @@
                 <x-inputs.input id="application.install_command" label="Install Command" />
                 <x-inputs.input id="application.build_command" label="Build Command" />
                 <x-inputs.input id="application.start_command" label="Start Command" />
-                <x-inputs.input id="application.build_pack" label="Build Pack" />
+                <x-inputs.select id="application.build_pack" label="Build Pack" required>
+                    <option value="nixpacks">Nixpacks</option>
+                    <option value="docker">Docker</option>
+                </x-inputs.select>
                 @if ($application->settings->is_static)
-                    <x-inputs.input id="application.static_image" label="Static Image" required />
+                    <x-inputs.select id="application.static_image" label="Static Image" required>
+                        <option value="nginx:alpine">nginx:alpine</option>
+                        <option value="apache:alpine">apache:alpine</option>
+                    </x-inputs.select>
                 @endif
             </div>
             <div class="flex flex-col w-96">
