@@ -43,7 +43,7 @@ class InstallProxy
     protected function getComposeData(): array
     {
         $cwd = config('app.env') === 'local'
-            ? config('coolify.project_path_on_host') . '/_testing_hosts/host_2_proxy'
+            ? config('proxy.project_path_on_host') . '/_testing_hosts/host_2_proxy'
             : '.';
 
         ray($cwd);
