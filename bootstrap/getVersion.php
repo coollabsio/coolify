@@ -1,3 +1,4 @@
 <?php
-$version = include 'config/coolify.php';
-echo $version['version'];
+include 'vendor/autoload.php';
+$config = include 'config/coolify.php';
+echo $config['version'];
