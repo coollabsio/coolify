@@ -1,32 +1,19 @@
 @props([
     'id' => null,
+    'type' => 'text',
     'required' => false,
     'readonly' => false,
     'label' => null,
-    'type' => 'text',
-    'class' => '',
     'instantSave' => false,
     'disabled' => false,
     'hidden' => false,
 ])
 
-@if ($type === 'checkbox')
-    <label for={{ $id }}>
-        @if ($label)
-            {{ $label }}
-        @else
-            {{ $id }}
-        @endif
-        @if ($required)
-            *
-        @endif
-        <input type="checkbox" id={{ $id }}
-            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $id }} @endif>
-    </label>
-    @error($id)
-        <span class="text-red-500">{{ $message }}</span>
-    @enderror
-@else
+
+<span @class([
+    'flex justify-end' => $type === 'checkbox',
+    'flex flex-col' => $type !== 'checkbox',
+])>
     <label for={{ $id }}>
         @if ($label)
             {{ $label }}
@@ -38,17 +25,13 @@
         @endif
     </label>
     @if ($type === 'textarea')
-        <textarea class={{ $class }} type={{ $type }} id={{ $id }}
-            wire:model.defer={{ $id }} @if ($required) required @endif
-            @if ($disabled) disabled @endif @if ($readonly) readOnly disabled @endif></textarea>
+        <textarea {{ $attributes }} type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}></textarea>
     @else
-        <input class={{ $class }} type={{ $type }} id={{ $id }}
-            wire:model.defer={{ $id }} @if ($required) required @endif
-            @if ($disabled) disabled @endif
-            @if ($readonly) readOnly disabled @endif />
+        <input {{ $attributes }} type={{ $type }} id={{ $id }}
+            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $id }} @endif />
     @endif
 
     @error($id)
         <div class="text-red-500">{{ $message }}</div>
     @enderror
-@endif
+</span>

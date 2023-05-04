@@ -60,9 +60,9 @@ Route::middleware(['auth'])->group(function () {
         return view('update');
     })->name('update');
 
-    Route::get('/demo', function () {
-        return view('demo');
-    })->name('demo');
+    Route::get('/command-center', function () {
+        return view('command-center');
+    })->name('command-center');
 });
 
 Route::middleware(['auth'])->group(function () {

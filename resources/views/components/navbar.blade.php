@@ -2,9 +2,7 @@
     <div>v{{ config('coolify.version') }}</div>
     @auth
         <a href="/">Home</a>
-        @env('local')
-        <a href="/demo">Demo</a>
-        @endenv
+        <a href="/command-center">Command Center</a>
         <a href="/profile">Profile</a>
         @if (auth()->user()->isRoot())
             <a href="/settings">Settings</a>
