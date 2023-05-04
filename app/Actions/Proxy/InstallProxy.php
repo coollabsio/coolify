@@ -57,7 +57,8 @@ class InstallProxy
             ],
             "services" => [
                 "traefik" => [
-                    "image" => "traefik:v2.9",
+                    "container_name" => "coolify-proxy",
+                    "image" => "traefik:v2.10",
                     "restart" => "always",
                     "extra_hosts" => [
                         "host.docker.internal:host-gateway",
