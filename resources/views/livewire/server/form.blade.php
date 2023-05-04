@@ -1,4 +1,5 @@
-<div>
+<div x-data="{ deleteServer: false }">
+    <x-naked-modal show="deleteServer" message='Are you sure you would like to delete this server?' />
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
@@ -21,7 +22,7 @@
             <x-inputs.button type="submit">Submit</x-inputs.button>
             <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
             <x-inputs.button wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
-            <x-inputs.button confirm="Are you sure you would like to delete this application?" confirmAction="delete">
+            <x-inputs.button isWarning x-on:click="deleteServer = true">
                 Delete
             </x-inputs.button>
         </div>

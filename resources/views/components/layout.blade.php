@@ -20,7 +20,7 @@
     @livewireStyles
 </head>
 
-<body x-data="confirmModal">
+<body>
     @auth
         <x-navbar />
     @endauth
@@ -28,7 +28,6 @@
         {{ $slot }}
     </main>
 
-    <x-confirm-modal />
     @livewireScripts
     @auth
         <script>
