@@ -243,7 +243,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     {
         $environment_variables = collect();
 
-        foreach ($this->application->environment_variables as $env) {
+        foreach ($this->application->runtime_environment_variables as $env) {
             $environment_variables->push("$env->key=$env->value");
         }
         // Add PORT if not exists, use the first port as default
