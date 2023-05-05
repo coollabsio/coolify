@@ -35,8 +35,7 @@
             <livewire:project.application.destination :destination="$application->destination" />
         </div>
         <div x-cloak x-show="activeTab === 'storages'">
-            <h3>Persistent Storages</h3>
-            <livewire:project.application.storages :storages="$application->persistentStorages" />
+            <livewire:project.application.storages.all :application="$application" />
         </div>
     </div>
 </x-layout>

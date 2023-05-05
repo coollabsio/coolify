@@ -1,9 +1,9 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
+namespace App\Http\Livewire\Project\Application\Storages;
 
 use App\Models\Application;
-use App\Models\EnvironmentVariable;
+use App\Models\LocalPersistentVolume;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
@@ -11,14 +11,13 @@ use Livewire\Component;
 class Add extends Component
 {
     public $parameters;
-    public string $key;
-    public string $value;
-    public bool $is_build_time = false;
-
+    public string $name;
+    public string $mount_path;
+    public string|null $host_path = null;
     protected $rules = [
-        'key' => 'required|string',
-        'value' => 'required|string',
-        'is_build_time' => 'required|boolean',
+        'name' => 'required|string',
+        'mount_path' => 'required|string',
+        'host_path' => 'string|nullable',
     ];
     public function mount()
     {
@@ -29,15 +28,17 @@ class Add extends Component
         $this->validate();
         try {
             $application_id = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail()->id;
-            EnvironmentVariable::create([
-                'key' => $this->key,
-                'value' => $this->value,
-                'is_build_time' => $this->is_build_time,
-                'application_id' => $application_id,
+            LocalPersistentVolume::create([
+                'name' => $this->name,
+                'mount_path' => $this->mount_path,
+                'host_path' => $this->host_path,
+                'resource_id' => $application_id,
+                'resource_type' => Application::class,
             ]);
-            $this->emit('refreshEnvs');
-            $this->key = '';
-            $this->value = '';
+            $this->emit('refreshStorages');
+            $this->name = '';
+            $this->mount_path = '';
+            $this->host_path = '';
         } catch (mixed $e) {
             dd('asdf');
             if ($e instanceof QueryException) {
