@@ -45,7 +45,7 @@ class General extends Component
     ];
     public function instantSave()
     {
-        // @TODO: find another way
+        // @TODO: find another way - if possible
         $this->application->settings->is_static = $this->is_static;
         $this->application->settings->is_git_submodules_allowed = $this->is_git_submodules_allowed;
         $this->application->settings->is_git_lfs_allowed = $this->is_git_lfs_allowed;

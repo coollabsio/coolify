@@ -1,10 +1,10 @@
-<form wire:submit.prevent='submit' class="flex gap-2 p-4">
-    <input type="text" wire:model.defer="key" wire:dirty.class="text-black bg-amber-300" />
-    <input type="text" wire:model.defer="value" wire:dirty.class="text-black bg-amber-300" />
+<form wire:submit.prevent='submit' class="flex gap-2 px-2">
+    <x-inputs.input noLabel noDirty id="key" required />
+    <x-inputs.input noLabel noDirty id="value" required />
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <input type="checkbox" wire:model.defer="is_build_time" />
-            <label>Used during build?</label>
+            <label>Build Variable?</label>
         </div>
     </div>
     <x-inputs.button type="submit">

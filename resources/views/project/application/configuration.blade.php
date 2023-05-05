@@ -23,15 +23,8 @@
             <h3>General Configurations</h3>
             <livewire:project.application.general :applicationId="$application->id" />
         </div>
-        <div x-cloak x-show="activeTab === 'environment-variables'" class="flex flex-col gap-2">
-            <h3>Environment Variables</h3>
-            @forelse ($application->environment_variables as $env)
-                <livewire:project.application.environment-variable.show :env="$env" />
-            @empty
-                <p>There are no environment variables for this application.</p>
-            @endforelse
-            <h4>Add new environment variable</h4>
-            <livewire:project.application.environment-variable.add />
+        <div x-cloak x-show="activeTab === 'environment-variables'">
+            <livewire:project.application.environment-variable.all :application="$application" />
         </div>
         <div x-cloak x-show="activeTab === 'source'">
             <h3>Source</h3>

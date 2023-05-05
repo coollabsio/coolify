@@ -30,6 +30,6 @@ class Show extends Component
     public function delete()
     {
         $this->env->delete();
-        $this->emit('reloadWindow');
+        $this->emit('refreshEnvs');
     }
 }
