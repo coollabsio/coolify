@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class EnvironmentVariable extends Model
 {
 
     protected $fillable = ['key', 'value', 'is_build_time', 'application_id'];
     protected $casts = [
+        "key" => 'string',
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
     ];
@@ -31,6 +32,7 @@ class EnvironmentVariable extends Model
     }
     private function set_environment_variables(string $environment_variable): string|null
     {
+        $environment_variable = trim($environment_variable);
         if (!str_contains(trim($environment_variable), '{{') && !str_contains(trim($environment_variable), '}}')) {
             return encrypt($environment_variable);
         }
@@ -41,6 +43,12 @@ class EnvironmentVariable extends Model
         return Attribute::make(
             get: fn (string $value) => $this->get_environment_variables($value),
             set: fn (string $value) => $this->set_environment_variables($value),
+        );
+    }
+    protected function key(): Attribute
+    {
+        return Attribute::make(
+            set: fn (string $value) => Str::of($value)->trim(),
         );
     }
 }

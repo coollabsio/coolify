@@ -82,6 +82,10 @@ class Application extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class)->where('is_build_time', true);
     }
+    public function nixpacks_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('key', 'like', 'NIXPACKS_%');
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);

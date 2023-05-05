@@ -36,6 +36,8 @@ class DeployApplicationJob implements ShouldQueue
     protected string $git_commit;
     protected string $workdir;
     protected string $docker_compose;
+    protected $build_args;
+    protected $env_args;
     public static int $batch_counter = 0;
     public $timeout = 3600;
     /**
@@ -187,11 +189,12 @@ class DeployApplicationJob implements ShouldQueue
                 "echo -n 'Building image... '",
             ]);
 
-            $build_args = $this->generate_build_environment_variables();
+            $this->generate_build_env_variables();
+            $this->add_build_env_variables_to_dockerfile();
 
             if ($this->application->settings->is_static) {
                 $this->executeNow([
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit}-build {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit}-build {$this->workdir}"),
                 ], isDebuggable: true);
 
                 $dockerfile = "FROM {$this->application->static_image}
@@ -202,11 +205,11 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
 
                 $this->executeNow([
                     $this->execute_in_builder("echo '{$docker_file}' | base64 -d > {$this->workdir}/Dockerfile-prod"),
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
                 ], hideFromOutput: true);
             } else {
                 $this->executeNow([
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
                 ], isDebuggable: true);
             }
 
@@ -249,23 +252,36 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         }
         return $environment_variables->all();
     }
-    private function generate_build_environment_variables()
+    private function generate_env_variables()
     {
-        $build_args = collect(["--build-arg SOURCE_COMMIT={$this->git_commit}"]);
+        $this->env_args = collect([]);
+        foreach ($this->application->nixpacks_environment_variables as $env) {
+            $this->env_args->push("--env {$env->key}={$env->value}");
+        }
+        $this->env_args = $this->env_args->implode(' ');
+    }
+    private function generate_build_env_variables()
+    {
+        $this->build_args = collect(["--build-arg SOURCE_COMMIT={$this->git_commit}"]);
+        foreach ($this->application->build_environment_variables as $env) {
+            $this->build_args->push("--build-arg {$env->key}={$env->value}");
+        }
+        $this->build_args = $this->build_args->implode(' ');
+    }
+    private function add_build_env_variables_to_dockerfile()
+    {
         $this->executeNow([
             $this->execute_in_builder("cat {$this->workdir}/Dockerfile")
         ], propertyName: 'dockerfile', hideFromOutput: true);
         $dockerfile = collect(Str::of($this->activity->properties->get('dockerfile'))->trim()->explode("\n"));
 
         foreach ($this->application->build_environment_variables as $env) {
-            $build_args->push("--build-arg {$env->key}={$env->value}");
             $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->executeNow([
             $this->execute_in_builder("echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile")
         ], hideFromOutput: true);
-        return $build_args->implode(' ');
     }
     private function generate_docker_compose()
     {
@@ -488,15 +504,16 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     }
     private function nixpacks_build_cmd()
     {
-        $nixpacks_command = "nixpacks build -o {$this->workdir} --no-error-without-start";
-        if ($this->application->install_command) {
-            $nixpacks_command .= " --install-cmd '{$this->application->install_command}'";
-        }
+        $this->generate_env_variables();
+        $nixpacks_command = "nixpacks build -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
-            $nixpacks_command .= " --build-cmd '{$this->application->build_command}'";
+            $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
         if ($this->application->start_command) {
-            $nixpacks_command .= " --start-cmd '{$this->application->start_command}'";
+            $nixpacks_command .= " --start-cmd \"{$this->application->start_command}\"";
+        }
+        if ($this->application->install_command) {
+            $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
         }
         $nixpacks_command .= " {$this->workdir}";
         return $this->execute_in_builder($nixpacks_command);
