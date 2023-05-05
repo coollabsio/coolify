@@ -19,6 +19,7 @@ class InstallProxy
         );
 
         $activity = remoteProcess([
+            "docker network ls --format '{{.Name}}' | grep '^coolify$' || docker network create coolify",
             'mkdir -p projects',
             'mkdir -p projects/proxy',
             'mkdir -p projects/proxy/letsencrypt',

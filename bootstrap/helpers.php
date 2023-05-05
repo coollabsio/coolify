@@ -87,7 +87,7 @@ if (!function_exists('generateSshCommand')) {
         $delimiter = 'EOF-COOLIFY-SSH';
         Storage::disk('local')->makeDirectory('.ssh');
         $ssh_command = "ssh ";
-        if ($isMux) {
+        if ($isMux && config('coolify.mux_enabled')) {
             $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r ';
         }
         $ssh_command .= "-i {$private_key_location} "
