@@ -1,13 +1,11 @@
 @props([
-    'id' => null,
+    'id' => $attributes->has('id') || $attributes->has('label'),
     'type' => 'text',
     'required' => $attributes->has('required'),
-    'label' => null,
-    'instantSave' => false,
-    'disabled' => false,
-    'hidden' => false,
-    'noLabel' => false,
-    'noDirty' => false,
+    'label' => $attributes->has('label'),
+    'instantSave' => $attributes->has('instantSave'),
+    'noLabel' => $attributes->has('noLabel'),
+    'noDirty' => $attributes->has('noDirty'),
 ])
 
 <span @class([
@@ -30,9 +28,9 @@
         <textarea @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif {{ $attributes }}
             required={{ $required }} type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}></textarea>
     @else
-        <input {{ $attributes }} required={{ $required }}
-            @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif
-            type={{ $type }} id={{ $id }}
+        <input {{ $attributes }} @if ($required) required @endif
+            @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif type={{ $type }}
+            id={{ $id }}
             @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     @endif
     @error($id)
