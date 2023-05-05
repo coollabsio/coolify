@@ -4,6 +4,7 @@ use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -11,6 +12,20 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 
+if (!function_exists('generalErrorHandlerLivewire')) {
+    function generalErrorHandlerLivewire(\Throwable $e, $that)
+    {
+        if ($e instanceof QueryException) {
+            if ($e->errorInfo[0] === '23505') {
+                $that->emit('error', 'Duplicate entry found.');
+            } else {
+                $that->emit('error', $e->errorInfo[3]);
+            }
+        } else {
+            $that->emit('error', $e);
+        }
+    }
+}
 if (!function_exists('remoteProcess')) {
     /**
      * Run a Remote Process, which SSH's asynchronously into a machine to run the command(s).

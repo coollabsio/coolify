@@ -3,8 +3,7 @@
     <x-inputs.input noDirty id="value" label="Value" required />
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
-            <input type="checkbox" wire:model.defer="is_build_time" />
-            <label>Build Variable?</label>
+            <x-inputs.input noDirty type="checkbox" id="is_build_time" label="Build Variable?" />
         </div>
     </div>
     <x-inputs.button type="submit">

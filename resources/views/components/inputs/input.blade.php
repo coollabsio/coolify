@@ -13,7 +13,8 @@
     'flex flex-col' => $type !== 'checkbox',
 ])>
     @if (!$noLabel)
-        <label for={{ $id }}>
+        <label for={{ $id }} @if (!$noDirty) wire:dirty.class="text-amber-300" @endif
+            wire:target={{ $id }}>
             @if ($label)
                 {{ $label }}
             @else
@@ -29,8 +30,8 @@
             required={{ $required }} type={{ $type }} id={{ $id }} wire:model.defer={{ $id }}></textarea>
     @else
         <input {{ $attributes }} @if ($required) required @endif
-            @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif type={{ $type }}
-            id={{ $id }}
+            @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif
+            type={{ $type }} id={{ $id }}
             @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     @endif
     @error($id)
