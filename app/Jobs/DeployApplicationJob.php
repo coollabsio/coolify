@@ -171,9 +171,6 @@ class DeployApplicationJob implements ShouldQueue
                 $this->execute_in_builder("rm -fr {$this->workdir}/.git")
             ], hideFromOutput: true);
 
-            // Generate docker-compose.yml
-            $this->generateComposeFile();
-
             $this->executeNow([
                 "echo -n 'Generating nixpacks configuration... '",
             ]);
@@ -183,14 +180,18 @@ class DeployApplicationJob implements ShouldQueue
                 $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
             ], isDebuggable: true);
 
+            // Generate docker-compose.yml
+            $this->generateComposeFile();
             $this->executeNow([
                 "echo 'Done.'",
                 "echo -n 'Building image... '",
             ]);
 
+            $build_args = $this->generate_build_environment_variables();
+
             if ($this->application->settings->is_static) {
                 $this->executeNow([
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit}-build {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit}-build {$this->workdir}"),
                 ], isDebuggable: true);
 
                 $dockerfile = "FROM {$this->application->static_image}
@@ -201,11 +202,11 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
 
                 $this->executeNow([
                     $this->execute_in_builder("echo '{$docker_file}' | base64 -d > {$this->workdir}/Dockerfile-prod"),
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
                 ], hideFromOutput: true);
             } else {
                 $this->executeNow([
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile --build-arg SOURCE_COMMIT={$this->git_commit} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$build_args} --progress plain -t {$this->application->uuid}:{$this->git_commit} {$this->workdir}"),
                 ], isDebuggable: true);
             }
 
@@ -217,9 +218,6 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
 
             // Start application
             $this->startByComposeFile();
-
-            // Saving docker-compose.yml
-            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
         } catch (\Exception $e) {
             $this->executeNow([
                 "echo '\nOops something is not okay, are you okay? 😢'",
@@ -227,6 +225,8 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
             ]);
             $this->fail($e->getMessage());
         } finally {
+            // Saving docker-compose.yml
+            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
             $this->executeNow(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
             dispatch(new ContainerStatusJob($this->application_uuid));
         }
@@ -236,12 +236,43 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     {
         return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
     }
+    private function generate_environment_variables($ports)
+    {
+        $environment_variables = collect();
 
+        foreach ($this->application->environment_variables as $env) {
+            $environment_variables->push("$env->key=$env->value");
+        }
+        // Add PORT if not exists, use the first port as default
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
+            $environment_variables->push("PORT={$ports[0]}");
+        }
+        return $environment_variables->all();
+    }
+    private function generate_build_environment_variables()
+    {
+        $build_args = collect(["--build-arg SOURCE_COMMIT={$this->git_commit}"]);
+        $this->executeNow([
+            $this->execute_in_builder("cat {$this->workdir}/Dockerfile")
+        ], propertyName: 'dockerfile', hideFromOutput: true);
+        $dockerfile = collect(Str::of($this->activity->properties->get('dockerfile'))->trim()->explode("\n"));
+
+        foreach ($this->application->build_environment_variables as $env) {
+            $build_args->push("--build-arg {$env->key}={$env->value}");
+            $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+        }
+        $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
+        $this->executeNow([
+            $this->execute_in_builder("echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile")
+        ], hideFromOutput: true);
+        return $build_args->implode(' ');
+    }
     private function generate_docker_compose()
     {
+        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
         $persistentStorages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-        $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
+        $environment_variables = $this->generate_environment_variables($ports);
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -249,9 +280,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                     'image' => "{$this->application->uuid}:$this->git_commit",
                     'container_name' => $this->application->uuid,
                     'restart' => 'always',
-                    'environment' => [
-                        'PORT' => $ports[0]
-                    ],
+                    'environment' => $environment_variables,
                     'labels' => $this->set_labels_for_applications(),
                     'expose' => $ports,
                     'networks' => [

@@ -78,6 +78,10 @@ class Application extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class);
     }
+    public function build_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_build_time', true);
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);
