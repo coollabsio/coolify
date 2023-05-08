@@ -13,6 +13,7 @@ use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 
 /*
 |--------------------------------------------------------------------------
@@ -84,7 +85,17 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
-        return view('source.github.show', ['host' => $request->schemeAndHttpHost()]);
+        $settings = InstanceSettings::first();
+        $host = $request->schemeAndHttpHost();
+        if ($settings->fqdn) {
+            $host = $settings->fqdn;
+        }
+        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
+        return view('source.github.show', [
+            'github_app' => $github_app,
+            'host' => $host,
+            'name' => Str::kebab('coolify' . $github_app->name)
+        ]);
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {

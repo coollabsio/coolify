@@ -23,22 +23,9 @@
         @else
             <div class="py-2">
                 <x-inputs.button type="submit">Save</x-inputs.button>
-
             </div>
         @endif
     </form>
-    <form x-data="ContactForm()" @submit.prevent="submitForm">
-        <x-inputs.input id="host" noLabel />
-        <button type="submit">Create GitHub Application</button>
-    </form>
-    <script>
-        function ContactForm() {
-            return {
-                host: "",
-                submitForm() {
-                    console.log(JSON.stringify(this.host));
-                },
-            };
-        }
-    </script>
+
+
 </div>

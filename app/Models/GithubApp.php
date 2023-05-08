@@ -22,6 +22,6 @@ class GithubApp extends BaseModel
     }
     static public function private()
     {
-        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', false)->get();
+        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', false)->whereNotNull('app_id')->whereNotNull('installation_id')->get();
     }
 }

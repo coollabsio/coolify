@@ -21,6 +21,8 @@
 </head>
 
 <body>
+    @livewireScripts
+
     @auth
         <x-navbar />
     @endauth
@@ -28,7 +30,6 @@
         {{ $slot }}
     </main>
 
-    @livewireScripts
     @auth
         <script>
             function checkIfIamDead() {
@@ -80,6 +81,7 @@
             })
         </script>
     @endauth
+
 </body>
 
 </html>
