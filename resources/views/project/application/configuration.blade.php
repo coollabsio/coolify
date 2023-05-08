@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Configuration</h1>
-    <x-applications.navbar :applicationId="$application->id" />
+    <x-applications.navbar :applicationId="$application->id" :gitLocation="$application->gitLocation" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }">
         <div class="flex gap-4">
             <a :class="activeTab === 'general' && 'text-purple-500'"

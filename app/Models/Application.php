@@ -43,6 +43,15 @@ class Application extends BaseModel
             set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
         );
     }
+    public function gitLocation(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->git_commit_sha)
+                ? "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}"
+                : "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_commit_sha}"
+
+        );
+    }
     public function baseDirectory(): Attribute
     {
         return Attribute::make(

@@ -1,5 +1,12 @@
 <nav class="flex gap-4 py-2">
-    <a href="{{ route('project.application.configuration', Route::current()->parameters()) }}">Configuration</a>
-    <a href="{{ route('project.application.deployments', Route::current()->parameters()) }}">Deployments</a>
+    <a target="_blank" href="{{ $gitLocation }}">
+        <x-inputs.button>Open on Git ↗️</x-inputs.button>
+    </a>
+    <a href="{{ route('project.application.configuration', Route::current()->parameters()) }}">
+        <x-inputs.button>Configuration</x-inputs.button>
+    </a>
+    <a href="{{ route('project.application.deployments', Route::current()->parameters()) }}">
+        <x-inputs.button>Deployments</x-inputs.button>
+    </a>
     <livewire:project.application.deploy :applicationId="$applicationId" />
 </nav>
