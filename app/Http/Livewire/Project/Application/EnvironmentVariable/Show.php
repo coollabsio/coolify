@@ -20,7 +20,7 @@ class Show extends Component
     ];
     public function mount()
     {
-        $this->parameters = Route::current()->parameters();
+        $this->parameters = saveParameters();
     }
     public function submit()
     {

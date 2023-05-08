@@ -42,7 +42,7 @@ class PublicGitRepository extends Component
             $this->public_repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
             $this->port = 3000;
         }
-        $this->parameters = Route::current()->parameters();
+        $this->parameters = saveParameters();
         $this->servers = session('currentTeam')->load(['servers'])->servers;
     }
     public function chooseServer($server)

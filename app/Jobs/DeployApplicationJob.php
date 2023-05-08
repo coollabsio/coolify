@@ -372,29 +372,6 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         return implode(' ', $generated_healthchecks_commands);
     }
 
-    private function generate_jwt_token_for_github()
-    {
-        $signingKey = InMemory::plainText($this->source->privateKey->private_key);
-        $algorithm = new Sha256();
-        $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
-        $now = new DateTimeImmutable();
-        $now = $now->setTime($now->format('H'), $now->format('i'));
-        $issuedToken = $tokenBuilder
-            ->issuedBy($this->source->app_id)
-            ->issuedAt($now)
-            ->expiresAt($now->modify('+10 minutes'))
-            ->getToken($algorithm, $signingKey)
-            ->toString();
-        $token = Http::withHeaders([
-            'Authorization' => "Bearer $issuedToken",
-            'Accept' => 'application/vnd.github.machine-man-preview+json'
-        ])->post("{$this->source->api_url}/app/installations/{$this->source->installation_id}/access_tokens");
-        if ($token->failed()) {
-            throw new \Exception("Failed to get access token for $this->application->name from " . $this->source->name . " with error: " . $token->json()['message']);
-        }
-        return $token->json()['token'];
-    }
-
     private function set_labels_for_applications()
     {
         $labels = [];
@@ -472,8 +449,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         $source_html_url_scheme = $url['scheme'];
 
         $git_clone_command = "git clone -q -b {$this->application->git_branch}";
-
-        if ($this->application->source->getMorphClass() == 'App\Models\GithubApp') {
+        if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
             if ($this->source->is_public) {
                 $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
                 $git_clone_command = $this->setGitImportSettings($git_clone_command);
@@ -481,12 +457,11 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                     $this->execute_in_builder($git_clone_command)
                 ];
             } else {
-                if (!$this->application->source->app_id) {
-                    $private_key = base64_encode($this->application->source->privateKey->private_key);
+                if (!$this->source->app_id) {
+                    $private_key = base64_encode($this->source->privateKey->private_key);
 
                     $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}";
                     $git_clone_command = $this->setGitImportSettings($git_clone_command);
-
                     return [
                         $this->execute_in_builder("mkdir -p /root/.ssh"),
                         $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
@@ -494,7 +469,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                         $this->execute_in_builder($git_clone_command)
                     ];
                 } else {
-                    $github_access_token = $this->generate_jwt_token_for_github();
+                    $github_access_token = generate_github_token($this->source);
                     return [
                         $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}")
                     ];

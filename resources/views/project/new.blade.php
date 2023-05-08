@@ -18,7 +18,7 @@
             <livewire:project.new.public-git-repository :type="$type" />
         </div>
         <div x-cloak x-show="activeTab === 'github-private-repo'">
-            github-private-repo
+            <livewire:project.new.github-private-repository />
         </div>
     </div>
 </x-layout>

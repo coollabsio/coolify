@@ -15,4 +15,12 @@ class GithubApp extends BaseModel
     {
         return $this->belongsTo(PrivateKey::class);
     }
+    static public function public()
+    {
+        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', true)->get();
+    }
+    static public function private()
+    {
+        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', false)->get();
+    }
 }

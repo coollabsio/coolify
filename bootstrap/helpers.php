@@ -2,6 +2,7 @@
 
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
+use App\Models\GithubApp;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -9,6 +10,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 
@@ -172,5 +174,42 @@ if (!function_exists('generateRandomName')) {
             ]
         );
         return $generator->getName();
+    }
+}
+
+use Lcobucci\JWT\Encoding\ChainedFormatter;
+use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Lcobucci\JWT\Token\Builder;
+
+if (!function_exists('generate_github_token')) {
+    function generate_github_token(GithubApp $source)
+    {
+        $signingKey = InMemory::plainText($source->privateKey->private_key);
+        $algorithm = new Sha256();
+        $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+        $now = new DateTimeImmutable();
+        $now = $now->setTime($now->format('H'), $now->format('i'));
+        $issuedToken = $tokenBuilder
+            ->issuedBy($source->app_id)
+            ->issuedAt($now)
+            ->expiresAt($now->modify('+10 minutes'))
+            ->getToken($algorithm, $signingKey)
+            ->toString();
+        $token = Http::withHeaders([
+            'Authorization' => "Bearer $issuedToken",
+            'Accept' => 'application/vnd.github.machine-man-preview+json'
+        ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+        if ($token->failed()) {
+            throw new \Exception("Failed to get access token for " . $source->name . " with error: " . $token->json()['message']);
+        }
+        return $token->json()['token'];
+    }
+}
+if (!function_exists('saveParameters')) {
+    function saveParameters()
+    {
+        return Route::current()->parameters();
     }
 }
