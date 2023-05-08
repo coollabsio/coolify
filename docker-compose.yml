@@ -1,18 +1,20 @@
 version: '3.8'
 services:
-  coolify:
-    working_dir: /var/www/html
-    extra_hosts:
-      - 'host.docker.internal:host-gateway'
-    networks:
-      - coolify
-    depends_on:
-      - postgres
+    coolify:
+        restart: always
+        working_dir: /var/www/html
+        extra_hosts:
+            - 'host.docker.internal:host-gateway'
+        networks:
+            - coolify
+        depends_on:
+            - postgres
 
-  postgres:
-    image: postgres:15-alpine
-    networks:
-      - coolify
+    postgres:
+        image: postgres:15-alpine
+        restart: always
+        networks:
+            - coolify
 networks:
-  coolify:
-    driver: bridge
+    coolify:
+        driver: bridge
