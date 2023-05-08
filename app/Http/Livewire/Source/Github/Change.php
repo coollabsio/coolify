@@ -50,6 +50,10 @@ class Change extends Component
     }
     public function mount()
     {
+        $settings = InstanceSettings::first();
+        if ($settings->fqdn) {
+            $this->host = $settings->fqdn;
+        }
         $this->parameters = getParameters();
         $this->github_app = GithubApp::where('uuid', $this->parameters['github_app_uuid'])->first();
         $this->is_system_wide = $this->github_app->is_system_wide;
