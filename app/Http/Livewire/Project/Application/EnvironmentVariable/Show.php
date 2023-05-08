@@ -20,7 +20,7 @@ class Show extends Component
     ];
     public function mount()
     {
-        $this->parameters = saveParameters();
+        $this->parameters = getParameters();
     }
     public function submit()
     {

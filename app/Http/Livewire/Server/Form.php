@@ -54,6 +54,7 @@ class Form extends Component
                 $this->dockerComposeVersion = 'Not installed.';
             }
         } catch (\Exception $e) {
+            return generalErrorHandlerLivewire($e, $this);
         }
     }
     public function delete()

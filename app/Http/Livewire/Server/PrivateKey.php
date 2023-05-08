@@ -20,7 +20,7 @@ class PrivateKey extends Component
     }
     public function mount()
     {
-        $this->parameters = saveParameters();
+        $this->parameters = getParameters();
         $this->private_keys = ModelsPrivateKey::where('team_id', session('currentTeam')->id)->get();
     }
 }

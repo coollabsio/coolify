@@ -8,7 +8,10 @@ use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Http\Controllers\ServerController;
+use App\Models\GithubApp;
+use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,18 +29,21 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', function () {
-        $projects = session('currentTeam')->load(['projects'])->projects;
-        $servers = session('currentTeam')->load(['servers'])->servers;
+        $id = session('currentTeam')->id;
+        $projects = Project::where('team_id', $id)->get();
+        $servers = Server::where('team_id', $id)->get();
         $destinations = $servers->map(function ($server) {
             return $server->standaloneDockers->merge($server->swarmDockers);
         })->flatten();
-        $private_keys = session('currentTeam')->load(['privateKeys'])->privateKeys;
+        $private_keys = PrivateKey::where('team_id', $id)->get();
+        $github_apps = GithubApp::private();
 
         return view('dashboard', [
             'servers' => $servers->sortBy('name'),
             'projects' => $projects->sortBy('name'),
             'destinations' => $destinations->sortBy('name'),
             'private_keys' => $private_keys->sortBy('name'),
+            'github_apps' => $github_apps->sortBy('name'),
         ]);
     })->name('dashboard');
 
@@ -74,6 +80,12 @@ Route::middleware(['auth'])->group(function () {
             'private_key' => $private_key,
         ]);
     })->name('private-key.show');
+});
+Route::middleware(['auth'])->group(function () {
+    Route::get('/source/new', fn () => view('source.new'))->name('source.new');
+    Route::get('/source/github/{github_app_uuid}', function (Request $request) {
+        return view('source.github.show', ['host' => $request->schemeAndHttpHost()]);
+    })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
     Route::get('/server/new', fn () => view('server.new'))->name('server.new');

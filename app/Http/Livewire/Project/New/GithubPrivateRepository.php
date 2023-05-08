@@ -130,12 +130,12 @@ class GithubPrivateRepository extends Component
                 'environment_name' => $environment->name
             ]);
         } catch (\Exception $e) {
-            $this->emit('error', $e->getMessage());
+            return generalErrorHandlerLivewire($e, $this);
         }
     }
     public function mount()
     {
-        $this->parameters = saveParameters();
+        $this->parameters = getParameters();
         $this->repositories = $this->branches = $this->servers = $this->destinations = collect();
         $this->github_apps = GithubApp::private();
     }

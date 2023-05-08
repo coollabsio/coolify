@@ -20,8 +20,10 @@ if (!function_exists('generalErrorHandlerLivewire')) {
         if ($e instanceof QueryException) {
             if ($e->errorInfo[0] === '23505') {
                 $that->emit('error', 'Duplicate entry found.');
-            } else {
+            } else if (count($e->errorInfo) === 4) {
                 $that->emit('error', $e->errorInfo[3]);
+            } else {
+                $that->emit('error', $e->errorInfo[2]);
             }
         } else {
             $that->emit('error', $e);
@@ -207,8 +209,8 @@ if (!function_exists('generate_github_token')) {
         return $token->json()['token'];
     }
 }
-if (!function_exists('saveParameters')) {
-    function saveParameters()
+if (!function_exists('getParameters')) {
+    function getParameters()
     {
         return Route::current()->parameters();
     }

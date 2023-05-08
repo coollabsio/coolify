@@ -76,7 +76,7 @@
                 window.location.reload();
             })
             Livewire.on('error', (message) => {
-                alert(message);
+                console.log(message);
             })
         </script>
     @endauth

@@ -8,7 +8,6 @@ use Illuminate\Support\Str;
 
 class EnvironmentVariable extends Model
 {
-
     protected $fillable = ['key', 'value', 'is_build_time', 'application_id'];
     protected $casts = [
         "key" => 'string',

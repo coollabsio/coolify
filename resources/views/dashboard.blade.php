@@ -31,4 +31,12 @@
     @empty
         <p>No servers found.</p>
     @endforelse
+    <h1>GitHub Apps <a href="{{ route('source.new') }}">
+            <x-inputs.button>New</x-inputs.button>
+        </a></h1>
+    @forelse ($github_apps as $github_app)
+        <a href="{{ route('source.github.show', [$github_app->uuid]) }}">{{ data_get($github_app, 'name') }}</a>
+    @empty
+        <p>No servers found.</p>
+    @endforelse
 </x-layout>
