@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Enums\ProcessStatus;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
@@ -31,12 +32,24 @@ class ActivityMonitor extends Component
     public function polling()
     {
         $this->hydrateActivity();
-
-        if (data_get($this->activity, 'properties.exitCode') !== null) {
+        $this->setStatus(ProcessStatus::IN_PROGRESS);
+        $exit_code = data_get($this->activity, 'properties.exitCode');
+        if ($exit_code !== null) {
+            if ($exit_code === 0) {
+                $this->setStatus(ProcessStatus::FINISHED);
+            } else {
+                $this->setStatus(ProcessStatus::ERROR);
+            }
             $this->isPollingActive = false;
         }
     }
-
+    protected function setStatus($status)
+    {
+        $this->activity->properties = $this->activity->properties->merge([
+            'status' => $status,
+        ]);
+        $this->activity->save();
+    }
     public function render()
     {
         return view('livewire.activity-monitor');

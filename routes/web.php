@@ -93,7 +93,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/destination/new', function () {
-        $servers = Server::where('team_id', session('currentTeam')->id)->get();
+        $servers = Server::validated();
         return view('destination.new', [
             "servers" => $servers,
         ]);

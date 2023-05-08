@@ -52,4 +52,9 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
+
+    static public function validated()
+    {
+        return Server::where('team_id', session('currentTeam')->id)->whereRelation('settings', 'is_validated', true)->get();
+    }
 }

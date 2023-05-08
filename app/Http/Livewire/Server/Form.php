@@ -20,10 +20,11 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
+        'server.settings.is_validated' => 'required'
     ];
     public function mount()
     {
-        $this->server = Server::find($this->server_id);
+        $this->server = Server::find($this->server_id)->load(['settings']);
     }
     public function installDocker()
     {
@@ -38,6 +39,11 @@ class Form extends Component
             if (!$this->uptime) {
                 $this->uptime = 'Server not reachable.';
                 throw new \Exception('Server not reachable.');
+            } else {
+                if (!$this->server->settings->is_validated) {
+                    $this->server->settings->is_validated = true;
+                    $this->server->settings->save();
+                }
             }
             $this->dockerVersion = instantRemoteProcess(['docker version|head -2|grep -i version'], $this->server, false);
             if (!$this->dockerVersion) {

@@ -18,7 +18,7 @@
                 @endif
             </div>
         </div>
-        <div>
+        <div class="flex">
             <x-inputs.button type="submit">Submit</x-inputs.button>
             <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
             <x-inputs.button wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
@@ -26,7 +26,9 @@
                 Delete
             </x-inputs.button>
         </div>
+        <x-inputs.input class="" disabled type="checkbox" id="server.settings.is_validated" label="Validated" />
     </form>
+
     @isset($uptime)
         <p>Uptime: {{ $uptime }}</p>
     @endisset

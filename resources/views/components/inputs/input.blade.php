@@ -9,7 +9,7 @@
 ])
 
 <span @class([
-    'flex justify-end' => $type === 'checkbox',
+    'flex' => $type === 'checkbox',
     'flex flex-col' => $type !== 'checkbox',
 ])>
     @if (!$noLabel)

@@ -20,7 +20,7 @@ class CoolifyTaskArgs extends Data
         public string  $type,
         public ?string $type_uuid = null,
         public ?Model  $model = null,
-        public string  $status = ProcessStatus::HOLDING->value,
+        public string  $status = ProcessStatus::QUEUED->value,
     ) {
     }
 }

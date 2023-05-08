@@ -1,8 +1,8 @@
 @props([
     'isWarning' => null,
-    'defaultClass' => 'text-white bg-neutral-800 hover:bg-violet-600 w-28 h-6',
-    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600 w-28 h-6',
-    'loadingClass' => 'text-black bg-green-500 w-28 h-6',
+    'defaultClass' => 'text-white bg-neutral-800 hover:bg-violet-600 h-8',
+    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600 h-8',
+    'loadingClass' => 'text-black bg-green-500 h-8',
     'confirm' => null,
     'confirmAction' => null,
 ])
