@@ -24,6 +24,7 @@ class Application extends BaseModel
 
     protected $fillable = [
         'name',
+        'project_id',
         'description',
         'git_repository',
         'git_branch',

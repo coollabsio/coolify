@@ -38,7 +38,6 @@ Route::middleware(['auth'])->group(function () {
         })->flatten();
         $private_keys = PrivateKey::where('team_id', $id)->get();
         $github_apps = GithubApp::private();
-
         return view('dashboard', [
             'servers' => $servers->sortBy('name'),
             'projects' => $projects->sortBy('name'),
@@ -86,7 +85,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
         $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
-        $name = Str::kebab('coolify' . $github_app->name);
+        $name = Str::of(Str::kebab($github_app->name))->start('coolify-');
         $settings = InstanceSettings::first();
         $host = $request->schemeAndHttpHost();
         if ($settings->fqdn) {

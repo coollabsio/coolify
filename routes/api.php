@@ -18,13 +18,6 @@ use Illuminate\Support\Facades\Route;
 Route::get('/health', function () {
     return 'OK';
 });
-Route::get('/webhooks/source/github/redirect', function () {
-    $code = request()->get('code');
-    $state = request()->get('state');
-    $github_app = GithubApp::where('uuid', $state)->firstOrFail();
-    return 'OK';
-});
-
 // Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 //     return $request->user();
 // });

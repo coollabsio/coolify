@@ -72,7 +72,7 @@ class GithubPrivateRepository extends Component
         $this->repositories = collect();
         $this->page = 1;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
-        $this->token = generate_github_token($this->github_app);
+        $this->token = generate_github_installation_token($this->github_app);
         $this->loadRepositoryByPage();
         if ($this->repositories->count() < $this->total_repositories_count) {
             while ($this->repositories->count() < $this->total_repositories_count) {
@@ -123,6 +123,7 @@ class GithubPrivateRepository extends Component
             }
             $application = Application::create([
                 'name' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}:{$this->selected_branch_name}",
+                'project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
                 'build_pack' => 'nixpacks',

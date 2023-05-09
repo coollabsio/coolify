@@ -4,7 +4,7 @@ namespace App\Models;
 
 class GithubApp extends BaseModel
 {
-    protected $fillable = ['name', 'organization', 'api_url', 'html_url', 'custom_user', 'custom_port', 'team_id'];
+    protected $fillable = ['name', 'uuid', 'organization', 'api_url', 'html_url', 'custom_user', 'custom_port', 'team_id'];
     protected $casts = [
         'is_public' => 'boolean',
     ];

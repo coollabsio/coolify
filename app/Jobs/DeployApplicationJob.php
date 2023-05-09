@@ -469,7 +469,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                         $this->execute_in_builder($git_clone_command)
                     ];
                 } else {
-                    $github_access_token = generate_github_token($this->source);
+                    $github_access_token = generate_github_installation_token($this->source);
                     return [
                         $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}")
                     ];

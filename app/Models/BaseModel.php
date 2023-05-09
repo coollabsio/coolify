@@ -12,7 +12,10 @@ abstract class BaseModel extends Model
         parent::boot();
 
         static::creating(function (Model $model) {
-            $model->uuid = (string) new Cuid2(7);
+            // Generate a UUID if one isn't set
+            if (!$model->uuid) {
+                $model->uuid = (string) new Cuid2(7);
+            }
         });
     }
 }

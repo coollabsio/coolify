@@ -25,6 +25,7 @@ class ApplicationSeeder extends Seeder
 
         Application::create([
             'name' => 'coollabsio/coolify-examples:nodejs-fastify',
+            'project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'nodejs-fastify',
             'build_pack' => 'nixpacks',
