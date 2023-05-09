@@ -103,10 +103,17 @@ class GithubPrivateRepository extends Component
     }
     public function loadDestinations()
     {
-        $server = $this->servers->where('id', $this->selected_server_id)->first();
-        $this->destinations = $server->standaloneDockers->merge($server->swarmDockers);
-        $this->selected_destination_id = $this->destinations[0]['id'];
-        $this->selected_destination_class = $this->destinations[0]->getMorphClass();
+        try {
+            $server = $this->servers->where('id', $this->selected_server_id)->first();
+            if ($server->standaloneDockers->count() === 0 && $server->swarmDockers->count() === 0) {
+                $this->destinations = 0;
+            }
+            $this->destinations = $server->standaloneDockers->merge($server->swarmDockers);
+            $this->selected_destination_id = $this->destinations[0]['id'];
+            $this->selected_destination_class = $this->destinations[0]->getMorphClass();
+        } catch (\Exception $e) {
+            return generalErrorHandler($e);
+        }
     }
     public function submit()
     {

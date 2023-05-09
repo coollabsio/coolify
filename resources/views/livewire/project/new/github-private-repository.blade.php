@@ -72,6 +72,11 @@
                     @endforeach
                 </select>
                 <x-inputs.button wire:click="submit">Select Destination</x-inputs.button>
+            @else
+                <h1>No destinations found on this server.</h1>
+                <a href="{{ route('destination.new', ['server_id' => $selected_server_id]) }}">Add
+                    a
+                    destination</a>
             @endif
         </div>
     @else
