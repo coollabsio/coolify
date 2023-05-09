@@ -98,8 +98,12 @@ class GithubPrivateRepository extends Component
     }
     public function loadServers()
     {
-        $this->servers = Server::validated();
-        $this->selected_server_id = $this->servers[0]['id'];
+        try {
+            $this->servers = Server::validated();
+            $this->selected_server_id = $this->servers[0]['id'];
+        } catch (\Exception $e) {
+            return generalErrorHandler($e);
+        }
     }
     public function loadDestinations()
     {
