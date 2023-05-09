@@ -10,7 +10,7 @@
             <x-inputs.button>
                 Submit
             </x-inputs.button>
-            <x-inputs.button isWarning x-on:click="deleteDestination = true">
+            <x-inputs.button isWarning x-on:click.prevent="deleteDestination = true">
                 Delete
             </x-inputs.button>
         </div>

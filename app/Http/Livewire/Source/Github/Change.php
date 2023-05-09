@@ -58,46 +58,13 @@ class Change extends Component
         $this->parameters = getParameters();
         $this->is_system_wide = $this->github_app->is_system_wide;
     }
-    public function createGithubApp()
+    public function delete()
     {
-        $settings = InstanceSettings::first();
-        $fqdn = $settings->fqdn;
-        if (!$fqdn) {
-            $fqdn = $this->host;
+        try {
+            $this->github_app->delete();
+            redirect()->route('dashboard');
+        } catch (\Exception $e) {
+            return generalErrorHandlerLivewire($e, $this);
         }
-        if ($this->github_app->organization) {
-            $url = 'organizations/' . $this->github_app->organization . '/settings/apps/new';
-        } else {
-            $url = 'settings/apps/new';
-        }
-        $name = Str::kebab('coolify' . $this->github_app->name);
-        $data = [
-            "name" => $name,
-            "url" => $fqdn,
-            "hook_attributes" => [
-                "url" => "$fqdn/webhooks/github/events"
-            ],
-            "redirect_url" => "$fqdn/webhooks/github",
-            "callback_url" => [
-                "$fqdn/login/github/app",
-            ],
-            "public" => false,
-            "request_oauth_on_install" => false,
-            "setup_url" => "$fqdn/webhooks/github/install?source_id=" . $this->github_app->uuid,
-            "setup_on_update" => true,
-            "default_permissions" => [
-                "contents" => 'read',
-                "metadata" => 'read',
-                "pull_requests" => 'read',
-                "emails" => 'read'
-            ],
-            "default_events" => ['pull_request', 'push']
-        ];
-        $response = Http::asForm()->post("{$this->github_app->html_url}/{$url}?state={$this->github_app->uuid}", [
-            'id' => 'manifest',
-            'name' => 'manifest',
-            'data' => json_encode($data),
-        ]);
-        dd($response);
     }
 }

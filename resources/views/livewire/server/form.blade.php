@@ -22,7 +22,7 @@
             <x-inputs.button type="submit">Submit</x-inputs.button>
             <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
             <x-inputs.button wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
-            <x-inputs.button isWarning x-on:click="deleteServer = true">
+            <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
                 Delete
             </x-inputs.button>
         </div>

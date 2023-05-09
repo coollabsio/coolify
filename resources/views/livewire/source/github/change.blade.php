@@ -1,4 +1,5 @@
-<div>
+<div x-data="{ deleteSource: false }">
+    <x-naked-modal show="deleteSource" message='Are you sure you would like to delete this source?' />
     <h3>Change Github App</h3>
     <form wire:submit.prevent='submit'>
         <x-inputs.input id="github_app.name" label="App Name" required />
@@ -23,6 +24,9 @@
         @else
             <div class="py-2">
                 <x-inputs.button type="submit">Save</x-inputs.button>
+                <x-inputs.button isWarning x-on:click.prevent="deleteSource = true">
+                    Delete
+                </x-inputs.button>
             </div>
         @endif
     </form>
