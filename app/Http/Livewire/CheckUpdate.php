@@ -16,7 +16,7 @@ class CheckUpdate extends Component
     public function checkUpdate()
     {
         $this->latestVersion = getLatestVersionOfCoolify();
-        $this->currentVersion = config('coolify.version');
+        $this->currentVersion = config('version');
         if ($this->latestVersion === 'latest') {
             $this->updateAvailable = true;
             return;

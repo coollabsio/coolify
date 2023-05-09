@@ -376,7 +376,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     {
         $labels = [];
         $labels[] = 'coolify.managed=true';
-        $labels[] = 'coolify.version=' . config('coolify.version');
+        $labels[] = 'coolify.version=' . config('version');
         $labels[] = 'coolify.applicationId=' . $this->application->id;
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
