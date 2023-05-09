@@ -85,16 +85,20 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
+        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
+        $name = Str::kebab('coolify' . $github_app->name);
         $settings = InstanceSettings::first();
         $host = $request->schemeAndHttpHost();
         if ($settings->fqdn) {
             $host = $settings->fqdn;
         }
-        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
+        $installation_path = $github_app->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+        $installation_url = "$github_app->html_url/$installation_path/$name/installations/new";
         return view('source.github.show', [
             'github_app' => $github_app,
             'host' => $host,
-            'name' => Str::kebab('coolify' . $github_app->name)
+            'name' => $name,
+            'installation_url' => $installation_url,
         ]);
     })->name('source.github.show');
 });

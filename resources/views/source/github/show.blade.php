@@ -25,13 +25,14 @@
                     name,
                     url: baseUrl,
                     hook_attributes: {
-                        url: `${webhookBaseUrl}/github/events`
+                        url: `${webhookBaseUrl}/source/github/events`,
+                        active: true,
                     },
-                    redirect_url: `${webhookBaseUrl}/github`,
+                    redirect_url: `${webhookBaseUrl}/source/github/redirect`,
                     callback_urls: [`${baseUrl}/login/github/app`],
                     public: false,
                     request_oauth_on_install: false,
-                    setup_url: `${webhookBaseUrl}/github/install?source=${uuid}`,
+                    setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
                     setup_on_update: true,
                     default_permissions: {
                         contents: 'read',
@@ -54,5 +55,14 @@
                 form.submit();
             }
         </script>
+    @elseif($github_app->app_id && !$github_app->installation_id)
+        <a href="{{ $installation_url }}">
+            <x-inputs.button>Install Repositories</x-inputs.button>
+        </a>
+    @elseif($github_app->app_id && $github_app->installation_id)
+        <a href="{{ $installation_url }}">
+            <x-inputs.button>Update Repositories</x-inputs.button>
+        </a>
     @endif
+
 </x-layout>

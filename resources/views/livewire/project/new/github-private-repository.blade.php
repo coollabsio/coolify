@@ -2,7 +2,9 @@
     @if ($github_apps->count() > 0)
         <h1>Choose a GitHub App</h1>
         @foreach ($github_apps as $ghapp)
-            <x-inputs.button wire:click="loadRepositories({{ $ghapp->id }})">{{ $ghapp->name }}</x-inputs.button>
+            <x-inputs.button wire:key="{{ $ghapp->id }}" wire:click="loadRepositories({{ $ghapp->id }})">
+                {{ $ghapp->name }}
+            </x-inputs.button>
         @endforeach
         <div>
             @if ($repositories->count() > 0)

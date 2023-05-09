@@ -26,7 +26,7 @@ class All extends Component
             $this->application->refresh();
             $this->emit('clearAddEnv');
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
 }

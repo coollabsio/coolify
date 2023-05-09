@@ -16,6 +16,7 @@ class GithubPrivateRepository extends Component
     public $github_apps;
     public GithubApp $github_app;
     public $parameters;
+    public $type;
 
     public int $selected_repository_id;
     public string $selected_repository_owner;
@@ -110,8 +111,16 @@ class GithubPrivateRepository extends Component
     public function submit()
     {
         try {
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            if ($this->type === 'project') {
+                $project = Project::create([
+                    'name' => generateRandomName(),
+                    'team_id' => session('currentTeam')->id
+                ]);
+                $environment = $project->load(['environments'])->environments->first();
+            } else {
+                $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+                $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            }
             $application = Application::create([
                 'name' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}:{$this->selected_branch_name}",
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
@@ -130,7 +139,7 @@ class GithubPrivateRepository extends Component
                 'environment_name' => $environment->name
             ]);
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
     public function mount()

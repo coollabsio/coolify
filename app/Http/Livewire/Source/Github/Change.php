@@ -36,7 +36,7 @@ class Change extends Component
             $this->validate();
             $this->github_app->save();
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
     public function instantSave()
@@ -46,7 +46,7 @@ class Change extends Component
             $this->github_app->save();
             $this->emit('saved', 'GitHub settings updated!');
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
     public function mount()
@@ -64,7 +64,7 @@ class Change extends Component
             $this->github_app->delete();
             redirect()->route('dashboard');
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
 }

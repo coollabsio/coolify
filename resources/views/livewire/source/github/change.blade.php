@@ -21,6 +21,9 @@
             <x-inputs.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
             <x-inputs.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
             <x-inputs.button type="submit">Save</x-inputs.button>
+            <x-inputs.button isWarning x-on:click.prevent="deleteSource = true">
+                Delete
+            </x-inputs.button>
         @else
             <div class="py-2">
                 <x-inputs.button type="submit">Save</x-inputs.button>
@@ -30,6 +33,4 @@
             </div>
         @endif
     </form>
-
-
 </div>

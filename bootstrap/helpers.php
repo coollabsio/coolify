@@ -14,19 +14,23 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 
-if (!function_exists('generalErrorHandlerLivewire')) {
-    function generalErrorHandlerLivewire(\Throwable $e, $that)
+if (!function_exists('generalErrorHandler')) {
+    function generalErrorHandler(\Throwable $e, $that = null)
     {
-        if ($e instanceof QueryException) {
-            if ($e->errorInfo[0] === '23505') {
-                $that->emit('error', 'Duplicate entry found.');
-            } else if (count($e->errorInfo) === 4) {
-                $that->emit('error', $e->errorInfo[3]);
+        if ($that) {
+            if ($e instanceof QueryException) {
+                if ($e->errorInfo[0] === '23505') {
+                    $that->emit('error', 'Duplicate entry found.');
+                } else if (count($e->errorInfo) === 4) {
+                    $that->emit('error', $e->errorInfo[3]);
+                } else {
+                    $that->emit('error', $e->errorInfo[2]);
+                }
             } else {
-                $that->emit('error', $e->errorInfo[2]);
+                $that->emit('error', $e->getMessage());
             }
         } else {
-            $that->emit('error', $e);
+            dump($e);
         }
     }
 }

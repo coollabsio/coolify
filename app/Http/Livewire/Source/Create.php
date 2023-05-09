@@ -31,7 +31,7 @@ class Create extends Component
                 "custom_port" => 'required|int',
                 "is_system_wide" => 'required|bool',
             ]);
-            GithubApp::create([
+            $github_app = GithubApp::create([
                 'name' => $this->name,
                 'organization' => $this->organization,
                 'api_url' => $this->api_url,
@@ -41,8 +41,9 @@ class Create extends Component
                 'is_system_wide' => $this->is_system_wide,
                 'team_id' => session('currentTeam')->id,
             ]);
+            redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Exception $e) {
-            return generalErrorHandlerLivewire($e, $this);
+            return generalErrorHandler($e, $this);
         }
     }
 }
