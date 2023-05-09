@@ -33,6 +33,7 @@ class Form extends Component
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->is_https_forced = $this->is_https_forced;
         $this->settings->save();
+        $this->emit('saved', 'Settings updated!');
     }
     public function submit()
     {

@@ -44,10 +44,11 @@
         </x-inputs.button>
     </form>
     <div class="flex flex-col pt-4">
-        <x-inputs.input instantSave type="checkbox" id="is_static" label="Static website?" />
-        <x-inputs.input instantSave type="checkbox" id="is_git_submodules_allowed" label="Git Submodules Allowed?" />
-        <x-inputs.input instantSave type="checkbox" id="is_git_lfs_allowed" label="Git LFS Allowed?" />
-        <x-inputs.input instantSave type="checkbox" id="is_debug" label="Debug" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_static" label="Static website?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_git_submodules_allowed"
+            label="Git Submodules Allowed?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_git_lfs_allowed" label="Git LFS Allowed?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_debug" label="Debug" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_previews" label="Previews?" />

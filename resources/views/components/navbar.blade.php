@@ -1,5 +1,5 @@
 <nav class="flex gap-2 ">
-    <div>v{{ config('coolify.version') }}</div>
+    <div>v{{ config('version') }}</div>
     @auth
         <a href="/">Home</a>
         <a href="/command-center">Command Center</a>

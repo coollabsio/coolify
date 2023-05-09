@@ -1,5 +1,5 @@
 <?php
 
 return [
-    'version' => '4.0.0-nightly.2',
+    'dev_webhook' => env('SERVEO_URL'),
 ];

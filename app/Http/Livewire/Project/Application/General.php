@@ -57,6 +57,7 @@ class General extends Component
         $this->application->settings->is_dual_cert = $this->is_dual_cert;
         $this->application->settings->save();
         $this->application->refresh();
+        $this->emit('saved', 'Application settings updated!');
     }
     public function mount()
     {

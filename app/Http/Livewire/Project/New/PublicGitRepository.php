@@ -67,6 +67,7 @@ class PublicGitRepository extends Component
             $this->port = 3000;
             $this->publish_directory = null;
         }
+        $this->emit('saved', 'Application settings updated!');
     }
 
     public function submit()

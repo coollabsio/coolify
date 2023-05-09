@@ -44,6 +44,7 @@ class Change extends Component
         try {
             $this->github_app->is_system_wide = $this->is_system_wide;
             $this->github_app->save();
+            $this->emit('saved', 'GitHub settings updated!');
         } catch (\Exception $e) {
             return generalErrorHandlerLivewire($e, $this);
         }

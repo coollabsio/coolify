@@ -79,6 +79,10 @@
             Livewire.on('error', (message) => {
                 console.log(message);
             })
+            Livewire.on('saved', (message) => {
+                if (message) console.log(message);
+                else console.log('saved');
+            })
         </script>
     @endauth
 
