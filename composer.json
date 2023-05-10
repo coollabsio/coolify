@@ -13,6 +13,7 @@
         "laravel/horizon": "^5.15",
         "laravel/sanctum": "^v3.2.1",
         "laravel/tinker": "^v2.8.1",
+        "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "livewire/livewire": "^v2.12.3",
         "nubs/random-name-generator": "^2.2",

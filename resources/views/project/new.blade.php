@@ -4,6 +4,9 @@
     @elseif ($type === 'resource')
         <h1>New Resource</h1>
     @endif
+    <div id="vue">
+        <magic-search-bar></magic-search-bar>
+    </div>
     <div x-data="{ activeTab: 'choose' }">
         <div class="flex flex-col w-64 gap-2 mb-10">
             <x-inputs.button @click.prevent="activeTab = 'public-repo'">Public Repository</x-inputs.button>
