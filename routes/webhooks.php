@@ -95,16 +95,18 @@ Route::post('/source/github/events', function () {
         }
         $applications = Application::where('project_id', $id)->where('git_branch', $branch)->get();
         foreach ($applications as $application) {
-            GithubEventsApplications::create([
-                "delivery_guid" => $x_github_delivery,
-                "application_id" => $application->id
-            ]);
-            $deployment_uuid = new Cuid2(7);
-            dispatch(new DeployApplicationJob(
-                deployment_uuid: $deployment_uuid,
-                application_uuid: $application->uuid,
-                force_rebuild: false,
-            ));
+            if ($application->isDeployable()) {
+                GithubEventsApplications::create([
+                    "delivery_guid" => $x_github_delivery,
+                    "application_id" => $application->id
+                ]);
+                $deployment_uuid = new Cuid2(7);
+                dispatch(new DeployApplicationJob(
+                    deployment_uuid: $deployment_uuid,
+                    application_uuid: $application->uuid,
+                    force_rebuild: false,
+                ));
+            }
         }
     } catch (\Exception $e) {
         return generalErrorHandler($e);

@@ -49,7 +49,7 @@
             label="Git Submodules Allowed?" />
         <x-inputs.input noDirty instantSave type="checkbox" id="is_git_lfs_allowed" label="Git LFS Allowed?" />
         <x-inputs.input noDirty instantSave type="checkbox" id="is_debug" label="Debug" />
-        <x-inputs.input disabled instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_previews" label="Previews?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_custom_ssl" label="Is Custom SSL?" />

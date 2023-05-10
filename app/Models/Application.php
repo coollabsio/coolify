@@ -135,4 +135,11 @@ class Application extends BaseModel
     {
         return Activity::where('subject_id', $this->id)->where('properties->type_uuid', '=', $deployment_uuid)->first();
     }
+    public function isDeployable(): bool
+    {
+        if ($this->settings->is_auto_deploy) {
+            return true;
+        }
+        return false;
+    }
 }
