@@ -47,9 +47,15 @@ class Application extends BaseModel
     public function gitLocation(): Attribute
     {
         return Attribute::make(
-            get: fn () => is_null($this->git_commit_sha)
-                ? "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}"
-                : "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_commit_sha}"
+            get: function () {
+                if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+                    if (is_null($this->git_commit_sha)) {
+                        return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                    } else {
+                        return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_commit_sha}";
+                    }
+                }
+            }
 
         );
     }
