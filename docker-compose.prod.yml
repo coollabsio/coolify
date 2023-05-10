@@ -23,6 +23,7 @@ services:
       - DB_USERNAME
       - DB_PASSWORD
       - QUEUE_CONNECTION
+      - REDIS_PASSWORD
       - SSL_MODE=off
       - PHP_PM_CONTROL=dynamic
       - PHP_PM_START_SERVERS=5
