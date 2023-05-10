@@ -23,7 +23,7 @@ function sync-bunny {
     php artisan sync:bunny --env=secrets
 }
 function queue {
-    bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
+    bash vendor/bin/spin exec -u webuser coolify php artisan horizon
 }
 function schedule {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
