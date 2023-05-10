@@ -89,7 +89,7 @@ class PublicGitRepository extends Component
             $environment = $project->environments->where('name', $this->parameters['environment_name'])->firstOrFail();
         }
         $application_init = [
-            'name' => generateRandomName(),
+            'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
             'git_repository' => $git_repository,
             'git_branch' => $git_branch,
             'build_pack' => 'nixpacks',

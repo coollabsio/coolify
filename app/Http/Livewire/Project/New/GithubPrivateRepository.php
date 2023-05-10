@@ -133,7 +133,7 @@ class GithubPrivateRepository extends Component
                 $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
             }
             $application = Application::create([
-                'name' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}:{$this->selected_branch_name}",
+                'name' => generateRandomName() . "-{$this->selected_repository_owner}/{$this->selected_repository_repo}:{$this->selected_branch_name}",
                 'project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,

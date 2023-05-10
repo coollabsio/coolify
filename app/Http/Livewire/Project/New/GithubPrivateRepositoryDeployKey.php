@@ -88,7 +88,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $environment = $project->environments->where('name', $this->parameters['environment_name'])->firstOrFail();
         }
         $application_init = [
-            'name' => generateRandomName(),
+            'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
             'git_repository' => $git_repository,
             'git_branch' => $git_branch,
             'git_full_url' => "git@$git_host:$git_repository.git",
