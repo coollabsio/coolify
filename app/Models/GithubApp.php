@@ -8,6 +8,15 @@ class GithubApp extends BaseModel
     protected $casts = [
         'is_public' => 'boolean',
     ];
+    protected static function booted(): void
+    {
+        static::deleting(function (GithubApp $github_app) {
+            $applications_count = Application::where('source_id', $github_app->id)->count();
+            if ($applications_count > 0) {
+                throw new \Exception('You cannot delete this GitHub App because it is in use by ' . $applications_count . ' application(s). Delete them first.');
+            }
+        });
+    }
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');

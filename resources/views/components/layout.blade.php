@@ -78,6 +78,7 @@
             })
             Livewire.on('error', (message) => {
                 console.log(message);
+                alert(message);
             })
             Livewire.on('saved', (message) => {
                 if (message) console.log(message);

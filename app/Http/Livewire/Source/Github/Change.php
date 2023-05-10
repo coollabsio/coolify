@@ -4,10 +4,7 @@ namespace App\Http\Livewire\Source\Github;
 
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
-use Illuminate\Support\Str;
 
 class Change extends Component
 {

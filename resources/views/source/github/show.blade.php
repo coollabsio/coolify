@@ -64,5 +64,4 @@
             <x-inputs.button>Update Repositories</x-inputs.button>
         </a>
     @endif
-
 </x-layout>
