@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
+use Illuminate\Support\Str;
+
 
 if (!function_exists('generalErrorHandler')) {
     function generalErrorHandler(\Throwable $e, $that = null)
@@ -179,7 +181,7 @@ if (!function_exists('generateRandomName')) {
                 new \Nubs\RandomNameGenerator\Alliteration()
             ]
         );
-        return $generator->getName();
+        return Str::kebab($generator->getName());
     }
 }
 
