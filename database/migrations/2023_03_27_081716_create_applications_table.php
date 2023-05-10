@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('git_repository');
             $table->string('git_branch');
             $table->string('git_commit_sha')->default('HEAD');
+            $table->string('git_full_url')->nullable();
 
             $table->string('docker_registry_image_name')->nullable();
             $table->string('docker_registry_image_tag')->nullable();
@@ -55,8 +56,9 @@ return new class extends Migration
             $table->string('status')->default('exited');
 
             $table->nullableMorphs('destination');
-            $table->morphs('source');
+            $table->nullableMorphs('source');
 
+            $table->foreignId('private_key_id')->nullable();
             $table->foreignId('environment_id');
             $table->timestamps();
         });

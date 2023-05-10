@@ -7,7 +7,10 @@
     <div x-data="{ activeTab: 'choose' }">
         <div class="flex flex-col w-64 gap-2 mb-10">
             <x-inputs.button @click.prevent="activeTab = 'public-repo'">Public Repository</x-inputs.button>
-            <x-inputs.button @click.prevent="activeTab = 'github-private-repo'">Private Repository (GitHub App)
+            <x-inputs.button @click.prevent="activeTab = 'github-private-repo'">Private Repository (with GitHub App)
+            </x-inputs.button>
+            <x-inputs.button @click.prevent="activeTab = 'github-private-repo-deploy-key'">Private Repository (with
+                Deploy Key)
             </x-inputs.button>
             @if ($type === 'project')
                 <livewire:project.new.empty-project />
@@ -19,6 +22,9 @@
         </div>
         <div x-cloak x-show="activeTab === 'github-private-repo'">
             <livewire:project.new.github-private-repository :type="$type" />
+        </div>
+        <div x-cloak x-show="activeTab === 'github-private-repo-deploy-key'">
+            <livewire:project.new.github-private-repository-deploy-key :type="$type" />
         </div>
     </div>
 </x-layout>

@@ -28,6 +28,7 @@ class Application extends BaseModel
         'description',
         'git_repository',
         'git_branch',
+        'git_full_url',
         'build_pack',
         'environment_id',
         'destination_id',
@@ -37,6 +38,7 @@ class Application extends BaseModel
         'ports_mappings',
         'ports_exposes',
         'publish_directory',
+        'private_key_id'
     ];
     public function publishDirectory(): Attribute
     {
@@ -113,6 +115,10 @@ class Application extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class)->where('key', 'like', 'NIXPACKS_%');
     }
+    public function private_key()
+    {
+        return $this->belongsTo(PrivateKey::class);
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);
@@ -148,5 +154,15 @@ class Application extends BaseModel
             return true;
         }
         return false;
+    }
+    public function deploymentType()
+    {
+        if (data_get($this, 'source')) {
+            return 'source';
+        }
+        if (data_get($this, 'private_key_id')) {
+            return 'deploy_key';
+        }
+        throw new \Exception('No deployment type found');
     }
 }

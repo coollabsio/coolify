@@ -107,7 +107,10 @@ class DeployApplicationJob implements ShouldQueue
     {
         try {
             $coolify_instance_settings = InstanceSettings::find(0);
-            $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+            $deployment_type = $this->application->deploymentType();
+            if ($this->application->deploymentType() === 'source') {
+                $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+            }
 
             // Get Wildcard Domain
             $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
@@ -443,29 +446,19 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     }
     private function gitImport()
     {
-        $source_html_url = data_get($this->application, 'source.html_url');
-        $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-        $source_html_url_host = $url['host'];
-        $source_html_url_scheme = $url['scheme'];
-
         $git_clone_command = "git clone -q -b {$this->application->git_branch}";
-        if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
-            if ($this->source->is_public) {
-                $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
-                $git_clone_command = $this->setGitImportSettings($git_clone_command);
-                return [
-                    $this->execute_in_builder($git_clone_command)
-                ];
-            } else {
-                if (!$this->source->app_id) {
-                    $private_key = base64_encode($this->source->privateKey->private_key);
 
-                    $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} git@$source_html_url_host:{$this->application->git_repository}.git {$this->workdir}";
+        if ($this->application->deploymentType() === 'source') {
+            $source_html_url = data_get($this->application, 'source.html_url');
+            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
+            $source_html_url_host = $url['host'];
+            $source_html_url_scheme = $url['scheme'];
+
+            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                if ($this->source->is_public) {
+                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
                     $git_clone_command = $this->setGitImportSettings($git_clone_command);
                     return [
-                        $this->execute_in_builder("mkdir -p /root/.ssh"),
-                        $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
-                        $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
                         $this->execute_in_builder($git_clone_command)
                     ];
                 } else {
@@ -475,6 +468,17 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                     ];
                 }
             }
+        }
+        if ($this->application->deploymentType() === 'deploy_key') {
+            $private_key = base64_encode($this->application->private_key->private_key);
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->workdir}";
+            $git_clone_command = $this->setGitImportSettings($git_clone_command);
+            return [
+                $this->execute_in_builder("mkdir -p /root/.ssh"),
+                $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
+                $this->execute_in_builder($git_clone_command)
+            ];
         }
     }
     private function nixpacks_build_cmd()

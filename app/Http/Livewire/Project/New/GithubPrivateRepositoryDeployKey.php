@@ -3,33 +3,31 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Application;
-use App\Models\GithubApp;
-use App\Models\GitlabApp;
+use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Spatie\Url\Url;
 
-class PublicGitRepository extends Component
+class GithubPrivateRepositoryDeployKey extends Component
 {
-    public string $repository_url;
-    public int $port = 3000;
-    public string $type;
     public $parameters;
+    public $private_keys;
+    public int $private_key_id;
+    public string $repository_url;
 
     public $servers;
     public $standalone_docker;
     public $swarm_docker;
     public $chosenServer;
     public $chosenDestination;
-    public $github_apps;
-    public $gitlab_apps;
+
+    public int $port = 3000;
+    public string $type;
 
     public bool $is_static = false;
     public null|string $publish_directory = null;
-
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
@@ -40,9 +38,9 @@ class PublicGitRepository extends Component
     {
         if (config('app.env') === 'local') {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
-            $this->port = 3000;
         }
         $this->parameters = getParameters();
+        $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
         $this->servers = session('currentTeam')->load(['servers'])->servers;
     }
     public function chooseServer($server)
@@ -57,7 +55,6 @@ class PublicGitRepository extends Component
         $instance = new $class;
         $this->chosenDestination = $instance::where('uuid', $destination_uuid)->first();
     }
-
     public function instantSave()
     {
         if ($this->is_static) {
@@ -67,9 +64,11 @@ class PublicGitRepository extends Component
             $this->port = 3000;
             $this->publish_directory = null;
         }
-        $this->emit('saved', 'Application settings updated!');
     }
-
+    public function setPrivateKey($private_key_id)
+    {
+        $this->private_key_id = $private_key_id;
+    }
     public function submit()
     {
         $this->validate();
@@ -92,21 +91,15 @@ class PublicGitRepository extends Component
             'name' => generateRandomName(),
             'git_repository' => $git_repository,
             'git_branch' => $git_branch,
+            'git_full_url' => "git@$git_host:$git_repository.git",
             'build_pack' => 'nixpacks',
             'ports_exposes' => $this->port,
             'publish_directory' => $this->publish_directory,
             'environment_id' => $environment->id,
             'destination_id' => $this->chosenDestination->id,
             'destination_type' => $this->chosenDestination->getMorphClass(),
+            'private_key_id' => $this->private_key_id,
         ];
-        if ($git_host == 'github.com') {
-            $application_init['source_id'] = GithubApp::where('name', 'Public GitHub')->first()->id;
-            $application_init['source_type'] = GithubApp::class;
-        } elseif ($git_host == 'gitlab.com') {
-            $application_init['source_id'] = GitlabApp::where('name', 'Public GitLab')->first()->id;
-            $application_init['source_type'] = GitlabApp::class;
-        } elseif ($git_host == 'bitbucket.org') {
-        }
         $application = Application::create($application_init);
         $application->settings->is_static = $this->is_static;
         $application->settings->save();
