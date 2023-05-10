@@ -19,4 +19,13 @@ class Source extends Component
     {
         $this->application = Application::where('id', $this->applicationId)->first();
     }
+    public function submit()
+    {
+        $this->validate();
+        if (!$this->application->git_commit_sha) {
+            $this->application->git_commit_sha = 'HEAD';
+        }
+        $this->application->save();
+        $this->emit('saved', 'Application source updated!');
+    }
 }

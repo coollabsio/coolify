@@ -1,5 +1,5 @@
 <nav class="flex gap-4 py-2">
-    <a target="_blank" href="{{ $gitLocation }}">
+    <a target="_blank" href="{{ $gitBranchLocation }}">
         <x-inputs.button>Open on Git ↗️</x-inputs.button>
     </a>
     <a

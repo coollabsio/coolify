@@ -22,7 +22,7 @@ return new class extends Migration
 
             $table->string('git_repository');
             $table->string('git_branch');
-            $table->string('git_commit_sha')->nullable();
+            $table->string('git_commit_sha')->default('HEAD');
 
             $table->string('docker_registry_image_name')->nullable();
             $table->string('docker_registry_image_tag')->nullable();

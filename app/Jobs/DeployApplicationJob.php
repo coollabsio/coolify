@@ -430,8 +430,8 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
     }
     private function setGitImportSettings($git_clone_command)
     {
-        if ($this->application->git_commit_sha) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git checkout {$this->application->git_commit_sha}";
+        if ($this->application->git_commit_sha !== 'HEAD') {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
         }
         if ($this->application->settings->is_git_submodules_allowed) {
             $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
