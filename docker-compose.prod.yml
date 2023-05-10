@@ -2,7 +2,6 @@ version: '3.8'
 services:
   coolify:
     image: "ghcr.io/coollabsio/coolify:${APP_TAG:-4.0.0-nightly.0}"
-    container_name: coolify
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -41,7 +40,6 @@ services:
       postgres:
         condition: service_healthy
   postgres:
-    container_name: coolify-db
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
@@ -59,6 +57,19 @@ services:
       interval: 2s
       retries: 5
       timeout: 2s
+  redis:
+    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    volumes:
+      - coolify-redis:/data
+    healthcheck:
+      test: redis-cli ping
+      interval: 2s
+      retries: 5
+      timeout: 2s
 volumes:
   coolify-db:
     name: coolify-db
+  coolify-redis:
+    name: coolify-redis

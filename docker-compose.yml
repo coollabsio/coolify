@@ -1,6 +1,7 @@
 version: '3.8'
 services:
     coolify:
+        container_name: coolify
         restart: always
         working_dir: /var/www/html
         extra_hosts:
@@ -12,6 +13,13 @@ services:
 
     postgres:
         image: postgres:15-alpine
+        container_name: coolify-db
+        restart: always
+        networks:
+            - coolify
+    redis:
+        image: redis:alpine
+        container_name: coolify-redis
         restart: always
         networks:
             - coolify
