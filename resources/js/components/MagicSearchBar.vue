@@ -1,8 +1,8 @@
 <template>
     <div class="flex justify-center">
         <div class="flex flex-col">
-            <input v-model="search" class="w-96" placeholder="🪄 Let the magic happen... Just type...">
-            <div class="mt-1 text-sm bg-neutral-800">
+            <input @focus="toggle" @blur="toggleAndClear" v-model="search" class="w-96" placeholder="🪄 Let the magic happen... Just type...">
+            <div v-if="menuOpen" class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <div class="py-2 pl-4 cursor-pointer hover:bg-neutral-700" v-for="(item, index) in filteredItems(items)">
                     {{ item.name }}
                 </div>
@@ -16,6 +16,7 @@
 export default {
     data() {
         return {
+            menuOpen : false,
             search: '',
             selectedMenus: '',
             items: [{
@@ -38,6 +39,13 @@ export default {
         }
     },
     methods: {
+        toggle() {
+            this.menuOpen = !this.menuOpen
+        },
+        toggleAndClear() {
+            this.menuOpen = false
+            this.search = ''
+        },
         filteredItems(items) {
             console.log(items)
             return items.filter(item => {

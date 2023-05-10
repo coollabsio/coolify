@@ -74,4 +74,10 @@ class User extends Authenticatable
             return $team->id != $team_id;
         });
     }
+    public function resources()
+    {
+        $team_id = data_get(session('currentTeam'), 'id');
+        $data = Application::where('team_id', $team_id)->get();
+        return $data;
+    }
 }

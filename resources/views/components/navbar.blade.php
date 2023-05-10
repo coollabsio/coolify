@@ -7,6 +7,8 @@
         @if (auth()->user()->isRoot())
             <a href="/settings">Settings</a>
         @endif
+        <x-magic-search-bar />
+        <div class="flex-1"></div>
         <form action="/logout" method="POST">
             @csrf
             <x-inputs.button type="submit">Logout</x-inputs.button>
