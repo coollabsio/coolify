@@ -41,6 +41,8 @@ class SyncBunny extends Command
         $docker_install_script = "install-docker.sh";
         $production_env = ".env.production";
 
+        $versions = "versions.json";
+
         PendingRequest::macro('storage', function ($file) {
             $headers = [
                 'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
@@ -68,6 +70,7 @@ class SyncBunny extends Command
                 $pool->storage(file: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
                 $pool->storage(file: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
                 $pool->storage(file: "$parent_dir/scripts/$docker_install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$docker_install_script"),
+                $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$versions"),
             ]);
             Http::pool(fn (Pool $pool) => [
                 $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$compose_file"),
@@ -76,6 +79,7 @@ class SyncBunny extends Command
                 $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$install_script"),
                 $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$docker_install_script"),
+                $pool->purge(url: "$bunny_cdn/$versions"),
             ]);
             echo "All files uploaded & purged...\n";
             return;

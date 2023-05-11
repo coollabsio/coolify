@@ -177,7 +177,7 @@ if (!function_exists('instantRemoteProcess')) {
 if (!function_exists('getLatestVersionOfCoolify')) {
     function getLatestVersionOfCoolify()
     {
-        $response = Http::get('https://get.coollabs.io/versions.json');
+        $response = Http::get('https://coolify-cdn.b-cdn.net/versions.json');
         $versions = $response->json();
         return data_get($versions, 'coolify.v4.version');
     }
