@@ -1,6 +1,6 @@
 import Alpine from "alpinejs";
 import { createApp } from "vue";
-import MagicSearchBar from "./components/MagicSearchBar.vue";
+// import MagicSearchBar from "./components/MagicSearchBar.vue";
 window.Alpine = Alpine;
 Alpine.start();
 
