@@ -6,6 +6,8 @@ use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -16,6 +18,7 @@ class GithubPrivateRepository extends Component
     public $github_apps;
     public GithubApp $github_app;
     public $parameters;
+    public $query;
     public $type;
 
     public int $selected_repository_id;
@@ -24,16 +27,10 @@ class GithubPrivateRepository extends Component
 
     public string $selected_branch_name = 'main';
 
-    public int $selected_server_id;
-    public int $selected_destination_id;
-    public string $selected_destination_class;
-
     public string $token;
 
     protected int $page = 1;
 
-    public $servers;
-    public $destinations;
     public $repositories;
     public int $total_repositories_count = 0;
 
@@ -42,7 +39,6 @@ class GithubPrivateRepository extends Component
 
     protected function loadRepositoryByPage()
     {
-        Log::info('Loading page ' . $this->page);
         $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
         $json = $response->json();
         if ($response->status() !== 200) {
@@ -96,55 +92,37 @@ class GithubPrivateRepository extends Component
             }
         }
     }
-    public function loadServers()
-    {
-        try {
-            $this->servers = Server::validated();
-            $this->selected_server_id = $this->servers[0]['id'];
-        } catch (\Exception $e) {
-            return generalErrorHandler($e);
-        }
-    }
-    public function loadDestinations()
-    {
-        try {
-            $server = $this->servers->where('id', $this->selected_server_id)->first();
-            if ($server->standaloneDockers->count() === 0 && $server->swarmDockers->count() === 0) {
-                $this->destinations = 0;
-            }
-            $this->destinations = $server->standaloneDockers->merge($server->swarmDockers);
-            $this->selected_destination_id = $this->destinations[0]['id'];
-            $this->selected_destination_class = $this->destinations[0]->getMorphClass();
-        } catch (\Exception $e) {
-            return generalErrorHandler($e);
-        }
-    }
     public function submit()
     {
         try {
-            if ($this->type === 'project') {
-                $project = Project::create([
-                    'name' => generateRandomName(),
-                    'team_id' => session('currentTeam')->id
-                ]);
-                $environment = $project->load(['environments'])->environments->first();
-            } else {
-                $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-                $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            $destination_uuid = $this->query['destination'];
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            if (!$destination) {
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
             }
+            if (!$destination) {
+                throw new \Exception('Destination not found. What?!');
+            }
+            $destination_class = $destination->getMorphClass();
+
+
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+
             $application = Application::create([
                 'name' => generateRandomName() . "-{$this->selected_repository_owner}/{$this->selected_repository_repo}:{$this->selected_branch_name}",
-                'project_id' => $this->selected_repository_id,
+                'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
                 'build_pack' => 'nixpacks',
                 'ports_exposes' => '3000',
                 'environment_id' => $environment->id,
-                'destination_id' => $this->selected_destination_id,
-                'destination_type' => $this->selected_destination_class,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
                 'source_type' => GithubApp::class,
             ]);
+
             redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'project_uuid' => $project->uuid,
@@ -157,7 +135,8 @@ class GithubPrivateRepository extends Component
     public function mount()
     {
         $this->parameters = getParameters();
-        $this->repositories = $this->branches = $this->servers = $this->destinations = collect();
+        $this->query = request()->query();
+        $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
     }
 }

@@ -17,22 +17,31 @@ use Illuminate\Support\Str;
 
 
 if (!function_exists('generalErrorHandler')) {
-    function generalErrorHandler(\Throwable $e, $that = null)
+    function generalErrorHandler(\Throwable $e, $that = null, $isJson = false)
     {
-        if ($that) {
+        try {
             if ($e instanceof QueryException) {
                 if ($e->errorInfo[0] === '23505') {
-                    $that->emit('error', 'Duplicate entry found.');
+                    throw new \Exception('Duplicate entry found.', '23505');
                 } else if (count($e->errorInfo) === 4) {
-                    $that->emit('error', $e->errorInfo[3]);
+                    throw new \Exception($e->errorInfo[3]);
                 } else {
-                    $that->emit('error', $e->errorInfo[2]);
+                    throw new \Exception($e->errorInfo[2]);
                 }
             } else {
-                $that->emit('error', $e->getMessage());
+                throw new \Exception($e->getMessage());
             }
-        } else {
-            dump($e);
+        } catch (\Throwable $error) {
+            if ($that) {
+                $that->emit('error', $error);
+            } elseif ($isJson) {
+                return response()->json([
+                    'code' => $error->getCode(),
+                    'error' => $error->getMessage(),
+                ]);
+            } else {
+                dump('Duplicate entry found.');
+            }
         }
     }
 }

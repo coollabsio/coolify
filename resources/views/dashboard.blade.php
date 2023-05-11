@@ -1,7 +1,5 @@
 <x-layout>
-    <h1>Projects <a href="{{ route('project.new') }}">
-            <x-inputs.button>New</x-inputs.button>
-        </a></h1>
+    <h1>Projects </h1>
     @forelse ($projects as $project)
         <a href="{{ route('project.environments', [$project->uuid]) }}">{{ data_get($project, 'name') }}</a>
     @empty

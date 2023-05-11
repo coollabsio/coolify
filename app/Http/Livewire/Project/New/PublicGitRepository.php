@@ -8,7 +8,6 @@ use App\Models\GitlabApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -18,12 +17,8 @@ class PublicGitRepository extends Component
     public int $port = 3000;
     public string $type;
     public $parameters;
+    public $query;
 
-    public $servers;
-    public $standalone_docker;
-    public $swarm_docker;
-    public $chosenServer;
-    public $chosenDestination;
     public $github_apps;
     public $gitlab_apps;
 
@@ -43,19 +38,7 @@ class PublicGitRepository extends Component
             $this->port = 3000;
         }
         $this->parameters = getParameters();
-        $this->servers = session('currentTeam')->load(['servers'])->servers;
-    }
-    public function chooseServer($server)
-    {
-        $this->chosenServer = $server;
-        $this->standalone_docker = StandaloneDocker::where('server_id', $server['id'])->get();
-        $this->swarm_docker = SwarmDocker::where('server_id', $server['id'])->get();
-    }
-    public function setDestination($destination_uuid, $destination_type)
-    {
-        $class = "App\Models\\{$destination_type}";
-        $instance = new $class;
-        $this->chosenDestination = $instance::where('uuid', $destination_uuid)->first();
+        $this->query = request()->query();
     }
 
     public function instantSave()
@@ -72,49 +55,58 @@ class PublicGitRepository extends Component
 
     public function submit()
     {
-        $this->validate();
-        $url = Url::fromString($this->repository_url);
-        $git_host = $url->getHost();
-        $git_repository = $url->getSegment(1) . '/' . $url->getSegment(2);
-        $git_branch = $url->getSegment(4) ?? 'main';
+        try {
+            $this->validate();
 
-        if ($this->type === 'project') {
-            $project = Project::create([
-                'name' => generateRandomName(),
-                'team_id' => session('currentTeam')->id,
+            $url = Url::fromString($this->repository_url);
+            $git_host = $url->getHost();
+            $git_repository = $url->getSegment(1) . '/' . $url->getSegment(2);
+            $git_branch = $url->getSegment(4) ?? 'main';
+
+            $destination_uuid = $this->query['destination'];
+            $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+            if (!$destination) {
+                $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
+            }
+            if (!$destination) {
+                throw new \Exception('Destination not found. What?!');
+            }
+            $destination_class = $destination->getMorphClass();
+
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+
+
+            $application_init = [
+                'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
+                'git_repository' => $git_repository,
+                'git_branch' => $git_branch,
+                'build_pack' => 'nixpacks',
+                'ports_exposes' => $this->port,
+                'publish_directory' => $this->publish_directory,
+                'environment_id' => $environment->id,
+                'destination_id' => $destination->id,
+                'destination_type' => $destination_class,
+            ];
+            if ($git_host == 'github.com') {
+                $application_init['source_id'] = GithubApp::where('name', 'Public GitHub')->first()->id;
+                $application_init['source_type'] = GithubApp::class;
+            } elseif ($git_host == 'gitlab.com') {
+                $application_init['source_id'] = GitlabApp::where('name', 'Public GitLab')->first()->id;
+                $application_init['source_type'] = GitlabApp::class;
+            } elseif ($git_host == 'bitbucket.org') {
+            }
+            $application = Application::create($application_init);
+            $application->settings->is_static = $this->is_static;
+            $application->settings->save();
+
+            return redirect()->route('project.application.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'application_uuid' => $application->uuid,
             ]);
-            $environment = $project->environments->first();
-        } else {
-            $project = Project::where('uuid', $this->parameters['project_uuid'])->firstOrFail();
-            $environment = $project->environments->where('name', $this->parameters['environment_name'])->firstOrFail();
+        } catch (\Exception $e) {
+            return generalErrorHandler($e);
         }
-        $application_init = [
-            'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
-            'git_repository' => $git_repository,
-            'git_branch' => $git_branch,
-            'build_pack' => 'nixpacks',
-            'ports_exposes' => $this->port,
-            'publish_directory' => $this->publish_directory,
-            'environment_id' => $environment->id,
-            'destination_id' => $this->chosenDestination->id,
-            'destination_type' => $this->chosenDestination->getMorphClass(),
-        ];
-        if ($git_host == 'github.com') {
-            $application_init['source_id'] = GithubApp::where('name', 'Public GitHub')->first()->id;
-            $application_init['source_type'] = GithubApp::class;
-        } elseif ($git_host == 'gitlab.com') {
-            $application_init['source_id'] = GitlabApp::where('name', 'Public GitLab')->first()->id;
-            $application_init['source_type'] = GitlabApp::class;
-        } elseif ($git_host == 'bitbucket.org') {
-        }
-        $application = Application::create($application_init);
-        $application->settings->is_static = $this->is_static;
-        $application->settings->save();
-
-        return redirect()->route('project.application.configuration', [
-            'project_uuid' => $project->uuid,
-            'environment_name' => $environment->name,
-            'application_uuid' => $application->uuid,
-        ]);
     }
 }

@@ -35,48 +35,7 @@
                         @endif
                     @endforeach
                 </select>
-                <x-inputs.button wire:click="loadServers">Select Branch</x-inputs.button>
-            @endif
-        </div>
-
-        <div>
-            @if ($servers->count() > 0)
-                <h3>Choose a Server</h3>
-                <select wire:model.defer="selected_server_id">
-                    <option disabled>Choose a server</option>
-                    @foreach ($servers as $server)
-                        @if ($loop->first)
-                            <option selected value="{{ data_get($server, 'id') }}">{{ data_get($server, 'name') }}
-                            </option>
-                        @else
-                            <option value="{{ data_get($server, 'id') }}">{{ data_get($server, 'name') }}</option>
-                        @endif
-                    @endforeach
-                </select>
-                <x-inputs.button wire:click="loadDestinations">Select Server</x-inputs.button>
-            @endif
-        </div>
-        <div>
-            @if ($destinations->count() > 0)
-                <h3>Choose a Destination</h3>
-                <select wire:model.defer="selected_destination_id">
-                    <option disabled>Choose a destination</option>
-                    @foreach ($destinations as $destination)
-                        @if ($loop->first)
-                            <option selected value="{{ data_get($destination, 'id') }}">
-                                {{ data_get($destination, 'network') }}</option>
-                        @else
-                            <option value="{{ data_get($destination, 'id') }}">{{ data_get($destination, 'network') }}
-                            </option>
-                        @endif
-                    @endforeach
-                </select>
-                <x-inputs.button wire:click="submit">Select Destination</x-inputs.button>
-            @else
-                <h1>No destinations found on this server.</h1>
-                <a href="{{ route('destination.new', ['server_id' => $selected_server_id]) }}">Add
-                    a
-                    destination</a>
+                <x-inputs.button wire:click="submit">Save</x-inputs.button>
             @endif
         </div>
     @else

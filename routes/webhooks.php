@@ -93,7 +93,7 @@ Route::post('/source/github/events', function () {
         if (!$id || !$branch) {
             return response('not cool');
         }
-        $applications = Application::where('project_id', $id)->where('git_branch', $branch)->get();
+        $applications = Application::where('repository_project_id', $id)->where('git_branch', $branch)->get();
         foreach ($applications as $application) {
             if ($application->isDeployable()) {
                 $deployment_uuid = new Cuid2(7);

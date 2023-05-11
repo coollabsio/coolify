@@ -28,6 +28,7 @@ class Server extends BaseModel
         'extra_attributes' => SchemalessAttributes::class,
     ];
 
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
@@ -56,5 +57,12 @@ class Server extends BaseModel
     static public function validated()
     {
         return Server::where('team_id', session('currentTeam')->id)->whereRelation('settings', 'is_validated', true)->get();
+    }
+    static public function destinations($server_uuid)
+    {
+        $server = Server::where('team_id', session('currentTeam')->id)->where('uuid', $server_uuid)->firstOrFail();
+        $standaloneDocker = collect($server->standaloneDockers->all());
+        $swarmDocker = collect($server->swarmDockers->all());
+        return $standaloneDocker->concat($swarmDocker);
     }
 }

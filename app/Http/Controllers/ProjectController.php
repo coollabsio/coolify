@@ -19,7 +19,7 @@ class ProjectController extends Controller
         return view('project.environments', ['project' => $project]);
     }
 
-    public function resources_new()
+    public function new()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -29,7 +29,12 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        return view('project.new', ['project' => $project, 'environment' => $environment, 'type' => 'resource']);
+
+        $type = request()->query('type');
+
+        return view('project.new', [
+            'type' => $type
+        ]);
     }
     public function resources()
     {
