@@ -27,7 +27,9 @@ class StandaloneDocker extends Component
             if (request()->query('server_id')) {
                 $this->server_id = request()->query('server_id');
             } else {
-                $this->server_id = Server::validated()->first()->id;
+                if ($this->servers->count() > 0) {
+                    $this->server_id = $this->servers->first()->id;
+                }
             }
         }
         $this->network = new Cuid2(7);

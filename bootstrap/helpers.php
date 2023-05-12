@@ -40,7 +40,7 @@ if (!function_exists('generalErrorHandler')) {
                     'error' => $error->getMessage(),
                 ]);
             } else {
-                dump('Duplicate entry found.');
+                dump($error);
             }
         }
     }

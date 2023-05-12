@@ -1,4 +1,4 @@
-<div x-data="magicsearchbar" @slash.window="mainMenu = true">
+<div x-data="magicsearchbar" @slash.window="mainMenu = true" class="pt-2">
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>
@@ -13,11 +13,11 @@
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-green-600 rounded" x-show="item.type === 'Add'"
+                        <span class="px-2 mr-1 text-xs text-white bg-green-600 rounded" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
-                        <span class="px-2 mr-1 text-xs bg-purple-600 rounded" x-show="item.type === 'Jump'"
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-600 rounded" x-show="item.type === 'Jump'"
                             x-text="item.type"></span>
-                        <span class="px-2 mr-1 text-xs bg-blue-600 rounded" x-show="item.type === 'New'"
+                        <span class="px-2 mr-1 text-xs text-white bg-blue-600 rounded" x-show="item.type === 'New'"
                             x-text="item.type"></span>
                         <span x-text="item.name"></span>
                     </div>
@@ -32,10 +32,15 @@
                 x-on:keydown.down="focusNext(servers.length)" x-on:keydown.up="focusPrev(servers.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('destination',filteredServers()[focusedIndex].uuid)" />
             <div class="magic-items">
+                <template x-if="servers.length === 0">
+                    <div class="magic-item" x-on:click="set('newServer')">
+                        <span>No server found. Click here to add a new one!</span>
+                    </div>
+                </template>
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-600 rounded">Server</span>
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-600 rounded">Server</span>
                         <span x-text="server.name"></span>
                     </div>
                 </template>
@@ -47,6 +52,7 @@
         <div x-on:click.outside="closeMenus">
             <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a destination..."
                 x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
+                x-on:keyup.escape="closeMenus"
                 x-on:keyup.enter="focusedIndex !== '' && await set('project',filteredDestinations()[focusedIndex].uuid)" />
             <div class="magic-items">
                 <template x-if="destinations.length === 0">
@@ -57,18 +63,19 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Destination</span>
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
             </div>
         </div>
     </template>
-    {{-- Projects --}}
+    {{-- Project --}}
     <template x-cloak x-if="projectMenu">
         <div x-on:click.outside="closeMenus">
             <input class="magic-input" x-ref="search" x-model="search" placeholder="Type your project name..."
                 x-on:keydown.down="focusNext(projects.length + 1)" x-on:keydown.up="focusPrev(projects.length + 1)"
+                x-on:keyup.escape="closeMenus"
                 x-on:keyup.enter="focusedIndex !== '' && await set('environment',filteredProjects()[focusedIndex - 1]?.uuid)" />
             <div class="magic-items">
                 <div x-on:click="await newProject" class="magic-item"
@@ -79,7 +86,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Project</span>
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Project</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -91,7 +98,7 @@
         <div x-on:click.outside="closeMenus">
             <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a environment..."
                 x-on:keydown.down="focusNext(environments.length + 1)"
-                x-on:keydown.up="focusPrev(environments.length + 1)"
+                x-on:keydown.up="focusPrev(environments.length + 1)" x-on:keyup.escape="closeMenus"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
             <div class="magic-items">
                 <div x-on:click="await newEnvironment" class="magic-item"
@@ -102,7 +109,7 @@
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Env</span>
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
                 </template>
@@ -113,14 +120,20 @@
     <template x-cloak x-if="projectsMenu">
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a project..."
-                x-on:keydown.down="focusNext(projects.length)" x-on:keydown.up="focusPrev(projects.length)"
-                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex].uuid)" />
+                x-on:keyup.escape="closeMenus" x-on:keydown.down="focusNext(projects.length)"
+                x-on:keydown.up="focusPrev(projects.length)"
+                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex]?.uuid)" />
             <div class="magic-items">
+                <template x-if="projects.length === 0">
+                    <div class="magic-item hover:bg-neutral-800">
+                        <span>No projects found.</span>
+                    </div>
+                </template>
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'"
                         class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Jump</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -130,10 +143,16 @@
     {{-- Destinations --}}
     <template x-cloak x-if="destinationsMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="magic-items" placeholder="Select a destination..."
-                x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
+            <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a destination..."
+                x-on:keyup.escape="closeMenus" x-on:keydown.down="focusNext(destinations.length)"
+                x-on:keydown.up="focusPrev(destinations.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToDestination',filteredDestinations()[focusedIndex].uuid)" />
             <div class="magic-items">
+                <template x-if="destinations.length === 0">
+                    <div class="magic-item" x-on:click="set('newDestination')">
+                        <span>No destination found. Click here to add a new one!</span>
+                    </div>
+                </template>
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'"
@@ -203,49 +222,50 @@
 
             focusedIndex: "",
             items: [{
+                    name: 'Server',
+                    type: 'Add',
+                    tags: 'new,server',
+                    next: 'newServer'
+                },
+                {
+                    name: 'Destination',
+                    type: 'Add',
+                    tags: 'new,destination',
+                    next: 'newDestination'
+                },
+                {
+                    name: 'Private Key',
+                    type: 'Add',
+                    tags: 'new,private-key,ssh,key',
+                    next: 'newPrivateKey'
+                },
+                {
+                    name: 'Source',
+                    type: 'Add',
+                    tags: 'new,source,github,gitlab,bitbucket',
+                    next: 'newSource'
+                },
+                {
                     name: 'Public Repository',
                     type: 'Add',
-                    tags: 'application,public,repository',
+                    tags: 'application,public,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Private Repository (with GitHub App)',
                     type: 'Add',
-                    tags: 'application,private,repository',
+                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Private Repository (with Deploy Key)',
                     type: 'Add',
-                    tags: 'application,private,repository',
+                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Database',
                     type: 'Add',
                     tags: 'data,database,mysql,postgres,sql,sqlite,redis,mongodb,maria,percona',
                 },
-                {
-                    name: 'Server',
-                    type: 'New',
-                    tags: 'new,server',
-                    next: 'newServer'
-                },
-                {
-                    name: 'Destination',
-                    type: 'New',
-                    tags: 'new,destination',
-                    next: 'newDestination'
-                },
-                {
-                    name: 'Private Key',
-                    type: 'New',
-                    tags: 'new,private-key,ssh,key',
-                    next: 'newPrivateKey'
-                },
-                {
-                    name: 'Source',
-                    type: 'New',
-                    tags: 'new,source,github,gitlab,bitbucket',
-                    next: 'newSource'
-                },
+
                 {
                     name: 'Servers',
                     type: 'Jump',

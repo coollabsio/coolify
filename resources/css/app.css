@@ -1,39 +1,46 @@
-/* @tailwind base; */
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 body {
-    @apply bg-neutral-900 text-white font-sans;
+    @apply bg-coolgray-100 text-white font-sans;
 }
-a, a:visited {
-    @apply text-neutral-300 hover:text-purple-500;
-}
+
 input, textarea {
-    @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none
+    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none  ;
 }
 select {
-    @apply border-none p-2 bg-neutral-800 text-white disabled:text-neutral-600  read-only:select-none
+    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
 }
 
 button {
     @apply border-none px-2 p-1 cursor-pointer;
 }
 .main-menu {
-    @apply relative float-left ;
+    @apply relative float-left;
 }
 .main-menu:after {
     content: '/';
-    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-1;
+    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-[0.3rem];
 }
 .magic-input {
-    @apply w-96 rounded shadow outline-none focus:bg-neutral-700;
+    @apply w-[25rem] rounded shadow outline-none focus:bg-neutral-700 text-white;
 }
 .magic-items {
-    @apply text-xs absolute top-11 w-[25rem] bg-neutral-800;
+    @apply absolute top-14 w-[25rem] bg-coolgray-200 border-b-2 border-r-2 border-l-2 border-solid border-coolgray-100 rounded-b;
 }
 .magic-item {
     @apply m-2 py-2 pl-4 cursor-pointer hover:bg-neutral-700 text-neutral-300 hover:text-white;
 }
 .magic-item-focused {
     @apply bg-neutral-700 text-white;
+}
+h1 {
+    @apply text-3xl font-bold py-4;
+}
+h2 {
+    @apply text-xl font-bold py-4;
+}
+.box {
+    @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs p-2;
 }

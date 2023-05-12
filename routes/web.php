@@ -130,7 +130,13 @@ Route::middleware(['auth'])->group(function () {
     })->name('update');
 
     Route::get('/command-center', function () {
-        return view('command-center');
+        $servers = Server::validated();
+        if ($servers->count() === 0) {
+            return redirect()->route('dashboard');
+        }
+        return view('command-center', [
+            'servers' => $servers,
+        ]);
     })->name('command-center');
 });
 

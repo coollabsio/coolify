@@ -1,10 +1,10 @@
 @props([
     'isWarning' => null,
     'disabled' => null,
-    'defaultClass' => 'text-white bg-neutral-800 hover:bg-violet-600 h-8',
-    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600 h-8',
-    'disabledClass' => 'text-neutral-400 bg-neutral-900 h-8',
-    'loadingClass' => 'text-black bg-green-500 h-8',
+    'defaultClass' => 'text-white hover:bg-coollabs h-8 rounded transition-colors',
+    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600 h-8 rounded',
+    'disabledClass' => 'text-coolgray-200 h-8 rounded',
+    'loadingClass' => 'text-black bg-green-500 h-8 rounded',
     'confirm' => null,
     'confirmAction' => null,
 ])

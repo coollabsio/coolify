@@ -4,6 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
+    <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @env('local')
     <title>Coolify - localhost</title>
     @endenv
@@ -28,7 +30,7 @@
     @auth
         <x-navbar />
     @endauth
-    <main>
+    <main class="max-w-6xl pt-10 mx-auto">
         {{ $slot }}
     </main>
 

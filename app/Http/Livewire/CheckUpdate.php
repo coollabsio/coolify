@@ -2,8 +2,6 @@
 
 namespace App\Http\Livewire;
 
-use App\Models\Server;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class CheckUpdate extends Component
