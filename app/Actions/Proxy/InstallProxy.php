@@ -3,12 +3,14 @@
 namespace App\Actions\Proxy;
 
 use App\Enums\ActivityTypes;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
+use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 
 class InstallProxy
 {
-    public function __invoke(Server $server)
+    public function __invoke(Server $server): Activity
     {
         $docker_compose_yml_base64 = base64_encode(
             $this->getDockerComposeContents()
@@ -30,6 +32,10 @@ class InstallProxy
             'docker ps',
         ], $server, ActivityTypes::INLINE->value);
 
+        // Persist to Database
+        $server->extra_attributes->proxy = ProxyTypes::TRAEFIK_V2->value;
+        $server->save();
+
         return $activity;
     }
 
@@ -46,8 +52,6 @@ class InstallProxy
         $cwd = config('app.env') === 'local'
             ? config('proxy.project_path_on_host') . '/_testing_hosts/host_2_proxy'
             : '.';
-
-        ray($cwd);
 
         return [
             "version" => "3.7",

@@ -14,7 +14,6 @@
             <p>Network: {{ data_get($docker, 'network') }}</p>
         @endforeach
     @endif
-    <h1> {{ $server->name }}</h1>
 
     <livewire:server.proxy :server="$server"/>
 </x-layout>

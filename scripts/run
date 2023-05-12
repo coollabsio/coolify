@@ -35,6 +35,9 @@ function schedule-run {
 function reset-db {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
+function mfs {
+    reset-db
+}
 function coolify {
     bash vendor/bin/spin exec -u webuser coolify bash
 }

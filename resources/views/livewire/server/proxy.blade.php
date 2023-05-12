@@ -2,20 +2,29 @@
     <h2> Proxy </h2>
 
     @if($this->server->extra_attributes->proxy)
-        <div class="mt-12">
+        <div class="mt-6">
             <div>
                 Proxy type: {{ $this->server->extra_attributes->proxy  }}
             </div>
-            <div class="mt-12"> Features in W11.</div>
-            <ul>
-                <li>Edit config file</li>
-                <li>Enable dashboard (blocking port by firewall)</li>
-                <li>Dashboard access - login/password</li>
-                <li>Setup host for Traefik Dashboard</li>
-                <li>Visit (nav to traefik dashboard)</li>
-            </ul>
+
+            <div id="proxy_options" x-init="$wire.checkProxySettingsInSync()" class="relative w-fit">
+
+                {{-- Proxy is being checked against DB information --}}
+                @if(! $this->is_check_proxy_complete)
+                    @include('livewire.server._proxy.loading')
+                @endif
+
+                @if($this->is_check_proxy_complete && (! $this->is_proxy_settings_in_sync) )
+                    @include('livewire.server._proxy.problems')
+                @endif
+
+                @include('livewire.server._proxy.options')
+            </div>
+
         </div>
     @else
+        {{-- There is no Proxy installed --}}
+
         No proxy installed.
         <select wire:model="selectedProxy">
             <option value="{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}">

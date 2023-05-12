@@ -13,6 +13,11 @@ class Proxy extends Component
 
     protected string $selectedProxy = '';
 
+    public $is_proxy_installed;
+
+    public $is_check_proxy_complete = false;
+    public $is_proxy_settings_in_sync = false;
+
     public function mount(Server $server)
     {
         $this->server = $server;
@@ -23,6 +28,14 @@ class Proxy extends Component
         $activity = resolve(InstallProxy::class)($this->server);
 
         $this->emit('newMonitorActivity', $activity->id);
+    }
+
+    public function checkProxySettingsInSync()
+    {
+
+
+        $this->is_check_proxy_complete = true;
+        $this->is_proxy_settings_in_sync = true;
     }
 
     public function render()
