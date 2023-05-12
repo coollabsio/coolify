@@ -28,13 +28,13 @@
     {{-- Servers --}}
     <template x-cloak x-if="serverMenu">
         <div x-on:click.outside="closeMenus">
-            <input class="magic-input" x-ref="search" x-model="search" class="w-96" placeholder="Select a server..."
+            <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a server..."
                 x-on:keydown.down="focusNext(servers.length)" x-on:keydown.up="focusPrev(servers.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('destination',filteredServers()[focusedIndex].uuid)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+            <div class="magic-items">
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'" class="magic-item">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-600 rounded">Server</span>
                         <span x-text="server.name"></span>
                     </div>
@@ -45,14 +45,18 @@
     {{-- Destinations --}}
     <template x-cloak x-if="destinationMenu">
         <div x-on:click.outside="closeMenus">
-            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
-                placeholder="Select a destination..." x-on:keydown.down="focusNext(destinations.length)"
-                x-on:keydown.up="focusPrev(destinations.length)"
+            <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a destination..."
+                x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('project',filteredDestinations()[focusedIndex].uuid)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+            <div class="magic-items">
+                <template x-if="destinations.length === 0">
+                    <div class="magic-item" x-on:click="set('newDestination')">
+                        <span>No destination found. Click here to add a new one!</span>
+                    </div>
+                </template>
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'" cclass="magic-item">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
@@ -63,18 +67,18 @@
     {{-- Projects --}}
     <template x-cloak x-if="projectMenu">
         <div x-on:click.outside="closeMenus">
-            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
-                placeholder="Type your project name..." x-on:keydown.down="focusNext(projects.length + 1)"
-                x-on:keydown.up="focusPrev(projects.length + 1)"
+            <input class="magic-input" x-ref="search" x-model="search" placeholder="Type your project name..."
+                x-on:keydown.down="focusNext(projects.length + 1)" x-on:keydown.up="focusPrev(projects.length + 1)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('environment',filteredProjects()[focusedIndex - 1]?.uuid)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
-                <div x-on:click="await newProject" class="magic-item" :class="focusedIndex === 0 && 'bg-neutral-700'">
+            <div class="magic-items">
+                <div x-on:click="await newProject" class="magic-item"
+                    :class="focusedIndex === 0 && 'magic-item-focused'">
                     <span>New Project</span>
                     <span x-text="search"></span>
                 </div>
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
-                        :class="focusedIndex === index + 1 && 'bg-neutral-700'" class="magic-item">
+                        :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Project</span>
                         <span x-text="project.name"></span>
                     </div>
@@ -85,19 +89,19 @@
     {{-- Environments --}}
     <template x-cloak x-if="environmentMenu">
         <div x-on:click.outside="closeMenus">
-            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
-                placeholder="Select a environment..." x-on:keydown.down="focusNext(environments.length + 1)"
+            <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a environment..."
+                x-on:keydown.down="focusNext(environments.length + 1)"
                 x-on:keydown.up="focusPrev(environments.length + 1)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
             <div class="magic-items">
                 <div x-on:click="await newEnvironment" class="magic-item"
-                    :class="focusedIndex === 0 && magic - item - focused">
+                    :class="focusedIndex === 0 && 'magic-item-focused'">
                     <span>New Environment</span>
                     <span x-text="search"></span>
                 </div>
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
-                        :class="focusedIndex === index + 1 && 'bg-neutral-700'" class="magic-item">
+                        :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
@@ -108,13 +112,13 @@
     {{-- Projects --}}
     <template x-cloak x-if="projectsMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a project..."
+            <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a project..."
                 x-on:keydown.down="focusNext(projects.length)" x-on:keydown.up="focusPrev(projects.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex].uuid)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+            <div class="magic-items">
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'"
+                        :class="focusedIndex === index && 'magic-item-focused'"
                         class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
                         <span x-text="project.name"></span>
@@ -126,13 +130,13 @@
     {{-- Destinations --}}
     <template x-cloak x-if="destinationsMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a destination..."
-                x-on:keydown.down="focusNext(Destinations.length)" x-on:keydown.up="focusPrev(Destinations.length)"
+            <input x-ref="search" x-model="search" class="magic-items" placeholder="Select a destination..."
+                x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToDestination',filteredDestinations()[focusedIndex].uuid)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+            <div class="magic-items">
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'"
+                        :class="focusedIndex === index && 'magic-item-focused'"
                         class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
                         <span x-text="destination.name"></span>
@@ -283,7 +287,7 @@
                 if (this.search === '') {
                     this.closeMenus()
                     this.$nextTick(() => {
-                        this.$refs.search.blur();
+                        if (this.$refs.search) this.$refs.search.blur();
                     })
                     return
                 }
@@ -291,7 +295,7 @@
                 this.focusedIndex = ''
             },
             closeMenus() {
-                this.$refs.search.blur();
+                if (this.$refs.search) this.$refs.search.blur();
                 this.search = ''
                 this.focusedIndex = ''
                 this.mainMenu = false
@@ -320,6 +324,7 @@
             },
             filteredDestinations() {
                 if (this.search === '') return this.destinations
+                if (this.destinations.length === 0) return []
                 return this.destinations.filter(destination => {
                     return destination.name.toLowerCase().includes(this.search
                         .toLowerCase())
@@ -494,6 +499,10 @@
                         this.closeMenus()
                         break
                     case 'newDestination':
+                        if (this.selectedServer !== '') {
+                            window.location = `/destination/new?server=${this.selectedServer}`
+                            return
+                        }
                         window.location = `/destination/new`
                         this.closeMenus()
                         break

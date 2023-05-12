@@ -14,7 +14,7 @@ class StandaloneDocker extends Component
     public string $network;
 
     public Collection $servers;
-    public int $server_id;
+    public int|null $server_id = null;
 
     protected $rules = [
         'name' => 'required|string',
@@ -23,10 +23,12 @@ class StandaloneDocker extends Component
     ];
     public function mount()
     {
-        if (request()->query('server_id')) {
-            $this->server_id = request()->query('server_id');
-        } else {
-            $this->server_id = Server::validated()->first()->id;
+        if (!$this->server_id) {
+            if (request()->query('server_id')) {
+                $this->server_id = request()->query('server_id');
+            } else {
+                $this->server_id = Server::validated()->first()->id;
+            }
         }
         $this->network = new Cuid2(7);
         $this->name = generateRandomName();

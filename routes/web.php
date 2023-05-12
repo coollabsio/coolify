@@ -182,8 +182,16 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/destination/new', function () {
         $servers = Server::validated();
+        $pre_selected_server_uuid = data_get(request()->query(), 'server');
+        if ($pre_selected_server_uuid) {
+            $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
+            if ($server) {
+                $server_id = $server->id;
+            }
+        }
         return view('destination.new', [
             "servers" => $servers,
+            "server_id" => $server_id ?? null,
         ]);
     })->name('destination.new');
     Route::get('/destination/{destination_uuid}', function () {
