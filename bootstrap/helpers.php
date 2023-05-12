@@ -2,6 +2,7 @@
 
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
+use App\Models\GithubApp;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\QueryException;
@@ -9,20 +10,38 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
+use Illuminate\Support\Str;
+use Visus\Cuid2\Cuid2;
 
-if (!function_exists('generalErrorHandlerLivewire')) {
-    function generalErrorHandlerLivewire(\Throwable $e, $that)
+if (!function_exists('generalErrorHandler')) {
+    function generalErrorHandler(\Throwable $e, $that = null, $isJson = false)
     {
-        if ($e instanceof QueryException) {
-            if ($e->errorInfo[0] === '23505') {
-                $that->emit('error', 'Duplicate entry found.');
+        try {
+            if ($e instanceof QueryException) {
+                if ($e->errorInfo[0] === '23505') {
+                    throw new \Exception('Duplicate entry found.', '23505');
+                } else if (count($e->errorInfo) === 4) {
+                    throw new \Exception($e->errorInfo[3]);
+                } else {
+                    throw new \Exception($e->errorInfo[2]);
+                }
             } else {
-                $that->emit('error', $e->errorInfo[3]);
+                throw new \Exception($e->getMessage());
             }
-        } else {
-            $that->emit('error', $e);
+        } catch (\Throwable $error) {
+            if ($that) {
+                $that->emit('error', $error);
+            } elseif ($isJson) {
+                return response()->json([
+                    'code' => $error->getCode(),
+                    'error' => $error->getMessage(),
+                ]);
+            } else {
+                dump($error);
+            }
         }
     }
 }
@@ -158,7 +177,7 @@ if (!function_exists('instantRemoteProcess')) {
 if (!function_exists('getLatestVersionOfCoolify')) {
     function getLatestVersionOfCoolify()
     {
-        $response = Http::get('https://get.coollabs.io/versions.json');
+        $response = Http::get('https://coolify-cdn.b-cdn.net/versions.json');
         $versions = $response->json();
         return data_get($versions, 'coolify.v4.version');
     }
@@ -166,11 +185,62 @@ if (!function_exists('getLatestVersionOfCoolify')) {
 if (!function_exists('generateRandomName')) {
     function generateRandomName()
     {
-        $generator = new \Nubs\RandomNameGenerator\All(
-            [
-                new \Nubs\RandomNameGenerator\Alliteration()
-            ]
-        );
-        return $generator->getName();
+        $generator = \Nubs\RandomNameGenerator\All::create();
+        $cuid = new Cuid2(7);
+        return Str::kebab("{$generator->getName()}-{$cuid}");
+    }
+}
+
+use Lcobucci\JWT\Encoding\ChainedFormatter;
+use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Lcobucci\JWT\Token\Builder;
+
+if (!function_exists('generate_github_installation_token')) {
+    function generate_github_installation_token(GithubApp $source)
+    {
+        $signingKey = InMemory::plainText($source->privateKey->private_key);
+        $algorithm = new Sha256();
+        $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+        $now = new DateTimeImmutable();
+        $now = $now->setTime($now->format('H'), $now->format('i'));
+        $issuedToken = $tokenBuilder
+            ->issuedBy($source->app_id)
+            ->issuedAt($now)
+            ->expiresAt($now->modify('+10 minutes'))
+            ->getToken($algorithm, $signingKey)
+            ->toString();
+        $token = Http::withHeaders([
+            'Authorization' => "Bearer $issuedToken",
+            'Accept' => 'application/vnd.github.machine-man-preview+json'
+        ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+        if ($token->failed()) {
+            throw new \Exception("Failed to get access token for " . $source->name . " with error: " . $token->json()['message']);
+        }
+        return $token->json()['token'];
+    }
+}
+if (!function_exists('generate_github_jwt_token')) {
+    function generate_github_jwt_token(GithubApp $source)
+    {
+        $signingKey = InMemory::plainText($source->privateKey->private_key);
+        $algorithm = new Sha256();
+        $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+        $now = new DateTimeImmutable();
+        $now = $now->setTime($now->format('H'), $now->format('i'));
+        $issuedToken = $tokenBuilder
+            ->issuedBy($source->app_id)
+            ->issuedAt($now->modify('-1 minute'))
+            ->expiresAt($now->modify('+10 minutes'))
+            ->getToken($algorithm, $signingKey)
+            ->toString();
+        return $issuedToken;
+    }
+}
+if (!function_exists('getParameters')) {
+    function getParameters()
+    {
+        return Route::current()->parameters();
     }
 }

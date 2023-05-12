@@ -19,8 +19,8 @@ return new class extends Migration
             $table->string('organization')->nullable();
             $table->string('api_url');
             $table->string('html_url');
-            $table->integer('custom_port')->default(22);
             $table->string('custom_user')->default('git');
+            $table->integer('custom_port')->default(22);
 
             $table->integer('app_id')->nullable();
             $table->integer('installation_id')->nullable();

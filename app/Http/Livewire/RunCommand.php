@@ -8,7 +8,7 @@ use Livewire\Component;
 
 class RunCommand extends Component
 {
-    public $command;
+    public string $command;
     public $server;
     public $servers = [];
 
@@ -16,16 +16,20 @@ class RunCommand extends Component
         'server' => 'required',
         'command' => 'required',
     ];
-    public function mount()
+    public function mount($servers)
     {
-        $this->servers = Server::where('team_id', session('currentTeam')->id)->get();
-        $this->server = $this->servers[0]->uuid;
+        $this->servers = $servers;
+        $this->server = $servers[0]->uuid;
     }
 
     public function runCommand()
     {
-        $this->validate();
-        $activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
-        $this->emit('newMonitorActivity', $activity->id);
+        try {
+            $this->validate();
+            $activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
+            $this->emit('newMonitorActivity', $activity->id);
+        } catch (\Exception $e) {
+            return generalErrorHandler($e);
+        }
     }
 }

@@ -11,7 +11,7 @@ DOCKER_VERSION="23.0"
 CDN="https://coolify-cdn.b-cdn.net/files"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
 OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
-LATEST_VERSION=$(curl --silent https://get.coollabs.io/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
+LATEST_VERSION=$(curl --silent https://coolify-cdn.b-cdn.net/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 
 if [ $EUID != 0 ]; then
     echo "Please run as root"
@@ -43,6 +43,7 @@ if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.production /data/coolify/source/.env
     sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
+    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh-keys/id.root@host.docker.internal

@@ -7,7 +7,7 @@
         <x-inputs.button type="submit">
             Update
         </x-inputs.button>
-        <x-inputs.button x-on:click="deleteStorage = true" isWarning>
+        <x-inputs.button x-on:click.prevent="deleteStorage = true" isWarning>
             Delete
         </x-inputs.button>
     </form>

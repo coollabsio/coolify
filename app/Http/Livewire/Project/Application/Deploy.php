@@ -23,7 +23,7 @@ class Deploy extends Component
 
     public function mount()
     {
-        $this->parameters = Route::current()->parameters();
+        $this->parameters = getParameters();
         $this->application = Application::where('id', $this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }

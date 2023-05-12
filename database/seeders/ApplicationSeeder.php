@@ -24,7 +24,8 @@ class ApplicationSeeder extends Seeder
         $github_public_source = GithubApp::where('name', 'Public GitHub')->first();
 
         Application::create([
-            'name' => 'Public application (from GitHub)',
+            'name' => 'coollabsio/coolify-examples:nodejs-fastify',
+            'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'nodejs-fastify',
             'build_pack' => 'nixpacks',

@@ -1,5 +1,5 @@
 <x-layout>
-    <div>v{{ config('coolify.version') }}</div>
+    <div>v{{ config('version') }}</div>
     <a href="/login">Login</a>
     <a href="/register">Register</a>
     <form action="/register" method="POST">

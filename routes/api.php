@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\GithubApp;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 

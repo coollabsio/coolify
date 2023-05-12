@@ -7,7 +7,7 @@
         <x-inputs.button type="submit">
             Submit
         </x-inputs.button>
-        <x-inputs.button isWarning x-on:click="deletePrivateKey = true">
+        <x-inputs.button isWarning x-on:click.prevent="deletePrivateKey = true">
             Delete
         </x-inputs.button>
     </form>

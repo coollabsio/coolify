@@ -1,3 +1,3 @@
 <x-layout>
-    <livewire:run-command />
+    <livewire:run-command :servers="$servers" />
 </x-layout>

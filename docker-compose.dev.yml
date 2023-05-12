@@ -1,13 +1,13 @@
 version: '3.8'
 
-x-testing-host: &testing-host-base
+x-testing-host:
+  &testing-host-base
   image: coolify-testing-host
   build:
     dockerfile: Dockerfile
     context: ./docker/testing-host
   networks:
     - coolify
-
 
 services:
   coolify:
@@ -38,6 +38,13 @@ services:
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
       - ./_volumes/database/:/var/lib/postgresql/data
+  redis:
+    ports:
+      - "${FORWARD_REDIS_PORT:-6379}:6379"
+    env_file:
+      - .env
+    volumes:
+      - ./_volumes/redis/:/data
   vite:
     image: node:19
     working_dir: /var/www/html
@@ -47,16 +54,13 @@ services:
       - .:/var/www/html:cached
     command: sh -c "npm install && npm run dev"
   testing-host:
-      <<: *testing-host-base
-      container_name: coolify-testing-host
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
+    <<: *testing-host-base
+    container_name: coolify-testing-host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
   testing-host-2:
-      <<: *testing-host-base
-      container_name: coolify-testing-host-2
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock
-        - "./_testing_hosts/host_2_proxy:/root/projects/proxy"
-
-
-
+    <<: *testing-host-base
+    container_name: coolify-testing-host-2
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "./_testing_hosts/host_2_proxy:/root/projects/proxy"

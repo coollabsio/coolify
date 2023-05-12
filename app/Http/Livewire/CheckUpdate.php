@@ -2,8 +2,6 @@
 
 namespace App\Http\Livewire;
 
-use App\Models\Server;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class CheckUpdate extends Component
@@ -16,7 +14,7 @@ class CheckUpdate extends Component
     public function checkUpdate()
     {
         $this->latestVersion = getLatestVersionOfCoolify();
-        $this->currentVersion = config('coolify.version');
+        $this->currentVersion = config('version');
         if ($this->latestVersion === 'latest') {
             $this->updateAvailable = true;
             return;

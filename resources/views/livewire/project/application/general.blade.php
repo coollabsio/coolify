@@ -11,12 +11,13 @@
                 <x-inputs.input id="application.start_command" label="Start Command" />
                 <x-inputs.select id="application.build_pack" label="Build Pack" required>
                     <option value="nixpacks">Nixpacks</option>
-                    <option value="docker">Docker</option>
+                    <option disabled value="docker">Docker</option>
+                    <option disabled value="compose">Compose</option>
                 </x-inputs.select>
                 @if ($application->settings->is_static)
                     <x-inputs.select id="application.static_image" label="Static Image" required>
                         <option value="nginx:alpine">nginx:alpine</option>
-                        <option value="apache:alpine">apache:alpine</option>
+                        <option disabled value="apache:alpine">apache:alpine</option>
                     </x-inputs.select>
                 @endif
             </div>
@@ -42,15 +43,17 @@
             Submit
         </x-inputs.button>
     </form>
-    <div class="flex flex-col pt-4 text-right w-52">
-        <x-inputs.input instantSave type="checkbox" id="is_static" label="Static website?" />
-        <x-inputs.input instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
-        <x-inputs.input instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
-        <x-inputs.input instantSave type="checkbox" id="is_previews" label="Previews?" />
-        <x-inputs.input instantSave type="checkbox" id="is_custom_ssl" label="Is Custom SSL?" />
-        <x-inputs.input instantSave type="checkbox" id="is_http2" label="Is Http2?" />
-        <x-inputs.input instantSave type="checkbox" id="is_git_submodules_allowed" label="Git Submodules Allowed?" />
-        <x-inputs.input instantSave type="checkbox" id="is_git_lfs_allowed" label="Git LFS Allowed?" />
-        <x-inputs.input instantSave type="checkbox" id="is_debug" label="Debug" />
+    <div class="flex flex-col pt-4">
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_static" label="Static website?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_git_submodules_allowed"
+            label="Git Submodules Allowed?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_git_lfs_allowed" label="Git LFS Allowed?" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_debug" label="Debug" />
+        <x-inputs.input noDirty instantSave type="checkbox" id="is_auto_deploy" label="Auto Deploy?" />
+        <x-inputs.input disabled instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
+        <x-inputs.input disabled instantSave type="checkbox" id="is_previews" label="Previews?" />
+        <x-inputs.input disabled instantSave type="checkbox" id="is_custom_ssl" label="Is Custom SSL?" />
+        <x-inputs.input disabled instantSave type="checkbox" id="is_http2" label="Is Http2?" />
+
     </div>
 </div>

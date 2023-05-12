@@ -8,7 +8,6 @@
 # Define Docker Compose command prefix...
 set -e
 
-docker compose &>/dev/null
 if [ $? == 0 ]; then
     DOCKER_COMPOSE="docker compose"
 else
@@ -24,7 +23,7 @@ function sync-bunny {
     php artisan sync:bunny --env=secrets
 }
 function queue {
-    bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
+    bash vendor/bin/spin exec -u webuser coolify php artisan horizon
 }
 function schedule {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
@@ -37,6 +36,10 @@ function reset-db {
 }
 function mfs {
     reset-db
+}
+function reset-db-production {
+    bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
 function coolify {
     bash vendor/bin/spin exec -u webuser coolify bash

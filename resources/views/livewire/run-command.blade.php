@@ -1,12 +1,18 @@
 <div>
-    <form class="flex gap-2" wire:submit.prevent='runCommand'>
-        <x-inputs.input autofocus id="command" label="Command" required />
+    <form class="flex items-end justify-center gap-2" wire:submit.prevent='runCommand'>
+        <x-inputs.input class="w-[32rem]" autofocus noDirty noLabel id="command" label="Command" required />
         <select wire:model.defer="server">
             @foreach ($servers as $server)
-                <option value="{{ $server->uuid }}">{{ $server->name }}</option>
+                @if ($loop->first)
+                    <option selected value="{{ $server->uuid }}">{{ $server->name }}</option>
+                @else
+                    <option value="{{ $server->uuid }}">{{ $server->name }}</option>
+                @endif
             @endforeach
         </select>
         <x-inputs.button type="submit">Run</x-inputs.button>
     </form>
-    <livewire:activity-monitor />
+    <div class="container w-full pt-10 mx-auto">
+        <livewire:activity-monitor />
+    </div>
 </div>

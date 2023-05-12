@@ -8,7 +8,7 @@
         <x-inputs.button wire:click='start'>Start</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Start (no cache)</x-inputs.button>
     @endif
-    <x-inputs.button isWarning x-on:click="deleteApplication = true">
+    <x-inputs.button isWarning x-on:click.prevent="deleteApplication = true">
         Delete</x-inputs.button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')

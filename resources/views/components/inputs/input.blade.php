@@ -6,15 +6,16 @@
     'instantSave' => $attributes->has('instantSave'),
     'noLabel' => $attributes->has('noLabel'),
     'noDirty' => $attributes->has('noDirty'),
+    'hidden' => $attributes->has('hidden'),
 ])
 
 <span @class([
-    'flex justify-end' => $type === 'checkbox',
+    'flex' => $type === 'checkbox',
     'flex flex-col' => $type !== 'checkbox',
 ])>
     @if (!$noLabel)
         <label for={{ $id }} @if (!$noDirty) wire:dirty.class="text-amber-300" @endif
-            wire:target={{ $id }}>
+            @if ($hidden) class="hidden" @endif wire:target={{ $id }}>
             @if ($label)
                 {{ $label }}
             @else
@@ -23,6 +24,7 @@
             @if ($required)
                 *
             @endif
+
         </label>
     @endif
     @if ($type === 'textarea')
@@ -31,8 +33,9 @@
     @else
         <input {{ $attributes }} @if ($required) required @endif
             @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif
-            type={{ $type }} id={{ $id }}
-            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
+            type={{ $type }} id={{ $id }} name={{ $id }}
+            @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif
+            @if ($hidden) class="hidden" @endif />
     @endif
     @error($id)
         <div class="text-red-500">{{ $message }}</div>

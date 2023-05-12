@@ -4,6 +4,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
+    <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @env('local')
     <title>Coolify - localhost</title>
     @endenv
@@ -21,16 +23,28 @@
 </head>
 
 <body>
+    <a
+        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
+    @livewireScripts
+
     @auth
         <x-navbar />
     @endauth
-    <main>
+    <main class="max-w-6xl pt-10 mx-auto">
         {{ $slot }}
     </main>
 
-    @livewireScripts
     @auth
         <script>
+            window.addEventListener("keydown", function(event) {
+                if (event.target.nodeName === 'BODY') {
+                    if (event.key === '/') {
+                        event.preventDefault();
+                        window.dispatchEvent(new CustomEvent('slash'));
+                    }
+                }
+            })
+
             function checkIfIamDead() {
                 console.log('Checking server\'s pulse...')
                 checkIfIamDeadInterval = setInterval(async () => {
@@ -76,10 +90,16 @@
                 window.location.reload();
             })
             Livewire.on('error', (message) => {
+                console.log(message);
                 alert(message);
+            })
+            Livewire.on('saved', (message) => {
+                if (message) console.log(message);
+                else console.log('saved');
             })
         </script>
     @endauth
+
 </body>
 
 </html>

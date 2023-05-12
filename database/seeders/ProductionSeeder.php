@@ -21,6 +21,26 @@ class ProductionSeeder extends Seeder
                 'id' => 0
             ]);
         }
+        if (GithubApp::find(0) == null) {
+            GithubApp::create([
+                'id' => 0,
+                'name' => 'Public GitHub',
+                'api_url' => 'https://api.github.com',
+                'html_url' => 'https://github.com',
+                'is_public' => true,
+                'team_id' => 0,
+            ]);
+        }
+        if (GitlabApp::find(0) == null) {
+            GitlabApp::create([
+                'id' => 0,
+                'name' => 'Public GitLab',
+                'api_url' => 'https://gitlab.com/api/v4',
+                'html_url' => 'https://gitlab.com',
+                'is_public' => true,
+                'team_id' => 0,
+            ]);
+        }
 
         // Add first Team if it doesn't exist
         if (Team::find(0) == null) {
@@ -50,6 +70,7 @@ class ProductionSeeder extends Seeder
                 $private_key->save();
             }
         } else {
+            // TODO: Add a command to generate a new SSH key for the Coolify host machine (localhost).
             echo "No SSH key found for the Coolify host machine (localhost).\n";
             echo "Please generate one and save it in storage/app/ssh-keys/{$coolify_key_name}\n";
             exit(1);
@@ -57,7 +78,7 @@ class ProductionSeeder extends Seeder
 
         // Add Coolify host (localhost) as Server if it doesn't exist
         if (Server::find(0) == null) {
-            Server::create([
+            $server = Server::create([
                 'id' => 0,
                 'name' => "localhost",
                 'description' => "This is the local machine",
@@ -66,26 +87,8 @@ class ProductionSeeder extends Seeder
                 'team_id' => 0,
                 'private_key_id' => 0,
             ]);
-        }
-        if (GithubApp::find(0) == null) {
-            GithubApp::create([
-                'id' => 0,
-                'name' => 'Public GitHub',
-                'api_url' => 'https://api.github.com',
-                'html_url' => 'https://github.com',
-                'is_public' => true,
-                'team_id' => 0,
-            ]);
-        }
-        if (GitlabApp::find(0) == null) {
-            GitlabApp::create([
-                'id' => 0,
-                'name' => 'Public GitLab',
-                'api_url' => 'https://gitlab.com/api/v4',
-                'html_url' => 'https://gitlab.com',
-                'is_public' => true,
-                'team_id' => 0,
-            ]);
+            $server->settings->is_validated = true;
+            $server->settings->save();
         }
     }
 }

@@ -22,7 +22,7 @@ class Form extends Component
     }
     public function delete()
     {
-        instantRemoteProcess(['docker network rm -f ' . $this->destination->network], $this->destination->server);
+        // instantRemoteProcess(['docker network rm -f ' . $this->destination->network], $this->destination->server);
         $this->destination->delete();
         return redirect()->route('dashboard');
     }

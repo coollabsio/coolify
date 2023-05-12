@@ -23,7 +23,7 @@ class Add extends Component
     ];
     public function mount()
     {
-        $this->parameters = Route::current()->parameters();
+        $this->parameters = getParameters();
     }
     public function submit()
     {
