@@ -32,6 +32,15 @@
 
     @auth
         <script>
+            window.addEventListener("keydown", function(event) {
+                if (event.target.nodeName === 'BODY') {
+                    if (event.key === '/') {
+                        event.preventDefault();
+                        window.dispatchEvent(new CustomEvent('slash'));
+                    }
+                }
+            })
+
             function checkIfIamDead() {
                 console.log('Checking server\'s pulse...')
                 checkIfIamDeadInterval = setInterval(async () => {

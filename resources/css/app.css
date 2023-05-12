@@ -18,3 +18,10 @@ select {
 button {
     @apply border-none px-2 p-1 cursor-pointer;
 }
+.mainMenu {
+    @apply relative float-left;
+}
+.mainMenu:after {
+    content: '/';
+    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-1;
+}

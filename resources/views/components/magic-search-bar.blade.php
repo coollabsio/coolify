@@ -1,11 +1,13 @@
-<div x-data="magicsearchbar">
+<div x-data="magicsearchbar" @slash.window="mainMenu = true">
     {{-- Main --}}
     <template x-cloak x-if="!serverMenu && !destinationMenu && !projectMenu && !environmentMenu">
         <div>
-            <input x-ref="search" x-model="search" class="w-96" x-on:click="checkMainMenu" x-on:click.outside="closeMenus"
-                placeholder="🪄 Search for anything... magically..." x-on:keyup.down="focusNext(items.length)"
-                x-on:keyup.up="focusPrev(items.length)"
-                x-on:keyup.enter="await set('server',filteredItems()[focusedIndex].name)" />
+            <div class="mainMenu">
+                <input x-ref="search" x-model="search" class="w-96" x-on:click="checkMainMenu"
+                    x-on:click.outside="closeMenus" placeholder="Search or jump to..." x-on:keyup.escape="clearSearch"
+                    x-on:keyup.down="focusNext(items.length)" x-on:keyup.up="focusPrev(items.length)"
+                    x-on:keyup.enter="await set('server',filteredItems()[focusedIndex].name)" />
+            </div>
             <div x-cloak x-show="mainMenu" class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set('server',item.name)" :class="focusedIndex === index && 'bg-neutral-700'"
@@ -195,14 +197,25 @@
                     }
                 }
             },
+            clearSearch() {
+                if (this.search === '') {
+                    this.closeMenus()
+                    this.$nextTick(() => {
+                        this.$refs.search.blur();
+                    })
+                    return
+                }
+                this.search = ''
+                this.focusedIndex = ''
+            },
             closeMenus() {
+                this.search = ''
                 this.focusedIndex = ''
                 this.mainMenu = false
                 this.serverMenu = false
                 this.destinationMenu = false
                 this.projectMenu = false
                 this.environmentMenu = false
-                this.search = ''
             },
             checkMainMenu() {
                 if (this.serverMenu) return
@@ -250,13 +263,11 @@
                     const {
                         project_uuid
                     } = await response.json();
-                    console.log(project_uuid);
                     this.set('environment', project_uuid)
                     this.set('jump', 'production')
                 }
             },
             async newEnvironment() {
-                console.log('new environment')
                 const response = await fetch('/magic?server=' + this.selectedServer +
                     '&destination=' + this.selectedDestination +
                     '&project=' + this.selectedProject + '&environment=new&name=' + this
