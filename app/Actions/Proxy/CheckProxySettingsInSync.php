@@ -17,8 +17,17 @@ class CheckProxySettingsInSync
             ProxyTypes::TRAEFIK_V2->value => 'proxy',
         };
 
-        return instantRemoteProcess([
+        $container_name = 'coolify-proxy';
+
+        $output = instantRemoteProcess([
             'if [ -d "projects/'.$folder_name.'" ]; then echo "true"; else echo "false"; fi',
+            <<<EOT
+            [[ "$(docker inspect -f '{{.State.Running}}' $container_name 2>/dev/null)" == "true" ]] && echo "true" || echo "false"
+            EOT,
         ], $server);
+
+        return collect(
+            explode(PHP_EOL, $output)
+        )->every(fn($output) => $output === 'true');
     }
 }

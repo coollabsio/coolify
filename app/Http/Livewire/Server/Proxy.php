@@ -33,9 +33,9 @@ class Proxy extends Component
 
     public function checkProxySettingsInSync()
     {
-        $status = resolve(CheckProxySettingsInSync::class)($this->server);
+        $this->is_proxy_settings_in_sync = resolve(CheckProxySettingsInSync::class)($this->server);
+
         $this->is_check_proxy_complete = true;
-        $this->is_proxy_settings_in_sync = $status === 'true';
     }
 
     public function render()
