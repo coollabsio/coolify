@@ -2,7 +2,7 @@
 <div class="mt-4">
     <label>
         <div>Edit config file</div>
-        <textarea cols="45" rows="25"></textarea>
+        <textarea cols="45" rows="6"></textarea>
     </label>
 </div>
 

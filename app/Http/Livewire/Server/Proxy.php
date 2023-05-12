@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server;
 
+use App\Actions\Proxy\CheckProxySettingsInSync;
 use App\Actions\Proxy\InstallProxy;
 use App\Enums\ActivityTypes;
 use App\Models\Server;
@@ -32,10 +33,9 @@ class Proxy extends Component
 
     public function checkProxySettingsInSync()
     {
-
-
+        $status = resolve(CheckProxySettingsInSync::class)($this->server);
         $this->is_check_proxy_complete = true;
-        $this->is_proxy_settings_in_sync = true;
+        $this->is_proxy_settings_in_sync = $status === 'true';
     }
 
     public function render()
