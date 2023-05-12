@@ -41,7 +41,7 @@ Route::middleware(['auth'])->group(function () {
             }
 
             // Get destinations
-            if (request()->query('server') && request()->query('destinations') === 'true') {
+            if ((request()->query('server') && request()->query('destinations') === 'true') || request()->query('destinations') === 'true') {
                 $destinations = Server::destinations(request()->query('server'));
                 return response()->json([
                     'destinations' => $destinations->toArray(),
@@ -200,7 +200,6 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/project/new', fn () => view('project.new', ['type' => 'project']))->name('project.new');
     Route::get(
         '/project/{project_uuid}',
         [ProjectController::class, 'environments']

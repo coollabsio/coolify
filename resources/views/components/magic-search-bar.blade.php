@@ -4,8 +4,9 @@
         <div>
             <div class="mainMenu">
                 <input x-ref="search" x-model="search" class="w-96" x-on:click="checkMainMenu"
-                    x-on:click.outside="closeMenus" placeholder="Search or jump to..." x-on:keyup.escape="clearSearch"
-                    x-on:keyup.down="focusNext(items.length)" x-on:keyup.up="focusPrev(items.length)"
+                    x-on:click.outside="closeMenus" placeholder="Search, jump or create... magically..."
+                    x-on:keyup.escape="clearSearch" x-on:keyup.down="focusNext(items.length)"
+                    x-on:keyup.up="focusPrev(items.length)"
                     x-on:keyup.enter="focusedIndex !== '' && await set(filteredItems()[focusedIndex]?.next ?? 'server',filteredItems()[focusedIndex]?.name)" />
             </div>
             <div x-cloak x-show="mainMenu" class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
@@ -18,6 +19,8 @@
                         <span class="px-2 mr-1 text-xs bg-green-600 rounded" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
                         <span class="px-2 mr-1 text-xs bg-purple-600 rounded" x-show="item.type === 'Jump'"
+                            x-text="item.type"></span>
+                        <span class="px-2 mr-1 text-xs bg-blue-600 rounded" x-show="item.type === 'New'"
                             x-text="item.type"></span>
                         <span x-text="item.name"></span>
                     </div>
@@ -125,6 +128,24 @@
             </div>
         </div>
     </template>
+    {{-- Destinations --}}
+    <template x-cloak x-if="destinationsMenu">
+        <div x-on:click.outside="closeMenus">
+            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a destination..."
+                x-on:keyup.down="focusNext(Destinations.length)" x-on:keyup.up="focusPrev(Destinations.length)"
+                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToDestination',filteredDestinations()[focusedIndex].uuid)" />
+            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+                <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
+                    <div x-on:click="await set('jumpToDestination',destination.uuid)"
+                        :class="focusedIndex === index && 'bg-neutral-700'"
+                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span x-text="destination.name"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 </div>
 
 <script>
@@ -135,7 +156,8 @@
                     !this.destinationMenu &&
                     !this.projectMenu &&
                     !this.environmentMenu &&
-                    !this.projectsMenu
+                    !this.projectsMenu &&
+                    !this.destinationsMenu
             },
             focus() {
                 if (this.$refs.search) this.$refs.search.focus()
@@ -163,6 +185,7 @@
             mainMenu: false,
             serverMenu: false,
             destinationMenu: false,
+            destinationsMenu: false,
             projectMenu: false,
             projectsMenu: false,
             environmentMenu: false,
@@ -199,17 +222,48 @@
                     name: 'Database',
                     type: 'Add',
                     tags: 'data,database,mysql,postgres,sql,sqlite,redis,mongodb,maria,percona',
-                    disabled: true,
+                },
+                {
+                    name: 'Server',
+                    type: 'New',
+                    tags: 'new,server',
+                    next: 'newServer'
+                },
+                {
+                    name: 'Destination',
+                    type: 'New',
+                    tags: 'new,destination',
+                    next: 'newDestination'
+                },
+                {
+                    name: 'Private Key',
+                    type: 'New',
+                    tags: 'new,private-key,ssh,key',
+                    next: 'newPrivateKey'
+                },
+                {
+                    name: 'Source',
+                    type: 'New',
+                    tags: 'new,source,github,gitlab,bitbucket',
+                    next: 'newSource'
                 },
                 {
                     name: 'Servers',
                     type: 'Jump',
+                    tags: 'servers',
                     next: 'server'
                 },
                 {
                     name: 'Projects',
                     type: 'Jump',
+                    tags: 'projects',
                     next: 'projects'
+                },
+                {
+                    name: 'Destinations',
+                    type: 'Jump',
+                    tags: 'destinations',
+                    next: 'destinations'
                 }
             ],
             focusPrev(maxLength) {
@@ -257,7 +311,8 @@
             filteredItems() {
                 if (this.search === '') return this.items
                 return this.items.filter(item => {
-                    return item.name.toLowerCase().includes(this.search.toLowerCase())
+                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                        item.tags.toLowerCase().includes(this.search.toLowerCase())
                 })
             },
             filteredServers() {
@@ -365,7 +420,6 @@
                         this.projectMenu = true
                         break
                     case 'projects':
-
                         response = await fetch('/magic?projects=true');
                         if (response.ok) {
                             const {
@@ -375,6 +429,17 @@
                         }
                         this.closeMenus()
                         this.projectsMenu = true
+                        break
+                    case 'destinations':
+                        response = await fetch('/magic?destinations=true');
+                        if (response.ok) {
+                            const {
+                                destinations
+                            } = await response.json();
+                            this.destinations = destinations;
+                        }
+                        this.closeMenus()
+                        this.destinationsMenu = true
                         break
                     case 'environment':
                         if (this.focusedIndex === 0) {
@@ -421,7 +486,27 @@
                         this.closeMenus()
                         break
                     case 'jumpToProject':
-                        window.location = `/project/${id}/`
+                        window.location = `/project/${id}`
+                        this.closeMenus()
+                        break
+                    case 'jumpToDestination':
+                        window.location = `/destination/${id}`
+                        this.closeMenus()
+                        break
+                    case 'newServer':
+                        window.location = `/server/new`
+                        this.closeMenus()
+                        break
+                    case 'newDestination':
+                        window.location = `/destination/new`
+                        this.closeMenus()
+                        break
+                    case 'newPrivateKey':
+                        window.location = `/private-key/new`
+                        this.closeMenus()
+                        break
+                    case 'newSource':
+                        window.location = `/source/new`
                         this.closeMenus()
                         break
                 }
