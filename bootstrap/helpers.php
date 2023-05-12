@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Contracts\Activity;
 use Illuminate\Support\Str;
-
+use Visus\Cuid2\Cuid2;
 
 if (!function_exists('generalErrorHandler')) {
     function generalErrorHandler(\Throwable $e, $that = null, $isJson = false)
@@ -185,12 +185,9 @@ if (!function_exists('getLatestVersionOfCoolify')) {
 if (!function_exists('generateRandomName')) {
     function generateRandomName()
     {
-        $generator = new \Nubs\RandomNameGenerator\All(
-            [
-                new \Nubs\RandomNameGenerator\Alliteration()
-            ]
-        );
-        return Str::kebab($generator->getName());
+        $generator = \Nubs\RandomNameGenerator\All::create();
+        $cuid = new Cuid2(7);
+        return Str::kebab("{$generator->getName()}-{$cuid}");
     }
 }
 

@@ -81,7 +81,7 @@ Route::middleware(['auth'])->group(function () {
                     ]);
                 }
                 return response()->json([
-                    'environment' => $environment->name
+                    'environment_name' => $environment->name
                 ]);
             }
             return response()->json([
