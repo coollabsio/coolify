@@ -20,7 +20,9 @@ class CheckProxySettingsInSync
         $container_name = 'coolify-proxy';
 
         $output = instantRemoteProcess([
+            // Folder exists, in ~/projects/<folder-name>
             'if [ -d "projects/'.$folder_name.'" ]; then echo "true"; else echo "false"; fi',
+            // Container of name <container-name> is running
             <<<EOT
             [[ "$(docker inspect -f '{{.State.Running}}' $container_name 2>/dev/null)" == "true" ]] && echo "true" || echo "false"
             EOT,
