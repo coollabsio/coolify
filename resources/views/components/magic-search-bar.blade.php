@@ -1,16 +1,17 @@
 <div x-data="magicsearchbar" @slash.window="mainMenu = true">
     {{-- Main --}}
-    <template x-cloak x-if="!serverMenu && !destinationMenu && !projectMenu && !environmentMenu">
+    <template x-cloak x-if="isMainMenu">
         <div>
             <div class="mainMenu">
                 <input x-ref="search" x-model="search" class="w-96" x-on:click="checkMainMenu"
                     x-on:click.outside="closeMenus" placeholder="Search or jump to..." x-on:keyup.escape="clearSearch"
                     x-on:keyup.down="focusNext(items.length)" x-on:keyup.up="focusPrev(items.length)"
-                    x-on:keyup.enter="await set('server',filteredItems()[focusedIndex].name)" />
+                    x-on:keyup.enter="focusedIndex !== '' && await set(filteredItems()[focusedIndex]?.next ?? 'server',filteredItems()[focusedIndex]?.name)" />
             </div>
             <div x-cloak x-show="mainMenu" class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(item,index) in filteredItems" :key="item.name">
-                    <div x-on:click="await set('server',item.name)" :class="focusedIndex === index && 'bg-neutral-700'"
+                    <div x-on:click="await set(item.next ?? 'server',item.name)"
+                        :class="focusedIndex === index && 'bg-neutral-700'"
                         :class="item.disabled &&
                             'text-neutral-500 bg-neutral-900 hover:bg-neutral-900 cursor-not-allowed opacity-60'"
                         class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
@@ -29,7 +30,7 @@
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Select a server..."
                 x-on:keyup.down="focusNext(servers.length)" x-on:keyup.up="focusPrev(servers.length)"
-                x-on:keyup.enter="await set('destination',filteredServers()[focusedIndex].uuid)" />
+                x-on:keyup.enter="focusedIndex !== '' && await set('destination',filteredServers()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
@@ -47,7 +48,7 @@
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Select a destination..."
                 x-on:keyup.down="focusNext(destinations.length)" x-on:keyup.up="focusPrev(destinations.length)"
-                x-on:keyup.enter="await set('project',filteredDestinations()[focusedIndex].uuid)" />
+                x-on:keyup.enter="focusedIndex !== '' && await set('project',filteredDestinations()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
@@ -65,7 +66,7 @@
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Type your project name..."
                 x-on:keyup.down="focusNext(projects.length + 1)" x-on:keyup.up="focusPrev(projects.length + 1)"
-                x-on:keyup.enter="await set('environment',filteredProjects()[focusedIndex - 1]?.uuid)" />
+                x-on:keyup.enter="focusedIndex !== '' && await set('environment',filteredProjects()[focusedIndex - 1]?.uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <div x-on:click="await newProject" class="py-2 pl-4 cursor-pointer hover:bg-neutral-700"
                     :class="focusedIndex === 0 && 'bg-neutral-700'">
@@ -88,7 +89,7 @@
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Select a environment..."
                 x-on:keyup.down="focusNext(environments.length + 1)" x-on:keyup.up="focusPrev(environments.length + 1)"
-                x-on:keyup.enter="await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
+                x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <div x-on:click="await newEnvironment" class="py-2 pl-4 cursor-pointer hover:bg-neutral-700"
                     :class="focusedIndex === 0 && 'bg-neutral-700'">
@@ -106,11 +107,36 @@
             </div>
         </div>
     </template>
+    {{-- Projects --}}
+    <template x-cloak x-if="projectsMenu">
+        <div x-on:click.outside="closeMenus">
+            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a project..."
+                x-on:keyup.down="focusNext(projects.length)" x-on:keyup.up="focusPrev(projects.length)"
+                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex].uuid)" />
+            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+                <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
+                    <div x-on:click="await set('jumpToProject',project.uuid)"
+                        :class="focusedIndex === index && 'bg-neutral-700'"
+                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span x-text="project.name"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 </div>
 
 <script>
     document.addEventListener('alpine:init', () => {
         Alpine.data('magicsearchbar', () => ({
+            isMainMenu() {
+                return !this.serverMenu &&
+                    !this.destinationMenu &&
+                    !this.projectMenu &&
+                    !this.environmentMenu &&
+                    !this.projectsMenu
+            },
             focus() {
                 if (this.$refs.search) this.$refs.search.focus()
             },
@@ -138,6 +164,7 @@
             serverMenu: false,
             destinationMenu: false,
             projectMenu: false,
+            projectsMenu: false,
             environmentMenu: false,
             search: '',
 
@@ -177,6 +204,12 @@
                 {
                     name: 'Servers',
                     type: 'Jump',
+                    next: 'server'
+                },
+                {
+                    name: 'Projects',
+                    type: 'Jump',
+                    next: 'projects'
                 }
             ],
             focusPrev(maxLength) {
@@ -331,6 +364,18 @@
                         this.closeMenus()
                         this.projectMenu = true
                         break
+                    case 'projects':
+
+                        response = await fetch('/magic?projects=true');
+                        if (response.ok) {
+                            const {
+                                projects
+                            } = await response.json();
+                            this.projects = projects;
+                        }
+                        this.closeMenus()
+                        this.projectsMenu = true
+                        break
                     case 'environment':
                         if (this.focusedIndex === 0) {
                             this.focusedIndex = ''
@@ -373,6 +418,10 @@
                         } else if (this.selectedAction === 3) {
                             console.log('new Database')
                         }
+                        this.closeMenus()
+                        break
+                    case 'jumpToProject':
+                        window.location = `/project/${id}/`
                         this.closeMenus()
                         break
                 }

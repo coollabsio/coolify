@@ -48,7 +48,7 @@ Route::middleware(['auth'])->group(function () {
                 ]);
             }
             // Get projects
-            if (request()->query('server') && request()->query('destination') && request()->query('projects') === 'true') {
+            if ((request()->query('server') && request()->query('destination') && request()->query('projects') === 'true') || request()->query('projects') === 'true') {
                 $projects = Project::where('team_id', session('currentTeam')->id)->get();
                 return response()->json([
                     'projects' => $projects->toArray(),
