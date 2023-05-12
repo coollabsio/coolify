@@ -21,6 +21,8 @@
 </head>
 
 <body>
+    <a
+        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @livewireScripts
 
     @auth

@@ -31,7 +31,7 @@
     @else
         <input {{ $attributes }} @if ($required) required @endif
             @if (!$noDirty) wire:dirty.class="text-black bg-amber-300" @endif
-            type={{ $type }} id={{ $id }}
+            type={{ $type }} id={{ $id }} name={{ $id }}
             @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     @endif
     @error($id)

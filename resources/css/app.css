@@ -18,10 +18,22 @@ select {
 button {
     @apply border-none px-2 p-1 cursor-pointer;
 }
-.mainMenu {
-    @apply relative float-left;
+.main-menu {
+    @apply relative float-left ;
 }
-.mainMenu:after {
+.main-menu:after {
     content: '/';
     @apply absolute right-0 top-0 text-neutral-400 px-2 pt-1;
+}
+.magic-input {
+    @apply w-96 rounded shadow outline-none focus:bg-neutral-700;
+}
+.magic-items {
+    @apply text-xs absolute top-11 w-[25rem] bg-neutral-800;
+}
+.magic-item {
+    @apply m-2 py-2 pl-4 cursor-pointer hover:bg-neutral-700 text-neutral-300 hover:text-white;
+}
+.magic-item-focused {
+    @apply bg-neutral-700 text-white;
 }

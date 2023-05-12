@@ -2,20 +2,17 @@
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>
-            <div class="mainMenu">
-                <input x-ref="search" x-model="search" class="w-96" x-on:click="checkMainMenu"
-                    x-on:click.outside="closeMenus" placeholder="Search, jump or create... magically..."
-                    x-on:keyup.escape="clearSearch" x-on:keyup.down="focusNext(items.length)"
-                    x-on:keyup.up="focusPrev(items.length)"
+            <div class="main-menu">
+                <input class="magic-input" x-ref="search" x-model="search" x-on:click="checkMainMenu"
+                    x-on:click.outside="closeMenus" placeholder="Search, jump or create... magically... 🪄"
+                    x-on:keyup.escape="clearSearch" x-on:keydown.down="focusNext(items.length)"
+                    x-on:keydown.up="focusPrev(items.length)"
                     x-on:keyup.enter="focusedIndex !== '' && await set(filteredItems()[focusedIndex]?.next ?? 'server',filteredItems()[focusedIndex]?.name)" />
             </div>
-            <div x-cloak x-show="mainMenu" class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
+            <div x-show="mainMenu" class="magic-items">
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
-                        :class="focusedIndex === index && 'bg-neutral-700'"
-                        :class="item.disabled &&
-                            'text-neutral-500 bg-neutral-900 hover:bg-neutral-900 cursor-not-allowed opacity-60'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-green-600 rounded" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
                         <span class="px-2 mr-1 text-xs bg-purple-600 rounded" x-show="item.type === 'Jump'"
@@ -31,14 +28,13 @@
     {{-- Servers --}}
     <template x-cloak x-if="serverMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a server..."
-                x-on:keyup.down="focusNext(servers.length)" x-on:keyup.up="focusPrev(servers.length)"
+            <input class="magic-input" x-ref="search" x-model="search" class="w-96" placeholder="Select a server..."
+                x-on:keydown.down="focusNext(servers.length)" x-on:keydown.up="focusPrev(servers.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('destination',filteredServers()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'bg-neutral-700'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-600 rounded">Server</span>
                         <span x-text="server.name"></span>
                     </div>
@@ -49,14 +45,14 @@
     {{-- Destinations --}}
     <template x-cloak x-if="destinationMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a destination..."
-                x-on:keyup.down="focusNext(destinations.length)" x-on:keyup.up="focusPrev(destinations.length)"
+            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
+                placeholder="Select a destination..." x-on:keydown.down="focusNext(destinations.length)"
+                x-on:keydown.up="focusPrev(destinations.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('project',filteredDestinations()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
-                        :class="focusedIndex === index && 'bg-neutral-700'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'bg-neutral-700'" cclass="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
@@ -67,19 +63,18 @@
     {{-- Projects --}}
     <template x-cloak x-if="projectMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Type your project name..."
-                x-on:keyup.down="focusNext(projects.length + 1)" x-on:keyup.up="focusPrev(projects.length + 1)"
+            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
+                placeholder="Type your project name..." x-on:keydown.down="focusNext(projects.length + 1)"
+                x-on:keydown.up="focusPrev(projects.length + 1)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('environment',filteredProjects()[focusedIndex - 1]?.uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
-                <div x-on:click="await newProject" class="py-2 pl-4 cursor-pointer hover:bg-neutral-700"
-                    :class="focusedIndex === 0 && 'bg-neutral-700'">
+                <div x-on:click="await newProject" class="magic-item" :class="focusedIndex === 0 && 'bg-neutral-700'">
                     <span>New Project</span>
                     <span x-text="search"></span>
                 </div>
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
-                        :class="focusedIndex === index + 1 && 'bg-neutral-700'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index + 1 && 'bg-neutral-700'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Project</span>
                         <span x-text="project.name"></span>
                     </div>
@@ -90,19 +85,19 @@
     {{-- Environments --}}
     <template x-cloak x-if="environmentMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="w-96" placeholder="Select a environment..."
-                x-on:keyup.down="focusNext(environments.length + 1)" x-on:keyup.up="focusPrev(environments.length + 1)"
+            <input class="magic-input" x-ref="search" x-model="search" class="w-96"
+                placeholder="Select a environment..." x-on:keydown.down="focusNext(environments.length + 1)"
+                x-on:keydown.up="focusPrev(environments.length + 1)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
-            <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
-                <div x-on:click="await newEnvironment" class="py-2 pl-4 cursor-pointer hover:bg-neutral-700"
-                    :class="focusedIndex === 0 && 'bg-neutral-700'">
+            <div class="magic-items">
+                <div x-on:click="await newEnvironment" class="magic-item"
+                    :class="focusedIndex === 0 && magic - item - focused">
                     <span>New Environment</span>
                     <span x-text="search"></span>
                 </div>
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
-                        :class="focusedIndex === index + 1 && 'bg-neutral-700'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index + 1 && 'bg-neutral-700'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
@@ -114,7 +109,7 @@
     <template x-cloak x-if="projectsMenu">
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Select a project..."
-                x-on:keyup.down="focusNext(projects.length)" x-on:keyup.up="focusPrev(projects.length)"
+                x-on:keydown.down="focusNext(projects.length)" x-on:keydown.up="focusPrev(projects.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
@@ -132,7 +127,7 @@
     <template x-cloak x-if="destinationsMenu">
         <div x-on:click.outside="closeMenus">
             <input x-ref="search" x-model="search" class="w-96" placeholder="Select a destination..."
-                x-on:keyup.down="focusNext(Destinations.length)" x-on:keyup.up="focusPrev(Destinations.length)"
+                x-on:keydown.down="focusNext(Destinations.length)" x-on:keydown.up="focusPrev(Destinations.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToDestination',filteredDestinations()[focusedIndex].uuid)" />
             <div class="absolute text-sm top-11 w-[25rem] bg-neutral-800">
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
@@ -296,6 +291,7 @@
                 this.focusedIndex = ''
             },
             closeMenus() {
+                this.$refs.search.blur();
                 this.search = ''
                 this.focusedIndex = ''
                 this.mainMenu = false
