@@ -6,8 +6,9 @@ body {
     @apply bg-coolgray-100 text-white font-sans;
 }
 
-input, textarea {
-    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none  ;
+input,
+textarea {
+    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none;
 }
 select {
     @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
@@ -20,11 +21,11 @@ button {
     @apply relative float-left;
 }
 .main-menu:after {
-    content: '/';
+    content: "/";
     @apply absolute right-0 top-0 text-neutral-400 px-2 pt-[0.3rem];
 }
 .magic-input {
-    @apply w-[25rem] rounded shadow outline-none focus:bg-neutral-700 text-white;
+    @apply w-[25rem] rounded outline-none bg-coolgray-400 focus:bg-neutral-700 text-white;
 }
 .magic-items {
     @apply absolute top-14 w-[25rem] bg-coolgray-200 border-b-2 border-r-2 border-l-2 border-solid border-coolgray-100 rounded-b;

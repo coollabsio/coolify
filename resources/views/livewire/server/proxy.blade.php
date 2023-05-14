@@ -1,20 +1,20 @@
 <div>
-    <h2> Proxy </h2>
+    <h2>Proxy</h2>
 
-    @if($this->server->extra_attributes->proxy)
-        <div class="mt-6">
+    @if ($this->server->extra_attributes->proxy)
+        <div>
             <div>
-                Proxy type: {{ $this->server->extra_attributes->proxy  }}
+                Proxy type: {{ $this->server->extra_attributes->proxy }}
             </div>
 
             <div id="proxy_options" x-init="$wire.checkProxySettingsInSync()" class="relative w-fit">
 
                 {{-- Proxy is being checked against DB information --}}
-                @if(! $this->is_check_proxy_complete)
+                @if (!$this->is_check_proxy_complete)
                     @include('livewire.server._proxy.loading')
                 @endif
 
-                @if($this->is_check_proxy_complete && (! $this->is_proxy_settings_in_sync) )
+                @if ($this->is_check_proxy_complete && !$this->is_proxy_settings_in_sync)
                     @include('livewire.server._proxy.problems')
                 @endif
 
