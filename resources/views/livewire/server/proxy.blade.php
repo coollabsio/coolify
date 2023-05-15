@@ -23,7 +23,8 @@
                 @endif
                 <x-inputs.button isBold wire:click="stopProxy">Stop</x-inputs.button>
                 <span x-data="{ showConfiguration: false }">
-                    <x-inputs.button isBold x-on:click="showConfiguration = !showConfiguration">Show Configuration
+                    <x-inputs.button isBold x-on:click.prevent="showConfiguration = !showConfiguration">Show
+                        Configuration
                     </x-inputs.button>
                     <div class="pt-4">
                         <livewire:activity-monitor />
@@ -41,7 +42,7 @@
                                         wire:click.prevent="installProxy">
                                         Apply
                                     </x-inputs.button>
-                                    <x-inputs.button isBold wire:click.prevent="checkProxySettingsInSync">
+                                    <x-inputs.button isBold wire:click.prevent="resetProxy">
                                         Default
                                     </x-inputs.button>
                                     <textarea wire:model.defer="proxy_settings" class="w-full" rows="30"></textarea>
