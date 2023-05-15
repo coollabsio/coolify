@@ -14,9 +14,6 @@ class Proxy extends Component
     public Server $server;
 
     public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
-    public $is_proxy_installed;
-
-    public $is_check_proxy_complete = false;
     public $proxy_settings = null;
 
     public function installProxy()
@@ -64,7 +61,6 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server);
-            $this->is_check_proxy_complete = true;
         } catch (\Exception $e) {
             return generalErrorHandler($e);
         }

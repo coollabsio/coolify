@@ -1,8 +1,5 @@
 <div>
-    <div class="flex items-center gap-2">
-        <h2>Proxy</h2>
-        <div>{{ $this->server->extra_attributes->proxy_status }}</div>
-    </div>
+
     @if ($this->server->extra_attributes->proxy_status !== 'running')
         <select wire:model="selectedProxy">
             <option value="{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}">
@@ -32,8 +29,8 @@
                     <livewire:activity-monitor />
                 </div>
                 <template x-if="showConfiguration">
-                    <div x-init="$wire.checkProxySettingsInSync" class="pt-4">
-                        <h1>Proxy Configuration</h1>
+                    <div x-init="$wire.checkProxySettingsInSync">
+                        <h3>Configuration</h3>
                         <div wire:loading wire:target="checkProxySettingsInSync">
                             <x-proxy.loading />
                         </div>

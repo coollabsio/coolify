@@ -42,6 +42,9 @@ h1 {
 h2 {
     @apply text-xl font-bold py-4;
 }
+h3 {
+    @apply text-lg font-bold py-4;
+}
 .box {
     @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs p-2;
 }

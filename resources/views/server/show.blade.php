@@ -20,6 +20,15 @@
     @else
         <p>No destinations found</p>
     @endif
-
-    <livewire:server.proxy :server="$server" />
+    <div class="flex items-center gap-2">
+        <h2>Proxy</h2>
+        @if ($server->settings->is_validated)
+            <div>{{ $server->extra_attributes->proxy_status }}</div>
+        @endif
+    </div>
+    @if ($server->settings->is_validated)
+        <livewire:server.proxy :server="$server" />
+    @else
+        <p>Server is not validated. Validate first.</p>
+    @endif
 </x-layout>
