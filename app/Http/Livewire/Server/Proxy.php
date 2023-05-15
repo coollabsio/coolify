@@ -11,11 +11,16 @@ use Livewire\Component;
 
 class Proxy extends Component
 {
+    protected $listeners = ['serverValidated'];
     public Server $server;
 
     public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
     public $proxy_settings = null;
 
+    public function serverValidated()
+    {
+        $this->server->settings->refresh();
+    }
     public function installProxy()
     {
         $this->saveConfiguration($this->server);

@@ -26,9 +26,5 @@
             <div>{{ $server->extra_attributes->proxy_status }}</div>
         @endif
     </div>
-    @if ($server->settings->is_validated)
-        <livewire:server.proxy :server="$server" />
-    @else
-        <p>Server is not validated. Validate first.</p>
-    @endif
+    <livewire:server.proxy :server="$server" />
 </x-layout>

@@ -43,6 +43,7 @@ class Form extends Component
                 if (!$this->server->settings->is_validated) {
                     $this->server->settings->is_validated = true;
                     $this->server->settings->save();
+                    $this->emit('serverValidated');
                 }
             }
             $this->dockerVersion = instantRemoteProcess(['docker version|head -2|grep -i version'], $this->server, false);
