@@ -189,7 +189,6 @@
 		}
 		if (name === 'basicAuth') {
 			basicAuth = !basicAuth;
-			// TODO: Set user and password
 		}
 		if (name === 'isBot') {
 			if ($status.application.overallStatus !== 'stopped') return;
