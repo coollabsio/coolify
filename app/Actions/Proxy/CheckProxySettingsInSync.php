@@ -21,7 +21,7 @@ class CheckProxySettingsInSync
 
         $output = instantRemoteProcess([
             // Folder exists, in ~/projects/<folder-name>
-            'if [ -d "projects/'.$folder_name.'" ]; then echo "true"; else echo "false"; fi',
+            'if [ -d "projects/' . $folder_name . '" ]; then echo "true"; else echo "false"; fi',
             // Container of name <container-name> is running
             <<<EOT
             [[ "$(docker inspect -f '{{.State.Running}}' $container_name 2>/dev/null)" == "true" ]] && echo "true" || echo "false"
@@ -30,6 +30,6 @@ class CheckProxySettingsInSync
 
         return collect(
             explode(PHP_EOL, $output)
-        )->every(fn($output) => $output === 'true');
+        )->every(fn ($output) => $output === 'true');
     }
 }

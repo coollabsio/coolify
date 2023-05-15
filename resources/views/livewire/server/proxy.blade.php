@@ -11,14 +11,15 @@
 
                 {{-- Proxy is being checked against DB information --}}
                 @if (!$this->is_check_proxy_complete)
-                    @include('livewire.server._proxy.loading')
+                    <x-proxy.loading />
                 @endif
 
                 @if ($this->is_check_proxy_complete && !$this->is_proxy_settings_in_sync)
-                    @include('livewire.server._proxy.problems')
+                    <x-proxy.problems />
+                @else
+                    <x-proxy.options />
                 @endif
 
-                @include('livewire.server._proxy.options')
             </div>
 
         </div>
