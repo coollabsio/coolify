@@ -38,7 +38,6 @@
         <div class="flex gap-2">
             <x-inputs.button isBold wire:click.prevent='validateServer'>Validate Server</x-inputs.button>
             <x-inputs.button isBold wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
-
         </div>
     </form>
 

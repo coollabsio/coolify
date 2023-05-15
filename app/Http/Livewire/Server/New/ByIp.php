@@ -29,7 +29,6 @@ class ByIp extends Component
     public function mount()
     {
         $this->name = generateRandomName();
-        $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
     }
     public function setPrivateKey(string $private_key_id)
     {

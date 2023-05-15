@@ -13,20 +13,15 @@
         <x-inputs.input type="number" id="port" label="Port" />
         <x-inputs.input id="private_key_id" label="Private Key Id" readonly hidden />
 
-        @if ($private_keys->count() > 0)
-            <h1>Select a private key</h1>
+        <h1>Select a private key</h1>
+        <div class="flex">
             @foreach ($private_keys as $key)
-                <div class="box" :class="{ 'bg-coollabs': {{ $private_key_id === $key->id }} }"
+                <div class="w-32 box" :class="{ 'bg-coollabs': {{ $private_key_id == $key->id }} }"
                     wire:click.defer.prevent="setPrivateKey('{{ $key->id }}')">
                     {{ $key->name }}
                 </div>
             @endforeach
-        @endif
+        </div>
     </form>
-    @if ($private_keys->count() > 0)
-        <h2>Or add a new private key</h2>
-    @else
-        <h2>Create private key</h2>
-    @endif
-    <livewire:private-key.create />
+
 </div>

@@ -13,7 +13,9 @@
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-green-600 rounded" x-show="item.type === 'Add'"
+                        <span class="px-2 mr-1 text-xs text-white bg-green-600 rounded" x-show="item.type === 'App'"
+                            x-text="item.type"></span>
+                        <span class="px-2 mr-1 text-xs text-white bg-indigo-600 rounded" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
                         <span class="px-2 mr-1 text-xs text-white bg-purple-600 rounded" x-show="item.type === 'Jump'"
                             x-text="item.type"></span>
@@ -222,6 +224,21 @@
 
             focusedIndex: "",
             items: [{
+                    name: 'Public Repository',
+                    type: 'App',
+                    tags: 'application,public,repository,github,gitlab,bitbucket,git',
+                },
+                {
+                    name: 'Private Repository (with GitHub App)',
+                    type: 'App',
+                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
+                },
+                {
+                    name: 'Private Repository (with Deploy Key)',
+                    type: 'App',
+                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
+                },
+                {
                     name: 'Server',
                     type: 'Add',
                     tags: 'new,server',
@@ -245,21 +262,7 @@
                     tags: 'new,source,github,gitlab,bitbucket',
                     next: 'newSource'
                 },
-                {
-                    name: 'Public Repository',
-                    type: 'Add',
-                    tags: 'application,public,repository,github,gitlab,bitbucket,git',
-                },
-                {
-                    name: 'Private Repository (with GitHub App)',
-                    type: 'Add',
-                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
-                },
-                {
-                    name: 'Private Repository (with Deploy Key)',
-                    type: 'Add',
-                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
-                },
+
                 {
                     name: 'Database',
                     type: 'Add',
@@ -491,7 +494,7 @@
                             return await this.newEnvironment()
                         }
                         this.selectedEnvironment = id
-
+                        console.log(this.selectedAction)
                         if (this.selectedAction === 0) {
                             window.location =
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=public&destination=${this.selectedDestination}`

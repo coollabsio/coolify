@@ -170,7 +170,9 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
-    Route::get('/server/new', fn () => view('server.new'))->name('server.new');
+    Route::get('/server/new', fn () => view('server.new', [
+        'private_keys' => PrivateKey::where('team_id', session('currentTeam')->id)->get(),
+    ]))->name('server.new');
     Route::get('/server/{server_uuid}', function () {
         $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
         if (!$server) {

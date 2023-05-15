@@ -9,7 +9,7 @@ use Livewire\Component;
 class Create extends Component
 {
     public string $name;
-    public string|null $description;
+    public string|null $description = null;
     public string $value;
     public string $currentRoute;
 
@@ -29,9 +29,6 @@ class Create extends Component
             'private_key' => $this->value,
             'team_id' => session('currentTeam')->id
         ]);
-        session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
-        if ($this->currentRoute !== 'server/new') {
-            redirect()->route('private-key.show', $new_private_key->uuid);
-        }
+        redirect()->route('server.new');
     }
 }
