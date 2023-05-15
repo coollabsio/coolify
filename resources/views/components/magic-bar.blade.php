@@ -1,4 +1,4 @@
-<div x-data="magicsearchbar" @slash.window="mainMenu = true" class="pt-2">
+<div x-data="magicsearchbar" @slash.window="mainMenu = true">
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>

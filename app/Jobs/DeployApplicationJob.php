@@ -69,7 +69,6 @@ class DeployApplicationJob implements ShouldQueue
     protected function stopRunningContainer()
     {
         $this->executeNow([
-
             "echo -n 'Removing old instance... '",
             $this->execute_in_builder("docker rm -f {$this->application->uuid} >/dev/null 2>&1"),
             "echo 'Done.'",

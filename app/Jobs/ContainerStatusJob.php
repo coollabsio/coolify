@@ -67,9 +67,7 @@ class ContainerStatusJob implements ShouldQueue
             return;
         }
         if ($application->destination->server) {
-            $container = instantRemoteProcess(["docker inspect --format '{{json .State}}' {$this->container_id}"], $application->destination->server);
-            $container = formatDockerCmdOutputToJson($container);
-            $application->status = $container[0]['Status'];
+            $application->status = checkContainerStatus(server: $application->destination->server, container_id: $this->container_id);
             $application->save();
         }
     }

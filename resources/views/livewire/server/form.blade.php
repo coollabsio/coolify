@@ -1,6 +1,23 @@
 <div x-data="{ deleteServer: false }">
     <x-naked-modal show="deleteServer" message='Are you sure you would like to delete this server?' />
     <form wire:submit.prevent='submit' class="flex flex-col">
+        <div class="flex flex-col pb-4">
+            <div class="flex items-center gap-2">
+                <div class="text-3xl font-bold">Server</div>
+                <x-inputs.button isBold type="submit">Submit</x-inputs.button>
+                <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
+                    Delete
+                </x-inputs.button>
+            </div>
+            <div>
+                @if ($server->settings->is_validated)
+                    <div class="text-green-400/90">Validated</div>
+                @else
+                    <div class="text-red-400/90">Not validated</div>
+                @endif
+            </div>
+        </div>
+
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
                 <x-inputs.input id="server.name" label="Name" required />
@@ -18,15 +35,11 @@
                 @endif
             </div>
         </div>
-        <div class="flex">
-            <x-inputs.button type="submit">Submit</x-inputs.button>
-            <x-inputs.button wire:click.prevent='checkServer'>Check Server</x-inputs.button>
-            <x-inputs.button wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
-            <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
-                Delete
-            </x-inputs.button>
+        <div class="flex gap-2">
+            <x-inputs.button isBold wire:click.prevent='validateServer'>Validate Server</x-inputs.button>
+            <x-inputs.button isBold wire:click.prevent='installDocker'>Install Docker</x-inputs.button>
+
         </div>
-        <x-inputs.input class="" disabled type="checkbox" id="server.settings.is_validated" label="Validated" />
     </form>
 
     @isset($uptime)

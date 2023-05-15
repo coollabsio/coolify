@@ -1,20 +1,34 @@
 <x-layout>
-    <h1>Server</h1>
     <livewire:server.form :server_id="$server->id" />
-    <h2>Private Key <a href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">
-            <x-inputs.button>Change</x-inputs.button>
+    <div class="flex items-center gap-2">
+        <h2>Private Key</h2>
+        <a href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">
+            <x-inputs.button isBold>Change</x-inputs.button>
         </a>
-    </h2>
+    </div>
     <p>{{ $server->privateKey->name }}</p>
-    <h2>Destinations <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">
-            <x-inputs.button>New</x-inputs.button>
-        </a></h2>
-    @if ($server->standaloneDockers)
+    <div class="flex items-center gap-2">
+        <h2>Destinations</h2>
+        <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">
+            <x-inputs.button isBold>New</x-inputs.button>
+        </a>
+    </div>
+    @if ($server->standaloneDockers->count() > 0)
         @foreach ($server->standaloneDockers as $docker)
             <p>Network: {{ data_get($docker, 'network') }}</p>
         @endforeach
+    @else
+        <p>No destinations found</p>
     @endif
-    <h1> {{ $server->name }}</h1>
-
-    <livewire:server.proxy :server="$server"/>
+    <div class="flex items-center gap-2">
+        <h2>Proxy</h2>
+        @if ($server->settings->is_validated)
+            <div>{{ $server->extra_attributes->proxy_status }}</div>
+        @endif
+    </div>
+    @if ($server->settings->is_validated)
+        <livewire:server.proxy :server="$server" />
+    @else
+        <p>Server is not validated. Validate first.</p>
+    @endif
 </x-layout>

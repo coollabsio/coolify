@@ -32,7 +32,7 @@ class Form extends Component
 
         $this->emit('newMonitorActivity', $activity->id);
     }
-    public function checkServer()
+    public function validateServer()
     {
         try {
             $this->uptime = instantRemoteProcess(['uptime'], $this->server, false);

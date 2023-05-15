@@ -2,7 +2,6 @@ version: '3.8'
 
 x-testing-host:
   &testing-host-base
-  image: coolify-testing-host
   build:
     dockerfile: Dockerfile
     context: ./docker/testing-host

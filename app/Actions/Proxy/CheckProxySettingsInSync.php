@@ -1,0 +1,33 @@
+<?php
+
+namespace App\Actions\Proxy;
+
+use App\Enums\ProxyTypes;
+use App\Models\Server;
+use Illuminate\Support\Str;
+
+class CheckProxySettingsInSync
+{
+    public function __invoke(Server $server)
+    {
+        $proxy_path = config('coolify.proxy_config_path');
+        $output = instantRemoteProcess([
+            "cat $proxy_path/docker-compose.yml",
+        ], $server, false);
+        if (is_null($output)) {
+            $final_output = Str::of(getProxyConfiguration($server))->trim();
+        } else {
+            $final_output = Str::of($output)->trim();
+        }
+        $docker_compose_yml_base64 = base64_encode($final_output);
+        $server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->save();
+        if (is_null($output)) {
+            instantRemoteProcess([
+                "mkdir -p $proxy_path",
+                "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
+            ], $server);
+        }
+        return $final_output;
+    }
+}

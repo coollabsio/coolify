@@ -1,5 +1,3 @@
-@extends('errors::minimal')
-
-@section('title', __('Not Found'))
-@section('code', '404')
-@section('message', __('Not Found'))
+<div>
+    You are lost. <a href="{{ route('dashboard') }}">Go home</a>
+</div>
