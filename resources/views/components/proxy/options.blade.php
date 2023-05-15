@@ -1,4 +1,4 @@
-
+@props(['proxy_settings'])
 <div class="mt-4">
     <label>
         <div>Edit config file</div>
@@ -45,4 +45,3 @@
         <button>Update</button>
     </label>
 </div>
-

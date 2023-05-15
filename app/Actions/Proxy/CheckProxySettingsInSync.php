@@ -2,34 +2,32 @@
 
 namespace App\Actions\Proxy;
 
-use App\Enums\ActivityTypes;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
-use Spatie\Activitylog\Models\Activity;
-use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Str;
 
 class CheckProxySettingsInSync
 {
     public function __invoke(Server $server)
     {
-        // @TODO What is the mechanism to make sure setting in sync?
-        $folder_name = match ($server->extra_attributes->proxy) {
-            ProxyTypes::TRAEFIK_V2->value => 'proxy',
-        };
-
-        $container_name = 'coolify-proxy';
-
+        $proxy_path = config('coolify.proxy_config_path');
         $output = instantRemoteProcess([
-            // Folder exists, in ~/projects/<folder-name>
-            'if [ -d "projects/' . $folder_name . '" ]; then echo "true"; else echo "false"; fi',
-            // Container of name <container-name> is running
-            <<<EOT
-            [[ "$(docker inspect -f '{{.State.Running}}' $container_name 2>/dev/null)" == "true" ]] && echo "true" || echo "false"
-            EOT,
-        ], $server);
-
-        return collect(
-            explode(PHP_EOL, $output)
-        )->every(fn ($output) => $output === 'true');
+            "cat $proxy_path/docker-compose.yml",
+        ], $server, false);
+        if (is_null($output)) {
+            $final_output = Str::of(getProxyConfiguration($server))->trim();
+        } else {
+            $final_output = Str::of($output)->trim();
+        }
+        $docker_compose_yml_base64 = base64_encode($final_output);
+        $server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->save();
+        if (is_null($output)) {
+            instantRemoteProcess([
+                "mkdir -p $proxy_path",
+                "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
+            ], $server);
+        }
+        return $final_output;
     }
 }

@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\DockerCleanupDanglingImagesJob;
+use App\Jobs\ProxyCheckJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -16,6 +17,7 @@ class Kernel extends ConsoleKernel
     {
         $schedule->job(new ContainerStatusJob)->everyMinute();
         $schedule->job(new DockerCleanupDanglingImagesJob)->everyMinute();
+        // $schedule->job(new ProxyCheckJob)->everyMinute();
     }
 
     /**

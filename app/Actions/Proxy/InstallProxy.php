@@ -5,101 +5,61 @@ namespace App\Actions\Proxy;
 use App\Enums\ActivityTypes;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
-use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Str;
 
 class InstallProxy
 {
+    public Collection $networks;
+
     public function __invoke(Server $server): Activity
     {
-        $docker_compose_yml_base64 = base64_encode(
-            $this->getDockerComposeContents()
-        );
+        $proxy_path = config('coolify.proxy_config_path');
+
+        $networks = collect($server->standaloneDockers)->map(function ($docker) {
+            return $docker['network'];
+        })->unique();
+        if ($networks->count() === 0) {
+            $this->networks = collect(['coolify']);
+        }
+        $create_networks_command = $this->networks->map(function ($network) {
+            return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
+        });
+
+        $configuration = instantRemoteProcess([
+            "cat $proxy_path/docker-compose.yml",
+        ], $server, false);
+        if (is_null($configuration)) {
+            $configuration = Str::of(getProxyConfiguration($server))->trim();
+        } else {
+            $configuration = Str::of($configuration)->trim();
+        }
+        $docker_compose_yml_base64 = base64_encode($configuration);
+        $server->extra_attributes->last_applied_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->save();
 
         $env_file_base64 = base64_encode(
             $this->getEnvContents()
         );
-
         $activity = remoteProcess([
-            "docker network ls --format '{{.Name}}' | grep '^coolify$' || docker network create coolify",
-            'mkdir -p projects',
-            'mkdir -p projects/proxy',
-            'mkdir -p projects/proxy/letsencrypt',
-            'cd projects/proxy',
-            "echo '$docker_compose_yml_base64' | base64 -d > docker-compose.yml",
-            "echo '$env_file_base64' | base64 -d > .env",
+            ...$create_networks_command,
+            "echo 'Docker networks created...'",
+            "mkdir -p $proxy_path",
+            "cd $proxy_path",
+            "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
+            "echo '$env_file_base64' | base64 -d > $proxy_path/.env",
+            "echo 'Docker compose file created...'",
+            "echo 'Pulling docker image...'",
+            'docker compose pull -q',
+            "echo 'Stopping proxy...'",
+            'docker compose down -v --remove-orphans',
+            "echo 'Starting proxy...'",
             'docker compose up -d --remove-orphans',
-            'docker ps',
+            "echo 'Proxy installed successfully...'"
         ], $server, ActivityTypes::INLINE->value);
 
-        // Persist to Database
-        $server->extra_attributes->proxy = ProxyTypes::TRAEFIK_V2->value;
-        $server->save();
-
         return $activity;
-    }
-
-    protected function getDockerComposeContents()
-    {
-        return Yaml::dump($this->getComposeData());
-    }
-
-    /**
-     * @return array
-     */
-    protected function getComposeData(): array
-    {
-        $cwd = config('app.env') === 'local'
-            ? config('proxy.project_path_on_host') . '/_testing_hosts/host_2_proxy'
-            : '.';
-
-        return [
-            "version" => "3.7",
-            "networks" => [
-                "coolify" => [
-                    "external" => true,
-                ],
-            ],
-            "services" => [
-                "traefik" => [
-                    "container_name" => "coolify-proxy",
-                    "image" => "traefik:v2.10",
-                    "restart" => "always",
-                    "extra_hosts" => [
-                        "host.docker.internal:host-gateway",
-                    ],
-                    "networks" => [
-                        "coolify",
-                    ],
-                    "ports" => [
-                        "80:80",
-                        "443:443",
-                        "8080:8080",
-                    ],
-                    "volumes" => [
-                        "/var/run/docker.sock:/var/run/docker.sock:ro",
-                        "{$cwd}/letsencrypt:/letsencrypt",
-                        "{$cwd}/traefik.auth:/auth/traefik.auth",
-                    ],
-                    "command" => [
-                        "--api.dashboard=true",
-                        "--api.insecure=true",
-                        "--entrypoints.http.address=:80",
-                        "--entrypoints.https.address=:443",
-                        "--providers.docker=true",
-                        "--providers.docker.exposedbydefault=false",
-                    ],
-                    "labels" => [
-                        "traefik.enable=true",
-                        "traefik.http.routers.traefik.entrypoints=http",
-                        'traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)',
-                        "traefik.http.routers.traefik.service=api@internal",
-                        "traefik.http.services.traefik.loadbalancer.server.port=8080",
-                        "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
-                    ],
-                ],
-            ],
-        ];
     }
 
     protected function getEnvContents()

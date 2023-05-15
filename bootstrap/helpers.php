@@ -40,7 +40,7 @@ if (!function_exists('generalErrorHandler')) {
                     'error' => $error->getMessage(),
                 ]);
             } else {
-                dump($error);
+                // dump($error);
             }
         }
     }
@@ -165,10 +165,9 @@ if (!function_exists('instantRemoteProcess')) {
         $exitCode = $process->exitCode();
         if ($exitCode !== 0) {
             if (!$throwError) {
-                return false;
+                return null;
             }
-            Log::error($process->errorOutput());
-            throw new \RuntimeException('There was an error running the command.');
+            throw new \RuntimeException($process->errorOutput());
         }
         return $output;
     }
@@ -196,6 +195,7 @@ use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\Token\Builder;
+use Symfony\Component\Yaml\Yaml;
 
 if (!function_exists('generate_github_installation_token')) {
     function generate_github_installation_token(GithubApp $source)
@@ -242,5 +242,75 @@ if (!function_exists('getParameters')) {
     function getParameters()
     {
         return Route::current()->parameters();
+    }
+}
+if (!function_exists('checkContainerStatus')) {
+    function checkContainerStatus(Server $server, string $container_id, bool $throwError = false)
+    {
+        $container = instantRemoteProcess(["docker inspect --format '{{json .State}}' {$container_id}"], $server, $throwError);
+        if (!$container) {
+            return 'exited';
+        }
+        $container = formatDockerCmdOutputToJson($container);
+        return $container[0]['Status'];
+    }
+}
+if (!function_exists('getProxyConfiguration')) {
+    function getProxyConfiguration(Server $server)
+    {
+        $proxy_config_path = config('coolify.proxy_config_path');
+        $networks = collect($server->standaloneDockers)->map(function ($docker) {
+            return $docker['network'];
+        })->unique();
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
+        $array_of_networks = collect([]);
+        $networks->map(function ($network) use ($array_of_networks) {
+            $array_of_networks[$network] = [
+                "external" => true,
+            ];
+        });
+        return Yaml::dump([
+            "version" => "3.8",
+            "networks" => $array_of_networks->toArray(),
+            "services" => [
+                "traefik" => [
+                    "container_name" => "coolify-proxy", # Do not modify this! You will break everything!
+                    "image" => "traefik:v2.10",
+                    "restart" => "always",
+                    "extra_hosts" => [
+                        "host.docker.internal:host-gateway",
+                    ],
+                    "networks" => $networks->toArray(), # Do not modify this! You will break everything!
+                    "ports" => [
+                        "80:80",
+                        "443:443",
+                        "8080:8080",
+                    ],
+                    "volumes" => [
+                        "/var/run/docker.sock:/var/run/docker.sock:ro",
+                        "{$proxy_config_path}/letsencrypt:/letsencrypt", # Do not modify this! You will break everything!
+                        "{$proxy_config_path}/traefik.auth:/auth/traefik.auth", # Do not modify this! You will break everything!
+                    ],
+                    "command" => [
+                        "--api.dashboard=true",
+                        "--api.insecure=true",
+                        "--entrypoints.http.address=:80",
+                        "--entrypoints.https.address=:443",
+                        "--providers.docker=true",
+                        "--providers.docker.exposedbydefault=false",
+                    ],
+                    "labels" => [
+                        "traefik.enable=true", # Do not modify this! You will break everything!
+                        "traefik.http.routers.traefik.entrypoints=http",
+                        'traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)',
+                        "traefik.http.routers.traefik.service=api@internal",
+                        "traefik.http.services.traefik.loadbalancer.server.port=8080",
+                        "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
+                    ],
+                ],
+            ],
+        ], 4, 2);
     }
 }
