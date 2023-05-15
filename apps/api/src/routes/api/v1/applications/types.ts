@@ -43,6 +43,9 @@ export interface SaveApplicationSettings extends OnlyId {
 		isDBBranching: boolean;
 		isCustomSSL: boolean;
 		isHttp2: boolean;
+		basicAuth: boolean;
+		basicAuthUser: string;
+		basicAuthPw: string;
 	};
 }
 export interface DeleteApplication extends OnlyId {

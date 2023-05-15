@@ -29,27 +29,27 @@
 	export let application: any;
 	export let settings: any;
 
-	import yaml from 'js-yaml';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { onMount } from 'svelte';
-	import Select from 'svelte-select';
 	import { get, getAPIUrl, post } from '$lib/api';
-	import cuid from 'cuid';
+	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
+	import Beta from '$lib/components/Beta.svelte';
+	import Explainer from '$lib/components/Explainer.svelte';
+	import Setting from '$lib/components/Setting.svelte';
 	import {
 		addToast,
 		appSession,
 		checkIfDeploymentEnabledApplications,
-		setLocation,
-		status,
+		features,
 		isDeploymentEnabled,
-		features
+		setLocation,
+		status
 	} from '$lib/store';
 	import { t } from '$lib/translations';
-	import { errorNotification, getDomain, notNodeDeployments, staticDeployments } from '$lib/common';
-	import Setting from '$lib/components/Setting.svelte';
-	import Explainer from '$lib/components/Explainer.svelte';
-	import { goto } from '$app/navigation';
-	import Beta from '$lib/components/Beta.svelte';
+	import cuid from 'cuid';
+	import yaml from 'js-yaml';
+	import { onMount } from 'svelte';
+	import Select from 'svelte-select';
 	import { saveForm } from './utils';
 
 	const { id } = $page.params;
@@ -77,6 +77,7 @@
 	let isCustomSSL = application.settings?.isCustomSSL;
 	let autodeploy = application.settings?.autodeploy;
 	let isBot = application.settings?.isBot;
+	let basicAuth = application.settings?.basicAuth;
 	let isDBBranching = application.settings?.isDBBranching;
 	let htmlUrl = application.gitSource?.htmlUrl;
 	let isHttp2 = application.settings.isHttp2;
@@ -186,6 +187,10 @@
 		if (name === 'isCustomSSL') {
 			isCustomSSL = !isCustomSSL;
 		}
+		if (name === 'basicAuth') {
+			basicAuth = !basicAuth;
+			// TODO: Set user and password
+		}
 		if (name === 'isBot') {
 			if ($status.application.overallStatus !== 'stopped') return;
 			isBot = !isBot;
@@ -210,7 +215,10 @@
 				isCustomSSL,
 				isHttp2,
 				branch: application.branch,
-				projectId: application.projectId
+				projectId: application.projectId,
+				basicAuth,
+				basicAuthUser: application.basicAuthUser,
+				basicAuthPw: application.basicAuthPw
 			});
 			return addToast({
 				message: $t('application.settings_saved'),
@@ -231,6 +239,9 @@
 			}
 			if (name === 'isBot') {
 				isBot = !isBot;
+			}
+			if (name === 'basicAuth') {
+				basicAuth = !basicAuth;
 			}
 			if (name === 'isDBBranching') {
 				isDBBranching = !isDBBranching;
@@ -498,7 +509,7 @@
 				<div class="title font-bold pb-3">General</div>
 				{#if $appSession.isAdmin}
 					<button
-						class="btn btn-sm  btn-primary"
+						class="btn btn-sm btn-primary"
 						type="submit"
 						class:loading={loading.save}
 						class:bg-orange-600={forceSave}
@@ -751,7 +762,56 @@
 							on:click={() => !isDisabled && changeSettings('dualCerts')}
 						/>
 					</div>
-				
+
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="basicAuth"
+							dataTooltip={$t('forms.must_be_stopped_to_modify')}
+							disabled={isDisabled}
+							isCenter={false}
+							bind:setting={basicAuth}
+							title={$t('application.basic_auth')}
+							description="Activate basic authentication for your application. <br>Useful if you want to protect your application with a password. <br><br>Use the <span class='font-bold text-settings'>username</span> and <span class='font-bold text-settings'>password</span> fields to set the credentials."
+							on:click={() => !isDisabled && changeSettings('basicAuth')}
+						/>
+					</div>
+
+					{#if basicAuth}
+						<div class="grid grid-cols-2 items-center">
+							<label for="basicAuthUser">{$t('application.basic_auth_user')}</label>
+							<input
+								bind:this={fqdnEl}
+								class="w-full"
+								required={!application.settings?.basicAuth}
+								readonly={isDisabled}
+								disabled={isDisabled}
+								name="basicAuthUser"
+								id="basicAuthUser"
+								class:border={!application.settings?.basicAuth && !application.basicAuthUser}
+								class:border-red-500={!application.settings?.basicAuth &&
+									!application.basicAuthUser}
+								bind:value={application.basicAuthUser}
+								placeholder="eg: admin"
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center">
+							<label for="basicAuthPw">{$t('application.basic_auth_pw')}</label>
+							<input
+								bind:this={fqdnEl}
+								class="w-full"
+								required={!application.settings?.basicAuth}
+								readonly={isDisabled}
+								disabled={isDisabled}
+								name="basicAuthPw"
+								id="basicAuthPw"
+								class:border={!application.settings?.basicAuth && !application.basicAuthPw}
+								class:border-red-500={!application.settings?.basicAuth && !application.basicAuthPw}
+								bind:value={application.basicAuthPw}
+								placeholder="**********"
+							/>
+						</div>
+					{/if}
+
 					{#if isHttps && application.buildPack !== 'compose'}
 						<div class="grid grid-cols-2 items-center pb-4">
 							<Setting
@@ -782,7 +842,7 @@
 				</div>
 
 				<div class="grid grid-flow-row gap-2 px-4 pr-5">
-					<div class="grid grid-cols-2 items-center  pt-4">
+					<div class="grid grid-cols-2 items-center pt-4">
 						<label for="simpleDockerfile">Dockerfile</label>
 						<div class="flex gap-2">
 							<textarea

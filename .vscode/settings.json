@@ -18,5 +18,14 @@
 		"ts",
 		"json"
 	],
-	"i18n-ally.extract.autoDetect": true
+	"i18n-ally.extract.autoDetect": true,
+	"files.exclude": {
+		"**/.git": true,
+		"**/.svn": true,
+		"**/.hg": true,
+		"**/CVS": true,
+		"**/.DS_Store": true,
+		"**/Thumbs.db": true
+	},
+	"hide-files.files": []
 }
