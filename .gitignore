@@ -19,7 +19,7 @@ yarn-error.log
 /.vscode
 /.npm
 /.bash_history
-/_volumes
+/_data
 
 # Temp while developing Proxy deployment
 resources/recipes

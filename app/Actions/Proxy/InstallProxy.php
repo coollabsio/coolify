@@ -11,7 +11,6 @@ use Illuminate\Support\Str;
 
 class InstallProxy
 {
-    public Collection $networks;
 
     public function __invoke(Server $server): Activity
     {
@@ -21,9 +20,9 @@ class InstallProxy
             return $docker['network'];
         })->unique();
         if ($networks->count() === 0) {
-            $this->networks = collect(['coolify']);
+            $networks = collect(['coolify']);
         }
-        $create_networks_command = $this->networks->map(function ($network) {
+        $create_networks_command = $networks->map(function ($network) {
             return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
         });
 
