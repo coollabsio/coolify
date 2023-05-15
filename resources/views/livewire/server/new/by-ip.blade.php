@@ -16,8 +16,7 @@
         <h1>Select a private key</h1>
         <div class="flex">
             @foreach ($private_keys as $key)
-                <div class="w-32 box" :class="{ 'bg-coollabs': {{ $private_key_id == $key->id }} }"
-                    wire:click.defer.prevent="setPrivateKey('{{ $key->id }}')">
+                <div class="w-32 box" wire:click.defer.prevent="setPrivateKey('{{ $key->id }}')">
                     {{ $key->name }}
                 </div>
             @endforeach

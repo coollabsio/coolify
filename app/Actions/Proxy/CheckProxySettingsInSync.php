@@ -15,9 +15,9 @@ class CheckProxySettingsInSync
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
         if (is_null($output)) {
-            $final_output = Str::of(getProxyConfiguration($server))->trim();
+            $final_output = Str::of(getProxyConfiguration($server))->trim()->value;
         } else {
-            $final_output = Str::of($output)->trim();
+            $final_output = Str::of($output)->trim()->value;
         }
         $docker_compose_yml_base64 = base64_encode($final_output);
         $server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;

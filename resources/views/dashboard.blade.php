@@ -1,9 +1,8 @@
 <x-layout>
     @if ($servers->count() === 0)
         <div class="flex flex-col items-center justify-center h-full pt-32">
-            <div class="pb-3">Without a server, you won't be able to do much.</div>
-            <div class="text-2xl">Let's create <a href="{{ route('server.new') }}"
-                    class="p-2 rounded bg-coollabs hover:bg-coollabs-100">your
+            <div class="">Without a server, you won't be able to do much</div>
+            <div class="text-2xl">Let's create <a class="underline" href="{{ route('server.new') }}">your
                     first</a> one!</div>
         </div>
     @else

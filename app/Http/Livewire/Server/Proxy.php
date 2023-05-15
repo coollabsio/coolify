@@ -51,7 +51,7 @@ class Proxy extends Component
     {
         try {
             $proxy_path = config('coolify.proxy_config_path');
-            $this->proxy_settings = Str::of($this->proxy_settings)->trim();
+            $this->proxy_settings = Str::of($this->proxy_settings)->trim()->value;
             $docker_compose_yml_base64 = base64_encode($this->proxy_settings);
             $this->server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
             $this->server->save();

@@ -159,6 +159,7 @@ if (!function_exists('instantRemoteProcess')) {
     {
         $command_string = implode("\n", $command);
         $private_key_location = savePrivateKeyForServer($server);
+
         $ssh_command = generateSshCommand($private_key_location, $server->ip, $server->user, $server->port, $command_string);
         $process = Process::run($ssh_command);
         $output = trim($process->output());

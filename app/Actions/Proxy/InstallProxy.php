@@ -3,9 +3,7 @@
 namespace App\Actions\Proxy;
 
 use App\Enums\ActivityTypes;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
-use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 
@@ -30,9 +28,9 @@ class InstallProxy
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
         if (is_null($configuration)) {
-            $configuration = Str::of(getProxyConfiguration($server))->trim();
+            $configuration = Str::of(getProxyConfiguration($server))->trim()->value;
         } else {
-            $configuration = Str::of($configuration)->trim();
+            $configuration = Str::of($configuration)->trim()->value;
         }
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->extra_attributes->last_applied_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
