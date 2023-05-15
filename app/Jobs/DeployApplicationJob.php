@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 
 class DeployApplicationJob implements ShouldQueue
 {
@@ -376,8 +377,10 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
         if ($this->application->fqdn) {
+            $url = Url::fromString($this->application->fqdn);
+            $host = $url->getHost();
             $labels[] = 'traefik.enable=true';
-            $labels[] = "traefik.http.routers.container.rule=Host(`{$this->application->fqdn}`)";
+            $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`)";
         }
         return $labels;
     }

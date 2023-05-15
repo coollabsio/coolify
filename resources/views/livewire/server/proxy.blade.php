@@ -41,6 +41,9 @@
                                         wire:click.prevent="installProxy">
                                         Apply
                                     </x-inputs.button>
+                                    <x-inputs.button isBold wire:click.prevent="checkProxySettingsInSync">
+                                        Default
+                                    </x-inputs.button>
                                     <textarea wire:model.defer="proxy_settings" class="w-full" rows="30"></textarea>
                                 </form>
                             @endisset

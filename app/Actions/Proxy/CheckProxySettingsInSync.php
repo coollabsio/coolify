@@ -8,13 +8,13 @@ use Illuminate\Support\Str;
 
 class CheckProxySettingsInSync
 {
-    public function __invoke(Server $server)
+    public function __invoke(Server $server, bool $reset = false)
     {
         $proxy_path = config('coolify.proxy_config_path');
         $output = instantRemoteProcess([
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
-        if (is_null($output)) {
+        if (is_null($output) || $reset) {
             $final_output = Str::of(getProxyConfiguration($server))->trim()->value;
         } else {
             $final_output = Str::of($output)->trim()->value;

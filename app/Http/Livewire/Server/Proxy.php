@@ -65,7 +65,7 @@ class Proxy extends Component
     public function checkProxySettingsInSync()
     {
         try {
-            $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server);
+            $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server, true);
         } catch (\Exception $e) {
             return generalErrorHandler($e);
         }
