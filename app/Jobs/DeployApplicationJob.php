@@ -13,6 +13,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
@@ -379,8 +380,13 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         if ($this->application->fqdn) {
             $url = Url::fromString($this->application->fqdn);
             $host = $url->getHost();
+            $path = $url->getPath();
             $labels[] = 'traefik.enable=true';
-            $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`)";
+            if ($path === '/') {
+                $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+            } else {
+                $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+            }
         }
         return $labels;
     }

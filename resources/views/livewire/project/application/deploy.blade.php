@@ -1,7 +1,7 @@
 <div x-data="{ deleteApplication: false }">
     <x-naked-modal show="deleteApplication" />
     @if ($application->status === 'running')
-        <x-inputs.button wire:click='start'>Restart</x-inputs.button>
+        <x-inputs.button wire:click='start'>Rebuild</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Force Rebuild</x-inputs.button>
         <x-inputs.button wire:click='stop'>Stop</x-inputs.button>
     @else
