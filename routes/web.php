@@ -165,7 +165,7 @@ Route::middleware(['auth'])->group(function () {
         $private_key = PrivateKey::where('uuid', request()->private_key_uuid)->first();
         return view('private-key.show', [
             'private_key' => $private_key,
-        ]);G
+        ]);
     })->name('private-key.show');
 });
 Route::middleware(['auth'])->group(function () {
