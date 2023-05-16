@@ -11,6 +11,9 @@
                 <a href="/profile">
                     <x-inputs.button>Profile</x-inputs.button>
                 </a>
+                <a href="/profile/team">
+                    <x-inputs.button>Team</x-inputs.button>
+                </a>
                 @if (auth()->user()->isRoot())
                     <a href="/settings">
                         <x-inputs.button>Settings</x-inputs.button>

@@ -128,6 +128,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile', function () {
         return view('profile');
     })->name('profile');
+    Route::get('/profile/team', function () {
+        return view('team');
+    })->name('team');
 
     Route::get('/settings', function () {
         $isRoot = auth()->user()->isRoot();
