@@ -28,7 +28,6 @@ class Server extends BaseModel
         'extra_attributes' => SchemalessAttributes::class,
     ];
 
-
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);

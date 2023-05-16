@@ -2,9 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 
 class Application extends BaseModel
 {
@@ -20,8 +22,6 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
         });
     }
-
-
     protected $fillable = [
         'name',
         'project_id',
@@ -40,6 +40,16 @@ class Application extends BaseModel
         'publish_directory',
         'private_key_id'
     ];
+
+    public $casts = [
+        'previews' => SchemalessAttributes::class,
+    ];
+    public function scopeWithExtraAttributes(): Builder
+    {
+        return $this->previews->modelScope();
+    }
+
+
     public function publishDirectory(): Attribute
     {
         return Attribute::make(

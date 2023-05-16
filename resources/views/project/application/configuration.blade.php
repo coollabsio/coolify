@@ -18,9 +18,9 @@
             <a :class="activeTab === 'storages' && 'text-purple-500'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
-            <a :class="activeTab === 'previews' && 'text-purple-500'"
+            {{-- <a :class="activeTab === 'previews' && 'text-purple-500'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
-            </a>
+            </a> --}}
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'">
@@ -38,9 +38,9 @@
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.application.storages.all :application="$application" />
             </div>
-            <div x-cloak x-show="activeTab === 'previews'">
+            {{-- <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
-            </div>
+            </div> --}}
         </div>
     </div>
 </x-layout>

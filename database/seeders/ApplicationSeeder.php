@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Data\ApplicationPreview;
 use App\Models\Application;
 use App\Models\ApplicationSetting;
 use App\Models\Environment;
@@ -36,6 +37,16 @@ class ApplicationSeeder extends Seeder
             'destination_type' => StandaloneDocker::class,
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class,
+            'previews' => [
+                ApplicationPreview::from([
+                    'pullRequestId' => 1,
+                    'branch' => 'nodejs-fastify'
+                ]),
+                ApplicationPreview::from([
+                    'pullRequestId' => 2,
+                    'branch' => 'nodejs-fastify'
+                ])
+            ]
         ]);
     }
 }

@@ -41,6 +41,8 @@ return new class extends Migration
             $table->string('base_directory')->default('/');
             $table->string('publish_directory')->nullable();
 
+            $table->schemalessAttributes('previews');
+
             $table->string('health_check_path')->default('/');
             $table->string('health_check_port')->nullable();
             $table->string('health_check_host')->default('localhost');
