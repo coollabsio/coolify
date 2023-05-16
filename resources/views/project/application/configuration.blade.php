@@ -18,6 +18,9 @@
             <a :class="activeTab === 'storages' && 'text-purple-500'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
+            <a :class="activeTab === 'revert' && 'text-purple-500'"
+                @click.prevent="activeTab = 'revert'; window.location.hash = 'revert'" href="#">Revert
+            </a>
             {{-- <a :class="activeTab === 'previews' && 'text-purple-500'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
             </a> --}}
@@ -37,6 +40,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.application.storages.all :application="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'revert'">
+                <h3>TODO 🚧</h3>
             </div>
             {{-- <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
