@@ -1,22 +1,17 @@
 <x-layout>
     <div class="flex items-center gap-2">
         <h1>Resources</h1>
-        <a href="{{ route('project.resources.new', Route::current()->parameters()) }}">
-            <x-inputs.button>New</x-inputs.button>
-        </a>
         <livewire:project.delete :project_id="$project->id" :resource_count="$project->applications->count()" />
     </div>
     @if ($environment->applications->count() === 0)
         <p>No resources yet.</p>
     @endif
-    <div>
+    <div class="flex">
         @foreach ($environment->applications as $application)
-            <p>
-                <a
-                    href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
-                    {{ $application->name }}
-                </a>
-            </p>
+            <a class="box"
+                href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
+                {{ $application->name }}
+            </a>
         @endforeach
         {{-- @foreach ($environment->databases as $database)
             <p>

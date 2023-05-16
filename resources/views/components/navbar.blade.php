@@ -1,7 +1,7 @@
 @auth
-    <nav class="bg-coolgray-200/75">
+    <nav>
         <div class="flex px-2 py-1">
-            <div class="flex gap-2">
+            <div class="flex gap-2 text-sm">
                 <a href="/">
                     <x-inputs.button>Home</x-inputs.button>
                 </a>
@@ -20,7 +20,7 @@
             <div class="flex-1"></div>
             <x-magic-bar />
             <div class="flex-1"></div>
-            <div class="flex gap-2">
+            <div class="flex gap-2 text-sm">
                 {{-- <livewire:check-update /> --}}
                 <livewire:force-upgrade />
                 <form action="/logout" method="POST">
