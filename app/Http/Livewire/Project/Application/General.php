@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use Livewire\Component;
+use Illuminate\Support\Str;
 
 class General extends Component
 {
@@ -75,6 +76,10 @@ class General extends Component
     {
         try {
             $this->validate();
+            $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                return Str::of($domain)->trim()->lower();
+            });
+            $this->application->fqdn = $domains->implode(',');
             $this->application->save();
         } catch (\Exception $e) {
             return generalErrorHandler($e, $this);

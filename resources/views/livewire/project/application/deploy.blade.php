@@ -12,10 +12,6 @@
         Delete</x-inputs.button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')
-            @if (data_get($application, 'fqdn'))
-                <a target="_blank" href="{{ data_get($application, 'fqdn') }}">Open URL</a>
-            @endif
-
             @if (data_get($application, 'ports_mappings_array'))
                 @foreach ($application->ports_mappings_array as $port)
                     @if (config('app.env') === 'local')

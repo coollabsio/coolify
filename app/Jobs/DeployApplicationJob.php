@@ -378,16 +378,21 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
         if ($this->application->fqdn) {
-            $url = Url::fromString($this->application->fqdn);
-            $host = $url->getHost();
-            $path = $url->getPath();
+            $domains = Str::of($this->application->fqdn)->explode(',');
             $labels[] = 'traefik.enable=true';
-            if ($path === '/') {
-                $labels[] = "traefik.http.routers.{$this->application->uuid}.rule=Host(`{$host}`) && Path(`{$path}`)";
-            } else {
-                $labels[] = "traefik.http.routers.{$this->application->uuid}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                $labels[] =  "traefik.http.routers.{$this->application->uuid}.middlewares={$this->application->uuid}-stripprefix";
-                $labels[] =  "traefik.http.middlewares.{$this->application->uuid}-stripprefix.stripprefix.prefixes={$path}";
+            foreach ($domains as $domain) {
+                $url = Url::fromString($domain);
+                $host = $url->getHost();
+                $path = $url->getPath();
+                $slug = Str::slug($url);
+                $label_id = "{$this->application->uuid}-{$slug}";
+                if ($path === '/') {
+                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && Path(`{$path}`)";
+                } else {
+                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                    $labels[] =  "traefik.http.routers.{$label_id}.middlewares={$label_id}-stripprefix";
+                    $labels[] =  "traefik.http.middlewares.{$label_id}-stripprefix.stripprefix.prefixes={$path}";
+                }
             }
         }
         return $labels;
