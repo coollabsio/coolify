@@ -19,23 +19,27 @@ class ByIp extends Component
     public string $ip;
     public string $user = 'root';
     public int $port = 22;
+    public bool $is_part_of_swarm = false;
 
     protected $rules = [
         'name' => 'required',
         'ip' => 'required',
         'user' => 'required',
         'port' => 'required|integer',
+        'is_part_of_swarm' => 'required|boolean',
     ];
     public function mount()
     {
         $this->name = generateRandomName();
-        if ($this->private_keys->count() > 0) {
-            $this->private_key_id = $this->private_keys->first()->id;
-        }
+        $this->private_key_id = $this->private_keys->first()->id;
     }
     public function setPrivateKey(string $private_key_id)
     {
         $this->private_key_id = $private_key_id;
+    }
+    public function instantSave()
+    {
+        $this->emit('saved', 'Application settings updated!');
     }
     public function submit()
     {
@@ -51,8 +55,10 @@ class ByIp extends Component
                 'user' => $this->user,
                 'port' => $this->port,
                 'team_id' => session('currentTeam')->id,
-                'private_key_id' => $this->private_key_id
+                'private_key_id' => $this->private_key_id,
             ]);
+            $server->settings->is_part_of_swarm = $this->is_part_of_swarm;
+            $server->settings->save();
             return redirect()->route('server.show', $server->uuid);
         } catch (\Exception $e) {
             return generalErrorHandler($e);

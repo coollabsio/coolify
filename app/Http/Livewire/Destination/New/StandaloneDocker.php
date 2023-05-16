@@ -44,6 +44,10 @@ class StandaloneDocker extends Component
             $this->addError('network', 'Network already added to this server.');
             return;
         }
+        $server = Server::find($this->server_id);
+        instantRemoteProcess(['docker network create --attachable ' . $this->network], $server, throwError: false);
+        instantRemoteProcess(["docker network connect $this->network coolify-proxy"], $server, throwError: false);
+
         $docker = ModelsStandaloneDocker::create([
             'name' => $this->name,
             'network' => $this->network,
@@ -51,9 +55,7 @@ class StandaloneDocker extends Component
             'team_id' => session('currentTeam')->id
         ]);
 
-        $server = Server::find($this->server_id);
 
-        instantRemoteProcess(['docker network create --attachable ' . $this->network], $server, throwError: false);
         return redirect()->route('destination.show', $docker->uuid);
     }
 }

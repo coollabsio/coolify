@@ -57,11 +57,11 @@
         </script>
     @elseif($github_app->app_id && !$github_app->installation_id)
         <a href="{{ $installation_url }}">
-            <x-inputs.button>Install Repositories</x-inputs.button>
+            <x-inputs.button isBold>Install Repositories</x-inputs.button>
         </a>
     @elseif($github_app->app_id && $github_app->installation_id)
         <a href="{{ $installation_url }}">
-            <x-inputs.button>Update Repositories</x-inputs.button>
+            <x-inputs.button isBold>Update Repositories</x-inputs.button>
         </a>
     @endif
 </x-layout>

@@ -19,7 +19,7 @@ class ServerSettingSeeder extends Seeder
         $server_2->settings->save();
 
         $server_3 = Server::find(2)->load(['settings']);
-        $server_3->settings->is_build_server = false;
+        $server_3->settings->is_part_of_swarm = true;
         $server_3->settings->is_validated = false;
         $server_3->settings->save();
     }

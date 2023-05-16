@@ -2,8 +2,6 @@
 
 namespace App\Http\Livewire\Destination;
 
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Livewire\Component;
 
 class Form extends Component
@@ -22,8 +20,18 @@ class Form extends Component
     }
     public function delete()
     {
-        // instantRemoteProcess(['docker network rm -f ' . $this->destination->network], $this->destination->server);
-        $this->destination->delete();
-        return redirect()->route('dashboard');
+        try {
+            if ($this->destination->getMorphClass() === 'App\Models\StandaloneDocker') {
+                if ($this->destination->attachedTo()) {
+                    return $this->emit('error', 'You must delete all resources before deleting this destination.');
+                }
+                instantRemoteProcess(["docker network disconnect {$this->destination->network} coolify-proxy"], $this->destination->server, throwError: false);
+                instantRemoteProcess(['docker network rm -f ' . $this->destination->network], $this->destination->server);
+            }
+            $this->destination->delete();
+            return redirect()->route('dashboard');
+        } catch (\Exception $e) {
+            return generalErrorHandler($e);
+        }
     }
 }

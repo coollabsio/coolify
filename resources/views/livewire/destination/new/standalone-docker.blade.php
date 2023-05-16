@@ -4,10 +4,11 @@
         <x-inputs.input id="network" label="Network" required />
         <x-inputs.select id="server_id" label="Select a server" required>
             @foreach ($servers as $server)
+                <option disabled>Select a server</option>
                 <option value="{{ $server->id }}">{{ $server->name }}</option>
             @endforeach
         </x-inputs.select>
-        <x-inputs.button type="submit">
+        <x-inputs.button isBold type="submit">
             Submit
         </x-inputs.button>
     </form>

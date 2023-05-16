@@ -7,8 +7,8 @@
             <x-inputs.input id="destination.network" label="Docker Network" readonly />
         @endif
         <div>
-            <x-inputs.button>
-                Submit
+            <x-inputs.button isBold type="submit">
+                Save
             </x-inputs.button>
             <x-inputs.button isWarning x-on:click.prevent="deleteDestination = true">
                 Delete

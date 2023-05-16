@@ -20,7 +20,8 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
-        'server.settings.is_validated' => 'required'
+        'server.settings.is_validated' => 'required',
+        'server.settings.is_part_of_swarm' => 'required'
     ];
     public function mount()
     {
