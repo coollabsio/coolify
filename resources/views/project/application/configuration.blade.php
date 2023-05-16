@@ -1,27 +1,27 @@
 <x-layout>
-    <h1>Configuration</h1>
     <x-applications.navbar :applicationId="$application->id" :gitBranchLocation="$application->gitBranchLocation" />
+    <h1 class="py-10">Configuration</h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
-            <a :class="activeTab === 'general' && 'text-purple-500'"
+        <div class="flex flex-col min-w-fit">
+            <a :class="activeTab === 'general' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a :class="activeTab === 'environment-variables' && 'text-purple-500'"
+            <a :class="activeTab === 'environment-variables' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'source' && 'text-purple-500'"
+            <a :class="activeTab === 'source' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
-            <a :class="activeTab === 'destination' && 'text-purple-500'"
+            <a :class="activeTab === 'destination' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
                 href="#">Destination
             </a>
-            <a :class="activeTab === 'storages' && 'text-purple-500'"
+            <a :class="activeTab === 'storages' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
-            <a :class="activeTab === 'revert' && 'text-purple-500'"
+            <a :class="activeTab === 'revert' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'revert'; window.location.hash = 'revert'" href="#">Revert
             </a>
-            {{-- <a :class="activeTab === 'previews' && 'text-purple-500'"
+            {{-- <a :class="activeTab === 'previews' && 'text-coollabs-100'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
             </a> --}}
         </div>

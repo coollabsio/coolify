@@ -6,12 +6,15 @@ body {
     @apply bg-coolgray-100 text-white font-sans;
 }
 
+label {
+    @apply text-sm pb-2 font-bold tracking-wider;
+}
 input,
 textarea {
-    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none;
+    @apply border border-solid border-coolgray-500 rounded p-2 px-4 bg-transparent text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none focus:bg-coolgray-200/50 transition-all hover:bg-coolgray-200/50;
 }
 select {
-    @apply border-none p-2 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
+    @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-transparent text-white disabled:text-neutral-600 read-only:select-none outline-none;
 }
 
 button {
@@ -45,6 +48,10 @@ h2 {
 h3 {
     @apply text-lg font-bold pb-4;
 }
+a {
+    @apply m-2 hover:text-coollabs;
+}
+
 .box {
-    @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 p-2;
+    @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline;
 }

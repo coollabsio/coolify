@@ -3,20 +3,20 @@
         <div class="flex px-2 py-1">
             <div class="flex gap-2 text-sm">
                 <a href="/">
-                    <x-inputs.button>Home</x-inputs.button>
+                    Home
                 </a>
                 <a href="/command-center">
-                    <x-inputs.button>Command Center</x-inputs.button>
+                    Command Center
                 </a>
                 <a href="/profile">
-                    <x-inputs.button>Profile</x-inputs.button>
+                    Profile
                 </a>
                 <a href="/profile/team">
-                    <x-inputs.button>Team</x-inputs.button>
+                    Team
                 </a>
                 @if (auth()->user()->isRoot())
                     <a href="/settings">
-                        <x-inputs.button>Settings</x-inputs.button>
+                        Settings
                     </a>
                 @endif
             </div>
@@ -28,7 +28,7 @@
                 <livewire:force-upgrade />
                 <form action="/logout" method="POST">
                     @csrf
-                    <x-inputs.button type="submit">Logout</x-inputs.button>
+                    <button class="m-1 hover:underline" type="submit">Logout</button>
                 </form>
             </div>
         </div>

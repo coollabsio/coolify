@@ -22,7 +22,7 @@
     @livewireStyles
 </head>
 
-<body>
+<body class="antialiased">
 
     @livewireScripts
 

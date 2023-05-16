@@ -1,5 +1,5 @@
 <div>
     @if (auth()->user()->teams->contains(0))
-        <x-inputs.button wire:click='upgrade'>Force Upgrade</x-inputs.button>
+        <button wire:click='upgrade' class="m-1 hover:underline">Force Upgrade</button>
     @endif
 </div>

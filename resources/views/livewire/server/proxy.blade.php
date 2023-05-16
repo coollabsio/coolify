@@ -2,8 +2,8 @@
     <x-naked-modal show="stopProxy" action="stopProxy"
         message='Are you sure you would like to stop the proxy? All resources will be unavailable.' />
     @if ($server->settings->is_validated)
-        <div class="flex items-center gap-2">
-            <h3>Proxy</h3>
+        <div class="flex items-center gap-2 mb-4">
+            <h3 class="pb-0">Proxy</h3>
             <div>{{ $server->extra_attributes->proxy_status }}</div>
         </div>
 
@@ -35,15 +35,15 @@
                     @isset($proxy_settings)
                         <h3>Configuration</h3>
                         @if ($selectedProxy->value === 'TRAEFIK_V2')
-                            <h4>traefik.conf</h4>
                             <form wire:submit.prevent='saveConfiguration'>
-                                <x-inputs.input noDirty type="textarea" wire:model.defer="proxy_settings" rows="30" />
-                                <div class="pt-2">
+                                <div class="py-2 pb-8">
                                     <x-inputs.button isBold>Save</x-inputs.button>
                                     <x-inputs.button wire:click.prevent="resetProxy">
                                         Reset Configuration
                                     </x-inputs.button>
                                 </div>
+                                <h4>traefik.conf</h4>
+                                <x-inputs.input noDirty type="textarea" wire:model.defer="proxy_settings" rows="30" />
                             </form>
                         @endif
                     @endisset

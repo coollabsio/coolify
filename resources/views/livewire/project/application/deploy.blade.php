@@ -3,7 +3,7 @@
     @if ($application->status === 'running')
         <x-inputs.button wire:click='start'>Rebuild</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Force Rebuild</x-inputs.button>
-        <x-inputs.button wire:click='stop'>Stop</x-inputs.button>
+        <x-inputs.button isWarning wire:click='stop'>Stop</x-inputs.button>
     @else
         <x-inputs.button wire:click='start'>Start</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Start (no cache)</x-inputs.button>

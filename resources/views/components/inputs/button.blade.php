@@ -3,7 +3,7 @@
     'isBold' => false,
     'disabled' => null,
     'defaultClass' => 'text-white hover:bg-coollabs h-10 rounded transition-colors',
-    'defaultWarningClass' => 'text-white bg-red-500 hover:bg-red-600 h-10 rounded',
+    'defaultWarningClass' => 'text-red-500 hover:text-white hover:bg-red-600 h-10 rounded',
     'disabledClass' => 'text-neutral-400 h-10 rounded',
     'loadingClass' => 'text-black bg-green-500 h-10 rounded',
     'confirm' => null,

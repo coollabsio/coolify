@@ -1,9 +1,9 @@
 <div>
     <h3>General</h3>
     <form wire:submit.prevent='submit' class="flex flex-col">
-        <div class="flex flex-col gap-2">
+        <div class="flex flex-col gap-2 pb-4">
             <x-inputs.input id="application.name" label="Name" required />
-            <x-inputs.input id="application.fqdn" label="FQDN" />
+            <x-inputs.input id="application.fqdn" label="Domains" />
             <x-inputs.input id="application.install_command" label="Install Command" />
             <x-inputs.input id="application.build_command" label="Build Command" />
             <x-inputs.input id="application.start_command" label="Start Command" />
@@ -29,10 +29,9 @@
             @else
                 <x-inputs.input id="application.ports_exposes" label="Ports Exposes" required />
             @endif
-
             <x-inputs.input id="application.ports_mappings" label="Ports Mappings" />
         </div>
-        <x-inputs.button class="mx-auto mt-4 text-white bg-neutral-800 hover:bg-violet-600" type="submit">
+        <x-inputs.button isBold type="submit">
             Submit
         </x-inputs.button>
     </form>
@@ -47,6 +46,5 @@
         <x-inputs.input disabled instantSave type="checkbox" id="is_dual_cert" label="Dual Certs?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_custom_ssl" label="Is Custom SSL?" />
         <x-inputs.input disabled instantSave type="checkbox" id="is_http2" label="Is Http2?" />
-
     </div>
 </div>
