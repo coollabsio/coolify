@@ -16,28 +16,8 @@ textarea {
 select {
     @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-transparent text-white disabled:text-neutral-600 read-only:select-none outline-none;
 }
-
 button {
-    @apply border-none px-2 p-1 cursor-pointer;
-}
-.main-menu {
-    @apply relative float-left;
-}
-.main-menu:after {
-    content: "/";
-    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-[0.3rem];
-}
-.magic-input {
-    @apply w-[25rem] rounded outline-none bg-coolgray-400 focus:bg-neutral-700 text-white;
-}
-.magic-items {
-    @apply absolute top-12 w-[25rem] bg-coolgray-200 border-b-2 border-r-2 border-l-2 border-solid border-coolgray-100 rounded-b;
-}
-.magic-item {
-    @apply m-2 py-2 pl-4 cursor-pointer hover:bg-neutral-700 text-neutral-300 hover:text-white;
-}
-.magic-item-focused {
-    @apply bg-neutral-700 text-white;
+    @apply border border-solid border-coolgray-200 px-3 p-1 cursor-pointer;
 }
 h1 {
     @apply text-3xl font-bold pb-4;
@@ -54,4 +34,24 @@ a {
 
 .box {
     @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline;
+}
+
+.main-menu {
+    @apply relative float-left;
+}
+.main-menu:after {
+    content: "/";
+    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-[0.5rem];
+}
+.magic-input {
+    @apply w-[25rem] rounded outline-none bg-coolgray-400 focus:bg-neutral-700 text-white;
+}
+.magic-items {
+    @apply absolute top-12 w-[25rem] bg-coolgray-200 border-b-2 border-r-2 border-l-2 border-solid border-coolgray-100 rounded-b;
+}
+.magic-item {
+    @apply m-2 py-2 pl-4 cursor-pointer hover:bg-neutral-700 text-neutral-300 hover:text-white;
+}
+.magic-item-focused {
+    @apply bg-neutral-700 text-white;
 }

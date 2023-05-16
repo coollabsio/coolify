@@ -14,8 +14,9 @@
                             <div class="text-sm">
                                 @if (data_get($image, 'is_current'))
                                     <span class="font-bold text-coollabs">LIVE</span>
+                                    |
                                 @endif
-                                | {{ data_get($image, 'tag') }}
+                                {{ data_get($image, 'tag') }}
                             </div>
 
                             <div class="text-xs">{{ data_get($image, 'created_at') }}</div>

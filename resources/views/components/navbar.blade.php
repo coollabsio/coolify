@@ -20,7 +20,6 @@
                     </a>
                 @endif
             </div>
-            <div class="flex-1"></div>
             <x-magic-bar />
             <div class="flex-1"></div>
             <div class="flex gap-2 text-sm">
@@ -28,7 +27,7 @@
                 <livewire:force-upgrade />
                 <form action="/logout" method="POST">
                     @csrf
-                    <button class="m-1 hover:underline" type="submit">Logout</button>
+                    <button class="m-1 border-none hover:underline" type="submit">Logout</button>
                 </form>
             </div>
         </div>

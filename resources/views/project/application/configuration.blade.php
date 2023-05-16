@@ -1,5 +1,5 @@
 <x-layout>
-    <x-applications.navbar :applicationId="$application->id" :gitBranchLocation="$application->gitBranchLocation" />
+    <x-applications.navbar :application="$application" :gitBranchLocation="$application->gitBranchLocation" />
     <h1 class="py-10">Configuration</h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
         <div class="flex flex-col min-w-fit">
@@ -25,7 +25,7 @@
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
             </a> --}}
         </div>
-        <div class="w-full pl-8">
+        <div class="w-full pt-2 pl-8">
             <div x-cloak x-show="activeTab === 'general'">
                 <livewire:project.application.general :application="$application" />
             </div>

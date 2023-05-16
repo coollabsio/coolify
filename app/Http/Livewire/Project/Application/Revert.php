@@ -10,7 +10,7 @@ class Revert extends Component
 {
     public Application $application;
     public $images = [];
-    public string $current;
+    public string|null $current;
     public function revertImage($tag)
     {
         dd("Reverting to {$this->application->uuid}:{$tag}");
