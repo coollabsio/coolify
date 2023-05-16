@@ -383,9 +383,11 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
             $path = $url->getPath();
             $labels[] = 'traefik.enable=true';
             if ($path === '/') {
-                $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                $labels[] = "traefik.http.routers.{$this->application->uuid}.rule=Host(`{$host}`) && Path(`{$path}`)";
             } else {
-                $labels[] = "traefik.http.routers.container.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                $labels[] = "traefik.http.routers.{$this->application->uuid}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                $labels[] =  "traefik.http.routers.{$this->application->uuid}.middlewares={$this->application->uuid}-stripprefix";
+                $labels[] =  "traefik.http.middlewares.{$this->application->uuid}-stripprefix.stripprefix.prefixes={$path}";
             }
         }
         return $labels;

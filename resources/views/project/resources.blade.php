@@ -6,8 +6,8 @@
     @if ($environment->applications->count() === 0)
         <p>No resources yet.</p>
     @endif
-    <div class="flex">
-        @foreach ($environment->applications as $application)
+    <div class="flex gap-2">
+        @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                 {{ $application->name }}

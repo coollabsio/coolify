@@ -46,6 +46,9 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        return view('project.resources', ['project' => $project, 'environment' => $environment]);
+        return view('project.resources', [
+            'project' => $project,
+            'environment' => $environment
+        ]);
     }
 }

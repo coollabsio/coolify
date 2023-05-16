@@ -73,7 +73,11 @@ class General extends Component
     }
     public function submit()
     {
-        $this->validate();
-        $this->application->save();
+        try {
+            $this->validate();
+            $this->application->save();
+        } catch (\Exception $e) {
+            return generalErrorHandler($e, $this);
+        }
     }
 }

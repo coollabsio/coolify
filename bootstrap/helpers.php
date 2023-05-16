@@ -33,7 +33,7 @@ if (!function_exists('generalErrorHandler')) {
             }
         } catch (\Throwable $error) {
             if ($that) {
-                $that->emit('error', $error->getMessage());
+                return $that->emit('error', $error->getMessage());
             } elseif ($isJson) {
                 return response()->json([
                     'code' => $error->getCode(),
