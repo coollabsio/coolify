@@ -1,9 +1,7 @@
 FROM serversideup/php:8.2-fpm-nginx
 ARG POSTGRES_VERSION=15
 RUN apt-get update && apt-get install -y php-pgsql openssh-client git git-lfs postgresql-client
-RUN apt-get -y autoremove \
-    apt-get clean \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
