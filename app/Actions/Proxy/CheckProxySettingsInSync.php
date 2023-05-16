@@ -22,7 +22,7 @@ class CheckProxySettingsInSync
         $docker_compose_yml_base64 = base64_encode($final_output);
         $server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
-        if (is_null($output)) {
+        if (is_null($output) || $reset) {
             instantRemoteProcess([
                 "mkdir -p $proxy_path",
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
