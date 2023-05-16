@@ -23,7 +23,7 @@
                 <p>No servers found.</p>
             @endforelse
         </div>
-        <h1>Destinations </h1>
+        {{-- <h1>Destinations </h1>
         <div class="flex gap-2">
             @forelse ($destinations as $destination)
                 <a href="{{ route('destination.show', [$destination->uuid]) }}"
@@ -31,8 +31,8 @@
             @empty
                 <p>No destinations found.</p>
             @endforelse
-        </div>
-        <h1>Private Keys </h1>
+        </div> --}}
+        {{-- <h1>Private Keys </h1>
         <div class="flex gap-2">
             @forelse ($private_keys as $private_key)
                 <a href="{{ route('private-key.show', [$private_key->uuid]) }}"
@@ -40,8 +40,8 @@
             @empty
                 <p>No servers found.</p>
             @endforelse
-        </div>
-        <h1>GitHub Apps </h1>
+        </div> --}}
+        {{-- <h1>GitHub Apps </h1>
         <div class="flex">
             @forelse ($github_apps as $github_app)
                 <a href="{{ route('source.github.show', [$github_app->uuid]) }}"
@@ -49,7 +49,7 @@
             @empty
                 <p>No servers found.</p>
             @endforelse
-        </div>
+        </div> --}}
     @endif
 
 </x-layout>

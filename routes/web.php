@@ -30,11 +30,12 @@ use Illuminate\Support\Str;
 Route::middleware(['auth'])->group(function () {
     Route::get('/magic', function () {
         try {
+            $id = session('currentTeam')->id;
             $is_new_project = request()->query('project') === 'new';
             $is_new_environment = request()->query('environment') === 'new';
             // Get servers
             if (request()->query('servers') === 'true') {
-                $servers = Server::where('team_id', session('currentTeam')->id)->get();
+                $servers = Server::where('team_id', $id)->get();
                 return response()->json([
                     'servers' => $servers,
                 ]);
@@ -49,14 +50,22 @@ Route::middleware(['auth'])->group(function () {
             }
             // Get private Keys
             if (request()->query('privateKeys') === 'true') {
-                $privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+                $privateKeys = PrivateKey::where('team_id', $id)->get();
                 return response()->json([
                     'privateKeys' => $privateKeys->toArray(),
                 ]);
             }
+            // Get sources
+            if (request()->query('sources') === 'true') {
+                $github_apps = GithubApp::private();
+                $sources = $github_apps;
+                return response()->json([
+                    'sources' => $sources->toArray(),
+                ]);
+            }
             // Get projects
             if ((request()->query('server') && request()->query('destination') && request()->query('projects') === 'true') || request()->query('projects') === 'true') {
-                $projects = Project::where('team_id', session('currentTeam')->id)->get();
+                $projects = Project::where('team_id', $id)->get()->sortBy('name');
                 return response()->json([
                     'projects' => $projects->toArray(),
                 ]);
@@ -64,7 +73,7 @@ Route::middleware(['auth'])->group(function () {
 
             // Get environments
             if (request()->query('server') && request()->query('destination') && request()->query('project') && request()->query('environments') === 'true') {
-                $environments = Project::where('team_id', session('currentTeam')->id)->where('uuid', request()->query('project'))->first()->environments;
+                $environments = Project::where('team_id', $id)->where('uuid', request()->query('project'))->first()->environments;
                 return response()->json([
                     'environments' => $environments->toArray(),
                 ]);
@@ -73,7 +82,7 @@ Route::middleware(['auth'])->group(function () {
             if ($is_new_project) {
                 $project = Project::create([
                     'name' => request()->query('name') ?? generateRandomName(),
-                    'team_id' => session('currentTeam')->id,
+                    'team_id' => $id,
                 ]);
                 return response()->json([
                     'project_uuid' => $project->uuid

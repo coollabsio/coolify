@@ -190,6 +190,30 @@
             </div>
         </div>
     </template>
+    {{-- Sources --}}
+    <template x-cloak x-if="sourcesMenu">
+        <div x-on:click.outside="closeMenus">
+            <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a source..."
+                x-on:keyup.escape="closeMenus" x-on:keydown.down="focusNext(sources.length)"
+                x-on:keydown.up="focusPrev(sources.length)"
+                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToSource',filteredSources()[focusedIndex])" />
+            <div class="magic-items">
+                <template x-if="sources.length === 0">
+                    <div class="magic-item" x-on:click="set('newSource')">
+                        <span>No Source found. Click here to add a new one!</span>
+                    </div>
+                </template>
+                <template x-for="(source,index) in filteredSources" :key="source.name ?? source">
+                    <div x-on:click="await set('jumpToSource',source)"
+                        :class="focusedIndex === index && 'magic-item-focused'"
+                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span x-text="source.name"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 </div>
 
 <script>
@@ -202,7 +226,8 @@
                     !this.environmentMenu &&
                     !this.projectsMenu &&
                     !this.destinationsMenu &&
-                    !this.privateKeysMenu
+                    !this.privateKeysMenu &&
+                    !this.sourcesMenu
             },
             focus() {
                 if (this.$refs.search) this.$refs.search.focus()
@@ -229,6 +254,9 @@
                 this.$watch('privateKeysMenu', () => {
                     this.focus()
                 })
+                this.$watch('sourcesMenu', () => {
+                    this.focus()
+                })
             },
             mainMenu: false,
             serverMenu: false,
@@ -238,6 +266,7 @@
             projectsMenu: false,
             environmentMenu: false,
             privateKeysMenu: false,
+            sourcesMenu: false,
             search: '',
 
             selectedAction: '',
@@ -251,6 +280,7 @@
             projects: ['Loading...'],
             environments: ['Loading...'],
             privateKeys: ['Loading...'],
+            sources: ['Loading...'],
 
             focusedIndex: "",
             items: [{
@@ -322,6 +352,12 @@
                     type: 'Jump',
                     tags: 'private keys,ssh, keys, key',
                     next: 'privateKeys'
+                },
+                {
+                    name: 'Sources',
+                    type: 'Jump',
+                    tags: 'github,apps,source',
+                    next: 'sources'
                 }
             ],
             focusPrev(maxLength) {
@@ -362,6 +398,10 @@
                 this.destinationMenu = false
                 this.projectMenu = false
                 this.environmentMenu = false
+                this.projectsMenu = false
+                this.destinationsMenu = false
+                this.privateKeysMenu = false
+                this.sourcesMenu = false
             },
             checkMainMenu() {
                 if (this.serverMenu) return
@@ -407,6 +447,13 @@
                 if (this.search === '') return this.privateKeys
                 return this.privateKeys.filter(privateKey => {
                     return privateKey.name.toLowerCase().includes(this.search
+                        .toLowerCase())
+                })
+            },
+            filteredSources() {
+                if (this.search === '') return this.sources
+                return this.sources.filter(source => {
+                    return source.name.toLowerCase().includes(this.search
                         .toLowerCase())
                 })
             },
@@ -519,6 +566,17 @@
                         this.closeMenus()
                         this.privateKeysMenu = true
                         break
+                    case 'sources':
+                        response = await fetch('/magic?sources=true');
+                        if (response.ok) {
+                            const {
+                                sources
+                            } = await response.json();
+                            this.sources = sources;
+                        }
+                        this.closeMenus()
+                        this.sourcesMenu = true
+                        break
                     case 'environment':
                         if (this.focusedIndex === 0) {
                             this.focusedIndex = ''
@@ -571,6 +629,10 @@
                         break
                     case 'jumpToPrivateKey':
                         window.location = `/private-key/${id}`
+                        this.closeMenus()
+                        break
+                    case 'jumpToSource':
+                        window.location = `/source/${id.type}/${id.uuid}`
                         this.closeMenus()
                         break
                     case 'newServer':
