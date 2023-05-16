@@ -30,7 +30,7 @@
                 </div>
                 <div x-init="$wire.checkProxySettingsInSync">
                     <div wire:loading wire:target="checkProxySettingsInSync">
-                        <x-proxy.loading />
+                        <x-loading />
                     </div>
                     @isset($proxy_settings)
                         <h3>Configuration</h3>

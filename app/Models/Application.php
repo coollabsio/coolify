@@ -73,7 +73,6 @@ class Application extends BaseModel
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
             }
-
         );
     }
     public function baseDirectory(): Attribute

@@ -42,7 +42,7 @@
                 <livewire:project.application.storages.all :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'revert'">
-                <h3>TODO 🚧</h3>
+                <livewire:project.application.revert :application="$application" />
             </div>
             {{-- <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
