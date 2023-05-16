@@ -11,6 +11,10 @@ class Revert extends Component
     public Application $application;
     public $images = [];
     public string $current;
+    public function revertImage($tag)
+    {
+        dd("Reverting to {$this->application->uuid}:{$tag}");
+    }
     public function loadImages()
     {
         try {
@@ -29,11 +33,12 @@ class Revert extends Component
             })->map(function ($item) {
                 $item = Str::of($item)->explode('#');
                 if ($item[1] === $this->current) {
-                    $item[1] = $item[1] . " (current)";
+                    $is_current = true;
                 }
                 return [
                     'tag' => $item[1],
-                    'createdAt' => $item[2],
+                    'created_at' => $item[2],
+                    'is_current' => $is_current ?? null,
                 ];
             })->toArray();
         } catch (\Throwable $e) {
