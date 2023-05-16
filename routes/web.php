@@ -135,7 +135,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings', function () {
         $isRoot = auth()->user()->isRoot();
         if ($isRoot) {
-            $settings = InstanceSettings::find(0);
+            $settings = InstanceSettings::get();
             return view('settings', [
                 'settings' => $settings
             ]);
@@ -165,7 +165,7 @@ Route::middleware(['auth'])->group(function () {
         $private_key = PrivateKey::where('uuid', request()->private_key_uuid)->first();
         return view('private-key.show', [
             'private_key' => $private_key,
-        ]);
+        ]);G
     })->name('private-key.show');
 });
 Route::middleware(['auth'])->group(function () {
@@ -173,7 +173,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
         $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
         $name = Str::of(Str::kebab($github_app->name))->start('coolify-');
-        $settings = InstanceSettings::first();
+        $settings = InstanceSettings::get();
         $host = $request->schemeAndHttpHost();
         if ($settings->fqdn) {
             $host = $settings->fqdn;

@@ -48,7 +48,7 @@ class Change extends Component
     }
     public function mount()
     {
-        $settings = InstanceSettings::first();
+        $settings = InstanceSettings::get();
         if ($settings->fqdn) {
             $this->host = $settings->fqdn;
         }

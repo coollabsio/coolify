@@ -23,7 +23,7 @@ class CreateNewUser implements CreatesNewUsers
      */
     public function create(array $input): User
     {
-        $settings = InstanceSettings::find(0);
+        $settings = InstanceSettings::get();
         if (!$settings->is_registration_enabled) {
             Log::info('Registration is disabled');
             abort(403);

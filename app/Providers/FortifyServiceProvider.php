@@ -31,7 +31,7 @@ class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Fortify::registerView(function () {
-            $settings = InstanceSettings::find(0);
+            $settings = InstanceSettings::get();
             if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
@@ -39,7 +39,7 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::loginView(function () {
-            $settings = InstanceSettings::find(0);
+            $settings = InstanceSettings::get();
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled
             ]);

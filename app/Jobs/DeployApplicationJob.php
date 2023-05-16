@@ -43,6 +43,7 @@ class DeployApplicationJob implements ShouldQueue
         public string $application_uuid,
         public bool $force_rebuild = false,
     ) {
+
         $this->application = Application::query()
             ->where('uuid', $this->application_uuid)
             ->firstOrFail();
@@ -100,8 +101,7 @@ class DeployApplicationJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $coolify_instance_settings = InstanceSettings::find(0);
-            $deployment_type = $this->application->deploymentType();
+            $coolify_instance_settings = InstanceSettings::get();
             if ($this->application->deploymentType() === 'source') {
                 $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
             }

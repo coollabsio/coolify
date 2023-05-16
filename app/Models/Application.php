@@ -48,8 +48,6 @@ class Application extends BaseModel
     {
         return $this->previews->modelScope();
     }
-
-
     public function publishDirectory(): Attribute
     {
         return Attribute::make(

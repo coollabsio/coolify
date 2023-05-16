@@ -63,7 +63,7 @@ class InstallProxy
 
     protected function getEnvContents()
     {
-        $instance_fqdn = InstanceSettings::find(1)->fqdn ?? config('app.url');
+        $instance_fqdn = InstanceSettings::get()->fqdn ?? config('app.url');
         $url = Url::fromString($instance_fqdn);
         $data = [
             'TRAEFIK_DASHBOARD_HOST' => $url->getHost(),
