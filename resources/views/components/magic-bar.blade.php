@@ -166,6 +166,30 @@
             </div>
         </div>
     </template>
+    {{-- Private Keys --}}
+    <template x-cloak x-if="privateKeysMenu">
+        <div x-on:click.outside="closeMenus">
+            <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a private key..."
+                x-on:keyup.escape="closeMenus" x-on:keydown.down="focusNext(privateKeys.length)"
+                x-on:keydown.up="focusPrev(privateKeys.length)"
+                x-on:keyup.enter="focusedIndex !== '' && await set('jumpToPrivateKey',filteredPrivateKeys()[focusedIndex].uuid)" />
+            <div class="magic-items">
+                <template x-if="privateKeys.length === 0">
+                    <div class="magic-item" x-on:click="set('newPrivateKey')">
+                        <span>No private key found. Click here to add a new one!</span>
+                    </div>
+                </template>
+                <template x-for="(privateKey,index) in filteredPrivateKeys" :key="privateKey.name ?? privateKey">
+                    <div x-on:click="await set('jumpToPrivateKey',privateKey.uuid)"
+                        :class="focusedIndex === index && 'magic-item-focused'"
+                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span x-text="privateKey.name"></span>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </template>
 </div>
 
 <script>
@@ -177,7 +201,8 @@
                     !this.projectMenu &&
                     !this.environmentMenu &&
                     !this.projectsMenu &&
-                    !this.destinationsMenu
+                    !this.destinationsMenu &&
+                    !this.privateKeysMenu
             },
             focus() {
                 if (this.$refs.search) this.$refs.search.focus()
@@ -201,6 +226,9 @@
                 this.$watch('environmentMenu', () => {
                     this.focus()
                 })
+                this.$watch('privateKeysMenu', () => {
+                    this.focus()
+                })
             },
             mainMenu: false,
             serverMenu: false,
@@ -209,6 +237,7 @@
             projectMenu: false,
             projectsMenu: false,
             environmentMenu: false,
+            privateKeysMenu: false,
             search: '',
 
             selectedAction: '',
@@ -221,6 +250,7 @@
             destinations: ['Loading...'],
             projects: ['Loading...'],
             environments: ['Loading...'],
+            privateKeys: ['Loading...'],
 
             focusedIndex: "",
             items: [{
@@ -286,6 +316,12 @@
                     type: 'Jump',
                     tags: 'destinations',
                     next: 'destinations'
+                },
+                {
+                    name: 'Private Keys',
+                    type: 'Jump',
+                    tags: 'private keys,ssh, keys, key',
+                    next: 'privateKeys'
                 }
             ],
             focusPrev(maxLength) {
@@ -364,6 +400,13 @@
                 if (this.search === '') return this.environments
                 return this.environments.filter(environment => {
                     return environment.name.toLowerCase().includes(this.search
+                        .toLowerCase())
+                })
+            },
+            filteredPrivateKeys() {
+                if (this.search === '') return this.privateKeys
+                return this.privateKeys.filter(privateKey => {
+                    return privateKey.name.toLowerCase().includes(this.search
                         .toLowerCase())
                 })
             },
@@ -465,6 +508,17 @@
                         this.closeMenus()
                         this.destinationsMenu = true
                         break
+                    case 'privateKeys':
+                        response = await fetch('/magic?privateKeys=true');
+                        if (response.ok) {
+                            const {
+                                privateKeys
+                            } = await response.json();
+                            this.privateKeys = privateKeys;
+                        }
+                        this.closeMenus()
+                        this.privateKeysMenu = true
+                        break
                     case 'environment':
                         if (this.focusedIndex === 0) {
                             this.focusedIndex = ''
@@ -472,7 +526,6 @@
                         }
 
                         this.selectedProject = id
-
                         response = await fetch('/magic?server=' + this
                             .selectedServer +
                             '&destination=' + this.selectedDestination +
@@ -494,7 +547,6 @@
                             return await this.newEnvironment()
                         }
                         this.selectedEnvironment = id
-                        console.log(this.selectedAction)
                         if (this.selectedAction === 0) {
                             window.location =
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=public&destination=${this.selectedDestination}`
@@ -515,6 +567,10 @@
                         break
                     case 'jumpToDestination':
                         window.location = `/destination/${id}`
+                        this.closeMenus()
+                        break
+                    case 'jumpToPrivateKey':
+                        window.location = `/private-key/${id}`
                         this.closeMenus()
                         break
                     case 'newServer':

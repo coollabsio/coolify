@@ -29,6 +29,9 @@ class ByIp extends Component
     public function mount()
     {
         $this->name = generateRandomName();
+        if ($this->private_keys->count() > 0) {
+            $this->private_key_id = $this->private_keys->first()->id;
+        }
     }
     public function setPrivateKey(string $private_key_id)
     {

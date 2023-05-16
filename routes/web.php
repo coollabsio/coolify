@@ -47,6 +47,13 @@ Route::middleware(['auth'])->group(function () {
                     'destinations' => $destinations->toArray(),
                 ]);
             }
+            // Get private Keys
+            if (request()->query('privateKeys') === 'true') {
+                $privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+                return response()->json([
+                    'privateKeys' => $privateKeys->toArray(),
+                ]);
+            }
             // Get projects
             if ((request()->query('server') && request()->query('destination') && request()->query('projects') === 'true') || request()->query('projects') === 'true') {
                 $projects = Project::where('team_id', session('currentTeam')->id)->get();

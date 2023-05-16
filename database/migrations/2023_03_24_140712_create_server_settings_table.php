@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('server_settings', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
+            $table->boolean('is_jump_server')->default(false);
             $table->boolean('is_build_server')->default(false);
             $table->boolean('is_validated')->default(false);
 
