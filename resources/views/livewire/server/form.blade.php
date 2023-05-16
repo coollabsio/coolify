@@ -39,7 +39,6 @@
         </div>
         <div class="pt-3">
             @isset($uptime)
-                <p>Connection: OK</p>
                 <p>Uptime: {{ $uptime }}</p>
             @endisset
             @isset($dockerVersion)

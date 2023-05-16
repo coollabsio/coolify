@@ -95,7 +95,7 @@ if (!function_exists('savePrivateKeyForServer')) {
     function savePrivateKeyForServer(Server $server)
     {
         $temp_file = "id.root@{$server->ip}";
-        Storage::disk('ssh-keys')->put($temp_file, $server->privateKey->private_key, 'private');
+        Storage::disk('ssh-keys')->put($temp_file, $server->privateKey->private_key);
         return '/var/www/html/storage/app/ssh-keys/' . $temp_file;
     }
 }
@@ -103,9 +103,11 @@ if (!function_exists('savePrivateKeyForServer')) {
 if (!function_exists('generateSshCommand')) {
     function generateSshCommand(string $private_key_location, string $server_ip, string $user, string $port, string $command, bool $isMux = true)
     {
-        $delimiter = 'EOF-COOLIFY-SSH';
         Storage::disk('local')->makeDirectory('.ssh');
+
+        $delimiter = 'EOF-COOLIFY-SSH';
         $ssh_command = "ssh ";
+
         if ($isMux && config('coolify.mux_enabled')) {
             $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/.ssh/ssh_mux_%h_%p_%r ';
         }
@@ -159,7 +161,6 @@ if (!function_exists('instantRemoteProcess')) {
     {
         $command_string = implode("\n", $command);
         $private_key_location = savePrivateKeyForServer($server);
-
         $ssh_command = generateSshCommand($private_key_location, $server->ip, $server->user, $server->port, $command_string);
         $process = Process::run($ssh_command);
         $output = trim($process->output());

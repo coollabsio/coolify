@@ -8,3 +8,8 @@ enum ProxyTypes: string
     case NGINX = 'NGINX';
     case CADDY = 'CADDY';
 }
+enum ProxyStatus: string
+{
+    case EXITED = 'exited';
+    case RUNNING = 'running';
+}

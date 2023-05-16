@@ -17,13 +17,22 @@ class Proxy extends Component
     public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
     public $proxy_settings = null;
 
+    public function mount()
+    {
+        $this->proxyStatus();
+    }
     public function serverValidated()
     {
         $this->server->settings->refresh();
     }
     public function installProxy()
     {
-        $this->saveConfiguration($this->server);
+        if (
+            $this->server->extra_attributes->last_applied_proxy_settings &&
+            $this->server->extra_attributes->last_saved_proxy_settings !== $this->server->extra_attributes->last_applied_proxy_settings
+        ) {
+            $this->saveConfiguration($this->server);
+        }
         $activity = resolve(InstallProxy::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
@@ -32,6 +41,7 @@ class Proxy extends Component
     {
         $this->server->extra_attributes->proxy_status = checkContainerStatus(server: $this->server, container_id: 'coolify-proxy');
         $this->server->save();
+        $this->server->refresh();
     }
     public function setProxy()
     {

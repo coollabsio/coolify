@@ -1,27 +1,25 @@
 <div>
+
     @if ($server->settings->is_validated)
-        @if ($this->server->extra_attributes->proxy_status !== 'running')
-            <select wire:model="selectedProxy">
-                <option value="{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}">
-                    {{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}
-                </option>
-            </select>
-            <x-inputs.button isBold wire:click="setProxy">Set Proxy</x-inputs.button>
-        @endif
-        @if ($this->server->extra_attributes->proxy_type)
+        <div class="flex items-center gap-2">
+            <h3>Proxy</h3>
+            <div>{{ $server->extra_attributes->proxy_status }}</div>
+        </div>
+
+        @if ($server->extra_attributes->proxy_type)
             <div wire:poll="proxyStatus">
                 @if (
-                    $this->server->extra_attributes->last_applied_proxy_settings &&
-                        $this->server->extra_attributes->last_saved_proxy_settings !==
-                            $this->server->extra_attributes->last_applied_proxy_settings)
+                    $server->extra_attributes->last_applied_proxy_settings &&
+                        $server->extra_attributes->last_saved_proxy_settings !== $server->extra_attributes->last_applied_proxy_settings)
                     <div class="text-red-500">Configuration out of sync.</div>
                 @endif
-                @if ($this->server->extra_attributes->proxy_status !== 'running')
+                @if ($server->extra_attributes->proxy_status !== 'running')
                     <x-inputs.button isBold wire:click="installProxy">
-                        Install
+                        Start
                     </x-inputs.button>
+                @else
+                    <x-inputs.button isWarning wire:click="stopProxy">Stop</x-inputs.button>
                 @endif
-                <x-inputs.button isBold wire:click="stopProxy">Stop</x-inputs.button>
                 <span x-data="{ showConfiguration: false }">
                     <x-inputs.button isBold x-on:click.prevent="showConfiguration = !showConfiguration">Show
                         Configuration
@@ -35,16 +33,14 @@
                             <div wire:loading wire:target="checkProxySettingsInSync">
                                 <x-proxy.loading />
                             </div>
-                            @isset($this->proxy_settings)
+                            @isset($proxy_settings)
                                 <form wire:submit.prevent='saveConfiguration'>
-                                    <x-inputs.button isBold>Save</x-inputs.button>
-                                    <x-inputs.button x-on:click="showConfiguration = false" isBold
-                                        wire:click.prevent="installProxy">
-                                        Apply
-                                    </x-inputs.button>
-                                    <x-inputs.button isBold wire:click.prevent="resetProxy">
-                                        Default
-                                    </x-inputs.button>
+                                    <div class="pb-2">
+                                        <x-inputs.button isBold>Save</x-inputs.button>
+                                        <x-inputs.button wire:click.prevent="resetProxy">
+                                            Reset Configuration
+                                        </x-inputs.button>
+                                    </div>
                                     <textarea wire:model.defer="proxy_settings" class="w-full" rows="30"></textarea>
                                 </form>
                             @endisset
@@ -52,6 +48,13 @@
                     </template>
                 </span>
             </div>
+        @else
+            <select wire:model="selectedProxy">
+                <option value="{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}">
+                    {{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}
+                </option>
+            </select>
+            <x-inputs.button isBold wire:click="setProxy">Set Proxy</x-inputs.button>
         @endif
     @else
         <p>Server is not validated. Validate first.</p>
