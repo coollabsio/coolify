@@ -50,7 +50,7 @@
         </div>
     </template>
     {{-- Destinations --}}
-    <template x-cloak x-if="destinationMenu">
+    <template x-cloak x-if="destinationMenu"">
         <div x-on:click.outside="closeMenus">
             <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a destination..."
                 x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
@@ -103,8 +103,8 @@
                 x-on:keydown.up="focusPrev(environments.length + 1)" x-on:keyup.escape="closeMenus"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
             <div class="magic-items">
-                <div x-on:click="await newEnvironment" class="magic-item"
-                    :class="focusedIndex === 0 && 'magic-item-focused'">
+                <div x-on:click="await newEnvironment" :class="focusedIndex === 0 && 'magic-item-focused'"
+                    class="magic-item">
                     <span>New Environment</span>
                     <span x-text="search"></span>
                 </div>
@@ -133,8 +133,7 @@
                 </template>
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
-                        :class="focusedIndex === index && 'magic-item-focused'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Jump</span>
                         <span x-text="project.name"></span>
                     </div>
@@ -157,8 +156,7 @@
                 </template>
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
-                        :class="focusedIndex === index && 'magic-item-focused'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
                         <span x-text="destination.name"></span>
                     </div>
@@ -181,8 +179,7 @@
                 </template>
                 <template x-for="(privateKey,index) in filteredPrivateKeys" :key="privateKey.name ?? privateKey">
                     <div x-on:click="await set('jumpToPrivateKey',privateKey.uuid)"
-                        :class="focusedIndex === index && 'magic-item-focused'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
                         <span x-text="privateKey.name"></span>
                     </div>
@@ -205,8 +202,7 @@
                 </template>
                 <template x-for="(source,index) in filteredSources" :key="source.name ?? source">
                     <div x-on:click="await set('jumpToSource',source)"
-                        :class="focusedIndex === index && 'magic-item-focused'"
-                        class="py-2 pl-4 cursor-pointer hover:bg-neutral-700">
+                        :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
                         <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
                         <span x-text="source.name"></span>
                     </div>
@@ -301,62 +297,62 @@
                 {
                     name: 'Server',
                     type: 'Add',
-                    tags: 'new,server',
+                    tags: 'add,new,server',
                     next: 'newServer'
                 },
                 {
                     name: 'Destination',
                     type: 'Add',
-                    tags: 'new,destination',
+                    tags: 'add,new,destination',
                     next: 'newDestination'
                 },
                 {
                     name: 'Private Key',
                     type: 'Add',
-                    tags: 'new,private-key,ssh,key',
+                    tags: 'add,new,private-key,ssh,key',
                     next: 'newPrivateKey'
                 },
                 {
                     name: 'Source',
                     type: 'Add',
-                    tags: 'new,source,github,gitlab,bitbucket',
+                    tags: 'add,new,source,github,gitlab,bitbucket',
                     next: 'newSource'
                 },
 
                 {
                     name: 'Database',
                     type: 'Add',
-                    tags: 'data,database,mysql,postgres,sql,sqlite,redis,mongodb,maria,percona',
+                    tags: 'add,data,database,mysql,postgres,sql,sqlite,redis,mongodb,maria,percona',
                 },
 
                 {
                     name: 'Servers',
                     type: 'Jump',
-                    tags: 'servers',
+                    tags: 'jump,servers',
                     next: 'server'
                 },
                 {
                     name: 'Projects',
                     type: 'Jump',
-                    tags: 'projects',
+                    tags: 'jump,projects',
                     next: 'projects'
                 },
                 {
                     name: 'Destinations',
                     type: 'Jump',
-                    tags: 'destinations',
+                    tags: 'jump,destinations',
                     next: 'destinations'
                 },
                 {
                     name: 'Private Keys',
                     type: 'Jump',
-                    tags: 'private keys,ssh, keys, key',
+                    tags: 'jump,private keys,ssh, keys, key',
                     next: 'privateKeys'
                 },
                 {
                     name: 'Sources',
                     type: 'Jump',
-                    tags: 'github,apps,source',
+                    tags: 'jump,github,apps,source',
                     next: 'sources'
                 }
             ],
