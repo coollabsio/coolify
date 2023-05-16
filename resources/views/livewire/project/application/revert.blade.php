@@ -1,4 +1,7 @@
 <div x-init="$wire.loadImages">
+    <div>
+        <x-inputs.button isBold wire:click='loadImages'>Refresh</x-inputs.button>
+    </div>
     <div wire:loading wire:target='loadImages'>
         <x-loading />
     </div>
