@@ -1,5 +1,6 @@
-<div>
-
+<div x-data="{ stopProxy: false }">
+    <x-naked-modal show="stopProxy" action="stopProxy"
+        message='Are you sure you would like to stop the proxy? All resources will be unavailable.' />
     @if ($server->settings->is_validated)
         <div class="flex items-center gap-2">
             <h3>Proxy</h3>
@@ -18,7 +19,8 @@
                         Start
                     </x-inputs.button>
                 @else
-                    <x-inputs.button isWarning wire:click="stopProxy">Stop</x-inputs.button>
+                    <x-inputs.button isWarning x-on:click.prevent="stopProxy = true">Stop
+                    </x-inputs.button>
                 @endif
                 <span x-data="{ showConfiguration: false }">
                     <x-inputs.button isBold x-on:click.prevent="showConfiguration = !showConfiguration">Show

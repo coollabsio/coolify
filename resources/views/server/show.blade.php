@@ -26,7 +26,9 @@
                     <x-inputs.button>Change</x-inputs.button>
                 </a>
             </div>
-            <p>{{ $server->privateKey->name }}</p>
+            <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
+                <x-inputs.button>{{ data_get($server, 'privateKey.uuid') }}</x-inputs.button>
+            </a>
         </div>
         <div x-cloak x-show="activeTab === 'destinations'">
             <div class="flex items-center gap-2">
@@ -37,7 +39,9 @@
             </div>
             @if ($server->standaloneDockers->count() > 0)
                 @foreach ($server->standaloneDockers as $docker)
-                    <p>Network: {{ data_get($docker, 'network') }}</p>
+                    <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
+                        <x-inputs.button>{{ data_get($docker, 'network') }}</x-inputs.button>
+                    </a>
                 @endforeach
             @else
                 <p>No destinations found</p>
