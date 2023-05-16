@@ -8,8 +8,8 @@ FROM serversideup/php:8.2-fpm-nginx
 WORKDIR /var/www/html
 ARG POSTGRES_VERSION=15
 RUN apt-get update && apt-get install -y php-pgsql openssh-client git git-lfs
-RUN apt-get -y autoremove &&
-    apt-get clean &&
+RUN apt-get -y autoremove \
+    apt-get clean \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 COPY composer.json composer.lock ./
