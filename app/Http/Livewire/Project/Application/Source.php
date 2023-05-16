@@ -15,10 +15,7 @@ class Source extends Component
         'application.git_branch' => 'required',
         'application.git_commit_sha' => 'nullable',
     ];
-    public function mount()
-    {
-        $this->application = Application::where('id', $this->applicationId)->first();
-    }
+
     public function submit()
     {
         $this->validate();

@@ -1,4 +1,5 @@
 <div>
+    <h3>Source</h3>
     <p>Source Name: {{ data_get($application, 'source.name') }}</p>
     <p>Is Public Source: {{ data_get($application, 'source.is_public') }}</p>
     <div class="flex flex-col w-96">

@@ -61,7 +61,6 @@ class General extends Component
     }
     public function mount()
     {
-        $this->application = Application::where('id', $this->applicationId)->with('destination', 'settings')->firstOrFail();
         $this->is_static = $this->application->settings->is_static;
         $this->is_git_submodules_allowed = $this->application->settings->is_git_submodules_allowed;
         $this->is_git_lfs_allowed = $this->application->settings->is_git_lfs_allowed;

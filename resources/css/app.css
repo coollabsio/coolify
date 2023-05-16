@@ -37,13 +37,13 @@ button {
     @apply bg-neutral-700 text-white;
 }
 h1 {
-    @apply text-3xl font-bold py-4;
+    @apply text-3xl font-bold pb-4;
 }
 h2 {
-    @apply text-xl font-bold py-4;
+    @apply text-xl font-bold pb-4;
 }
 h3 {
-    @apply text-lg font-bold py-4;
+    @apply text-lg font-bold pb-4;
 }
 .box {
     @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 p-2;

@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-2">
-    <h3>Persistent Storages</h3>
+    <h3>Storages</h3>
     @forelse ($application->persistentStorages as $storage)
         <livewire:project.application.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
     @empty
