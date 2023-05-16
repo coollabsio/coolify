@@ -1,27 +1,30 @@
-<x-layout>
-    <div>v{{ config('version') }}</div>
-    <a href="/login">Login</a>
-    @if ($is_registration_enabled)
-        <a href="/register">Register</a>
-    @else
-        <span>Registration disabled</span>
-    @endif
-    <div>
-        <form action="/login" method="POST">
-            @csrf
-            <input type="text" name="email" placeholder="email" @env('local') value="test@example.com" @endenv
-                autofocus />
-            <input type="password" name="password" placeho lder="Password" @env('local') value="password" @endenv />
-            <x-inputs.button type="submit">Login</x-inputs.button>
-        </form>
-        @if ($errors->any())
-            <div class="alert alert-danger">
-                <ul>
-                    @foreach ($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
+<x-layout-simple>
+    <div class="flex items-center justify-center h-screen">
+        <div>
+            <div>
+                <form action="/login" method="POST" class="flex flex-col gap-2">
+                    @csrf
+                    <input type="email" name="email" placeholder="{{ __('input.email') }}"
+                        @env('local') value="test@example.com" @endenv autofocus />
+                    <input type="password" name="password" placeholder="{{ __('input.password') }}"
+                        @env('local') value="password" @endenv />
+                    <x-inputs.button isBold type="submit">{{ __('auth.login') }}</x-inputs.button>
+                </form>
+                @if ($errors->any())
+                    <div class="alert alert-danger">
+                        <ul>
+                            <li>{{ __('auth.failed') }}</li>
+                        </ul>
+                    </div>
+                @endif
             </div>
-        @endif
+            @if ($is_registration_enabled)
+                <a href="/register" class="flex justify-center pt-2">
+                    <button>{{ __('auth.register') }}</button>
+                </a>
+            @else
+                <div>{{ __('auth.registration_disabled') }}</div>
+            @endif
+        </div>
     </div>
-</x-layout>
+</x-layout-simple>

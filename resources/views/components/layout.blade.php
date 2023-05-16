@@ -23,8 +23,7 @@
 </head>
 
 <body>
-    <a
-        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
+
     @livewireScripts
 
     @auth
@@ -33,7 +32,8 @@
     <main class="max-w-6xl pt-10 mx-auto">
         {{ $slot }}
     </main>
-
+    <a
+        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @auth
         <script>
             window.addEventListener("keydown", function(event) {

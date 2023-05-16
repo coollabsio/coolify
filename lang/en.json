@@ -1,0 +1,15 @@
+{
+    "auth.login": "Login",
+    "auth.logout": "Logout",
+    "auth.register": "Register",
+    "auth.registration_disabled": "Registration is disabled.",
+    "auth.reset_password": "Reset Password",
+    "auth.failed": "These credentials do not match our records.",
+    "auth.failed.password": "The provided password is incorrect.",
+    "auth.failed.email": "We can't find a user with that e-mail address.",
+    "auth.throttle": "Too many login attempts. Please try again in :seconds seconds.",
+    "input.name": "Name",
+    "input.email": "Email",
+    "input.password": "Password",
+    "input.password.again": "Password Again"
+}
