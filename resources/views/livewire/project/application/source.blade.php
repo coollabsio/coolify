@@ -1,16 +1,20 @@
 <div>
     <h3>Source</h3>
-    <p>Source Name: {{ data_get($application, 'source.name') }}</p>
-    <p>Is Public Source: {{ data_get($application, 'source.is_public') }}</p>
-    <div class="flex flex-col w-96">
-        <x-inputs.input id="application.git_repository" label="Git Repository" readonly />
-        <x-inputs.input id="application.git_branch" label="Git Branch" readonly />
-        <form wire:submit.prevent='submit'>
-            <x-inputs.input id="application.git_commit_sha" placeholder="HEAD" label="Git Commit SHA" />
-            <x-inputs.button type="submit">Save</x-inputs.button>
-        </form>
-        <a target="_blank" href="{{ $application->gitCommits }}">
-            <x-inputs.button>Commits ↗️</x-inputs.button>
-        </a>
+    <div class="pb-8">{{ data_get($application, 'source.name') }}
+        @if (data_get($application, 'source.is_public'))
+            <span class="text-xs">public</span>
+        @endif
     </div>
+    <form wire:submit.prevent='submit' class="flex flex-col gap-2 w-max-fit">
+        <x-inputs.input id="application.git_repository" label="Repository" readonly />
+        <x-inputs.input id="application.git_branch" label=" Branch" readonly />
+        <x-inputs.input id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
+        <div>
+            <x-inputs.button type="submit">Save</x-inputs.button>
+            <a target="_blank" href="{{ $application->gitCommits }}">
+                Commits <img class="inline-flex w-4 h-4" src="{{ Vite::asset('public/svgs/external-link.svg') }}">
+            </a>
+        </div>
+    </form>
+
 </div>

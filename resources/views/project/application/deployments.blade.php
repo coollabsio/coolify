@@ -1,5 +1,5 @@
 <x-layout>
-    <x-applications.navbar :application="$application" :gitBranchLocation="$application->gitBranchLocation" />
+    <x-applications.navbar :application="$application" />
     <h1 class="py-10">Deployments</h1>
     <div class="pt-2">
         @forelse ($deployments as $deployment)

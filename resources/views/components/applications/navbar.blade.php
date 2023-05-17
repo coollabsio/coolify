@@ -15,7 +15,7 @@
         ]) }}">
         Deployments
     </a>
-    <a target="_blank" href="{{ $gitBranchLocation }}">
+    <a target="_blank" href="{{ $application->gitBranchLocation }}">
         Open on Git <img class="inline-flex w-4 h-4" src="{{ Vite::asset('public/svgs/external-link.svg') }}">
     </a>
     @if (data_get($application, 'ports_mappings_array'))

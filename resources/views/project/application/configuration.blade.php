@@ -1,5 +1,5 @@
 <x-layout>
-    <x-applications.navbar :application="$application" :gitBranchLocation="$application->gitBranchLocation" />
+    <x-applications.navbar :application="$application" />
     <h1 class="py-10">Configuration</h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
         <div class="flex flex-col min-w-fit">
