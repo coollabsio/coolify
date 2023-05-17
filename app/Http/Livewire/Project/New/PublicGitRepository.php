@@ -78,7 +78,7 @@ class PublicGitRepository extends Component
 
 
             $application_init = [
-                'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
+                'name' => generateRandomName(),
                 'git_repository' => $git_repository,
                 'git_branch' => $git_branch,
                 'build_pack' => 'nixpacks',

@@ -74,7 +74,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
             $application_init = [
-                'name' => generateRandomName() . "-{$git_repository}:{$git_branch}",
+                'name' => generateRandomName(),
                 'git_repository' => $git_repository,
                 'git_branch' => $git_branch,
                 'git_full_url' => "git@$git_host:$git_repository.git",
