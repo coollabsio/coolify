@@ -226,7 +226,9 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
             $this->fail($e->getMessage());
         } finally {
             // Saving docker-compose.yml
-            Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
+            if ($this->docker_compose) {
+                Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
+            }
             $this->executeNow(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
             dispatch(new ContainerStatusJob($this->application_uuid));
         }
