@@ -397,7 +397,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                 $slug = Str::slug($url);
                 $label_id = "{$this->application->uuid}-{$slug}";
                 if ($path === '/') {
-                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && Path(`{$path}`)";
+                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
                 } else {
                     $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
                     $labels[] =  "traefik.http.routers.{$label_id}.middlewares={$label_id}-stripprefix";
