@@ -29,7 +29,7 @@ h3 {
     @apply text-lg font-bold pb-4;
 }
 a {
-    @apply m-2 hover:text-coollabs;
+    @apply text-neutral-400 m-2 hover:underline;
 }
 
 .box {

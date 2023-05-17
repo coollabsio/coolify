@@ -1,10 +1,10 @@
 <x-layout>
     <div class="text-3xl font-bold">Server</div>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
-            <a :class="activeTab === 'general' && 'text-purple-500'"
+        <div class="flex flex-col min-w-fit">
+            <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a :class="activeTab === 'proxy' && 'text-purple-500'"
+            <a :class="activeTab === 'proxy' && 'text-white'"
                 @click.prevent="activeTab = 'proxy'; window.location.hash = 'proxy'" href="#">Proxy
             </a>
         </div>

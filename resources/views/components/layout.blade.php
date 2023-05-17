@@ -8,8 +8,10 @@
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @env('local')
     <title>Coolify - localhost</title>
+    <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
     @endenv
     @env('production')
+    <link rel="icon" href="{{ asset('favicon.png') }}" type="image/x-icon" />
     <title>{{ $title ?? 'Coolify' }}</title>
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">

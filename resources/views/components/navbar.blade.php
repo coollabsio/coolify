@@ -27,7 +27,7 @@
                 <livewire:force-upgrade />
                 <form action="/logout" method="POST">
                     @csrf
-                    <button class="m-1 border-none hover:underline" type="submit">Logout</button>
+                    <button class="m-1 border-none hover:underline text-neutral-400" type="submit">Logout</button>
                 </form>
             </div>
         </div>
