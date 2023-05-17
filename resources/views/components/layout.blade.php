@@ -31,7 +31,7 @@
     @auth
         <x-navbar />
     @endauth
-    <main class="max-w-6xl pt-10 mx-auto">
+    <main class="max-w-6xl px-8 pt-10 mx-auto">
         {{ $slot }}
     </main>
     <a
