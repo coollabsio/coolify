@@ -3,8 +3,7 @@
     @forelse ($application->persistentStorages as $storage)
         <livewire:project.application.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
     @empty
-        <p>There are no persistent storage attached for this application.</p>
+        <p>There are no persistent storages attached for this application.</p>
     @endforelse
-    <h4>Add new environment variable</h4>
     <livewire:project.application.storages.add />
 </div>

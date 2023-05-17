@@ -10,7 +10,7 @@
         <x-inputs.input id="application.git_branch" label=" Branch" readonly />
         <x-inputs.input id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
         <div>
-            <x-inputs.button type="submit">Save</x-inputs.button>
+            <x-inputs.button isBold type="submit">Save</x-inputs.button>
             <a target="_blank" href="{{ $application->gitCommits }}">
                 Commits <img class="inline-flex w-4 h-4" src="{{ asset('svgs/external-link.svg') }}">
             </a>

@@ -14,7 +14,7 @@
         <x-inputs.input placeholder="0-2" label="CPU set to use" id="application.limits_cpuset" />
         <x-inputs.input placeholder="1024" label="CPU Weight" id="application.limits_cpu_shares" />
         <div class="pt-4">
-            <x-inputs.button>Save</x-inputs.button>
+            <x-inputs.button isBold>Save</x-inputs.button>
         </div>
     </form>
 </div>

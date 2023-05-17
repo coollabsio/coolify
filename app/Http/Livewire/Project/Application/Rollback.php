@@ -6,7 +6,7 @@ use App\Models\Application;
 use Livewire\Component;
 use Illuminate\Support\Str;
 
-class Revert extends Component
+class Rollback extends Component
 {
     public Application $application;
     public $images = [];

@@ -18,8 +18,8 @@
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
-            <a :class="activeTab === 'revert' && 'text-white'"
-                @click.prevent="activeTab = 'revert'; window.location.hash = 'revert'" href="#">Revert
+            <a :class="activeTab === 'rollback' && 'text-white'"
+                @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
             <a :class="activeTab === 'resource-limits' && 'text-white'"
                 @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
@@ -45,8 +45,8 @@
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.application.storages.all :application="$application" />
             </div>
-            <div x-cloak x-show="activeTab === 'revert'">
-                <livewire:project.application.revert :application="$application" />
+            <div x-cloak x-show="activeTab === 'rollback'">
+                <livewire:project.application.rollback :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.application.resource-limits :application="$application" />
