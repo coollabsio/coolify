@@ -7,14 +7,14 @@ body {
 }
 
 label {
-    @apply text-sm pb-2 font-bold tracking-wider;
+    @apply text-sm pb-2  tracking-wider;
 }
 input,
 textarea {
-    @apply border border-solid border-coolgray-500 rounded p-2 px-4 bg-transparent text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none focus:bg-coolgray-200/50 transition-all hover:bg-coolgray-200/50;
+    @apply border border-solid border-coolgray-500 bg-coolgray-200 rounded p-2 px-4  text-white disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none outline-none focus:bg-coolgray-200/50 transition-all hover:bg-coolgray-200/50;
 }
 select {
-    @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-transparent text-white disabled:text-neutral-600 read-only:select-none outline-none;
+    @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
 }
 button {
     @apply border border-solid border-coolgray-200 px-3 p-1 cursor-pointer;
