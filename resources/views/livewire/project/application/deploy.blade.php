@@ -1,4 +1,4 @@
-<div x-data="{ deleteApplication: false }">
+<div x-data="{ deleteApplication: false }" class="flex items-center gap-2">
     <x-naked-modal show="deleteApplication" />
     @if ($application->status === 'running')
         <x-inputs.button wire:click='start'>Rebuild</x-inputs.button>
@@ -8,7 +8,7 @@
         <x-inputs.button wire:click='start'>Start</x-inputs.button>
         <x-inputs.button wire:click='forceRebuild'>Start (no cache)</x-inputs.button>
     @endif
-    <x-inputs.button isWarning x-on:click.prevent="deleteApplication = true">
+    <x-inputs.button x-on:click.prevent="deleteApplication = true">
         Delete</x-inputs.button>
     <span wire:poll.5000ms='pollingStatus'>
         @if ($application->status === 'running')

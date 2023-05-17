@@ -1,4 +1,4 @@
-<div x-data="magicsearchbar" @slash.window="mainMenu = true" class="fixed -translate-x-1/2 left-1/2">
+<div x-data="magicsearchbar" @slash.window="mainMenu = true">
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>
@@ -13,13 +13,13 @@
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-green-600 rounded" x-show="item.type === 'App'"
+                        <span class="w-12 w- badge badge-primary badge-sm" x-show="item.type === 'Apps'"
                             x-text="item.type"></span>
-                        <span class="px-2 mr-1 text-xs text-white bg-indigo-600 rounded" x-show="item.type === 'Add'"
+                        <span class="w-12 badge badge-secondary badge-sm" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-600 rounded" x-show="item.type === 'Jump'"
+                        <span class="w-12 badge badge-success badge-sm" x-show="item.type === 'Jump'"
                             x-text="item.type"></span>
-                        <span class="px-2 mr-1 text-xs text-white bg-blue-600 rounded" x-show="item.type === 'New'"
+                        <span class="w-12 badge badge-success badge-sm" x-show="item.type === 'New'"
                             x-text="item.type"></span>
                         <span x-text="item.name"></span>
                     </div>
@@ -42,7 +42,7 @@
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-600 rounded">Server</span>
+                        <span class="w-12 badge badge-primary badge-sm">Server</span>
                         <span x-text="server.name"></span>
                     </div>
                 </template>
@@ -65,7 +65,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Destination</span>
+                        <span class="w-12 badge badge-primary badge-sm">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -88,7 +88,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Project</span>
+                        <span class="w-12 badge badge-primary badge-sm">Project</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -111,7 +111,7 @@
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Env</span>
+                        <span class="w-12 badge badge-primary badge-sm">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
                 </template>
@@ -134,7 +134,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs text-white bg-purple-700 rounded">Jump</span>
+                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -157,7 +157,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -180,7 +180,7 @@
                 <template x-for="(privateKey,index) in filteredPrivateKeys" :key="privateKey.name ?? privateKey">
                     <div x-on:click="await set('jumpToPrivateKey',privateKey.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
                         <span x-text="privateKey.name"></span>
                     </div>
                 </template>
@@ -203,7 +203,7 @@
                 <template x-for="(source,index) in filteredSources" :key="source.name ?? source">
                     <div x-on:click="await set('jumpToSource',source)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="px-2 mr-1 text-xs bg-purple-700 rounded">Jump</span>
+                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
                         <span x-text="source.name"></span>
                     </div>
                 </template>
@@ -281,18 +281,18 @@
             focusedIndex: "",
             items: [{
                     name: 'Public Repository',
-                    type: 'App',
-                    tags: 'application,public,repository,github,gitlab,bitbucket,git',
+                    type: 'Apps',
+                    tags: 'Appslication,public,repository,github,gitlab,bitbucket,git',
                 },
                 {
-                    name: 'Private Repository (with GitHub App)',
-                    type: 'App',
-                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
+                    name: 'Private Repository (with GitHub Apps)',
+                    type: 'Apps',
+                    tags: 'Appslication,private,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Private Repository (with Deploy Key)',
-                    type: 'App',
-                    tags: 'application,private,repository,github,gitlab,bitbucket,git',
+                    type: 'Apps',
+                    tags: 'Appslication,private,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Server',
@@ -352,7 +352,7 @@
                 {
                     name: 'Sources',
                     type: 'Jump',
-                    tags: 'jump,github,apps,source',
+                    tags: 'jump,github,Appss,source',
                     next: 'sources'
                 }
             ],
@@ -606,7 +606,7 @@
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=public&destination=${this.selectedDestination}`
                         } else if (this.selectedAction === 1) {
                             window.location =
-                                `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-gh-app&destination=${this.selectedDestination}`
+                                `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-gh-Apps&destination=${this.selectedDestination}`
                         } else if (this.selectedAction === 2) {
                             window.location =
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-deploy-key&destination=${this.selectedDestination}`

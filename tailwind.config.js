@@ -30,5 +30,22 @@ module.exports = {
         }
     },
   },
-  plugins: [],
+  daisyui: {
+    themes: [
+      {
+        "coollabs": {
+          "primary": "#6B16ED",
+          "secondary": "#4338ca",
+          "accent": "#4338ca",
+          "neutral": "#1B1D1D",
+          "base-100": "#212121",
+          "info": "#2563EB",
+          "success": "#16A34A",
+          "warning": "#FCD34D",
+          "error": "#DC2626",
+        }
+      }
+    ],
+  },
+  plugins: [require("@tailwindcss/typography"),require("daisyui")],
 }

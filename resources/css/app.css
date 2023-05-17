@@ -3,37 +3,43 @@
 @tailwind utilities;
 
 body {
-    @apply bg-coolgray-100 text-white font-sans;
+    @apply bg-coolgray-100 text-white;
+}
+input {
+    @apply input w-full max-w-xl input-bordered input-sm;
+}
+textarea {
+    @apply textarea textarea-sm;
 }
 
-label {
-    @apply text-sm pb-2  tracking-wider;
-}
-input,
+/* input,
 textarea {
     @apply border border-solid border-coolgray-500 bg-coolgray-200 rounded p-2 px-4 text-white outline-none transition-all;
 }
 input,
 textarea {
     @apply disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none read-only:bg-coolgray-200/50;
-}
+} */
 select {
     @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
 }
 button {
-    @apply border border-solid border-coolgray-200 px-3 p-1 cursor-pointer;
+    @apply btn btn-xs btn-ghost no-animation normal-case;
+}
+button[type="submit"] {
+    @apply btn-primary btn-sm;
 }
 h1 {
     @apply text-3xl font-bold pb-4;
 }
 h2 {
-    @apply text-xl font-bold pb-4;
+    @apply text-2xl font-bold pb-4;
 }
 h3 {
-    @apply text-lg font-bold pb-4;
+    @apply text-xl font-bold pb-4;
 }
-a {
-    @apply text-neutral-400 m-2 hover:underline;
+a{
+    @apply hover:text-white text-sm;
 }
 
 .box {
@@ -45,16 +51,16 @@ a {
 }
 .main-menu:after {
     content: "/";
-    @apply absolute right-0 top-0 text-neutral-400 px-2 pt-[0.5rem];
+    @apply font-bold absolute right-0 top-0 text-neutral-400 px-2 pt-[0.7rem];
 }
 .magic-input {
-    @apply w-[25rem] rounded outline-none bg-coolgray-400 focus:bg-neutral-700 text-white;
+    @apply input input-ghost w-96 placeholder:text-neutral-400 text-sm;
 }
 .magic-items {
-    @apply absolute top-12 w-[25rem] bg-coolgray-200 border-b-2 border-r-2 border-l-2 border-solid border-coolgray-100 rounded-b;
+    @apply absolute top-16 mt-2 w-[24rem] bg-coolgray-200  rounded-xl outline outline-coolgray-500;
 }
 .magic-item {
-    @apply m-2 py-2 pl-4 cursor-pointer hover:bg-neutral-700 text-neutral-300 hover:text-white;
+    @apply text-sm flex items-center gap-4 m-2 py-2 pl-4 cursor-pointer hover:bg-coolgray-500 text-neutral-400 hover:text-white rounded-xl transition-colors hover:shadow;
 }
 .magic-item-focused {
     @apply bg-neutral-700 text-white;
