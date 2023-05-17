@@ -309,6 +309,14 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                         'retries' => $this->application->health_check_retries,
                         'start_period' => $this->application->health_check_start_period . 's'
                     ],
+                    'mem_limit' => $this->application->limits_memory,
+                    'memswap_limit' => $this->application->limits_memory_swap,
+                    'mem_swappiness' => $this->application->limits_memory_swappiness,
+                    'mem_reservation' => $this->application->limits_memory_reservation,
+                    'oom_kill_disable' => $this->application->limits_memory_oom_kill,
+                    'cpus' => $this->application->limits_cpus,
+                    'cpuset' => $this->application->limits_cpuset,
+                    'cpu_shares' => $this->application->limits_cpu_shares,
                 ]
             ],
             'networks' => [

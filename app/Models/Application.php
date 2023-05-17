@@ -43,6 +43,7 @@ class Application extends BaseModel
 
     public $casts = [
         'previews' => SchemalessAttributes::class,
+        'limits_memory_oom_kill' => 'boolean',
     ];
     public function scopeWithExtraAttributes(): Builder
     {

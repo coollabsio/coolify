@@ -21,6 +21,10 @@
             <a :class="activeTab === 'revert' && 'text-white'"
                 @click.prevent="activeTab = 'revert'; window.location.hash = 'revert'" href="#">Revert
             </a>
+            <a :class="activeTab === 'resource-limits' && 'text-white'"
+                @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
+                href="#">Resource Limits
+            </a>
             {{-- <a :class="activeTab === 'previews' && 'text-white'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
             </a> --}}
@@ -43,6 +47,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'revert'">
                 <livewire:project.application.revert :application="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'resource-limits'">
+                <livewire:project.application.resource-limits :application="$application" />
             </div>
             {{-- <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
