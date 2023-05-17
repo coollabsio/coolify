@@ -16,14 +16,14 @@
         Deployments
     </a>
     <a target="_blank" href="{{ $application->gitBranchLocation }}">
-        Open on Git <img class="inline-flex w-4 h-4" src="{{ Vite::asset('public/svgs/external-link.svg') }}">
+        Open on Git <img class="inline-flex w-4 h-4" src="{{ asset('svgs/external-link.svg') }}">
     </a>
     @if (data_get($application, 'ports_mappings_array'))
         @foreach ($application->ports_mappings_array as $port)
             @if (config('app.env') === 'local')
                 <a target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Open
                     {{ explode(':', $port)[0] }} <img class="inline-flex w-4 h-4"
-                        src="{{ Vite::asset('public/svgs/external-link.svg') }}"></a>
+                        src="{{ asset('svgs/external-link.svg') }}"></a>
             @else
                 <a target="_blank"
                     href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Open

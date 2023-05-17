@@ -12,7 +12,7 @@
         <div>
             <x-inputs.button type="submit">Save</x-inputs.button>
             <a target="_blank" href="{{ $application->gitCommits }}">
-                Commits <img class="inline-flex w-4 h-4" src="{{ Vite::asset('public/svgs/external-link.svg') }}">
+                Commits <img class="inline-flex w-4 h-4" src="{{ asset('svgs/external-link.svg') }}">
             </a>
         </div>
     </form>
