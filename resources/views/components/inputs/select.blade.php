@@ -12,7 +12,7 @@
             {{ $id }}
         @endif
         @if ($required)
-            *
+            <span class="text-warning">*</span>
         @endif
     </label>
     <select {{ $attributes }} wire:model.defer={{ $id }}>

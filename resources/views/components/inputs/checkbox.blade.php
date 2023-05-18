@@ -15,6 +15,23 @@
         @else
             {{ $id }}
         @endif
+        @if ($helper)
+            <div class="-mb-1 dropdown dropdown-right">
+                <label tabindex="0" class="cursor-pointer text-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                        class="w-4 h-4 stroke-current">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </label>
+                <div tabindex="0"
+                    class="border-2 shadow whitespace-nowrap w-max-fit border-coolgray-500 card compact dropdown-content bg-coolgray-200">
+                    <div class="card-body">
+                        {!! $helper !!}
+                    </div>
+                </div>
+            </div>
+        @endif
     </div>
     <div class="flex-1"></div>
     <input type="checkbox" @if ($disabled !== null) disabled @endif name={{ $id }}

@@ -9,7 +9,8 @@
         <div class="flex flex-col gap-2 pb-4">
             <div class="flex gap-2">
                 <x-inputs.input class="w-full" id="application.name" label="Name" required />
-                <x-inputs.input class="w-full" id="application.fqdn" label="Domains" />
+                <x-inputs.input class="w-full" id="application.fqdn" label="Domains"
+                    helper="You can specify one domain with path or more with comma.<br><span class='inline-block font-bold text-warning'>Example</span>- http://app.coolify.io,https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
             </div>
             <x-inputs.select id="application.build_pack" label="Build Pack" required>
                 <option value="nixpacks">Nixpacks</option>
@@ -28,7 +29,8 @@
                 <x-inputs.input id="application.start_command" label="Start Command" />
             </div>
             <div class="flex gap-2">
-                <x-inputs.input id="application.base_directory" label="Base Directory" />
+                <x-inputs.input id="application.base_directory" label="Base Directory"
+                    helper="Directory to use as root. Useful for monorepos." />
                 @if ($application->settings->is_static)
                     <x-inputs.input id="application.publish_directory" label="Publish Directory" required />
                 @else
@@ -39,21 +41,25 @@
                 @if ($application->settings->is_static)
                     <x-inputs.input id="application.ports_exposes" label="Ports Exposes" readonly />
                 @else
-                    <x-inputs.input id="application.ports_exposes" label="Ports Exposes" required />
+                    <x-inputs.input id="application.ports_exposes" label="Ports Exposes" required
+                        helper="A comma separated list of ports you would like to expose for the proxy." />
                 @endif
-                <x-inputs.input id="application.ports_mappings" label="Ports Mappings" />
+                <x-inputs.input id="application.ports_mappings" label="Ports Mappings"
+                    helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
             </div>
         </div>
         <div class="flex flex-col">
-            <x-inputs.checkbox instantSave id="is_debug" label="Debug" />
+            <x-inputs.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug"
+                label="Debug" />
             <x-inputs.checkbox instantSave id="is_static" label="Static website?" />
+            <x-inputs.checkbox helper="Git Webhooks won't deploy your application is you turn it off." instantSave
+                id="is_auto_deploy" label="Auto Deploy?" />
+            <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" />
             <x-inputs.checkbox instantSave id="is_git_submodules_allowed" label="Git Submodules Allowed?" />
             <x-inputs.checkbox instantSave id="is_git_lfs_allowed" label="Git LFS Allowed?" />
-            <x-inputs.checkbox instantSave id="is_auto_deploy" label="Auto Deploy?" />
-            <x-inputs.checkbox instantSave id="is_previews" label="Previews?" />
-            <x-inputs.checkbox disabled instantSave id="is_dual_cert" label="Dual Certs?" />
+            {{-- <x-inputs.checkbox disabled instantSave id="is_dual_cert" label="Dual Certs?" />
             <x-inputs.checkbox disabled instantSave id="is_custom_ssl" label="Is Custom SSL?" />
-            <x-inputs.checkbox disabled instantSave id="is_http2" label="Is Http2?" />
+            <x-inputs.checkbox disabled instantSave id="is_http2" label="Is Http2?" /> --}}
         </div>
     </form>
 </div>

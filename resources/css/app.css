@@ -25,7 +25,7 @@ textarea {
     @apply textarea;
 }
 select {
-    @apply select select-sm disabled:opacity-40;
+    @apply select select-sm disabled:opacity-40 font-normal;
 }
 
 button[type="button"] {
