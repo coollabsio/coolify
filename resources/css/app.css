@@ -3,29 +3,30 @@
 @tailwind utilities;
 
 * {
-@apply scrollbar-thumb-yellow-400 scrollbar-track-coolgray-200 scrollbar-w-1;
+  //outline: solid 0.25rem hsla(210, 100%, 100%, 0.5); 
+    @apply scrollbar-thumb-yellow-400 scrollbar-track-coolgray-200 scrollbar-w-2;
 }
 html {
-    @apply h-full min-h-full bg-coolgray-100 ;
+    @apply h-full min-h-full bg-coolgray-100;
 }
 body {
-    @apply bg-coolgray-100 text-white min-h-full antialiased;
+    @apply bg-coolgray-100 text-neutral-400 min-h-full antialiased;
 }
 input[type="checkbox"] {
     @apply toggle toggle-warning toggle-sm;
 }
 input {
-    @apply input input-sm;
+    @apply input input-sm placeholder:text-neutral-700 text-white;
 }
 input[type="text"],[type="number"],[type="email"],[type="password"] {
     @apply read-only:opacity-40;
 }
 
 textarea {
-    @apply textarea;
+    @apply textarea placeholder:text-neutral-700 text-white;
 }
 select {
-    @apply select select-sm disabled:opacity-40 font-normal;
+    @apply select select-sm disabled:opacity-40 font-normal placeholder:text-neutral-700 text-white;
 }
 
 button[type="button"] {
@@ -41,13 +42,13 @@ button[isHighlighted] {
     @apply btn-primary text-white;
 }
 h1 {
-    @apply text-3xl font-bold pb-4;
+    @apply text-3xl font-bold pb-4 text-white;
 }
 h2 {
-    @apply text-2xl font-bold pb-4;
+    @apply text-2xl font-bold pb-4 text-white;
 }
 h3 {
-    @apply text-xl font-bold py-4;
+    @apply text-xl font-bold py-4 text-white;
 }
 a {
     @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
@@ -62,10 +63,10 @@ a {
 }
 .main-menu:after {
     content: "/";
-    @apply font-bold absolute right-0 top-0 text-neutral-400 px-2 pt-[0.7rem];
+    @apply absolute border border-dotted rounded border-neutral-600 right-0 top-0 text-warning mx-1 px-2 mt-[0.7rem];
 }
 .magic-input {
-    @apply input input-ghost w-96 placeholder:text-neutral-400 text-sm;
+    @apply input  w-96 placeholder:text-neutral-700 text-sm;
 }
 .magic-items {
     @apply absolute top-16 mt-2 w-[24rem] bg-coolgray-200  rounded-xl outline outline-coolgray-500;

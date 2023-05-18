@@ -5,7 +5,7 @@
     'confirmAction' => null,
 ])
 @if ($type === 'submit')
-    <button type="submit" @if ($disabled !== null) disabled @endif wire:target="submit"
+    <button {{ $attributes }} type="submit" @if ($disabled !== null) disabled @endif wire:target="submit"
         wire:loading.delay.shorter.class="loading"
         @isset($confirm)
         x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"

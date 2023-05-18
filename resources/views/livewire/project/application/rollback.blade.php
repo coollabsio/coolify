@@ -1,7 +1,7 @@
 <div x-init="$wire.loadImages">
     <div class="flex gap-2">
         <h2>Rollback</h2>
-        <x-inputs.button isHighlighted wire:click='loadImages'>Refresh Images</x-inputs.button>
+        <x-inputs.button isHighlighted wire:click='loadImages'>Refresh</x-inputs.button>
     </div>
     <div wire:loading wire:target='loadImages'>
         <x-loading />
@@ -30,7 +30,8 @@
                     </div>
                 </div>
             @empty
-                <div>No images found</div>
+                <div>No images found
+                </div>
             @endforelse
         </div>
     </div>

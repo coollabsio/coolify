@@ -13,7 +13,7 @@
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 w- badge badge-primary badge-sm" x-show="item.type === 'Apps'"
+                        <span class="w-12 badge badge-primary badge-sm" x-show="item.type === 'Apps'"
                             x-text="item.type"></span>
                         <span class="w-12 badge badge-secondary badge-sm" x-show="item.type === 'Add'"
                             x-text="item.type"></span>
@@ -42,7 +42,7 @@
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Server</span>
+                        <span class="badge badge-primary badge-sm">Server</span>
                         <span x-text="server.name"></span>
                     </div>
                 </template>
@@ -50,7 +50,7 @@
         </div>
     </template>
     {{-- Destinations --}}
-    <template x-cloak x-if="destinationMenu"">
+    <template x-cloak x-if="destinationMenu">
         <div x-on:click.outside="closeMenus">
             <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a destination..."
                 x-on:keydown.down="focusNext(destinations.length)" x-on:keydown.up="focusPrev(destinations.length)"
@@ -65,7 +65,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Destination</span>
+                        <span class=" badge badge-primary badge-sm">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -88,7 +88,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Project</span>
+                        <span class="badge badge-primary badge-sm">Project</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -111,7 +111,7 @@
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Env</span>
+                        <span class="badge badge-primary badge-sm">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
                 </template>
@@ -134,7 +134,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
+                        <span class="badge badge-primary badge-sm">Jump</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -157,7 +157,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
+                        <span class="badge badge-primary badge-sm">Jump</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -180,7 +180,7 @@
                 <template x-for="(privateKey,index) in filteredPrivateKeys" :key="privateKey.name ?? privateKey">
                     <div x-on:click="await set('jumpToPrivateKey',privateKey.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
+                        <span class="badge badge-primary badge-sm">Jump</span>
                         <span x-text="privateKey.name"></span>
                     </div>
                 </template>
@@ -203,7 +203,7 @@
                 <template x-for="(source,index) in filteredSources" :key="source.name ?? source">
                     <div x-on:click="await set('jumpToSource',source)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm">Jump</span>
+                        <span class="badge badge-primary badge-sm">Jump</span>
                         <span x-text="source.name"></span>
                     </div>
                 </template>
@@ -281,17 +281,17 @@
             focusedIndex: "",
             items: [{
                     name: 'Public Repository',
-                    type: 'Apps',
+                    type: 'Add',
                     tags: 'Appslication,public,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Private Repository (with GitHub Apps)',
-                    type: 'Apps',
+                    type: 'Add',
                     tags: 'Appslication,private,repository,github,gitlab,bitbucket,git',
                 },
                 {
                     name: 'Private Repository (with Deploy Key)',
-                    type: 'Apps',
+                    type: 'Add',
                     tags: 'Appslication,private,repository,github,gitlab,bitbucket,git',
                 },
                 {

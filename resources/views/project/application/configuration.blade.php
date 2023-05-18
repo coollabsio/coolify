@@ -57,9 +57,7 @@
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.application.danger :application="$application" />
             </div>
-            {{-- <div x-cloak x-show="activeTab === 'previews'">
-                <livewire:project.application.previews :application="$application" />
-            </div> --}}
+
         </div>
     </div>
 </x-layout>

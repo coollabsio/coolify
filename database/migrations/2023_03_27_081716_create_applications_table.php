@@ -62,7 +62,7 @@ return new class extends Migration
             $table->boolean('limits_memory_oom_kill')->default(false);
 
             $table->string('limits_cpus')->default("0");
-            $table->string('limits_cpuset')->nullable()->default("");
+            $table->string('limits_cpuset')->nullable()->default("0");
             $table->integer('limits_cpu_shares')->default(1024);
 
             $table->string('status')->default('exited');

@@ -11,9 +11,10 @@
                 <ul tabindex="0" class="p-2 mt-3 shadow menu menu-compact dropdown-content bg-base-100 rounded-box w-52">
                     <li>
                         <a href="/">
-                            Home
+                            Dashboard
                         </a>
                     </li>
+
                     @if (auth()->user()->isRoot())
                         <li>
                             <a href="/settings">
@@ -44,18 +45,23 @@
                     <li>
                         <form action="/logout" method="POST">
                             @csrf
-                            <button type="submit">Logout</button>
+                            <button>Logout</button>
                         </form>
                     </li>
                 </ul>
             </div>
-            <a href="/" class="text-xl no-underline normal-case btn btn-ghost">Coolify</a>
+            <div href="/" class="text-xl text-white normal-case btn btn-ghost hover:bg-transparent">Coolify</div>
             <div class="form-control">
                 <x-magic-bar />
             </div>
         </div>
         <div class="hidden navbar-end xl:flex">
             <ul class="px-1 menu menu-horizontal text-neutral-400">
+                <li>
+                    <a href="/">
+                        Dashboard
+                    </a>
+                </li>
                 @if (auth()->user()->isRoot())
                     <li>
                         <a href="/settings">
@@ -86,8 +92,7 @@
                 <li>
                     <form action="/logout" method="POST" class="hover:bg-transparent">
                         @csrf
-                        <button class="font-normal link link-hover hover:bg-transparent hover:text-white"
-                            type="submit">Logout</button>
+                        <button class="text-sm link link-hover hover:text-white">Logout</button>
                     </form>
                 </li>
             </ul>
