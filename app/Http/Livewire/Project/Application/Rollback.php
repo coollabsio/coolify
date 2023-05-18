@@ -17,6 +17,7 @@ class Rollback extends Component
     }
     public function loadImages()
     {
+        sleep(2);
         try {
             $image = $this->application->uuid;
             $output = instantRemoteProcess([

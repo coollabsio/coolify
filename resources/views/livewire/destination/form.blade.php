@@ -7,10 +7,10 @@
             <x-inputs.input id="destination.network" label="Docker Network" readonly />
         @endif
         <div>
-            <x-inputs.button isBold type="submit">
+            <x-inputs.button type="submit">
                 Save
             </x-inputs.button>
-            <x-inputs.button isWarning x-on:click.prevent="deleteDestination = true">
+            <x-inputs.button x-on:click.prevent="deleteDestination = true">
                 Delete
             </x-inputs.button>
         </div>

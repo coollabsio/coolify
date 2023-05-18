@@ -1,12 +1,12 @@
 <div x-data="{ deleteServer: false }">
-    <h3>General</h3>
+    <h2>General</h2>
     <x-naked-modal show="deleteServer" message='Are you sure you would like to delete this server?' />
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
                 <x-inputs.input id="server.name" label="Name" required />
                 <x-inputs.input id="server.description" label="Description" />
-                <x-inputs.input disabled type="checkbox" id="server.settings.is_part_of_swarm"
+                <x-inputs.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" />
             </div>
             <div class="flex flex-col w-96">
@@ -23,9 +23,9 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <x-inputs.button isBold type="submit">Save</x-inputs.button>
+            <x-inputs.button type="submit">Save</x-inputs.button>
 
-            <x-inputs.button isBold wire:click.prevent='validateServer'>
+            <x-inputs.button wire:click.prevent='validateServer'>
                 @if ($server->settings->is_validated)
                     Check Connection
                 @else
@@ -33,8 +33,8 @@
                 @endif
             </x-inputs.button>
 
-            {{-- <x-inputs.button isBold wire:click.prevent='installDocker'>Install Docker</x-inputs.button> --}}
-            <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
+            {{-- <x-inputs.button  wire:click.prevent='installDocker'>Install Docker</x-inputs.button> --}}
+            <x-inputs.button x-on:click.prevent="deleteServer = true">
                 Delete
             </x-inputs.button>
         </div>
@@ -57,7 +57,7 @@
             {{ data_get($server, 'privateKey.uuid') }}
         </a>
         <a href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">
-            <x-inputs.button isBold>Change</x-inputs.button>
+            <x-inputs.button>Change</x-inputs.button>
         </a>
     </div>
     <div class="flex items-center gap-2 py-4">
@@ -71,7 +71,7 @@
             @endforeach
         </div>
         <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">
-            <x-inputs.button isBold>Add</x-inputs.button>
+            <x-inputs.button>Add</x-inputs.button>
         </a>
     </div>
 </div>

@@ -2,10 +2,7 @@
 
 namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
 
-use App\Models\Application;
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
-use Illuminate\Support\Facades\Request;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class Show extends Component

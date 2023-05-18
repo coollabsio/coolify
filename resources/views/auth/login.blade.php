@@ -8,7 +8,7 @@
                         @env('local') value="test@example.com" @endenv autofocus />
                     <input type="password" name="password" placeholder="{{ __('input.password') }}"
                         @env('local') value="password" @endenv />
-                    <x-inputs.button isBold type="submit">{{ __('auth.login') }}</x-inputs.button>
+                    <x-inputs.button type="submit">{{ __('auth.login') }}</x-inputs.button>
                 </form>
                 @if ($errors->any())
                     <div class="alert alert-danger">

@@ -11,7 +11,7 @@
                     @env('local') value="password" @endenv />
                 <input type="password" name="password_confirmation" placeholder="{{ __('input.password.again') }}"
                     @env('local') value="password" @endenv />
-                <x-inputs.button isBold type="submit">{{ __('auth.register') }}</x-inputs.button>
+                <x-inputs.button type="submit">{{ __('auth.register') }}</x-inputs.button>
             </form>
             @if ($errors->any())
                 <div class="alert alert-danger">

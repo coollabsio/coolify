@@ -11,6 +11,8 @@ class Change extends Component
     public string $host;
     public $parameters;
     public GithubApp $github_app;
+    public string $installation_url;
+    public string $name;
     public bool $is_system_wide;
 
     protected $rules = [

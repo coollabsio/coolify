@@ -4,7 +4,7 @@
     'required' => false,
 ])
 
-<span @class(['flex flex-col'])>
+<span {{ $attributes->merge(['class' => 'flex flex-col']) }}>
     <label for={{ $id }}>
         @if ($label)
             {{ $label }}

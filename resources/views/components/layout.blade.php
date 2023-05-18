@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-theme="coollabs" lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full bg-coolgray-100">
+<html data-theme="coollabs" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
     <meta charset="utf-8">
@@ -24,14 +24,13 @@
     @livewireStyles
 </head>
 
-<body class="antialiased">
+<body>
 
     @livewireScripts
-
     @auth
         <x-navbar />
     @endauth
-    <main class="max-w-6xl px-8 pt-10 mx-auto">
+    <main class="min-h-full px-8 pt-10 mx-auto max-w-7xl">
         {{ $slot }}
     </main>
     <a

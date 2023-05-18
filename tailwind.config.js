@@ -30,6 +30,10 @@ module.exports = {
         }
     },
   },
+  variants: {
+		scrollbar: ['dark'],
+		extend: {}
+	},
   daisyui: {
     themes: [
       {
@@ -47,5 +51,5 @@ module.exports = {
       }
     ],
   },
-  plugins: [require("@tailwindcss/typography"),require("daisyui")],
+  plugins: [require('tailwindcss-scrollbar'),require("@tailwindcss/typography"),require("daisyui")],
 }

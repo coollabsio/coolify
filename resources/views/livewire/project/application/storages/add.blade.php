@@ -5,7 +5,7 @@
         <x-inputs.input noDirty id="mount_path" label="Destination Path" required />
     </div>
     <div class="pt-2">
-        <x-inputs.button isBold type="submit">
+        <x-inputs.button type="submit">
             Add
         </x-inputs.button>
     </div>

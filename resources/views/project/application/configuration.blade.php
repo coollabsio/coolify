@@ -1,8 +1,8 @@
 <x-layout>
     <x-applications.navbar :application="$application" />
     <h1 class="py-10">Configuration</h1>
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
-        <div class="flex flex-col min-w-fit">
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
+        <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             <a :class="activeTab === 'environment-variables' && 'text-white'"
@@ -25,12 +25,15 @@
                 @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
                 href="#">Resource Limits
             </a>
+            <a :class="activeTab === 'danger' && 'text-white'"
+                @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
+            </a>
             {{-- <a :class="activeTab === 'previews' && 'text-white'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
             </a> --}}
         </div>
-        <div class="w-full pt-2 pl-8">
-            <div x-cloak x-show="activeTab === 'general'">
+        <div class="w-full pl-8">
+            <div x-cloak x-show="activeTab === 'general'" class="h-full">
                 <livewire:project.application.general :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
@@ -50,6 +53,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.application.resource-limits :application="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'danger'">
+                <livewire:project.application.danger :application="$application" />
             </div>
             {{-- <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />

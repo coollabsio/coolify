@@ -6,10 +6,10 @@
             <x-inputs.input id="storage.mount_path" label="Destination Path" required />
         </div>
         <div class="pt-2">
-            <x-inputs.button isBold type="submit">
+            <x-inputs.button type="submit">
                 Update
             </x-inputs.button>
-            <x-inputs.button x-on:click.prevent="deleteStorage = true" isWarning>
+            <x-inputs.button x-on:click.prevent="deleteStorage = true">
                 Delete
             </x-inputs.button>
         </div>

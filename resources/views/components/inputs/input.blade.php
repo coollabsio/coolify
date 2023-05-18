@@ -1,14 +1,15 @@
 @props([
     'id' => $attributes->has('id') || $attributes->has('label'),
-    'required' => $attributes->has('required'),
+    'type' => $attributes->get('type') ?? 'text',
+    'required' => null,
     'label' => $attributes->has('label'),
     'helper' => $attributes->has('helper'),
-    'instantSave' => $attributes->has('instantSave'),
     'noLabel' => $attributes->has('noLabel'),
     'noDirty' => $attributes->has('noDirty'),
+    'disabled' => null,
 ])
 
-<div class="w-full max-w-xs form-control">
+<div {{ $attributes->merge(['class' => 'w-full form-control']) }}>
     @if (!$noLabel)
         <label class="label">
             <span class="label-text">
@@ -40,8 +41,8 @@
             </span>
         </label>
     @endif
-    <input {{ $attributes }} name={{ $id }}
-        @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif
+    <input {{ $attributes }} type={{ $type }} name={{ $id }} wire:model.defer={{ $id }}
+        @if ($disabled !== null) disabled @endif @if ($required !== null) required @endif
         @if (!$noDirty) wire:dirty.class="input-warning" @endif />
     @error($id)
         <label class="label">

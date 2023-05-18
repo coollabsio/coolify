@@ -10,29 +10,29 @@
                 </label>
                 <ul tabindex="0" class="p-2 mt-3 shadow menu menu-compact dropdown-content bg-base-100 rounded-box w-52">
                     <li>
-                        <a href="/" class="justify-between">
+                        <a href="/">
                             Home
                         </a>
                     </li>
                     @if (auth()->user()->isRoot())
                         <li>
-                            <a href="/settings" class="justify-between">
+                            <a href="/settings">
                                 Settings
                             </a>
                         </li>
                     @endif
                     <li>
-                        <a href="/profile" class="justify-between">
+                        <a href="/profile">
                             Profile
                         </a>
                     </li>
                     <li>
-                        <a href="/profile/team" class="justify-between">
+                        <a href="/profile/team">
                             Team
                         </a>
                     </li>
                     <li>
-                        <a href="/command-center" class="justify-between">
+                        <a href="/command-center">
                             Command Center
                         </a>
                     </li>
@@ -49,7 +49,7 @@
                     </li>
                 </ul>
             </div>
-            <a href="/" class="text-xl normal-case btn btn-ghost">Coolify</a>
+            <a href="/" class="text-xl no-underline normal-case btn btn-ghost">Coolify</a>
             <div class="form-control">
                 <x-magic-bar />
             </div>
@@ -58,23 +58,23 @@
             <ul class="px-1 menu menu-horizontal text-neutral-400">
                 @if (auth()->user()->isRoot())
                     <li>
-                        <a href="/settings" class="justify-between link link-hover hover:bg-transparent">
+                        <a href="/settings">
                             Settings
                         </a>
                     </li>
                 @endif
                 <li>
-                    <a href="/profile" class="justify-between link link-hover hover:bg-transparent">
+                    <a href="/profile">
                         Profile
                     </a>
                 </li>
                 <li>
-                    <a href="/profile/team" class="justify-between link link-hover hover:bg-transparent">
+                    <a href="/profile/team">
                         Team
                     </a>
                 </li>
                 <li>
-                    <a class="justify-between link link-hover hover:bg-transparent" href="/command-center">
+                    <a href="/command-center">
                         Command Center
                     </a>
                 </li>

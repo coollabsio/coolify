@@ -10,7 +10,7 @@
                 @endif
             @endforeach
         </select>
-        <x-inputs.button isBold type="submit">Run</x-inputs.button>
+        <x-inputs.button type="submit">Run</x-inputs.button>
     </form>
     <div class="container w-full pt-10 mx-auto">
         <livewire:activity-monitor />

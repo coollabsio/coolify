@@ -19,7 +19,7 @@
         </x-inputs.select>
         <x-inputs.input instantSave noDirty type="checkbox" id="is_part_of_swarm"
             label="Is it part of a Swarm cluster?" />
-        <x-inputs.button isBold type="submit">
+        <x-inputs.button type="submit">
             Save
         </x-inputs.button>
     </form>

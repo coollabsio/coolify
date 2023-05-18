@@ -1,5 +1,5 @@
 <div class="flex flex-col gap-2">
-    <h3>Environment Variables</h3>
+    <h2>Environment Variables</h2>
     @forelse ($application->environment_variables as $env)
         <livewire:project.application.environment-variable.show wire:key="environment-{{ $env->id }}"
             :env="$env" />

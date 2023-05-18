@@ -2,32 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+@apply scrollbar-thumb-yellow-400 scrollbar-track-coolgray-200 scrollbar-w-1;
+}
+html {
+    @apply h-full min-h-full bg-coolgray-100 ;
+}
 body {
-    @apply bg-coolgray-100 text-white;
+    @apply bg-coolgray-100 text-white min-h-full antialiased;
+}
+input[type="checkbox"] {
+    @apply toggle toggle-warning toggle-sm;
 }
 input {
-    @apply input w-full max-w-xl input-bordered input-sm;
+    @apply input input-sm;
 }
-textarea {
-    @apply textarea textarea-sm;
+input[type="text"],[type="number"],[type="email"],[type="password"] {
+    @apply read-only:opacity-40;
 }
 
-/* input,
 textarea {
-    @apply border border-solid border-coolgray-500 bg-coolgray-200 rounded p-2 px-4 text-white outline-none transition-all;
+    @apply textarea;
 }
-input,
-textarea {
-    @apply disabled:text-neutral-600 read-only:text-neutral-600 read-only:select-none read-only:bg-coolgray-200/50;
-} */
 select {
-    @apply border border-solid border-coolgray-400 rounded p-2 px-4 bg-coolgray-200 text-white disabled:text-neutral-600 read-only:select-none outline-none;
+    @apply select select-sm disabled:opacity-40;
 }
-button {
-    @apply btn btn-xs btn-ghost no-animation normal-case;
+
+button[type="button"] {
+    @apply btn btn-xs btn-ghost no-animation normal-case text-white;
 }
 button[type="submit"] {
-    @apply btn-primary btn-sm;
+    @apply btn btn-xs no-animation normal-case text-white btn-primary;
+}
+button[isWarning] {
+    @apply btn-error text-white;
+}
+button[isHighlighted] {
+    @apply btn-primary text-white;
 }
 h1 {
     @apply text-3xl font-bold pb-4;
@@ -36,10 +47,10 @@ h2 {
     @apply text-2xl font-bold pb-4;
 }
 h3 {
-    @apply text-xl font-bold pb-4;
+    @apply text-xl font-bold py-4;
 }
-a{
-    @apply hover:text-white text-sm;
+a {
+    @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
 }
 
 .box {

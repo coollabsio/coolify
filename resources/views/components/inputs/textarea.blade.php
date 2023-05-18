@@ -8,7 +8,7 @@
     'noDirty' => $attributes->has('noDirty'),
 ])
 
-<div class="w-full max-w-xs form-control">
+<div class=" form-control">
     @if (!$noLabel)
         <label class="label">
             <span class="label-text">
@@ -40,8 +40,7 @@
             </span>
         </label>
     @endif
-    <textarea {{ $attributes }} name={{ $id }}
-        @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif
+    <textarea {{ $attributes }} name={{ $id }} wire:model.defer={{ $value ?? $id }}
         @if (!$noDirty) wire:dirty.class="input-warning" @endif></textarea>
     @error($id)
         <label class="label">

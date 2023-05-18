@@ -1,7 +1,7 @@
 <div x-init="$wire.loadImages">
-    <h2>Revert</h2>
-    <div>
-        <x-inputs.button isBold wire:click='loadImages'>Refresh Images</x-inputs.button>
+    <div class="flex gap-2">
+        <h2>Rollback</h2>
+        <x-inputs.button isHighlighted wire:click='loadImages'>Refresh Images</x-inputs.button>
     </div>
     <div wire:loading wire:target='loadImages'>
         <x-loading />

@@ -8,7 +8,7 @@
                 <option value="{{ $server->id }}">{{ $server->name }}</option>
             @endforeach
         </x-inputs.select>
-        <x-inputs.button isBold type="submit">
+        <x-inputs.button type="submit">
             Submit
         </x-inputs.button>
     </form>
