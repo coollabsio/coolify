@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use Symfony\Component\Mailer\Mailer;
 
 /*
 |--------------------------------------------------------------------------
@@ -14,19 +15,27 @@ use Illuminate\Support\Facades\Artisan;
 |
 */
 
-// Artisan::command('inspire', function () {
+Artisan::command('inspire', function () {
 
-//     $activity = Spatie\Activitylog\Models\Activity::latest()->first();
+    $smtp = [
+        "transport" => "smtp",
+        "host" => "mailpit",
+        "port" => 1025,
+        "encryption" => 'tls',
+        "username" => null,
+        "password" => null,
+        "timeout" => null,
+        "local_domain" => null,
+    ];
+    config()->set('mail.mailers.smtp', $smtp);
 
-//     $this->info(
-//         collect(
-//             json_decode(data_get($activity, 'description'), associative: true, flags: JSON_THROW_ON_ERROR)
-//         )
-//             ->sortBy('order')
-//             ->map(fn($i) => $i['output'])
-//             ->implode("\n")
-//     );
+//    \Illuminate\Support\Facades\Mail::mailer('smtp')
+//        ->to('ask@me.com')
+//        ->send(new \App\Mail\TestMail);
 
+    \Illuminate\Support\Facades\Notification::send(
+        \App\Models\User::find(1),
+        new \App\Notifications\TestMessage
+    );
 
-
-// })->purpose('Display an inspiring quote');
+})->purpose('Display an inspiring quote');
