@@ -2,8 +2,10 @@
     @if ($application->status === 'running')
         <div class="btn-group">
             <x-inputs.button isWarning wire:click='stop'>Stop</x-inputs.button>
-            <div class="border-none dropdown dropdown-hover btn btn-xs bg-coollabs hover:bg-coollabs-100 no-animation">
-                <button tabindex="0" class="flex items-center justify-center h-full">👇</button>
+            <div class="bg-transparent border-none dropdown dropdown-hover btn btn-xs no-animation">
+                <button tabindex="0" class="flex items-center justify-center h-full">
+                    <x-chevron-down />
+                </button>
                 <ul tabindex="0"
                     class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                     <li>
@@ -16,7 +18,9 @@
         <div class="btn-group">
             <x-inputs.button isHighlighted wire:click='start'>Deploy</x-inputs.button>
             <div class="border-none dropdown dropdown-hover btn btn-xs bg-coollabs hover:bg-coollabs-100 no-animation">
-                <button tabindex="0" class="flex items-center justify-center h-full">👇</button>
+                <button tabindex="0" class="flex items-center justify-center h-full">
+                    <x-chevron-down />
+                </button>
                 <ul tabindex="0"
                     class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                     <li>

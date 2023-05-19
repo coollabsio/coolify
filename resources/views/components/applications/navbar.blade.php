@@ -17,11 +17,12 @@
     </a>
     <div class="flex-1"></div>
     <div class="dropdown dropdown-hover">
-        <x-inputs.button>Links👇 </x-inputs.button>
-        <ul tabindex="0"
-            class="p-2 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+        <x-inputs.button>Links
+            <x-chevron-down />
+        </x-inputs.button>
+        <ul tabindex="0" class="p-2 font-bold text-white rounded min-w-max dropdown-content menu bg-coolgray-200">
             <li>
-                <a class="text-xs"target="_blank" href="{{ $application->gitBranchLocation }}">
+                <a class="text-xs" target="_blank" href="{{ $application->gitBranchLocation }}">
                     Open on Git
                     <x-external-link />
                 </a>
@@ -30,7 +31,8 @@
                 @foreach ($application->ports_mappings_array as $port)
                     @if (config('app.env') === 'local')
                         <li>
-                            <a class="text-xs" target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Open
+                            <a class="text-xs " target="_blank"
+                                href="http://localhost:{{ explode(':', $port)[0] }}">Open
                                 {{ explode(':', $port)[0] }}
                                 <x-external-link />
                             </a>

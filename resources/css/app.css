@@ -36,7 +36,7 @@ button[type="submit"] {
     @apply btn btn-xs no-animation normal-case text-white btn-primary;
 }
 button[isWarning] {
-    @apply btn-error text-white;
+    @apply text-error;
 }
 button[isHighlighted] {
     @apply btn-primary text-white;
