@@ -16,12 +16,14 @@ class ApplicationSetting extends Model
     {
         return Attribute::make(
             set: function ($value) {
-                if ($value) {
-                    $this->application->ports_exposes = '80';
-                } else {
-                    $this->application->ports_exposes = '3000';
+                if (is_null($this->application->ports_exposes)) {
+                    if ($value) {
+                        $this->application->ports_exposes = '80';
+                    } else {
+                        $this->application->ports_exposes = '3000';
+                    }
+                    $this->application->save();
                 }
-                $this->application->save();
                 return $value;
             }
         );

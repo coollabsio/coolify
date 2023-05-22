@@ -55,7 +55,7 @@
             <x-inputs.checkbox instantSave id="is_static" label="Static website?" />
             <x-inputs.checkbox helper="Git Webhooks won't deploy your application is you turn it off." instantSave
                 id="is_auto_deploy" label="Auto Deploy?" />
-            <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" />
+            {{-- <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" /> --}}
             <x-inputs.checkbox instantSave id="is_git_submodules_allowed" label="Git Submodules Allowed?" />
             <x-inputs.checkbox instantSave id="is_git_lfs_allowed" label="Git LFS Allowed?" />
             {{-- <x-inputs.checkbox disabled instantSave id="is_dual_cert" label="Dual Certs?" />
