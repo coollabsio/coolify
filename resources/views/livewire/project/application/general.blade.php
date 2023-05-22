@@ -6,6 +6,7 @@
                 Save
             </x-inputs.button>
         </div>
+        <x-inputs.checkbox instantSave id="is_static" label="Static website?" />
         <div class="flex flex-col gap-2 pb-4">
             <div class="flex flex-col gap-2 xl:flex-row">
                 <x-inputs.input class="w-full" id="application.name" label="Name" required />
@@ -49,11 +50,12 @@
                     helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
             </div>
         </div>
+        <h3>Advanced</h3>
         <div class="flex flex-col">
             <x-inputs.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug"
                 label="Debug" />
-            <x-inputs.checkbox instantSave id="is_static" label="Static website?" />
-            <x-inputs.checkbox helper="Git Webhooks won't deploy your application is you turn it off." instantSave
+
+            <x-inputs.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                 id="is_auto_deploy" label="Auto Deploy?" />
             {{-- <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" /> --}}
             <x-inputs.checkbox instantSave id="is_git_submodules_allowed" label="Git Submodules Allowed?" />

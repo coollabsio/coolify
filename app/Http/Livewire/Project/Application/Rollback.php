@@ -2,18 +2,36 @@
 
 namespace App\Http\Livewire\Project\Application;
 
+use App\Jobs\DeployApplicationJob;
+use App\Jobs\RollbackApplicationJob;
 use App\Models\Application;
 use Livewire\Component;
 use Illuminate\Support\Str;
+use Visus\Cuid2\Cuid2;
 
 class Rollback extends Component
 {
     public Application $application;
     public $images = [];
     public string|null $current;
-    public function revertImage($tag)
+    public array $parameters;
+
+    public function mount()
     {
-        dd("Reverting to {$this->application->uuid}:{$tag}");
+        $this->parameters = getParameters();
+    }
+    public function rollbackImage($tag)
+    {
+        $deployment_uuid = new Cuid2(7);
+
+        dispatch(new RollbackApplicationJob(
+            deployment_uuid: $deployment_uuid,
+            application_uuid: $this->application->uuid,
+            commit: $tag,
+        ));
+
+        $this->parameters['deployment_uuid'] = $deployment_uuid;
+        return redirect()->route('project.application.deployment', $this->parameters);
     }
     public function loadImages()
     {
