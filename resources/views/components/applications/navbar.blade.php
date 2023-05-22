@@ -1,5 +1,5 @@
 <nav class="flex gap-4 py-2 border-b-2 border-solid border-coolgray-200">
-    <a
+    <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', [
             'project_uuid' => Route::current()->parameters()['project_uuid'],
             'application_uuid' => Route::current()->parameters()['application_uuid'],
@@ -7,7 +7,7 @@
         ]) }}">
         Configuration
     </a>
-    <a
+    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
         href="{{ route('project.application.deployments', [
             'project_uuid' => Route::current()->parameters()['project_uuid'],
             'application_uuid' => Route::current()->parameters()['application_uuid'],
@@ -16,11 +16,14 @@
         Deployments
     </a>
     <div class="flex-1"></div>
-    <div class="dropdown dropdown-hover">
-        <x-inputs.button>Links
+    <div class="dropdown dropdown-bottom">
+        <button tabindex="0"
+            class="flex items-center justify-center h-full text-white normal-case bg-transparent border-none rounded btn btn-xs no-animation">
+            Links
             <x-chevron-down />
-        </x-inputs.button>
-        <ul tabindex="0" class="p-2 font-bold text-white rounded min-w-max dropdown-content menu bg-coolgray-200">
+        </button>
+        <ul tabindex="0"
+            class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
             <li>
                 <a class="text-xs" target="_blank" href="{{ $application->gitBranchLocation }}">
                     Open on Git
@@ -47,6 +50,7 @@
                 @endforeach
             @endif
         </ul>
+    </div>
     </div>
     <livewire:project.application.deploy :applicationId="$application->id" />
 </nav>

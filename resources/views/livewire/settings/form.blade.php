@@ -1,6 +1,6 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 border-b-2 border-solid border-coolgray-200">
             <h1>Settings</h1>
             <x-inputs.button type="submit">
                 Save

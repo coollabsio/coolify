@@ -25,16 +25,18 @@
 </head>
 
 <body>
-
     @livewireScripts
     @auth
         <x-navbar />
     @endauth
-    <main class="min-h-full px-8 pt-10 mx-auto max-w-7xl">
+    <main>
+        <div class="flex justify-center w-full">
+            <x-magic-bar />
+        </div>
         {{ $slot }}
     </main>
     <a
-        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
+        class="fixed text-xs cursor-pointer right-2 bottom-1 opacity-60 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @auth
         <script>
             window.addEventListener("keydown", function(event) {

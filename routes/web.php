@@ -189,6 +189,9 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
+    Route::get('/servers', fn () => view('servers', [
+        'servers' => Server::validated(),
+    ]))->name('servers');
     Route::get('/server/new', fn () => view('server.new', [
         'private_keys' => PrivateKey::where('team_id', session('currentTeam')->id)->get(),
     ]))->name('server.new');
@@ -236,9 +239,14 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get(
+        '/projects',
+        [ProjectController::class, 'all']
+    )->name('projects');
+
+    Route::get(
         '/project/{project_uuid}',
-        [ProjectController::class, 'environments']
-    )->name('project.environments');
+        [ProjectController::class, 'show']
+    )->name('project.show');
 
     Route::get(
         '/project/{project_uuid}/{environment_name}/new',

@@ -1,5 +1,6 @@
 <x-layout>
-    <h1>Server</h1>
+    <h1 class="border-b-2 border-solid border-coolgray-200">Server <span
+            class="text-xs text-neutral-400">{{ $server->name }}</span></h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
