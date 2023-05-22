@@ -3,8 +3,10 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
+use App\Models\InstanceSettings;
 use Livewire\Component;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 
 class General extends Component
 {
@@ -17,6 +19,9 @@ class General extends Component
     public string $git_branch;
     public string|null $git_commit_sha;
     public string $build_pack;
+    public string|null $wildcard_domain = null;
+    public string|null $project_wildcard_domain = null;
+    public string|null $global_wildcard_domain = null;
 
     public bool $is_static;
     public bool $is_git_submodules_allowed;
@@ -59,6 +64,14 @@ class General extends Component
         $this->application->settings->save();
         $this->application->refresh();
         $this->emit('saved', 'Application settings updated!');
+        $this->checkWildCardDomain();
+    }
+    protected function checkWildCardDomain()
+    {
+        $coolify_instance_settings = InstanceSettings::get();
+        $this->project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
+        $this->global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
+        $this->wildcard_domain = $this->project_wildcard_domain ?? $this->global_wildcard_domain ?? null;
     }
     public function mount()
     {
@@ -71,14 +84,37 @@ class General extends Component
         $this->is_http2 = $this->application->settings->is_http2;
         $this->is_auto_deploy = $this->application->settings->is_auto_deploy;
         $this->is_dual_cert = $this->application->settings->is_dual_cert;
+        $this->checkWildCardDomain();
+    }
+    public function generateGlobalRandomDomain()
+    {
+        // Set wildcard domain based on Global wildcard domain
+        $url = Url::fromString($this->global_wildcard_domain);
+        $host = $url->getHost();
+        $path = $url->getPath() === '/' ? '' : $url->getPath();
+        $scheme = $url->getScheme();
+        $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
+        $this->application->save();
+    }
+    public function generateProjectRandomDomain()
+    {
+        // Set wildcard domain based on Project wildcard domain
+        $url = Url::fromString($this->project_wildcard_domain);
+        $host = $url->getHost();
+        $path = $url->getPath() === '/' ? '' : $url->getPath();
+        $scheme = $url->getScheme();
+        $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
+        $this->application->save();
     }
     public function submit()
     {
         try {
             $this->validate();
+
             $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 return Str::of($domain)->trim()->lower();
             });
+
             $this->application->fqdn = $domains->implode(',');
             $this->application->save();
         } catch (\Exception $e) {

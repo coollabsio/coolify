@@ -21,6 +21,9 @@ input {
 input[type="text"],[type="number"],[type="email"],[type="password"] {
     @apply read-only:opacity-40;
 }
+.label-text, label {
+    @apply text-neutral-400 text-sm;
+}
 
 textarea {
     @apply textarea placeholder:text-neutral-700 text-white;

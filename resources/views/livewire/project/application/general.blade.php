@@ -8,11 +8,25 @@
         </div>
         <x-inputs.checkbox instantSave id="is_static" label="Static website?" />
         <div class="flex flex-col gap-2 pb-4">
-            <div class="flex flex-col gap-2 xl:flex-row">
+            <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-inputs.input class="w-full" id="application.name" label="Name" required />
                 <x-inputs.input placeholder="https://coolify.io" class="w-full" id="application.fqdn" label="Domains"
                     helper="You can specify one domain with path or more with comma.<br><span class='inline-block font-bold text-warning'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
+
             </div>
+            @if ($wildcard_domain)
+                <div class="pb-6">
+                    <div class="text-sm">Set Random Domain</div>
+                    @if ($global_wildcard_domain)
+                        <x-inputs.button isHighlighted wire:click="generateGlobalRandomDomain">Global Wildcard
+                        </x-inputs.button>
+                    @endif
+                    @if ($project_wildcard_domain)
+                        <x-inputs.button isHighlighted wire:click="generateProjectRandomDomain">Project Wildcard
+                        </x-inputs.button>
+                    @endif
+                </div>
+            @endif
             <x-inputs.select id="application.build_pack" label="Build Pack" required>
                 <option value="nixpacks">Nixpacks</option>
                 <option disabled value="docker">Docker</option>
@@ -24,7 +38,7 @@
                     <option disabled value="apache:alpine">apache:alpine</option>
                 </x-inputs.select>
             @endif
-            <div class="flex flex-col gap-2 xl:flex-row">
+            <div class="flex flex-col gap-2 pb-6 xl:flex-row">
                 <x-inputs.input placeholder="pnpm install" id="application.install_command" label="Install Command" />
                 <x-inputs.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
                 <x-inputs.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
@@ -54,7 +68,6 @@
         <div class="flex flex-col">
             <x-inputs.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug"
                 label="Debug" />
-
             <x-inputs.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                 id="is_auto_deploy" label="Auto Deploy?" />
             {{-- <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" /> --}}

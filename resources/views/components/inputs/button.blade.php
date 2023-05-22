@@ -5,7 +5,9 @@
     'confirmAction' => null,
     'tooltip' => null,
 ])
-<div class="tooltip tooltip-warning" @isset($tooltip) data-tip="{{ $tooltip }}" @endisset>
+@isset($tooltip)
+    <div class="tooltip tooltip-warning" data-tip="{{ $tooltip }}">
+    @endisset
     @if ($type === 'submit')
         <button {{ $attributes }} type="submit" @if ($disabled !== null) disabled @endif wire:target="submit"
             wire:loading.delay.shorter.class="loading"
@@ -31,4 +33,6 @@
         </button>
     @endif
 
-</div>
+    @isset($tooltip)
+    </div>
+@endisset

@@ -101,21 +101,10 @@ class DeployApplicationJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            $coolify_instance_settings = InstanceSettings::get();
             if ($this->application->deploymentType() === 'source') {
                 $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
             }
 
-            // Get Wildcard Domain
-            $project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
-            $global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
-            $wildcard_domain = $project_wildcard_domain ?? $global_wildcard_domain ?? null;
-
-            // Set wildcard domain
-            if (!$this->application->fqdn && $wildcard_domain) {
-                $this->application->fqdn = 'http://' . $this->application->uuid . '.' . $wildcard_domain;
-                $this->application->save();
-            }
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
             // Pull builder image
