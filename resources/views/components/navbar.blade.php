@@ -14,19 +14,18 @@
                             Dashboard
                         </a>
                     </li>
-
-                    @if (auth()->user()->isRoot())
+                    @if (auth()->user()->isPartOfRootTeam())
                         <li>
                             <a href="/settings">
                                 Settings
                             </a>
                         </li>
                     @endif
-                    <li>
+                    {{-- <li>
                         <a href="/profile">
                             Profile
                         </a>
-                    </li>
+                    </li> --}}
                     <li>
                         <a href="/profile/team">
                             Team
@@ -37,7 +36,7 @@
                             Command Center
                         </a>
                     </li>
-                    @if (auth()->user()->isRoot())
+                    @if (auth()->user()->isPartOfRootTeam())
                         <li>
                             <livewire:force-upgrade />
                         </li>
@@ -62,18 +61,18 @@
                         Dashboard
                     </a>
                 </li>
-                @if (auth()->user()->isRoot())
+                @if (auth()->user()->isPartOfRootTeam())
                     <li>
                         <a href="/settings">
                             Settings
                         </a>
                     </li>
                 @endif
-                <li>
+                {{-- <li>
                     <a href="/profile">
                         Profile
                     </a>
-                </li>
+                </li> --}}
                 <li>
                     <a href="/profile/team">
                         Team
@@ -84,7 +83,7 @@
                         Command Center
                     </a>
                 </li>
-                @if (auth()->user()->isRoot())
+                @if (auth()->user()->isPartOfRootTeam())
                     <li>
                         <livewire:force-upgrade />
                     </li>

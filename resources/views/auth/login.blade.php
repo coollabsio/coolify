@@ -23,7 +23,7 @@
                     <button>{{ __('auth.register') }}</button>
                 </a>
             @else
-                <div>{{ __('auth.registration_disabled') }}</div>
+                <div class="text-sm text-center">{{ __('auth.registration_disabled') }}</div>
             @endif
         </div>
     </div>

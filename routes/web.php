@@ -133,7 +133,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('team');
 
     Route::get('/settings', function () {
-        $isRoot = auth()->user()->isRoot();
+        $isRoot = auth()->user()->isPartOfRootTeam();
         if ($isRoot) {
             $settings = InstanceSettings::get();
             return view('settings', [

@@ -52,9 +52,15 @@ class User extends Authenticatable
             $model->uuid = (string) new Cuid2(7);
         });
     }
-    public function isRoot()
+    public function isPartOfRootTeam()
     {
-        return $this->id == 0;
+        $found_root_team = auth()->user()->teams->filter(function ($team) {
+            if ($team->id == 0) {
+                return true;
+            }
+            return false;
+        });
+        return $found_root_team->count() > 0;
     }
     public function teams()
     {

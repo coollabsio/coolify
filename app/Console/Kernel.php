@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\AutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\DockerCleanupDanglingImagesJob;
 use App\Jobs\ProxyCheckJob;
@@ -15,9 +16,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        $schedule->job(new ContainerStatusJob)->everyMinute();
-        $schedule->job(new DockerCleanupDanglingImagesJob)->everyMinute();
-        // $schedule->job(new ProxyCheckJob)->everyMinute();
+        $schedule->job(new DockerCleanupDanglingImagesJob)->everyFiveMinutes();
+        $schedule->job(new AutoUpdateJob)->everyFifteenMinutes();
+        $schedule->job(new ProxyCheckJob)->everyMinute();
     }
 
     /**
