@@ -33,10 +33,10 @@ select {
 }
 
 button[type="button"] {
-    @apply btn btn-xs btn-ghost no-animation normal-case text-white rounded;
+    @apply btn btn-xs bg-coolgray-200 no-animation normal-case text-white rounded-none;
 }
 button[type="submit"] {
-    @apply btn btn-xs no-animation normal-case text-white btn-primary rounded;
+    @apply btn btn-xs no-animation normal-case text-white btn-primary rounded-none;
 }
 button[isWarning] {
     @apply text-error;
@@ -58,7 +58,7 @@ a {
 }
 
 main {
-    @apply h-full w-full min-h-screen px-32 xl:px-10 pt-4 mx-auto max-w-7xl;
+    @apply h-full w-full pb-10 px-32 xl:px-14 pt-8 mx-auto max-w-screen-xl;
 }
 .main-navbar {
     @apply fixed top-0 left-0 min-h-screen overflow-hidden;
@@ -70,7 +70,7 @@ main {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center text-sm rounded cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+    @apply flex items-center justify-center text-sm rounded-none cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
 }
 
 .main-menu {
@@ -84,7 +84,7 @@ main {
     @apply min-w-fit px-2 rounded text-center border border-dotted border-primary text-white text-xs;
 }
 .magic-input {
-    @apply input input-sm w-96 placeholder:text-neutral-700 text-sm rounded-none;
+    @apply input input-sm w-80 xl:w-96 placeholder:text-neutral-700 text-sm rounded-none;
 }
 .magic-items {
     @apply absolute top-12 mt-2 w-[24rem] bg-coolgray-200 rounded  z-50;

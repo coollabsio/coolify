@@ -1,4 +1,4 @@
-<form wire:submit.prevent='submit' class="flex flex-col px-2 max-w-fit">
+<form wire:submit.prevent='submit' class="flex flex-col max-w-fit">
     <div class="flex gap-2">
         <x-inputs.input placeholder="NODE_ENV" noDirty id="key" label="Name" required />
         <x-inputs.input placeholder="production" noDirty id="value" label="Value" required />

@@ -59,21 +59,20 @@
                     </a>
                 </li>
             @endif
-
         </ul>
-
     </nav>
     <div class="absolute top-0 right-0 pt-2">
         <div class="dropdown dropdown-left">
             <label tabindex="0" class="btn btn-ghost no-animation hover:bg-transparent">
                 <div class="flex items-center justify-center gap-2 avatar placeholder">
-                    <div class="w-8 rounded-full bg-coolgray-300 text-neutral-content">
+                    <div class="w-10 border border-dotted rounded-full border-neutral-600 text-warning">
                         <span class="text-xs">{{ Str::of(auth()->user()->name)->substr(0, 2)->upper() }}</span>
                     </div>
                     <x-chevron-down />
                 </div>
             </label>
-            <ul tabindex="0" class="p-2 mt-3 shadow menu menu-compact dropdown-content bg-base-100 rounded-box w-52">
+            <ul tabindex="0"
+                class="p-2 mt-3 text-white rounded shadow menu menu-compact dropdown-content bg-coolgray-200 w-52">
                 <li>
                     <a href="/profile">
                         Profile
@@ -98,102 +97,4 @@
             </ul>
         </div>
     </div>
-    {{-- <div class="navbar">
-        <div class="navbar-start">
-            <div class="dropdown">
-                <label tabindex="0" class="btn btn-ghost xl:hidden">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24"
-                        stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" />
-                    </svg>
-                </label>
-                <ul tabindex="0" class="p-2 mt-3 shadow menu menu-compact dropdown-content bg-base-100 rounded-box w-52">
-                    <li>
-                        <a href="/">
-                            Dashboard
-                        </a>
-                    </li>
-                    @if (auth()->user()->isPartOfRootTeam())
-                        <li>
-                            <a href="/settings">
-                                Settings
-                            </a>
-                        </li>
-                    @endif
-                    <li>
-                        <a href="/profile">
-                            Profile
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/profile/team">
-                            Team
-                        </a>
-                    </li>
-                    <li>
-                        <a href="/command-center">
-                            Command Center
-                        </a>
-                    </li>
-                    @if (auth()->user()->isPartOfRootTeam())
-                        <li>
-                            <livewire:force-upgrade />
-                        </li>
-                    @endif
-                    <li>
-                        <form action="/logout" method="POST">
-                            @csrf
-                            <button>Logout</button>
-                        </form>
-                    </li>
-                </ul>
-            </div>
-            <div class="px-2 text-xl font-bold text-white normal-case">Coolify</div>
-            <div class="form-control">
-                <x-magic-bar />
-            </div>
-        </div>
-        <div class="hidden navbar-end xl:flex">
-            <ul class="px-1 menu menu-horizontal text-neutral-400">
-                <li>
-                    <a href="/">
-                        Dashboard
-                    </a>
-                </li>
-                @if (auth()->user()->isPartOfRootTeam())
-                    <li>
-                        <a href="/settings">
-                            Settings
-                        </a>
-                    </li>
-                @endif
-                <li>
-                    <a href="/profile">
-                        Profile
-                    </a>
-                </li>
-                <li>
-                    <a href="/profile/team">
-                        Team
-                    </a>
-                </li>
-                <li>
-                    <a href="/command-center">
-                        Command Center
-                    </a>
-                </li>
-                @if (auth()->user()->isPartOfRootTeam())
-                    <li>
-                        <livewire:force-upgrade />
-                    </li>
-                @endif
-                <li>
-                    <form action="/logout" method="POST" class="hover:bg-transparent">
-                        @csrf
-                        <button class="text-sm link link-hover hover:text-white">Logout</button>
-                    </form>
-                </li>
-            </ul>
-        </div>
-    </div> --}}
 @endauth

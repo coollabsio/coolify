@@ -1,5 +1,5 @@
 <div x-data="{ deleteEnvironment: false }">
-    <form wire:submit.prevent='submit' class="flex flex-col px-2 max-w-fit">
+    <form wire:submit.prevent='submit' class="flex flex-col max-w-fit">
         <div class="flex gap-2">
             <x-inputs.input label="Name" id="env.key" />
             <x-inputs.input label="Value" id="env.value" />

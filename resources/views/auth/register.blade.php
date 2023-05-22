@@ -14,7 +14,7 @@
                 <x-inputs.button type="submit">{{ __('auth.register') }}</x-inputs.button>
             </form>
             @if ($errors->any())
-                <div class="alert alert-danger">
+                <div class="fixed top-0 alert alert-error">
                     <ul>
                         <li>{{ __('auth.failed') }}</li>
                     </ul>

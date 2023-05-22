@@ -72,9 +72,4 @@ class Deploy extends Component
             $this->application->save();
         }
     }
-
-    public function pollingStatus()
-    {
-        $this->application->refresh();
-    }
 }

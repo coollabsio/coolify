@@ -1,7 +1,8 @@
 <x-layout>
-    <div>
-        <h3>Current Team</h3>
-        <p>{{ session('currentTeam')->name }}</p>
-        <livewire:switch-team>
+    <h1>Teams</h1>
+    <div class="flex gap-2">
+        <div>Currently Active Team:</div>
+        <div class='text-white'>{{ session('currentTeam')->name }}</div>
     </div>
+    <livewire:switch-team>
 </x-layout>

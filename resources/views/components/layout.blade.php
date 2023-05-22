@@ -29,10 +29,10 @@
     @auth
         <x-navbar />
     @endauth
+    <div class="flex justify-center w-full pt-4">
+        <x-magic-bar />
+    </div>
     <main>
-        <div class="flex justify-center w-full">
-            <x-magic-bar />
-        </div>
         {{ $slot }}
     </main>
     <a

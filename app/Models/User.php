@@ -74,15 +74,14 @@ class User extends Authenticatable
 
     public function otherTeams()
     {
-        $team_id = data_get(session('currentTeam'), 'id');
-
+        $team_id = session('currentTeam')->id;
         return auth()->user()->teams->filter(function ($team) use ($team_id) {
             return $team->id != $team_id;
         });
     }
     public function resources()
     {
-        $team_id = data_get(session('currentTeam'), 'id');
+        $team_id = session('currentTeam')->id;
         $data = Application::where('team_id', $team_id)->get();
         return $data;
     }

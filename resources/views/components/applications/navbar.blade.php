@@ -5,7 +5,7 @@
             'application_uuid' => Route::current()->parameters()['application_uuid'],
             'environment_name' => Route::current()->parameters()['environment_name'],
         ]) }}">
-        Configuration
+        <button>Configuration</button>
     </a>
     <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
         href="{{ route('project.application.deployments', [
@@ -13,9 +13,10 @@
             'application_uuid' => Route::current()->parameters()['application_uuid'],
             'environment_name' => Route::current()->parameters()['environment_name'],
         ]) }}">
-        Deployments
+        <button>Deployments</button>
     </a>
     <div class="flex-1"></div>
+
     <div class="dropdown dropdown-bottom">
         <button tabindex="0"
             class="flex items-center justify-center h-full text-white normal-case bg-transparent border-none rounded btn btn-xs no-animation">
@@ -53,4 +54,5 @@
     </div>
     </div>
     <livewire:project.application.deploy :applicationId="$application->id" />
+    <livewire:project.application.status :application="$application" />
 </nav>

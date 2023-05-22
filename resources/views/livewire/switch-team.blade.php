@@ -1,6 +1,6 @@
 <div class="pt-4">
+    <h3>Switch Team</h3>
     @if (auth()->user()->otherTeams()->count() > 0)
-        <p>Switch to:</p>
         <div class="flex gap-2">
             @foreach (auth()->user()->otherTeams() as $team)
                 <x-inputs.button isHighlighted wire:key="{{ $team->id }}"
@@ -9,5 +9,4 @@
             @endforeach
         </div>
     @endif
-
 </div>

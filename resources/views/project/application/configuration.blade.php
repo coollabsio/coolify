@@ -1,6 +1,17 @@
 <x-layout>
+    <h1 class="pb-0">Configuration</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li><a
+                    href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('project_uuid') }}</a>
+            </li>
+            <li><a
+                    href="{{ route('project.resources', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+            </li>
+            <li>{{ data_get($application, 'name') }}</li>
+        </ul>
+    </div>
     <x-applications.navbar :application="$application" />
-    <h1 class="py-10">Configuration</h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"

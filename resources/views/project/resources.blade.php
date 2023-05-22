@@ -1,7 +1,18 @@
 <x-layout>
-    <div class="flex items-center gap-2">
-        <h1>Resources</h1>
-        <livewire:project.delete :project_id="$project->id" :resource_count="$project->applications->count()" />
+    <div class="flex flex-col">
+        <div class="flex items-center gap-2">
+            <h1 class="pb-0">Resources</h1>
+            <livewire:project.delete :project_id="$project->id" :resource_count="$project->applications->count()" />
+        </div>
+        <div class="pb-10 text-sm breadcrumbs">
+            <ul>
+                <li><a
+                        href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('project_uuid') }}</a>
+                </li>
+                <li>
+                    {{ request()->route('environment_name') }} </li>
+            </ul>
+        </div>
     </div>
     @if ($environment->applications->count() === 0)
         <p>No resources yet.</p>
