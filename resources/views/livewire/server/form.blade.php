@@ -1,13 +1,19 @@
 <div x-data="{ deleteServer: false }">
-    <h2>General</h2>
     <x-naked-modal show="deleteServer" message='Are you sure you would like to delete this server?' />
     <form wire:submit.prevent='submit' class="flex flex-col">
+        <div class="flex gap-2">
+            <h2>General</h2>
+            <x-inputs.button type="submit">Save</x-inputs.button>
+            <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
+                Delete
+            </x-inputs.button>
+        </div>
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
                 <x-inputs.input id="server.name" label="Name" required />
                 <x-inputs.input id="server.description" label="Description" />
-                <x-inputs.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
-                    label="Is it part of a Swarm cluster?" />
+                {{-- <x-inputs.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
+                    label="Is it part of a Swarm cluster?" /> --}}
             </div>
             <div class="flex flex-col w-96">
                 @if ($server->id === 0)
@@ -23,9 +29,7 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <x-inputs.button type="submit">Save</x-inputs.button>
-
-            <x-inputs.button wire:click.prevent='validateServer'>
+            <x-inputs.button isHighlighted wire:click.prevent='validateServer'>
                 @if ($server->settings->is_validated)
                     Check Connection
                 @else
@@ -34,9 +38,7 @@
             </x-inputs.button>
 
             {{-- <x-inputs.button  wire:click.prevent='installDocker'>Install Docker</x-inputs.button> --}}
-            <x-inputs.button x-on:click.prevent="deleteServer = true">
-                Delete
-            </x-inputs.button>
+
         </div>
         <div class="pt-3">
             @isset($uptime)

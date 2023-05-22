@@ -8,21 +8,22 @@
         </div>
 
         @if ($server->extra_attributes->proxy_type)
+            <h3>Actions</h3>
             <div wire:poll="proxyStatus">
                 @if (
                     $server->extra_attributes->last_applied_proxy_settings &&
                         $server->extra_attributes->last_saved_proxy_settings !== $server->extra_attributes->last_applied_proxy_settings)
                     <div class="text-red-500">Configuration out of sync.</div>
-                    <x-inputs.button wire:click="installProxy">
+                    <x-inputs.button isHighlighted wire:click="installProxy">
                         Reconfigure
                     </x-inputs.button>
                 @endif
                 @if ($server->extra_attributes->proxy_status !== 'running')
-                    <x-inputs.button wire:click="installProxy">
+                    <x-inputs.button isHighlighted wire:click="installProxy">
                         Start
                     </x-inputs.button>
                 @else
-                    <x-inputs.button x-on:click.prevent="stopProxy = true">Stop
+                    <x-inputs.button isWarning x-on:click.prevent="stopProxy = true">Stop
                     </x-inputs.button>
                 @endif
                 <div class="py-4">
@@ -33,10 +34,10 @@
                         <x-loading />
                     </div>
                     @isset($proxy_settings)
-                        <h3>Configuration</h3>
                         @if ($selectedProxy->value === 'TRAEFIK_V2')
                             <form wire:submit.prevent='saveConfiguration'>
-                                <div class="py-2 pb-8">
+                                <div class="flex items-center gap-2">
+                                    <h3>Configuration</h3>
                                     <x-inputs.button type="submit">Save</x-inputs.button>
                                     <x-inputs.button wire:click.prevent="resetProxy">
                                         Reset Configuration
@@ -61,5 +62,4 @@
     @else
         <p>Server is not validated. Validate first.</p>
     @endif
-
 </div>
