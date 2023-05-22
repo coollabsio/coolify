@@ -6,7 +6,6 @@ use App\Enums\ActivityTypes;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -15,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class AutoUpdateJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ShouldBeUnique;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     /**
      * Create a new job instance.
@@ -24,8 +23,6 @@ class AutoUpdateJob implements ShouldQueue
     {
         $instance_settings = InstanceSettings::get();
         if (!$instance_settings->is_auto_update_enabled) {
-            Log::info('Auto update is disabled');
-            dd('Auto update is disabled');
             $this->delete();
         }
     }
@@ -39,11 +36,9 @@ class AutoUpdateJob implements ShouldQueue
             $latest_version = getLatestVersionOfCoolify();
             $current_version = config('version');
             if ($latest_version === $current_version) {
-                dd('no update, versions match', $latest_version, $current_version);
                 return;
             }
             if (version_compare($latest_version, $current_version, '<')) {
-                dd('no update, latest version is lower than current version');
                 return;
             }
 
@@ -57,7 +52,6 @@ class AutoUpdateJob implements ShouldQueue
             remoteProcess([
                 "sleep 10"
             ], $server, ActivityTypes::INLINE->value);
-            dd('update done');
         } else {
             $latest_version = getLatestVersionOfCoolify();
             $current_version = config('version');

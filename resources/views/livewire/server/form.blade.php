@@ -4,9 +4,11 @@
         <div class="flex gap-2">
             <h2>General</h2>
             <x-inputs.button type="submit">Save</x-inputs.button>
-            <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
-                Delete
-            </x-inputs.button>
+            @if ($server_id !== 0)
+                <x-inputs.button isWarning x-on:click.prevent="deleteServer = true">
+                    Delete
+                </x-inputs.button>
+            @endif
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">

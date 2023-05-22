@@ -11,7 +11,6 @@ use Spatie\Url\Url;
 
 class InstallProxy
 {
-
     public function __invoke(Server $server): Activity
     {
         $proxy_path = config('coolify.proxy_config_path');

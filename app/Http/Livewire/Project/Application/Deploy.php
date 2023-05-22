@@ -64,15 +64,6 @@ class Deploy extends Component
         return $this->redirectToDeployment();
     }
 
-    public function delete()
-    {
-        $this->stop();
-        Application::find($this->applicationId)->delete();
-        return redirect()->route('project.resources', [
-            'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name']
-        ]);
-    }
     public function stop()
     {
         instantRemoteProcess(["docker rm -f {$this->application->uuid}"], $this->destination->server);
