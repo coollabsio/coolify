@@ -8,6 +8,12 @@ You are checking the next-gen of Coolify here, aka v4. Hi 👋
 
 Thinks will be added here incrementally through PR's.
 
+# Installation
+
+```bash
+curl https://coolify-cdn.b-cdn.net/files/install.sh | bash
+```
+
 ## Support
 
 -   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)

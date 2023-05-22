@@ -1,4 +1,5 @@
 <div>
+    <h1>Command Center</h1>
     <form class="flex items-end justify-center gap-2" wire:submit.prevent='runCommand'>
         <x-inputs.input placeholder="ls -l" autofocus noDirty noLabel id="command" label="Command" required />
         <select wire:model.defer="server">
