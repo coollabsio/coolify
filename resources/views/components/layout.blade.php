@@ -29,7 +29,7 @@
     @auth
         <x-navbar />
     @endauth
-    <div class="flex justify-center w-full pt-4">
+    <div class="flex justify-center w-full pt-4 min-h-12">
         <x-magic-bar />
     </div>
     <main>
