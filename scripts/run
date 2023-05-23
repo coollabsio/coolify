@@ -25,6 +25,9 @@ function sync-bunny {
 function queue {
     bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
 }
+function horizon {
+    bash vendor/bin/spin exec -u webuser coolify php artisan horizon -vvv  
+}
 function schedule {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
 }

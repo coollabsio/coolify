@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 class DockerCleanupDanglingImagesJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
-
+    public $timeout = 500;
     /**
      * Create a new job instance.
      */

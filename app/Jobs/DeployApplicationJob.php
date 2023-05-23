@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
+use App\Enums\ProcessStatus;
 use App\Models\Application;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,12 +19,13 @@ use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Throwable;
 
 class DeployApplicationJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    protected $application;
+    protected Application $application;
     protected $destination;
     protected $source;
     protected Activity $activity;
@@ -34,15 +36,13 @@ class DeployApplicationJob implements ShouldQueue
     protected $env_args;
     public static int $batch_counter = 0;
     public $timeout = 3600;
+    public $tries = 60;
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping($this->application_uuid)];
+        return [(new WithoutOverlapping($this->application->uuid))->releaseAfter(10)];
     }
-    public function uniqueId(): string
-    {
-        return $this->application_uuid;
-    }
+
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,
@@ -223,10 +223,26 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                 Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
             }
             $this->executeNow(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
-            dispatch(new ContainerStatusJob($this->application_uuid));
+            // dispatch(new ContainerStatusJob($this->application_uuid));
         }
     }
-
+    public function failed(Throwable $exception): void
+    {
+        $outputStack[] = [
+            'type' => 'out',
+            'output' => $exception->getMessage(),
+            'timestamp' => hrtime(true),
+            'batch' => DeployApplicationJob::$batch_counter,
+            'order' => 0,
+        ];
+        $this->activity->description = json_encode($outputStack);
+        $this->activity->properties = $this->activity->properties->merge([
+            'exitCode' => 0,
+            'status' =>  ProcessStatus::ERROR->value,
+        ]);
+        $this->activity->save();
+        $this->fail($exception);
+    }
     private function execute_in_builder(string $command)
     {
         return "docker exec {$this->deployment_uuid} bash -c '{$command}'";

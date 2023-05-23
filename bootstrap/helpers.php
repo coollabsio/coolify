@@ -115,7 +115,7 @@ if (!function_exists('generateSshCommand')) {
             . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
             . '-o PasswordAuthentication=no '
             . '-o ConnectTimeout=3600 '
-            . '-o ServerAliveInterval=60 '
+            . '-o ServerAliveInterval=20 '
             . '-o RequestTTY=no '
             . '-o LogLevel=ERROR '
             . "-p {$port} "

@@ -27,7 +27,7 @@ class Deploy extends Component
         $this->parameters = getParameters();
         $this->application = Application::where('id', $this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
-        dispatch(new ContainerStatusJob($this->application->uuid));
+        // dispatch(new ContainerStatusJob($this->application->uuid));
     }
     protected function setDeploymentUuid()
     {
