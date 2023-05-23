@@ -31,7 +31,9 @@ textarea {
 select {
     @apply select select-sm disabled:opacity-40 font-normal placeholder:text-neutral-700 text-white rounded-none;
 }
-
+.breadcrumbs > ul > li::before {
+    @apply text-warning opacity-100;
+}
 button[type="button"] {
     @apply btn btn-xs bg-coolgray-200 no-animation normal-case text-white rounded-none;
 }

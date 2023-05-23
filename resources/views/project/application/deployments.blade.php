@@ -12,7 +12,7 @@
         </ul>
     </div>
     <x-applications.navbar :application="$application" />
-    <div class="pt-2">
+    <div class="flex flex-col gap-2 pt-2">
         @forelse ($deployments as $deployment)
             <livewire:project.application.get-deployments :deployment_uuid="data_get($deployment->properties, 'type_uuid')" :created_at="data_get($deployment, 'created_at')" :status="data_get($deployment->properties, 'status')" />
         @empty

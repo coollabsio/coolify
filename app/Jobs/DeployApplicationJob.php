@@ -6,19 +6,18 @@ use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
 use App\Models\Application;
-use App\Models\InstanceSettings;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 
 class DeployApplicationJob implements ShouldQueue
 {
@@ -35,9 +34,15 @@ class DeployApplicationJob implements ShouldQueue
     protected $env_args;
     public static int $batch_counter = 0;
     public $timeout = 3600;
-    /**
-     * Create a new job instance.
-     */
+
+    public function middleware(): array
+    {
+        return [new WithoutOverlapping($this->application_uuid)];
+    }
+    public function uniqueId(): string
+    {
+        return $this->application_uuid;
+    }
     public function __construct(
         public string $deployment_uuid,
         public string $application_uuid,

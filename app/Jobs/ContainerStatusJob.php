@@ -5,19 +5,24 @@ namespace App\Jobs;
 use App\Models\Application;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class ContainerStatusJob implements ShouldQueue
+class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public function __construct(
         public string|null $container_id = null,
     ) {
+    }
+    public function uniqueId(): string
+    {
+        return $this->container_id;
     }
     public function handle(): void
     {

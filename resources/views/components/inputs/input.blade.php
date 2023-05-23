@@ -31,7 +31,7 @@
                             </svg>
                         </label>
                         <div tabindex="0"
-                            class="border rounded shadow border-warning/30 card compact dropdown-content bg-coolgray-200 w-96">
+                            class="border rounded shadow border-coolgray-400 card compact dropdown-content bg-coolgray-200 w-96">
                             <div class="card-body">
                                 {!! $helper !!}
                             </div>

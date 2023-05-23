@@ -10,7 +10,7 @@
                 </x-inputs.button>
                 <x-inputs.button x-on:click.prevent="stopProxy = true">Stop
                 </x-inputs.button>
-                <div wire:poll="proxyStatus">
+                <div wire:poll.5000ms="proxyStatus">
                     @if (
                         $server->extra_attributes->last_applied_proxy_settings &&
                             $server->extra_attributes->last_saved_proxy_settings !== $server->extra_attributes->last_applied_proxy_settings)

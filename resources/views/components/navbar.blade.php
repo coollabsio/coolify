@@ -65,7 +65,7 @@
         <div class="dropdown dropdown-left">
             <label tabindex="0" class="btn btn-ghost no-animation hover:bg-transparent">
                 <div class="flex items-center justify-center gap-2 avatar placeholder">
-                    <div class="w-10 border border-dotted rounded-full border-neutral-600 text-warning">
+                    <div class="w-10 border rounded-full border-neutral-600 text-warning">
                         <span class="text-xs">{{ Str::of(auth()->user()->name)->substr(0, 2)->upper() }}</span>
                     </div>
                     <x-chevron-down />

@@ -6,18 +6,21 @@
         </div>
         <div class="pb-10 text-sm breadcrumbs">
             <ul>
-                <li><a
-                        href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('project_uuid') }}</a>
+                <li>
+                    <a href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                        {{ $project->name }}
+                    </a>
                 </li>
                 <li>
-                    {{ request()->route('environment_name') }} </li>
+                    {{ request()->route('environment_name') }}
+                </li>
             </ul>
         </div>
     </div>
     @if ($environment->applications->count() === 0)
         <p>No resources yet.</p>
     @endif
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2">
         @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
