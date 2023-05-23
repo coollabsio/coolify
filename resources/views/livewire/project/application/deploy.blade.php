@@ -9,10 +9,13 @@
             <ul tabindex="0"
                 class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
-                    <div wire:click='stop'>Stop</div>
+                    <div wire:click='start'>Restart</div>
                 </li>
                 <li>
                     <div wire:click='forceRebuild'>Force deploy without cache</div>
+                </li>
+                <li>
+                    <div class="hover:bg-red-500" wire:click='stop'>Stop</div>
                 </li>
             </ul>
         </div>

@@ -26,7 +26,6 @@ return new class extends Migration
             $table->boolean('is_auto_update_enabled')->default(true);
             // $table->boolean('is_dns_check_enabled')->default(true);
             $table->boolean('is_registration_enabled')->default(true);
-            $table->boolean('is_https_forced')->default(true);
             $table->timestamps();
         });
     }

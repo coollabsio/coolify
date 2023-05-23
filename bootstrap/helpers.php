@@ -260,7 +260,7 @@ if (!function_exists('checkContainerStatus')) {
 if (!function_exists('getProxyConfiguration')) {
     function getProxyConfiguration(Server $server)
     {
-        $proxy_config_path = config('coolify.proxy_config_path');
+        $proxy_path = config('coolify.proxy_config_path');
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
@@ -273,18 +273,18 @@ if (!function_exists('getProxyConfiguration')) {
                 "external" => true,
             ];
         });
-        return Yaml::dump([
+        $config = [
             "version" => "3.8",
             "networks" => $array_of_networks->toArray(),
             "services" => [
                 "traefik" => [
-                    "container_name" => "coolify-proxy", # Do not modify this! You will break everything!
+                    "container_name" => "coolify-proxy",
                     "image" => "traefik:v2.10",
                     "restart" => "always",
                     "extra_hosts" => [
                         "host.docker.internal:host-gateway",
                     ],
-                    "networks" => $networks->toArray(), # Do not modify this! You will break everything!
+                    "networks" => $networks->toArray(),
                     "ports" => [
                         "80:80",
                         "443:443",
@@ -292,8 +292,7 @@ if (!function_exists('getProxyConfiguration')) {
                     ],
                     "volumes" => [
                         "/var/run/docker.sock:/var/run/docker.sock:ro",
-                        "{$proxy_config_path}/letsencrypt:/letsencrypt", # Do not modify this! You will break everything!
-                        "{$proxy_config_path}/traefik.auth:/auth/traefik.auth", # Do not modify this! You will break everything!
+                        "{$proxy_path}:/traefik",
                     ],
                     "command" => [
                         "--api.dashboard=true",
@@ -302,17 +301,28 @@ if (!function_exists('getProxyConfiguration')) {
                         "--entrypoints.https.address=:443",
                         "--providers.docker=true",
                         "--providers.docker.exposedbydefault=false",
+                        "--providers.file.directory=/traefik/dynamic-conf/",
+                        "--providers.file.watch=true",
+                        "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
+                        "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
+                        "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http",
                     ],
                     "labels" => [
-                        "traefik.enable=true", # Do not modify this! You will break everything!
+                        "traefik.enable=true",
                         "traefik.http.routers.traefik.entrypoints=http",
                         'traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)',
+                        "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
                         "traefik.http.routers.traefik.service=api@internal",
                         "traefik.http.services.traefik.loadbalancer.server.port=8080",
                         "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
+                        "traefik.http.middlewares.gzip.compress=true",
                     ],
                 ],
             ],
-        ], 4, 2);
+        ];
+        if (config('app.env') === 'local') {
+            $config['services']['traefik']['command'][] = "--log.level=debug";
+        }
+        return Yaml::dump($config, 4, 2);
     }
 }

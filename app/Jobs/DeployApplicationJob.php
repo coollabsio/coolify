@@ -48,7 +48,6 @@ class DeployApplicationJob implements ShouldQueue
         public string $application_uuid,
         public bool $force_rebuild = false,
     ) {
-
         $this->application = Application::query()
             ->where('uuid', $this->application_uuid)
             ->firstOrFail();
@@ -388,14 +387,34 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                 $url = Url::fromString($domain);
                 $host = $url->getHost();
                 $path = $url->getPath();
-                $slug = Str::slug($url);
-                $label_id = "{$this->application->uuid}-{$slug}";
-                if ($path === '/') {
-                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                } else {
-                    $labels[] = "traefik.http.routers.{$label_id}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                    $labels[] =  "traefik.http.routers.{$label_id}.middlewares={$label_id}-stripprefix";
-                    $labels[] =  "traefik.http.middlewares.{$label_id}-stripprefix.stripprefix.prefixes={$path}";
+                $schema = $url->getScheme();
+                $slug = Str::slug($host . $path);
+
+                $http_label = "{$this->application->uuid}-{$slug}-http";
+                $https_label = "{$this->application->uuid}-{$slug}-https";
+
+                // Set labels for http
+                $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
+                if ($path !== '/') {
+                    $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
+                    $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
+                }
+
+                // Set labels for https
+                if ($schema === 'https') {
+                    $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                    $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
+                    if ($path !== '/') {
+                        $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
+                        $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
+                    }
+
+                    $labels[] = "traefik.http.routers.{$https_label}.tls=true";
+                    $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
+                    if ($this->application->settings->is_force_https) {
+                        $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
+                    }
                 }
             }
         }

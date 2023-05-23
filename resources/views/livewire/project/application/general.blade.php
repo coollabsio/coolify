@@ -68,6 +68,9 @@
         <div class="flex flex-col">
             <x-inputs.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug"
                 label="Debug" />
+            <x-inputs.checkbox
+                helper="Your application will be available only on https if your domain starts with https://..."
+                instantSave id="is_force_https" label="Force Https" />
             <x-inputs.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                 id="is_auto_deploy" label="Auto Deploy?" />
             {{-- <x-inputs.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" /> --}}

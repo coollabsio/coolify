@@ -28,10 +28,8 @@ class General extends Component
     public bool $is_git_lfs_allowed;
     public bool $is_debug;
     public bool $is_previews;
-    public bool $is_custom_ssl;
-    public bool $is_http2;
     public bool $is_auto_deploy;
-    public bool $is_dual_cert;
+    public bool $is_force_https;
 
     protected $rules = [
         'application.name' => 'required|min:6',
@@ -57,10 +55,8 @@ class General extends Component
         $this->application->settings->is_git_lfs_allowed = $this->is_git_lfs_allowed;
         $this->application->settings->is_debug = $this->is_debug;
         $this->application->settings->is_previews = $this->is_previews;
-        $this->application->settings->is_custom_ssl = $this->is_custom_ssl;
-        $this->application->settings->is_http2 = $this->is_http2;
         $this->application->settings->is_auto_deploy = $this->is_auto_deploy;
-        $this->application->settings->is_dual_cert = $this->is_dual_cert;
+        $this->application->settings->is_force_https = $this->is_force_https;
         $this->application->settings->save();
         $this->application->refresh();
         $this->emit('saved', 'Application settings updated!');
@@ -80,10 +76,8 @@ class General extends Component
         $this->is_git_lfs_allowed = $this->application->settings->is_git_lfs_allowed;
         $this->is_debug = $this->application->settings->is_debug;
         $this->is_previews = $this->application->settings->is_previews;
-        $this->is_custom_ssl = $this->application->settings->is_custom_ssl;
-        $this->is_http2 = $this->application->settings->is_http2;
         $this->is_auto_deploy = $this->application->settings->is_auto_deploy;
-        $this->is_dual_cert = $this->application->settings->is_dual_cert;
+        $this->is_force_https = $this->application->settings->is_force_https;
         $this->checkWildCardDomain();
     }
     public function generateGlobalRandomDomain()

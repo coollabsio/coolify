@@ -17,11 +17,12 @@ return new class extends Migration
             $table->boolean('is_git_submodules_allowed')->default(true);
             $table->boolean('is_git_lfs_allowed')->default(true);
             $table->boolean('is_auto_deploy')->default(true);
-            $table->boolean('is_dual_cert')->default(false);
+            $table->boolean('is_force_https')->default(true);
+            // $table->boolean('is_dual_cert')->default(false);
             $table->boolean('is_debug')->default(false);
             $table->boolean('is_previews')->default(false);
-            $table->boolean('is_custom_ssl')->default(false);
-            $table->boolean('is_http2')->default(false);
+            // $table->boolean('is_custom_ssl')->default(false);
+            // $table->boolean('is_http2')->default(false);
             $table->foreignId('application_id');
             $table->timestamps();
         });
