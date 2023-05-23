@@ -40,7 +40,7 @@ class EmailNotifications extends Component
     }
     public function sentTestMessage()
     {
-        Notification::send(auth()->user(), new TestMessage);
+
     }
     public function render()
     {

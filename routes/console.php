@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Foundation\Inspiring;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Artisan;
 use Symfony\Component\Mailer\Mailer;
 
@@ -29,13 +30,15 @@ Artisan::command('inspire', function () {
     ];
     config()->set('mail.mailers.smtp', $smtp);
 
-//    \Illuminate\Support\Facades\Mail::mailer('smtp')
-//        ->to('ask@me.com')
-//        ->send(new \App\Mail\TestMail);
+    // For testing custom SMTP Mailer
+    \Illuminate\Support\Facades\Mail::mailer('smtp')
+        ->to('ask@me.com')
+        ->send(new \App\Mail\ExampleMail);
 
-    \Illuminate\Support\Facades\Notification::send(
-        \App\Models\User::find(1),
-        new \App\Notifications\TestMessage
-    );
+    // For sending a notification
+//    \Illuminate\Support\Facades\Notification::send(
+//        \App\Models\User::find(1),
+//        new \App\Notifications\TestMessage
+//    );
 
 })->purpose('Display an inspiring quote');

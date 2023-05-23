@@ -29,7 +29,7 @@ class DiscordNotifications extends Component
     }
     public function sentTestMessage()
     {
-        // @TODO figure out how to do it in runtime
+        Notification::send(auth()->user(), new TestMessage);
     }
     public function render()
     {

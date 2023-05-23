@@ -35,6 +35,24 @@ class TestMessage extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
+        $smtp = [
+            "transport" => "smtp",
+            "host" => "mailpit",
+            "port" => 1025,
+            "encryption" => 'tls',
+            "username" => null,
+            "password" => null,
+            "timeout" => null,
+            "local_domain" => null,
+        ];
+        config()->set('mail.mailers.smtp', $smtp);
+
+        \Illuminate\Support\Facades\Mail::mailer('smtp')
+            ->to('ask@me.com')
+            ->send(new \App\Mail\ExampleMail);
+
+
+
         return (new MailMessage)
                     ->line('Welcome to Coolify!')
                     ->action('Go to dashboard', url('/'))
@@ -43,6 +61,7 @@ class TestMessage extends Notification
 
     public function toDiscord(object $notifiable): string
     {
+        ray('1111');
         return 'Welcome to Coolify! We need your attention for disk usage. [Go to dashboard]('.url('/').')';
     }
 
