@@ -9,5 +9,4 @@
             Delete
         </x-inputs.button>
     @endif
-
 </div>

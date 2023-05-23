@@ -2,7 +2,7 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1 class="pb-0">Resources</h1>
-            <livewire:project.delete :project_id="$project->id" :resource_count="$project->applications->count()" />
+            <livewire:project.delete-environment :environment_id="$environment->id" :resource_count="$environment->applications->count()" />
         </div>
         <div class="pb-10 text-sm breadcrumbs">
             <ul>
@@ -18,7 +18,7 @@
         </div>
     </div>
     @if ($environment->applications->count() === 0)
-        <p>No resources yet.</p>
+        <p>No resources found.</p>
     @endif
     <div class="flex flex-col gap-2">
         @foreach ($environment->applications->sortBy('name') as $application)

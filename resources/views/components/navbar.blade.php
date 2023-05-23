@@ -1,6 +1,6 @@
 @auth
     <nav class="main-navbar">
-        <ul class="gap-2 p-1 pt-2 menu">
+        <ul class="gap-2 p-1 pt-2 menu" title="Dashboard">
             <li class="{{ request()->is('/') ? 'text-warning' : '' }}">
                 <a @if (!request()->is('/')) href="/" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24"
@@ -10,20 +10,9 @@
                     </svg>
                 </a>
             </li>
-            <li class="{{ request()->is('server/*') || request()->is('servers') ? 'text-warning' : '' }}">
-                <a @if (!request()->is('server/*')) href="/servers" @endif>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
-                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                        <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" />
-                        <path d="M3 12m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" />
-                        <path d="M7 8l0 .01" />
-                        <path d="M7 16l0 .01" />
-                    </svg>
-                </a>
-            </li>
 
-            <li class="{{ request()->is('project/*') || request()->is('projects') ? 'text-warning' : '' }}">
+            <li class="{{ request()->is('project/*') || request()->is('projects') ? 'text-warning' : '' }}"
+                title="Projects">
                 <a @if (!request()->is('project/*')) href="/projects" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -35,8 +24,21 @@
                 </a>
             </li>
 
+            <li class="{{ request()->is('server/*') || request()->is('servers') ? 'text-warning' : '' }}" title="Servers">
+                <a @if (!request()->is('server/*')) href="/servers" @endif>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3z" />
+                        <path d="M15 20h-9a3 3 0 0 1 -3 -3v-2a3 3 0 0 1 3 -3h12" />
+                        <path d="M7 8v.01" />
+                        <path d="M7 16v.01" />
+                        <path d="M20 15l-2 3h3l-2 3" />
+                    </svg>
+                </a>
+            </li>
             @if (auth()->user()->isPartOfRootTeam())
-                <li class="{{ request()->is('command-center') ? 'text-warning' : '' }}">
+                <li class="{{ request()->is('command-center') ? 'text-warning' : '' }}" title="Command Center">
                     <a @if (!request()->is('command-center')) href="/command-center" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                             stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -46,8 +48,8 @@
                         </svg>
                     </a>
                 </li>
-                <li
-                    class="{{ request()->is('settings') ? 'absolute bottom-0 pb-4 text-warning' : 'absolute bottom-0 pb-4' }}">
+                <li class="{{ request()->is('settings') ? 'absolute bottom-0 pb-4 text-warning' : 'absolute bottom-0 pb-4' }}"
+                    title="Settings">
                     <a @if (!request()->is('settings')) href="/settings" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                             stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">

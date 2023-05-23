@@ -5,11 +5,16 @@ namespace App\Http\Livewire\Project;
 use App\Models\Project;
 use Livewire\Component;
 
-class Delete extends Component
+class DeleteProject extends Component
 {
+    public array $parameters;
     public int $project_id;
     public int $resource_count = 0;
 
+    public function mount()
+    {
+        $this->parameters = getParameters();
+    }
     public function delete()
     {
         $this->validate([
@@ -17,9 +22,9 @@ class Delete extends Component
         ]);
         $project = Project::findOrFail($this->project_id);
         if ($project->applications->count() > 0) {
-            return $this->emit('error', 'Project has applications, please delete them first.');
+            return $this->emit('error', 'Project has resources defined, please delete them first.');
         }
         $project->delete();
-        return redirect()->route('dashboard');
+        return redirect()->route('projects');
     }
 }
