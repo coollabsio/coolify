@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Models\Activity;
 
+const TIMEOUT = 3600;
+const IDLE_TIMEOUT = 3600;
+
 class RunRemoteProcess
 {
     public Activity $activity;
@@ -52,7 +55,7 @@ class RunRemoteProcess
 
         $status = ProcessStatus::IN_PROGRESS;
 
-        $processResult = Process::run($this->getCommand(), $this->handleOutput(...));
+        $processResult = Process::timeout(TIMEOUT)->idleTimeout(IDLE_TIMEOUT)->run($this->getCommand(), $this->handleOutput(...));
 
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;

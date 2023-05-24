@@ -19,7 +19,6 @@ use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
-use Throwable;
 
 class ApplicationDeploymentJob implements ShouldQueue
 {
