@@ -16,27 +16,31 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    private Application $application;
     public function __construct(
-        public string|null $container_id = null,
+        public string|null $application_id = null,
     ) {
+        if ($this->application_id) {
+            $this->application = Application::find($this->application_id)->first();
+        }
     }
     public function uniqueId(): string
     {
-        return $this->container_id;
+        return $this->application_id;
     }
     public function handle(): void
     {
         try {
-            if ($this->container_id) {
-                $this->checkContainerStatus();
+            if ($this->application->uuid) {
+                $this->check_container_status();
             } else {
-                $this->checkAllServers();
+                $this->check_all_servers();
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
         }
     }
-    protected function checkAllServers()
+    protected function check_all_servers()
     {
         $servers = Server::all()->reject(fn (Server $server) => $server->settings->is_build_server);
         $applications = Application::all();
@@ -44,7 +48,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
         $containers = collect();
         foreach ($servers as $server) {
             $output = instantRemoteProcess(['docker ps -a -q --format \'{{json .}}\''], $server);
-            $containers = $containers->concat(formatDockerCmdOutputToJson($output));
+            $containers = $containers->concat(format_docker_command_output_to_json($output));
         }
         foreach ($containers as $container) {
             $found_application = $applications->filter(function ($value, $key) use ($container) {
@@ -65,15 +69,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
             Log::info('Not found application: ' . $not_found_application->uuid . '. Set status to: ' . $not_found_application->status);
         }
     }
-    protected function checkContainerStatus()
+    protected function check_container_status()
     {
-        $application = Application::where('uuid', $this->container_id)->firstOrFail();
-        if (!$application) {
-            return;
-        }
-        if ($application->destination->server) {
-            $application->status = checkContainerStatus(server: $application->destination->server, container_id: $this->container_id);
-            $application->save();
+        if ($this->application->destination->server) {
+            $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
+            $this->application->save();
         }
     }
 }

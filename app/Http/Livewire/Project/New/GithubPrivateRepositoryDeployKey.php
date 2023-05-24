@@ -34,7 +34,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         if (config('app.env') === 'local') {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
         }
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
         $this->query = request()->query();
         $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
     }
@@ -74,7 +74,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
             $application_init = [
-                'name' => generateRandomName(),
+                'name' => generate_random_name(),
                 'git_repository' => $git_repository,
                 'git_branch' => $git_branch,
                 'git_full_url' => "git@$git_host:$git_repository.git",
@@ -96,7 +96,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'application_uuid' => $application->uuid,
             ]);
         } catch (\Exception $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
 }

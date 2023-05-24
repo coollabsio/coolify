@@ -12,5 +12,5 @@
         </ul>
     </div>
     <x-applications.navbar :application="$application" />
-    <livewire:project.application.poll-deployment :activity="$activity" :deployment_uuid="$deployment_uuid" />
+    <livewire:project.application.deployment-logs :activity="$activity" :deployment_uuid="$deployment_uuid" />
 </x-layout>

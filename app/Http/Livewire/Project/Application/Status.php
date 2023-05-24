@@ -8,6 +8,7 @@ use Livewire\Component;
 class Status extends Component
 {
     public Application $application;
+
     public function pollingStatus()
     {
         $this->application->refresh();

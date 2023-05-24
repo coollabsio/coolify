@@ -37,7 +37,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        return view('project.application.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
+        return view('project.application.deployments', ['application' => $application]);
     }
 
     public function deployment()

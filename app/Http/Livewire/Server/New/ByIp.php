@@ -30,7 +30,7 @@ class ByIp extends Component
     ];
     public function mount()
     {
-        $this->name = generateRandomName();
+        $this->name = generate_random_name();
         $this->private_key_id = $this->private_keys->first()->id;
     }
     public function setPrivateKey(string $private_key_id)
@@ -61,7 +61,7 @@ class ByIp extends Component
             $server->settings->save();
             return redirect()->route('server.show', $server->uuid);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
 }

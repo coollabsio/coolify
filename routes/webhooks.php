@@ -1,6 +1,6 @@
 <?php
 
-use App\Jobs\DeployApplicationJob;
+use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\PrivateKey;
 use App\Models\GithubApp;
@@ -36,7 +36,7 @@ Route::get('/source/github/redirect', function () {
         $github_app->save();
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     } catch (\Exception $e) {
-        return generalErrorHandler($e);
+        return general_error_handler($e);
     }
 });
 
@@ -52,7 +52,7 @@ Route::get('/source/github/install', function () {
         }
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     } catch (\Exception $e) {
-        return generalErrorHandler($e);
+        return general_error_handler($e);
     }
 });
 Route::post('/source/github/events', function () {
@@ -97,7 +97,7 @@ Route::post('/source/github/events', function () {
         foreach ($applications as $application) {
             if ($application->isDeployable()) {
                 $deployment_uuid = new Cuid2(7);
-                dispatch(new DeployApplicationJob(
+                dispatch(new ApplicationDeploymentJob(
                     deployment_uuid: $deployment_uuid,
                     application_uuid: $application->uuid,
                     force_rebuild: false,
@@ -105,6 +105,6 @@ Route::post('/source/github/events', function () {
             }
         }
     } catch (\Exception $e) {
-        return generalErrorHandler($e);
+        return general_error_handler($e);
     }
 });

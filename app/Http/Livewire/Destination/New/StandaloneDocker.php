@@ -33,7 +33,7 @@ class StandaloneDocker extends Component
             }
         }
         $this->network = new Cuid2(7);
-        $this->name = generateRandomName();
+        $this->name = generate_random_name();
     }
 
     public function submit()

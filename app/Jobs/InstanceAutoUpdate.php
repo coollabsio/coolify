@@ -12,7 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 
-class AutoUpdateJob implements ShouldQueue
+class InstanceAutoUpdate implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -33,7 +33,7 @@ class AutoUpdateJob implements ShouldQueue
     public function handle(): void
     {
         if (config('app.env') === 'local') {
-            $latest_version = getLatestVersionOfCoolify();
+            $latest_version = get_latest_version_of_coolify();
             $current_version = config('version');
             if ($latest_version === $current_version) {
                 return;
@@ -53,7 +53,7 @@ class AutoUpdateJob implements ShouldQueue
                 "sleep 10"
             ], $server, ActivityTypes::INLINE->value);
         } else {
-            $latest_version = getLatestVersionOfCoolify();
+            $latest_version = get_latest_version_of_coolify();
             $current_version = config('version');
             if ($latest_version === $current_version) {
                 return;

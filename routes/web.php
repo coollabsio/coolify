@@ -81,7 +81,7 @@ Route::middleware(['auth'])->group(function () {
 
             if ($is_new_project) {
                 $project = Project::create([
-                    'name' => request()->query('name') ?? generateRandomName(),
+                    'name' => request()->query('name') ?? generate_random_name(),
                     'team_id' => $id,
                 ]);
                 return response()->json([
@@ -92,7 +92,7 @@ Route::middleware(['auth'])->group(function () {
                 $environment = Project::where('uuid', request()->query('project'))->first()->environments->where('name', request()->query('name'))->first();
                 if (!$environment) {
                     $environment = Environment::create([
-                        'name' => request()->query('name') ?? generateRandomName(),
+                        'name' => request()->query('name') ?? generate_random_name(),
                         'project_id' => Project::where('uuid', request()->query('project'))->first()->id,
                     ]);
                 }
@@ -104,7 +104,7 @@ Route::middleware(['auth'])->group(function () {
                 'magic' => true,
             ]);
         } catch (\Throwable $e) {
-            return generalErrorHandler($e, isJson: true);
+            return general_error_handler($e, isJson: true);
         }
     });
     Route::get('/', function () {

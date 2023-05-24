@@ -2,8 +2,6 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\DeployApplicationJob;
-use App\Jobs\RollbackApplicationJob;
 use App\Models\Application;
 use Livewire\Component;
 use Illuminate\Support\Str;
@@ -18,20 +16,27 @@ class Rollback extends Component
 
     public function mount()
     {
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
     }
     public function rollbackImage($tag)
     {
         $deployment_uuid = new Cuid2(7);
 
-        dispatch(new RollbackApplicationJob(
-            deployment_uuid: $deployment_uuid,
-            application_uuid: $this->application->uuid,
-            commit: $tag,
-        ));
+        queue_application_deployment(
+            application: $this->application,
+            metadata: [
+                'deployment_uuid' => $deployment_uuid,
+                'application_uuid' => $this->application->uuid,
+                'force_rebuild' => false,
+                'commit' => $tag,
+            ]
+        );
 
-        $this->parameters['deployment_uuid'] = $deployment_uuid;
-        return redirect()->route('project.application.deployment', $this->parameters);
+        return redirect()->route('project.application.deployments', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+            'environment_name' => $this->parameters['environment_name'],
+        ]);
     }
     public function loadImages()
     {
@@ -51,7 +56,7 @@ class Rollback extends Component
             })->map(function ($item) {
                 $item = Str::of($item)->explode('#');
                 if ($item[1] === $this->current) {
-                    $is_current = true;
+                    // $is_current = true;
                 }
                 return [
                     'tag' => $item[1],
@@ -60,7 +65,7 @@ class Rollback extends Component
                 ];
             })->toArray();
         } catch (\Throwable $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
 }

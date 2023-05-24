@@ -110,7 +110,7 @@ class GithubPrivateRepository extends Component
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
             $application = Application::create([
-                'name' => generateRandomName(),
+                'name' => generate_random_name(),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
@@ -129,12 +129,12 @@ class GithubPrivateRepository extends Component
                 'environment_name' => $environment->name
             ]);
         } catch (\Exception $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
     public function mount()
     {
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();

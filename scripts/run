@@ -50,6 +50,9 @@ function coolify {
 function coolify-root {
     bash vendor/bin/spin exec coolify bash
 }
+function redis {
+    docker exec -ti coolify-redis redis-cli
+}
 function vite {
     bash vendor/bin/spin exec vite bash
 }

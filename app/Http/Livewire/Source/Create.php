@@ -17,7 +17,7 @@ class Create extends Component
 
     public function mount()
     {
-        $this->name = generateRandomName();
+        $this->name = generate_random_name();
     }
     public function createGitHubApp()
     {
@@ -43,7 +43,7 @@ class Create extends Component
             ]);
             redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Exception $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
 }

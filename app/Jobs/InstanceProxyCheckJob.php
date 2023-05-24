@@ -10,7 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ProxyCheckJob implements ShouldQueue
+class InstanceProxyCheckJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,7 +32,7 @@ class ProxyCheckJob implements ShouldQueue
             $servers = Server::whereRelation('settings', 'is_validated', true)->get();
 
             foreach ($servers as $server) {
-                $status = checkContainerStatus(server: $server, container_id: $container_name);
+                $status = get_container_status(server: $server, container_id: $container_name);
                 if ($status === 'running') {
                     continue;
                 }

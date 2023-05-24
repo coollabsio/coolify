@@ -20,7 +20,7 @@ it('starts a docker container correctly', function () {
 
     test()->actingAs(User::factory([
         'uuid' => Str::uuid(),
-        'email' => Str::uuid().'@example.com',
+        'email' => Str::uuid() . '@example.com',
     ])->create());
 
     $coolifyNamePrefix = 'coolify_test_';
@@ -40,7 +40,7 @@ it('starts a docker container correctly', function () {
     // Assert there's no containers start with coolify_test_*
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
     $tidyOutput = RunRemoteProcess::decodeOutput($activity);
-    $containers = formatDockerCmdOutputToJson($tidyOutput);
+    $containers = format_docker_command_output_to_json($tidyOutput);
     expect($containers)->toBeEmpty();
 
     // start a container nginx -d --name = $containerName
@@ -50,13 +50,13 @@ it('starts a docker container correctly', function () {
     // docker ps name = $container
     $activity = remoteProcess([$areThereCoolifyTestContainers], $host);
     $tidyOutput = RunRemoteProcess::decodeOutput($activity);
-    $containers = formatDockerCmdOutputToJson($tidyOutput);
+    $containers = format_docker_command_output_to_json($tidyOutput);
     expect($containers->where('Names', $containerName)->count())->toBe(1);
 
     // Stop testing containers
     $activity = remoteProcess([
         "docker ps --filter='name={$coolifyNamePrefix}*' -aq && " .
-        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+            "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
     ], $host);
     expect($activity->getExtraProperty('exitCode'))->toBe(0);
 });

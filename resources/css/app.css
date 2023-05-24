@@ -4,7 +4,7 @@
 
 * {
   //outline: solid 0.25rem hsla(210, 100%, 100%, 0.5); 
-    @apply scrollbar-thumb-yellow-400 scrollbar-track-coolgray-200 scrollbar-w-2;
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
 }
 html {
     @apply h-full min-h-full bg-coolgray-100;

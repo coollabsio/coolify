@@ -10,7 +10,7 @@ class EmptyProject extends Component
     public function createEmptyProject()
     {
         $project = Project::create([
-            'name' => generateRandomName(),
+            'name' => generate_random_name(),
             'team_id' => session('currentTeam')->id,
         ]);
         return redirect()->route('project.show', ['project_uuid' => $project->uuid, 'environment_name' => 'production']);

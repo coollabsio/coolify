@@ -39,7 +39,7 @@ class Proxy extends Component
 
     public function proxyStatus()
     {
-        $this->server->extra_attributes->proxy_status = checkContainerStatus(server: $this->server, container_id: 'coolify-proxy');
+        $this->server->extra_attributes->proxy_status = get_container_status(server: $this->server, container_id: 'coolify-proxy');
         $this->server->save();
         $this->server->refresh();
     }
@@ -69,7 +69,7 @@ class Proxy extends Component
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             ], $this->server);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
     public function resetProxy()
@@ -77,7 +77,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server, true);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
     public function checkProxySettingsInSync()
@@ -85,7 +85,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
 }

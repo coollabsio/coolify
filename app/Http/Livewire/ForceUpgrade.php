@@ -23,7 +23,7 @@ class ForceUpgrade extends Component
             ], $server, ActivityTypes::INLINE->value);
             $this->emit('updateInitiated');
         } else {
-            $latestVersion = getLatestVersionOfCoolify();
+            $latestVersion = get_latest_version_of_coolify();
 
             $cdn = "https://coolify-cdn.b-cdn.net/files";
             $server = Server::where('ip', 'host.docker.internal')->first();

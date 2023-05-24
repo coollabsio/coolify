@@ -4,7 +4,7 @@ namespace App\Actions\CoolifyTask;
 
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
-use App\Jobs\DeployApplicationJob;
+use App\Jobs\ApplicationDeploymentJob;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -125,7 +125,7 @@ class RunRemoteProcess
             'type' => $type,
             'output' => $output,
             'timestamp' => hrtime(true),
-            'batch' => DeployApplicationJob::$batch_counter,
+            'batch' => ApplicationDeploymentJob::$batch_counter,
             'order' => $this->getLatestCounter(),
         ];
 

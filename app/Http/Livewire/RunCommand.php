@@ -29,7 +29,7 @@ class RunCommand extends Component
             $activity = remoteProcess([$this->command], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
-class PollDeployment extends Component
+class DeploymentLogs extends Component
 {
     public $activity;
     public $isKeepAliveOn = true;

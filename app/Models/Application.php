@@ -150,7 +150,9 @@ class Application extends BaseModel
 
     public function deployments()
     {
-        return Activity::where('subject_id', $this->id)->where('properties->type', '=', 'deployment')->orderBy('created_at', 'desc')->get();
+        $asd = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->get();
+        return $asd;
+        // return Activity::where('subject_id', $this->id)->where('properties->type', '=', 'deployment')->orderBy('created_at', 'desc')->get();
     }
     public function get_deployment(string $deployment_uuid)
     {

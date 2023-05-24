@@ -29,7 +29,7 @@ class Form extends Component
                 'name' => $this->name,
             ]);
         } catch (\Throwable $error) {
-            return generalErrorHandler($error, $this);
+            return general_error_handler($error, $this);
         }
     }
 }

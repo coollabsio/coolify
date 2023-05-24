@@ -27,7 +27,7 @@ class All extends Component
             $this->application->refresh();
             $this->emit('clearAddStorage');
         } catch (\Exception $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
 }

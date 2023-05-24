@@ -14,7 +14,7 @@ class DeleteEnvironment extends Component
 
     public function mount()
     {
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
     }
     public function delete()
     {

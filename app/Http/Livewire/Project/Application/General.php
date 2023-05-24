@@ -112,7 +112,7 @@ class General extends Component
             $this->application->fqdn = $domains->implode(',');
             $this->application->save();
         } catch (\Exception $e) {
-            return generalErrorHandler($e, $this);
+            return general_error_handler($e, $this);
         }
     }
 }
