@@ -103,7 +103,6 @@ class ProductionSeeder extends Seeder
             StandaloneDocker::create([
                 'id' => 0,
                 'name' => 'localhost-coolify',
-                'description' => 'This is the standalone Docker instance that is used to run the Coolify services.',
                 'network' => 'coolify',
                 'server_id' => 0,
             ]);
