@@ -29,6 +29,7 @@
         "visus/cuid2": "^2.0.0"
     },
     "require-dev": {
+        "barryvdh/laravel-ide-helper": "^2.13",
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v7.7.0",
         "laravel/pint": "^v1.8.0",
@@ -62,7 +63,16 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate",
+            "@php artisan ide-helper:generate",
+            "@php artisan ide-helper:meta",
+            "@php artisan ide-helper:models --nowrite"
+        ],
+        "post-install-cmd": [
+            "@php artisan ide-helper:generate",
+            "@php artisan ide-helper:meta",
+            "@php artisan ide-helper:models --nowrite"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""

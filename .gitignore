@@ -27,3 +27,7 @@ resources/recipes
 .lesshst
 psysh_history
 .psql_history
+_ide_helper.php
+.gitignore
+.phpstorm.meta.php
+_ide_helper_models.php
