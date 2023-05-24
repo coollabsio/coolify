@@ -10,6 +10,7 @@ use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -97,6 +98,15 @@ class ProductionSeeder extends Seeder
             $server = Server::create($server_details);
             $server->settings->is_validated = true;
             $server->settings->save();
+        }
+        if (StandaloneDocker::find(0) == null) {
+            StandaloneDocker::create([
+                'id' => 0,
+                'name' => 'localhost-coolify',
+                'description' => 'This is the standalone Docker instance that is used to run the Coolify services.',
+                'network' => 'coolify',
+                'server_id' => 0,
+            ]);
         }
     }
 }

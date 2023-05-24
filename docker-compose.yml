@@ -25,4 +25,5 @@ services:
             - coolify
 networks:
     coolify:
+        name: coolify
         driver: bridge

@@ -82,8 +82,6 @@ class SyncBunny extends Command
                 $pool->purge(url: "$bunny_cdn/$versions"),
             ]);
             echo "All files uploaded & purged...\n";
-            return;
-            throw new \Exception("Something went wrong.");
         } catch (\Exception $e) {
             echo $e->getMessage();
         }

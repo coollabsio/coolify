@@ -20,7 +20,7 @@ function help {
     compgen -A function | cat -n
 }
 
-function sync-bunny {
+function sync:bunny {
     php artisan sync:bunny --env=secrets
 }
 
@@ -36,19 +36,19 @@ function schedule {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
 }
 
-function schedule-run {
+function schedule:run {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:run
 }
 
-function db-reset {
+function db:reset {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
 
 function mfs {
-    db-reset
+    db:reset
 }
 
-function db-reset-prod {
+function db:reset-prod {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
@@ -57,7 +57,7 @@ function coolify {
     bash vendor/bin/spin exec -u webuser coolify bash
 }
 
-function coolify-root {
+function coolify:root {
     bash vendor/bin/spin exec coolify bash
 }
 
@@ -77,7 +77,7 @@ function db {
     bash vendor/bin/spin exec -u webuser coolify php artisan db
 }
 
-function build-builder {
+function build:builder {
     act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
 }
 function default {
