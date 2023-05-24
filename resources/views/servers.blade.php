@@ -1,5 +1,12 @@
 <x-layout>
-    <h1>Servers</h1>
+    <h1 class="py-0">Servers</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li>
+                All Servers
+            </li>
+        </ul>
+    </div>
     @forelse ($servers as $server)
         <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
             class="box">{{ $server->name }}</a>

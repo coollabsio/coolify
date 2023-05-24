@@ -52,3 +52,8 @@ function generate_random_name()
     $cuid = new Cuid2(7);
     return Str::kebab("{$generator->getName()}-{$cuid}");
 }
+function generate_application_name(string $git_repository, string $git_branch)
+{
+    $cuid = new Cuid2(7);
+    return Str::kebab("{$git_repository}:{$git_branch}-{$cuid}");
+}

@@ -12,5 +12,6 @@
         </ul>
     </div>
     <x-applications.navbar :application="$application" />
+    <div class="pt-2 text-sm">{{ data_get($activity, 'properties.status') }}</div>
     <livewire:project.application.deployment-logs :activity="$activity" :deployment_uuid="$deployment_uuid" />
 </x-layout>

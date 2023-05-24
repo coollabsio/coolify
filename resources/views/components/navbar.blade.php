@@ -13,7 +13,7 @@
 
             <li class="{{ request()->is('project/*') || request()->is('projects') ? 'text-warning' : '' }}"
                 title="Projects">
-                <a @if (!request()->is('project/*')) href="/projects" @endif>
+                <a @if (!request()->is('projects')) href="/projects" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -25,7 +25,7 @@
             </li>
 
             <li class="{{ request()->is('server/*') || request()->is('servers') ? 'text-warning' : '' }}" title="Servers">
-                <a @if (!request()->is('server/*')) href="/servers" @endif>
+                <a @if (!request()->is('servers')) href="/servers" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
