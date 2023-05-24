@@ -1,7 +1,7 @@
 {
   "name": "coolify",
   "description": "An open-source & self-hostable Heroku / Netlify alternative.",
-  "version": "3.12.31",
+  "version": "3.12.32",
   "license": "Apache-2.0",
   "repository": "github:coollabsio/coolify",
   "scripts": {
