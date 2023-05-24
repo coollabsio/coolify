@@ -29,7 +29,7 @@ class ContainerStopJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             $application = Application::find($this->application_id)->first();
-            instantRemoteProcess(["docker rm -f {$application->uuid}"], $this->server);
+            instant_remote_process(["docker rm -f {$application->uuid}"], $this->server);
             $application->status = get_container_status(server: $application->destination->server, container_id: $application->uuid);
             $application->save();
         } catch (\Exception $e) {

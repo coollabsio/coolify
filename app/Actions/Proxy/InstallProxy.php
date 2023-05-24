@@ -25,7 +25,7 @@ class InstallProxy
             return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
         });
 
-        $configuration = instantRemoteProcess([
+        $configuration = instant_remote_process([
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
         if (is_null($configuration)) {
@@ -40,7 +40,7 @@ class InstallProxy
         $env_file_base64 = base64_encode(
             $this->getEnvContents()
         );
-        $activity = remoteProcess([
+        $activity = remote_process([
             ...$create_networks_command,
             "echo 'Docker networks created...'",
             "mkdir -p $proxy_path",

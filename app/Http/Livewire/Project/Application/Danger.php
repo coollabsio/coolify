@@ -18,7 +18,7 @@ class Danger extends Component
     {
         $destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
 
-        instantRemoteProcess(["docker rm -f {$this->application->uuid}"], $destination->server);
+        instant_remote_process(["docker rm -f {$this->application->uuid}"], $destination->server);
         $this->application->delete();
         return redirect()->route('project.resources', [
             'project_uuid' => $this->parameters['project_uuid'],

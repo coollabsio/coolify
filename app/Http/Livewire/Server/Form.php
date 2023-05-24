@@ -36,7 +36,7 @@ class Form extends Component
     public function validateServer()
     {
         try {
-            $this->uptime = instantRemoteProcess(['uptime'], $this->server, false);
+            $this->uptime = instant_remote_process(['uptime'], $this->server, false);
             if (!$this->uptime) {
                 $this->uptime = 'Server not reachable.';
                 throw new \Exception('Server not reachable.');
@@ -47,11 +47,11 @@ class Form extends Component
                     $this->emit('serverValidated');
                 }
             }
-            $this->dockerVersion = instantRemoteProcess(['docker version|head -2|grep -i version'], $this->server, false);
+            $this->dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $this->server, false);
             if (!$this->dockerVersion) {
                 $this->dockerVersion = 'Not installed.';
             }
-            $this->dockerComposeVersion = instantRemoteProcess(['docker compose version|head -2|grep -i version'], $this->server, false);
+            $this->dockerComposeVersion = instant_remote_process(['docker compose version|head -2|grep -i version'], $this->server, false);
             if (!$this->dockerComposeVersion) {
                 $this->dockerComposeVersion = 'Not installed.';
             }

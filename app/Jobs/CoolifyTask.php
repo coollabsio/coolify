@@ -19,18 +19,19 @@ class CoolifyTask implements ShouldQueue
      */
     public function __construct(
         public Activity $activity,
-    ){}
+    ) {
+    }
 
     /**
      * Execute the job.
      */
     public function handle(): void
     {
-        $remoteProcess = resolve(RunRemoteProcess::class, [
+        $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
         ]);
 
-        $remoteProcess();
+        $remote_process();
         // @TODO: Remove file at $this->activity->getExtraProperty('private_key_location') after process is finished
     }
 }

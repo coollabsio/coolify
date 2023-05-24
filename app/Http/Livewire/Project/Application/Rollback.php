@@ -42,13 +42,13 @@ class Rollback extends Component
     {
         try {
             $image = $this->application->uuid;
-            $output = instantRemoteProcess([
+            $output = instant_remote_process([
                 "docker inspect --format='{{.Config.Image}}' {$this->application->uuid}",
             ], $this->application->destination->server, throwError: false);
             $current_tag = Str::of($output)->trim()->explode(":");
             $this->current = data_get($current_tag, 1);
 
-            $output = instantRemoteProcess([
+            $output = instant_remote_process([
                 "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
             ], $this->application->destination->server);
             $this->images = Str::of($output)->trim()->explode("\n")->filter(function ($item) use ($image) {

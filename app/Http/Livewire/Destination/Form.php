@@ -25,8 +25,8 @@ class Form extends Component
                 if ($this->destination->attachedTo()) {
                     return $this->emit('error', 'You must delete all resources before deleting this destination.');
                 }
-                instantRemoteProcess(["docker network disconnect {$this->destination->network} coolify-proxy"], $this->destination->server, throwError: false);
-                instantRemoteProcess(['docker network rm -f ' . $this->destination->network], $this->destination->server);
+                instant_remote_process(["docker network disconnect {$this->destination->network} coolify-proxy"], $this->destination->server, throwError: false);
+                instant_remote_process(['docker network rm -f ' . $this->destination->network], $this->destination->server);
             }
             $this->destination->delete();
             return redirect()->route('dashboard');

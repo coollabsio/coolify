@@ -47,7 +47,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
         $not_found_applications = $applications;
         $containers = collect();
         foreach ($servers as $server) {
-            $output = instantRemoteProcess(['docker ps -a -q --format \'{{json .}}\''], $server);
+            $output = instant_remote_process(['docker ps -a -q --format \'{{json .}}\''], $server);
             $containers = $containers->concat(format_docker_command_output_to_json($output));
         }
         foreach ($containers as $container) {

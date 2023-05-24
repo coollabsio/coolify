@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Queue::after(function (JobProcessed $event) {
-            // @TODO: Remove `coolify-builder` container after the remoteProcess job is finishged and remoteProcess->type == `deployment`.
+            // @TODO: Remove `coolify-builder` container after the remote_process job is finishged and remote_process->type == `deployment`.
             if ($event->job->resolveName() === CoolifyTask::class) {
             }
         });

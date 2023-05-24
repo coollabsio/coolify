@@ -15,10 +15,10 @@ class ForceUpgrade extends Component
             if (!$server) {
                 return;
             }
-            instantRemoteProcess([
+            instant_remote_process([
                 "sleep 2"
             ], $server);
-            remoteProcess([
+            remote_process([
                 "sleep 10"
             ], $server, ActivityTypes::INLINE->value);
             $this->emit('updateInitiated');
@@ -31,18 +31,18 @@ class ForceUpgrade extends Component
                 return;
             }
 
-            instantRemoteProcess([
+            instant_remote_process([
                 "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
                 "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
                 "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
                 "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
             ], $server);
 
-            instantRemoteProcess([
+            instant_remote_process([
                 "docker compose -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml pull",
             ], $server);
 
-            remoteProcess([
+            remote_process([
                 "bash /data/coolify/source/upgrade.sh $latestVersion"
             ], $server, ActivityTypes::INLINE->value);
 

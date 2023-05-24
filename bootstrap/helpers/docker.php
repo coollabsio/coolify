@@ -31,7 +31,7 @@ function format_docker_labels_to_json($rawOutput): Collection
 
 function get_container_status(Server $server, string $container_id, bool $throwError = false)
 {
-    $container = instantRemoteProcess(["docker inspect --format '{{json .State}}' {$container_id}"], $server, $throwError);
+    $container = instant_remote_process(["docker inspect --format '{{json .State}}' {$container_id}"], $server, $throwError);
     if (!$container) {
         return 'exited';
     }

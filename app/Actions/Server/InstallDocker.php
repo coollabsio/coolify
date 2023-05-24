@@ -10,7 +10,7 @@ class InstallDocker
     public function __invoke(Server $server)
     {
         $config = base64_encode('{ "live-restore": true }');
-        $activity = remoteProcess([
+        $activity = remote_process([
             "echo Installing Docker...",
             "curl https://releases.rancher.com/install-docker/23.0.sh | sh",
             "echo Configuring Docker...",

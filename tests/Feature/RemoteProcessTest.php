@@ -17,7 +17,7 @@ it('outputs correctly', function () {
 
     $host = Server::where('name', 'testing-local-docker-container')->first();
 
-    $activity = remoteProcess([
+    $activity = remote_process([
         'pwd',
         'x=1; while  [ $x -le 3 ]; do sleep 0.1 && echo "Welcome $x times" $(( x++ )); done',
     ], $host);

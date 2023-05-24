@@ -100,7 +100,7 @@ class RunRemoteProcess
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
 
-        return generateSshCommand($private_key_location, $server_ip, $user, $port, $command);
+        return generate_ssh_command($private_key_location, $server_ip, $user, $port, $command);
     }
 
     protected function handleOutput(string $type, string $output)

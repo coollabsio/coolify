@@ -60,7 +60,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
         $server = $this->destination->server;
 
-        $private_key_location = savePrivateKeyForServer($server);
+        $private_key_location = save_private_key_for_server($server);
 
         $remoteProcessArgs = new CoolifyTaskArgs(
             server_ip: $server->ip,
@@ -452,13 +452,13 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         if ($isDebuggable && !$this->application->settings->is_debug) {
             $hideFromOutput = true;
         }
-        $remoteProcess = resolve(RunRemoteProcess::class, [
+        $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'hideFromOutput' => $hideFromOutput,
             'isFinished' => $isFinished,
             'ignoreErrors' => $ignoreErrors,
         ]);
-        $result = $remoteProcess();
+        $result = $remote_process();
         if ($propertyName) {
             $this->activity->properties = $this->activity->properties->merge([
                 $propertyName => trim($result->output()),

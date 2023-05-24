@@ -31,7 +31,7 @@ class InstanceDockerCleanup implements ShouldQueue
         try {
             $servers = Server::all();
             foreach ($servers as $server) {
-                instantRemoteProcess(['docker image prune -f'], $server);
+                instant_remote_process(['docker image prune -f'], $server);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
