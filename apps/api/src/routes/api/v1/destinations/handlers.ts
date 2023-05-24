@@ -18,6 +18,7 @@ import type {
 	Proxy,
 	SaveDestinationSettings
 } from './types';
+import { removeService } from '../../../../lib/services/common';
 
 export async function listDestinations(request: FastifyRequest<ListDestinations>) {
 	try {
@@ -139,6 +140,35 @@ export async function newDestination(request: FastifyRequest<NewDestination>, re
 			await prisma.destinationDocker.update({ where: { id }, data: { name, engine, network } });
 			return reply.code(201).send();
 		}
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
+export async function forceDeleteDestination(request: FastifyRequest<OnlyId>) {
+	try {
+		const { id } = request.params;
+		const services = await prisma.service.findMany({ where: { destinationDockerId: id } });
+		for (const service of services) {
+			await removeService({ id: service.id });
+		}
+		const applications = await prisma.application.findMany({ where: { destinationDockerId: id } });
+		for (const application of applications) {
+			await prisma.applicationSettings.deleteMany({ where: { application: { id: application.id } } });
+			await prisma.buildLog.deleteMany({ where: { applicationId: application.id } });
+			await prisma.build.deleteMany({ where: { applicationId: application.id } });
+			await prisma.secret.deleteMany({ where: { applicationId: application.id } });
+			await prisma.applicationPersistentStorage.deleteMany({ where: { applicationId: application.id } });
+			await prisma.applicationConnectedDatabase.deleteMany({ where: { applicationId: application.id } });
+			await prisma.previewApplication.deleteMany({ where: { applicationId: application.id } });
+		}
+		const databases = await prisma.database.findMany({ where: { destinationDockerId: id } });
+		for (const database of databases) {
+			await prisma.databaseSettings.deleteMany({ where: { databaseId: database.id } });
+			await prisma.databaseSecret.deleteMany({ where: { databaseId: database.id } });
+			await prisma.database.delete({ where: { id: database.id } });
+		}
+		await prisma.destinationDocker.delete({ where: { id } });
+		return {};
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
 	}
@@ -318,6 +348,7 @@ export async function verifyRemoteDockerEngineFn(id: string) {
 		}
 		await prisma.destinationDocker.update({ where: { id }, data: { remoteVerified: true } });
 	} catch (error) {
+		console.log(error)
 		throw new Error('Error while verifying remote docker engine');
 	}
 }
