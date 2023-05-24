@@ -47,7 +47,7 @@ if (!function_exists('getProxyConfiguration')) {
                         "--entrypoints.https.address=:443",
                         "--providers.docker=true",
                         "--providers.docker.exposedbydefault=false",
-                        "--providers.file.directory=/traefik/dynamic-conf/",
+                        "--providers.file.directory=/traefik/dynamic/",
                         "--providers.file.watch=true",
                         "--certificatesresolvers.letsencrypt.acme.httpchallenge=true",
                         "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
