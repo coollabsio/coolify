@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('application_settings', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->boolean('is_static')->default(false);
             $table->boolean('is_git_submodules_allowed')->default(true);
             $table->boolean('is_git_lfs_allowed')->default(true);

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('swarm_dockers', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('name');
             $table->string('uuid')->unique();
 

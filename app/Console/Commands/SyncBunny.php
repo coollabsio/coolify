@@ -60,7 +60,7 @@ class SyncBunny extends Command
             ];
             return PendingRequest::withHeaders($headers)->post('https://api.bunny.net/purge', [
                 "urls" => [$url],
-            ]);
+            ])->throw();
         });
         try {
             Http::pool(fn (Pool $pool) => [
@@ -72,15 +72,13 @@ class SyncBunny extends Command
                 $pool->storage(file: "$parent_dir/scripts/$docker_install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$docker_install_script"),
                 $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$versions"),
             ]);
-            Http::pool(fn (Pool $pool) => [
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$compose_file"),
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$production_env"),
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$install_script"),
-                $pool->purge(url: "$bunny_cdn/$bunny_cdn_path/$docker_install_script"),
-                $pool->purge(url: "$bunny_cdn/$versions"),
-            ]);
+            Http::withHeaders([
+                'AccessKey' => env('BUNNY_API_KEY'),
+                'Accept' => 'application/json',
+            ])->get('https://api.bunny.net/purge', [
+                "url" => "$bunny_cdn/$bunny_cdn_path/*",
+                "async" => false
+            ])->throw();
             echo "All files uploaded & purged...\n";
         } catch (\Exception $e) {
             echo $e->getMessage();

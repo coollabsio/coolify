@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('project_settings', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('uuid')->unique();
             $table->string('wildcard_domain')->nullable();
 

@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('instance_settings', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('fqdn')->nullable();
             $table->string('wildcard_domain')->nullable();
             $table->string('redirect_url')->nullable();

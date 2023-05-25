@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('server_settings', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('uuid')->unique();
 
             $table->boolean('is_part_of_swarm')->default(false);

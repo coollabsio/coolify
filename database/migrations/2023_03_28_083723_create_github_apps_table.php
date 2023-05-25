@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('github_apps', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('uuid')->unique();
             $table->string('name');
 

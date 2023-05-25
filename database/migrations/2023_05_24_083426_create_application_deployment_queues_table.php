@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('application_deployment_queues', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->string('application_id');
             $table->integer('pull_request_id')->default(0);
             $table->schemalessAttributes('metadata');

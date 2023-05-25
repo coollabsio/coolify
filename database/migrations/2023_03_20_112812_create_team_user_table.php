@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('team_user', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id()->primary();
             $table->foreignId('team_id');
             $table->foreignId('user_id');
             $table->string('role')->nullable();
