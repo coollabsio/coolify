@@ -42,7 +42,6 @@ class DemoNotification extends Notification implements ShouldQueue
         return (new MailMessage)
                     ->subject('Coolify demo notification')
                     ->line('Welcome to Coolify!')
-                    ->error()
                     ->action('Go to dashboard', url('/'))
                     ->line('We need your attention for disk usage.');
     }
