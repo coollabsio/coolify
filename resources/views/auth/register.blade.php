@@ -10,6 +10,18 @@
             </div>
             <form action="/register" method="POST" class="flex flex-col gap-2">
                 @csrf
+                @env('local')
+                <x-forms.input required value="test3 normal user" type="text" name="name"
+                    label="{{ __('input.name') }}" />
+                <x-forms.input required value="test3@example.com" type="email" name="email"
+                    label="{{ __('input.email') }}" />
+                <div class="flex gap-2">
+                    <x-forms.input required value="password" type="password" name="password"
+                        label="{{ __('input.password') }}" />
+                    <x-forms.input required value="password" type="password" name="password_confirmation"
+                        label="{{ __('input.password.again') }}" />
+                </div>
+            @else
                 <x-forms.input required type="text" name="name" label="{{ __('input.name') }}" />
                 <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" />
                 <div class="flex gap-2">
@@ -17,6 +29,8 @@
                     <x-forms.input required type="password" name="password_confirmation"
                         label="{{ __('input.password.again') }}" />
                 </div>
+                @endenv
+
                 <x-forms.button type="submit">{{ __('auth.register') }}</x-forms.button>
             </form>
             @if ($errors->any())

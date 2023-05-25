@@ -15,8 +15,17 @@
             <div class="w-96">
                 <form action="/login" method="POST" class="flex flex-col gap-2">
                     @csrf
-                    <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" autofocus />
+                    @env('local')
+                    <x-forms.input required value="test@example.com" type="email" name="email"
+                        label="{{ __('input.email') }}" autofocus />
+                    <x-forms.input required value="password" type="password" name="password"
+                        label="{{ __('input.password') }}" />
+                @else
                     <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" />
+                    <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" autofocus />
+                    @endenv
+
+
                     @if ($errors->any())
                         <div class="text-center text-error">
                             <span>{{ __('auth.failed') }}</span>
