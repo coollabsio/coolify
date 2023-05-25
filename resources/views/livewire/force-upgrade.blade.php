@@ -1,5 +1,4 @@
-<button class="link link-hover hover:no-underline hover:bg-coollabs hover:bg-transparent hover:text-white"
-    wire:click='upgrade'>
+<button class="link link-hover hover:no-underline hover:bg-coollabs" wire:click='upgrade'>
     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
         fill="none" stroke-linecap="round" stroke-linejoin="round">
         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
