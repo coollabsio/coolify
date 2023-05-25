@@ -2,16 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
-  //outline: solid 0.25rem hsla(210, 100%, 100%, 0.5); 
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
-}
 html {
-    @apply h-full min-h-full bg-coolgray-100;
+    @apply min-h-screen h-full bg-coolgray-100;
 }
 body {
-    @apply bg-coolgray-100 text-neutral-400 min-h-full antialiased;
+    @apply min-h-screen bg-coolgray-100 text-neutral-400 antialiased scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
 }
+main {
+    @apply px-32 xl:px-14 mx-auto max-w-screen-xl;
+}
+
 input[type="checkbox"] {
     @apply toggle toggle-warning toggle-xs rounded;
 }
@@ -59,9 +59,6 @@ a {
     @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
 }
 
-main {
-    @apply h-full w-full pb-10 px-32 xl:px-14 pt-8 mx-auto max-w-screen-xl;
-}
 .main-navbar {
     @apply fixed top-0 left-0 min-h-screen overflow-hidden;
 }
@@ -123,5 +120,5 @@ main {
 	}
 }
 .bg-coollabs-gradient {
-	@apply text-transparent bg-clip-text bg-gradient-to-r from-coollabs via-pink-500 to-red-500;
+	@apply text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
 }

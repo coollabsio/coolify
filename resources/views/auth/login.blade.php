@@ -5,8 +5,8 @@
             <div class="flex items-center gap-2">
                 <h1 class="pb-0">{{ __('auth.login') }}</h1>
                 @if ($is_registration_enabled)
-                    <a href="/register" class="flex justify-center pt-2">
-                        <x.inputs-button>{{ __('auth.register-now') }}</x.inputs-button>
+                    <a href="/register" class="flex justify-center pt-2 hover:no-underline">
+                        <x-forms.button type="submit">{{ __('auth.register-now') }}</x-forms.button>
                     </a>
                 @else
                     <div class="text-sm text-center">{{ __('auth.registration_disabled') }}</div>
@@ -21,23 +21,17 @@
                     <x-forms.input required value="password" type="password" name="password"
                         label="{{ __('input.password') }}" />
                 @else
-                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" />
                     <x-forms.input required type="email" name="email" label="{{ __('input.email') }}" autofocus />
+                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" />
                     @endenv
-
-
                     @if ($errors->any())
                         <div class="text-center text-error">
                             <span>{{ __('auth.failed') }}</span>
                         </div>
                     @endif
                     <x-forms.button type="submit">{{ __('auth.login') }}</x-forms.button>
-
                 </form>
-
             </div>
-
-
         </div>
     </div>
 </x-layout-simple>

@@ -1,11 +1,11 @@
-<div x-data="{ visible: @entangle('visible') }" class="fixed text-xs text-white top-2 right-28">
+<div x-data="{ visible: @entangle('visible') }" class="fixed text-xs text-white top-3 right-28">
     <template x-if="visible">
-        <div>
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto lds-heart text-warning" viewBox="0 0 24 24"
+        <div class="bg-coollabs-gradient">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-pink-500 lds-heart" viewBox="0 0 24 24"
                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                 <path d="M19.5 13.572l-7.5 7.428l-7.5 -7.428m0 0a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
-            </svg> Upgrading...
+            </svg> Upgrading, please wait...
             <script>
                 function checkHealth() {
                     console.log('Checking server\'s health...')
