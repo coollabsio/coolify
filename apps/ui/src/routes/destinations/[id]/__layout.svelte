@@ -75,6 +75,25 @@
 			}
 		}
 	}
+	async function forceDeleteDestination(destination: any) {
+		let sure = confirm($t('application.confirm_to_delete', { name: destination.name }));
+		if (sure) {
+			sure = confirm(
+				'Are you REALLY sure? This will delete all resources associated with this destination, but not on the destination (server) itself. You will have manually delete everything on the server afterwards.'
+			);
+			if (sure) {
+				sure = confirm('REALLY?');
+				if (sure) {
+					try {
+						await del(`/destinations/${destination.id}/force`, { id: destination.id });
+						return await goto('/', { replaceState: true });
+					} catch (error) {
+						return errorNotification(error);
+					}
+				}
+			}
+		}
+	}
 	function deletable() {
 		if (!isDestinationDeletable) {
 			return 'Please delete all resources before deleting this.';
@@ -88,7 +107,7 @@
 </script>
 
 {#if $page.params.id !== 'new'}
-	<nav class="header lg:flex-row flex-col-reverse">
+	<nav class="header lg:flex-row flex-col-reverse gap-2">
 		<div class="flex flex-row space-x-2 font-bold pt-10 lg:pt-0">
 			<div class="flex flex-col items-center justify-center title">
 				{#if $page.url.pathname === `/destinations/${$page.params.id}`}
@@ -110,6 +129,16 @@
 				class:text-stone-600={!isDestinationDeletable}><DeleteIcon /></button
 			>
 			<Tooltip triggeredBy="#delete">{deletable()}</Tooltip>
+		</div>
+		<div class="flex flex-row flex-wrap justify-center lg:justify-start lg:py-0 items-center">
+			<button
+				id="forceDelete"
+				on:click={() => forceDeleteDestination(destination)}
+				type="submit"
+				disabled={!$appSession.isAdmin && isDestinationDeletable}
+				class="icons bg-transparent text-sm text-red-500"><DeleteIcon /></button
+			>
+			<Tooltip triggeredBy="#forceDelete">Force Delete</Tooltip>
 		</div>
 	</nav>
 {/if}
