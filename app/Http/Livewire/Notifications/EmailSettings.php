@@ -12,6 +12,8 @@ class EmailSettings extends Component
 
     protected $rules = [
         'model.extra_attributes.smtp_active' => 'nullable|boolean',
+        'model.extra_attributes.from_address' => 'nullable',
+        'model.extra_attributes.from_name' => 'nullable',
         'model.extra_attributes.recipients' => 'nullable',
         'model.extra_attributes.smtp_host' => 'nullable',
         'model.extra_attributes.smtp_port' => 'nullable',
@@ -21,6 +23,8 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_timeout' => 'nullable',
     ];
     protected $validationAttributes = [
+        'model.extra_attributes.from_address' => 'From Address',
+        'model.extra_attributes.from_name' => 'From Name',
         'model.extra_attributes.recipients' => 'Recipients',
         'model.extra_attributes.smtp_host' => 'Host',
         'model.extra_attributes.smtp_port' => 'Port',

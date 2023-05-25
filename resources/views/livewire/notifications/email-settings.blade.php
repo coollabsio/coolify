@@ -25,6 +25,8 @@
                 <x-inputs.input id="model.extra_attributes.smtp_timeout" label="Timeout" />
             </div>
             <div class="flex flex-col w-96">
+                <x-inputs.input id="model.extra_attributes.from_address" label="From Address" />
+                <x-inputs.input id="model.extra_attributes.from_name" label="From Name" />
                 <x-inputs.input id="model.extra_attributes.test_address" label="Send test e-mails to" />
             </div>
         </div>

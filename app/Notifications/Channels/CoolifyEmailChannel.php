@@ -18,10 +18,13 @@ class CoolifyEmailChannel
         $mailMessage = $notification->toMail($notifiable);
 
         Mail::send([], [], fn(Message $message) => $message
-            ->from('ask@me.com', 'My Coolify Instance')
+            ->from(
+                $notifiable->extra_attributes?->get('from_address'),
+                $notifiable->extra_attributes?->get('from_name')
+            )
             ->bcc($bcc)
             ->subject($mailMessage->subject)
-            ->html((string) $mailMessage->render())
+            ->html((string)$mailMessage->render())
         );
     }
 
