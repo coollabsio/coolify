@@ -6,7 +6,7 @@
                 <h1 class="pb-0">{{ __('auth.register') }}</h1>
                 <a href="/login" class="flex justify-center pt-2 hover:no-underline">
                     <button
-                        class="normal-case btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already-registered') }}</button>
+                        class="normal-case rounded-none btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already-registered') }}</button>
                 </a>
             </div>
             <form action="/register" method="POST" class="flex flex-col gap-2">

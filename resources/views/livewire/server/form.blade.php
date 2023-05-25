@@ -14,10 +14,12 @@
             <div class="flex flex-col w-96">
                 @if ($server->id === 0)
                     <x-forms.input id="server.name" label="Name" readonly />
+                    <x-forms.input id="server.description" label="Description" readonly required />
                 @else
                     <x-forms.input id="server.name" label="Name" required />
+                    <x-forms.input id="server.description" label="Description" />
                 @endif
-                <x-forms.input id="server.description" label="Description" />
+
                 {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
