@@ -48,14 +48,20 @@ class Form extends Component
         }
         $this->validate();
         $this->settings->save();
-        if (isset($this->settings->fqdn)) {
-            if (config('app.env') == 'local') {
-                $server = Server::findOrFail(1);
-                $dynamic_config_path = '/data/coolify/proxy/dynamic';
-            } else {
-                $server = Server::findOrFail(0);
-                $dynamic_config_path = '/traefik/dynamic';
-            }
+
+        if (config('app.env') == 'local') {
+            $server = Server::findOrFail(1);
+            $dynamic_config_path = '/data/coolify/proxy/dynamic';
+        } else {
+            $server = Server::findOrFail(0);
+            $dynamic_config_path = '/traefik/dynamic';
+        }
+
+        if (empty($this->settings->fqdn)) {
+            remote_process([
+                "rm -f $dynamic_config_path/coolify.yaml",
+            ], $server, ActivityTypes::INLINE->value);
+        } else {
             $url = Url::fromString($this->settings->fqdn);
             $host = $url->getHost();
             $schema = $url->getScheme();
