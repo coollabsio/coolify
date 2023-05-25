@@ -17,10 +17,10 @@ curl https://coolify-cdn.b-cdn.net/files/install.sh | bash
 ## Support
 
 -   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
--   Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
--   Twitter: [@andrasbacsai](https://twitter.com/heyandras)
+-   Twitter: [@heyandras](https://twitter.com/heyandras)
 -   Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 -   Discord: [Invitation](https://coollabs.io/discord)
+-   Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
 
 ---
 
