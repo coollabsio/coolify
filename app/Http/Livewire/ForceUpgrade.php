@@ -3,7 +3,6 @@
 namespace App\Http\Livewire;
 
 use App\Jobs\InstanceAutoUpdateJob;
-use App\Models\Server;
 use Livewire\Component;
 
 class ForceUpgrade extends Component
