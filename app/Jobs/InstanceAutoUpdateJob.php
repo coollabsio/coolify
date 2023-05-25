@@ -66,11 +66,11 @@ class InstanceAutoUpdateJob implements ShouldQueue
                 ], $this->server);
             } else {
                 instant_remote_process([
-                    "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                    "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /tmp/upgrade.sh",
                 ], $this->server);
 
                 remote_process([
-                    "bash /data/coolify/source/upgrade.sh $this->latest_version"
+                    "bash /tmp/upgrade.sh $this->latest_version"
                 ], $this->server);
             }
         } catch (\Exception $e) {
