@@ -19,22 +19,19 @@ class InstanceAutoUpdateJob implements ShouldQueue
     private string $current_version;
     private Server $server;
 
-    public function __construct(private bool $force = false, Server|null $server = null)
+    public function __construct(private bool $force = false)
     {
         Log::info("InstanceAutoUpdateJob");
-        if (is_null($server)) {
-            Log::info("InstanceAutoUpdateJob: server is null");
-            if (config('app.env') === 'local') {
-                $server_name = 'testing-local-docker-container';
-            } else {
-                $server_name = 'localhost';
-            }
-            $this->server = Server::where('name', $server_name)->first();
-            Log::info("InstanceAutoUpdateJob: server is " . $this->server->name);
+        if (config('app.env') === 'local') {
+            $server_name = 'testing-local-docker-container';
         } else {
-            $this->server = $server;
+            $server_name = 'localhost';
         }
-        $instance_settings = InstanceSettings::get();
+        $server = Server::where('name', $server_name)->first();
+        if (is_null($server)) {
+            throw new \Exception("Server not found");
+        }
+        $this->server = $server;
 
         $this->latest_version = get_latest_version_of_coolify();
         $this->current_version = config('version');
@@ -42,6 +39,8 @@ class InstanceAutoUpdateJob implements ShouldQueue
         Log::info("InstanceAutoUpdateJob: current version is " . $this->current_version);
 
         if (!$this->force) {
+            Log::info("InstanceAutoUpdateJob: force is false");
+            $instance_settings = InstanceSettings::get();
             if (!$instance_settings->is_auto_update_enabled) {
                 return $this->delete();
             }
@@ -70,18 +69,13 @@ class InstanceAutoUpdateJob implements ShouldQueue
             Log::info('InstanceAutoUpdateJob: Starting update process');
             if (config('app.env') === 'local') {
                 instant_remote_process([
-                    "sleep 2"
-                ], $this->server);
-                remote_process([
                     "sleep 10"
                 ], $this->server);
+                Log::info("InstanceAutoUpdateJob completed");
             } else {
-                Log::info('InstanceAutoUpdateJob: Downloading upgrade script');
+                Log::info('InstanceAutoUpdateJob: Running upgrade script');
                 instant_remote_process([
                     "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                ], $this->server);
-                Log::info('InstanceAutoUpdateJob: Running upgrade script');
-                remote_process([
                     "bash /data/coolify/source/upgrade.sh $this->latest_version"
                 ], $this->server);
             }
