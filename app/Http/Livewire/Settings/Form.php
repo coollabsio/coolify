@@ -60,7 +60,7 @@ class Form extends Component
         if (empty($this->settings->fqdn)) {
             remote_process([
                 "rm -f $dynamic_config_path/coolify.yaml",
-            ], $server, ActivityTypes::INLINE->value);
+            ], $server);
         } else {
             $url = Url::fromString($this->settings->fqdn);
             $host = $url->getHost();
@@ -106,7 +106,7 @@ class Form extends Component
             remote_process([
                 "mkdir -p $dynamic_config_path",
                 "echo '$base64' | base64 -d > $dynamic_config_path/coolify.yaml",
-            ], $server, ActivityTypes::INLINE->value);
+            ], $server);
         }
     }
 }

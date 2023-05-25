@@ -26,7 +26,7 @@ class RunCommand extends Component
     {
         try {
             $this->validate();
-            $activity = remote_process([$this->command], Server::where('uuid', $this->server)->first(), ActivityTypes::INLINE->value);
+            $activity = remote_process([$this->command], Server::where('uuid', $this->server)->first());
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Exception $e) {
             return general_error_handler($e);

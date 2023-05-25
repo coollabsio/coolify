@@ -71,7 +71,7 @@ class InstanceAutoUpdateJob implements ShouldQueue
 
                 remote_process([
                     "bash /data/coolify/source/upgrade.sh $this->latest_version"
-                ], $this->server, ActivityTypes::INLINE->value);
+                ], $this->server);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());

@@ -55,7 +55,7 @@ class InstallProxy
             "echo 'Starting proxy...'",
             'docker compose up -d --remove-orphans',
             "echo 'Proxy installed successfully...'"
-        ], $server, ActivityTypes::INLINE->value);
+        ], $server);
 
         return $activity;
     }

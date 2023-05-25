@@ -17,7 +17,7 @@ class InstallDocker
             "echo '{$config}' | base64 -d > /etc/docker/daemon.json",
             "echo Restarting Docker...",
             "systemctl restart docker"
-        ], $server, ActivityTypes::INLINE->value);
+        ], $server);
 
         return $activity;
     }
