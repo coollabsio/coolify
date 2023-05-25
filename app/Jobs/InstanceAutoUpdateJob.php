@@ -65,16 +65,8 @@ class InstanceAutoUpdateJob implements ShouldQueue
                     "sleep 10"
                 ], $this->server);
             } else {
-                $cdn = "https://coolify-cdn.b-cdn.net/files";
                 instant_remote_process([
-                    "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
-                    "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
-                    "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
-                    "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                ], $this->server);
-
-                instant_remote_process([
-                    "docker compose -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml pull",
+                    "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /data/coolify/source/upgrade.sh",
                 ], $this->server);
 
                 remote_process([

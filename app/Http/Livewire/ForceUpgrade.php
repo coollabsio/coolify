@@ -9,7 +9,7 @@ class ForceUpgrade extends Component
 {
     public function upgrade()
     {
-        dispatch_sync(new InstanceAutoUpdateJob(force: true));
         $this->emit('updateInitiated');
+        dispatch_sync(new InstanceAutoUpdateJob(force: true));
     }
 }

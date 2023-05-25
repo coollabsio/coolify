@@ -64,26 +64,44 @@
             @endif
         </ul>
     </nav>
-    <div class="absolute top-0 right-0 pt-2">
-        <div class="dropdown dropdown-left">
-            <label tabindex="0" class="btn btn-ghost no-animation hover:bg-transparent">
-                <div class="flex items-center justify-center gap-2 avatar placeholder">
-                    <div class="w-10 border rounded-full border-neutral-600 text-warning">
-                        <span class="text-xs">{{ Str::of(auth()->user()->name)->substr(0, 2)->upper() }}</span>
-                    </div>
-                    <x-chevron-down />
+    <div class="absolute top-0 right-0 p-2">
+        <div class="dropdown dropdown-left dropdown-hover">
+            <label tabindex="0" class="btn btn-ghost no-animation hover:bg-transparent hover:text-warning">
+                <div class="flex items-center justify-center gap-2 placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
+                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                        <path d="M4 6l16 0" />
+                        <path d="M4 12l16 0" />
+                        <path d="M4 18l16 0" />
+                    </svg>
                 </div>
             </label>
             <ul tabindex="0"
                 class="p-2 mt-3 text-white rounded shadow menu menu-compact dropdown-content bg-coolgray-200 w-52">
                 <li>
-                    <a href="/profile">
-                        Profile
+                    <a class="hover:no-underline hover:bg-coollabs" href="/profile">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                            <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                            <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
+                        </svg> Profile
                     </a>
                 </li>
                 <li>
-                    <a href="/profile/team">
-                        Team
+                    <a class="hover:no-underline hover:bg-coollabs" href="/profile/team">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                            <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+                            <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                            <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+                            <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                            <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+                        </svg> Team
                     </a>
                 </li>
                 @if (auth()->user()->isPartOfRootTeam())
@@ -94,7 +112,15 @@
                 <form action="/logout" method="POST">
                     <li>
                         @csrf
-                        <button>Logout</button>
+                        <button class="text-sm hover:bg-coollabs"> <svg xmlns="http://www.w3.org/2000/svg" class="icon"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M13 12v.01" />
+                                <path d="M3 21h18" />
+                                <path d="M5 21v-16a2 2 0 0 1 2 -2h7.5m2.5 10.5v7.5" />
+                                <path d="M14 7h7m-3 -3l3 3l-3 3" />
+                            </svg>Logout</button>
                     </li>
                 </form>
             </ul>

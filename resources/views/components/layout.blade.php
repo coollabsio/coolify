@@ -35,6 +35,7 @@
     <main>
         {{ $slot }}
     </main>
+    <livewire:upgrading />
     <a
         class="fixed text-xs cursor-pointer right-2 bottom-1 opacity-60 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @auth
@@ -46,48 +47,6 @@
                         window.dispatchEvent(new CustomEvent('slash'));
                     }
                 }
-            })
-
-            function checkIfIamDead() {
-                console.log('Checking server\'s pulse...')
-                checkIfIamDeadInterval = setInterval(async () => {
-                    try {
-                        const res = await fetch('/api/health');
-                        if (res.ok) {
-                            console.log('I\'m alive. Waiting for server to be dead...');
-                        }
-                    } catch (error) {
-                        console.log('I\'m dead. Charging... Standby... Bzz... Bzz...')
-                        checkHealth();
-                        if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
-                    }
-
-                    return;
-                }, 2000);
-            }
-
-            function checkHealth() {
-                console.log('Checking server\'s health...')
-                checkHealthInterval = setInterval(async () => {
-                    try {
-                        const res = await fetch('/api/health');
-                        if (res.ok) {
-                            console.log('Server is back online. Reloading...')
-                            if (checkHealthInterval) clearInterval(checkHealthInterval);
-                            window.location.reload();
-                        }
-                    } catch (error) {
-                        console.log('Waiting for server to come back from dead...');
-                    }
-
-                    return;
-                }, 2000);
-            }
-            Livewire.on('updateInitiated', () => {
-                let checkHealthInterval = null;
-                let checkIfIamDeadInterval = null;
-                console.log('Update initiated. Waiting for server to be dead...')
-                checkIfIamDead();
             })
             Livewire.on('reloadWindow', () => {
                 window.location.reload();

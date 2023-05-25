@@ -97,3 +97,31 @@ main {
 .magic-item-focused {
     @apply bg-coolgray-400 text-white;
 }
+
+
+.lds-heart {
+	animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+@keyframes lds-heart {
+	0% {
+		transform: scale(1);
+	}
+	5% {
+		transform: scale(1.2);
+	}
+	39% {
+		transform: scale(0.85);
+	}
+	45% {
+		transform: scale(1);
+	}
+	60% {
+		transform: scale(0.95);
+	}
+	100% {
+		transform: scale(0.9);
+	}
+}
+.bg-coollabs-gradient {
+	@apply text-transparent bg-clip-text bg-gradient-to-r from-coollabs via-pink-500 to-red-500;
+}
