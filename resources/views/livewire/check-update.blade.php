@@ -1,6 +1,6 @@
 <div>
-    <x-inputs.button wire:click='checkUpdate' type="submit">
-        Check Update</x-inputs.button>
+    <x-forms.button wire:click='checkUpdate' type="submit">
+        Check Update</x-forms.button>
     @if ($updateAvailable)
         Update available
     @endif

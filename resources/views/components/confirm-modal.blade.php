@@ -22,8 +22,8 @@
         <div class="flex flex-col items-center justify-center h-full">
             <div class="pb-5 text-white" x-text="message"></div>
             <div>
-                <x-inputs.button x-on:click='confirmed()'>Confirm</x-inputs.button>
-                <x-inputs.button x-on:click="open = false">Cancel</x-inputs.button>
+                <x-forms.button x-on:click='confirmed()'>Confirm</x-forms.button>
+                <x-forms.button x-on:click="open = false">Cancel</x-forms.button>
             </div>
         </div>
     </div>

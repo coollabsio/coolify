@@ -5,11 +5,11 @@
         <div class="flex items-center gap-2 mb-2">
             <h2 class="pb-0">Proxy</h2>
             @if ($server->extra_attributes->proxy_type)
-                <x-inputs.button isHighlighted wire:click.prevent="installProxy">
+                <x-forms.button isHighlighted wire:click.prevent="installProxy">
                     Start/Reconfigure Proxy
-                </x-inputs.button>
-                <x-inputs.button x-on:click.prevent="stopProxy = true">Stop
-                </x-inputs.button>
+                </x-forms.button>
+                <x-forms.button x-on:click.prevent="stopProxy = true">Stop
+                </x-forms.button>
                 <div wire:poll.5000ms="proxyStatus">
                     @if (
                         $server->extra_attributes->last_applied_proxy_settings &&
@@ -46,13 +46,13 @@
                         <form wire:submit.prevent='saveConfiguration'>
                             <div class="flex items-center gap-2">
                                 <h3>Configuration</h3>
-                                <x-inputs.button type="submit">Save</x-inputs.button>
-                                <x-inputs.button wire:click.prevent="resetProxy">
+                                <x-forms.button type="submit">Save</x-forms.button>
+                                <x-forms.button wire:click.prevent="resetProxy">
                                     Reset Configuration
-                                </x-inputs.button>
+                                </x-forms.button>
                             </div>
                             <h4>traefik.conf</h4>
-                            <x-inputs.textarea class="text-xs" noDirty name="proxy_settings"
+                            <x-forms.textarea class="text-xs" noDirty name="proxy_settings"
                                 wire:model.defer="proxy_settings" rows="30" />
                         </form>
                     @endif
@@ -64,7 +64,7 @@
                     {{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}
                 </option>
             </select>
-            <x-inputs.button wire:click="setProxy">Set Proxy</x-inputs.button>
+            <x-forms.button wire:click="setProxy">Set Proxy</x-forms.button>
         @endif
     @else
         <p>Server is not validated. Validate first.</p>

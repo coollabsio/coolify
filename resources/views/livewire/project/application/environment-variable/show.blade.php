@@ -1,17 +1,17 @@
 <div x-data="{ deleteEnvironment: false }">
     <form wire:submit.prevent='submit' class="flex flex-col max-w-fit">
         <div class="flex gap-2">
-            <x-inputs.input label="Name" id="env.key" />
-            <x-inputs.input label="Value" id="env.value" />
-            <x-inputs.checkbox disabled class="flex-col items-center" id="env.is_build_time" label="Build Variable?" />
+            <x-forms.input label="Name" id="env.key" />
+            <x-forms.input label="Value" id="env.value" />
+            <x-forms.checkbox disabled class="flex-col items-center" id="env.is_build_time" label="Build Variable?" />
         </div>
         <div class="pt-2">
-            <x-inputs.button type="submit">
+            <x-forms.button type="submit">
                 Update
-            </x-inputs.button>
-            <x-inputs.button x-on:click.prevent="deleteEnvironment = true">
+            </x-forms.button>
+            <x-forms.button x-on:click.prevent="deleteEnvironment = true">
                 Delete
-            </x-inputs.button>
+            </x-forms.button>
         </div>
     </form>
     <x-naked-modal show="deleteEnvironment" message="Are you sure you want to delete {{ $env->key }}?" />

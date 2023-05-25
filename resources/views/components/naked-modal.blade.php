@@ -7,10 +7,10 @@
     <div class="relative modal-box">
         <div class="pb-8 text-base font-bold text-white">{{ $message }}</div>
         <div class="flex justify-end gap-4 text-xs">
-            <x-inputs.button wire:click='{{ $action }}' x-on:click="{{ $show }} = false">
+            <x-forms.button wire:click='{{ $action }}' x-on:click="{{ $show }} = false">
                 Yes
-            </x-inputs.button>
-            <x-inputs.button x-on:click="{{ $show }} = false">No</x-inputs.button>
+            </x-forms.button>
+            <x-forms.button x-on:click="{{ $show }} = false">No</x-forms.button>
         </div>
     </div>
 </div>

@@ -5,12 +5,12 @@
             <h1>GitHub App</h1>
             <div class="flex gap-2 ">
                 @if ($github_app->app_id)
-                    <x-inputs.button type="submit">Save</x-inputs.button>
-                    <x-inputs.button x-on:click.prevent="deleteSource = true">
+                    <x-forms.button type="submit">Save</x-forms.button>
+                    <x-forms.button x-on:click.prevent="deleteSource = true">
                         Delete
-                    </x-inputs.button>
+                    </x-forms.button>
                     <a href="{{ $installation_url }}">
-                        <x-inputs.button>
+                        <x-forms.button>
                             @if ($github_app->installation_id)
                                 Update Repositories
                                 <x-external-link />
@@ -18,43 +18,43 @@
                                 Install Repositories
                                 <x-external-link />
                             @endif
-                        </x-inputs.button>
+                        </x-forms.button>
                     </a>
                 @else
-                    <x-inputs.button disabled type="submit">Save</x-inputs.button>
-                    <x-inputs.button x-on:click.prevent="deleteSource = true">
+                    <x-forms.button disabled type="submit">Save</x-forms.button>
+                    <x-forms.button x-on:click.prevent="deleteSource = true">
                         Delete
-                    </x-inputs.button>
+                    </x-forms.button>
                     <form x-data>
-                        <x-inputs.button isHighlighted x-on:click.prevent="createGithubApp">Create GitHub Application
-                        </x-inputs.button>
+                        <x-forms.button isHighlighted x-on:click.prevent="createGithubApp">Create GitHub Application
+                        </x-forms.button>
                     </form>
                 @endif
             </div>
         </div>
 
-        <x-inputs.input id="github_app.name" label="App Name" required />
+        <x-forms.input id="github_app.name" label="App Name" required />
 
         @if ($github_app->app_id)
-            <x-inputs.input id="github_app.organization" label="Organization" disabled
+            <x-forms.input id="github_app.organization" label="Organization" disabled
                 placeholder="Personal user if empty" />
         @else
-            <x-inputs.input id="github_app.organization" label="Organization" placeholder="Personal user if empty" />
+            <x-forms.input id="github_app.organization" label="Organization" placeholder="Personal user if empty" />
         @endif
-        <x-inputs.input id="github_app.api_url" label="API Url" disabled />
-        <x-inputs.input id="github_app.html_url" label="HTML Url" disabled />
-        <x-inputs.input id="github_app.custom_user" label="User" required />
-        <x-inputs.input type="number" id="github_app.custom_port" label="Port" required />
+        <x-forms.input id="github_app.api_url" label="API Url" disabled />
+        <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
+        <x-forms.input id="github_app.custom_user" label="User" required />
+        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
 
         @if ($github_app->app_id)
-            <x-inputs.input type="number" id="github_app.app_id" label="App Id" disabled />
-            <x-inputs.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
-            <x-inputs.input id="github_app.client_id" label="Client Id" type="password" disabled />
-            <x-inputs.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
-            <x-inputs.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
-            <x-inputs.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
+            <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+            <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
+            <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
+            <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
+            <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
+            <x-forms.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
         @else
-            <x-inputs.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
+            <x-forms.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
             <div class="py-2">
 
             </div>

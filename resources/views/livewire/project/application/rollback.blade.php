@@ -1,7 +1,7 @@
 <div x-init="$wire.loadImages">
     <div class="flex gap-2">
         <h2>Rollback</h2>
-        <x-inputs.button isHighlighted wire:click='loadImages'>Refresh</x-inputs.button>
+        <x-forms.button isHighlighted wire:click='loadImages'>Refresh</x-forms.button>
     </div>
     <div wire:loading wire:target='loadImages'>
         <x-loading />
@@ -23,13 +23,13 @@
                         </div>
                         <div class="flex justify-end p-2">
                             @if (data_get($image, 'is_current'))
-                                <x-inputs.button disabled tooltip="This image is currently running.">
+                                <x-forms.button disabled tooltip="This image is currently running.">
                                     Rollback
-                                </x-inputs.button>
+                                </x-forms.button>
                             @else
-                                <x-inputs.button wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
+                                <x-forms.button wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
                                     Rollback
-                                </x-inputs.button>
+                                </x-forms.button>
                             @endif
                         </div>
                     </div>

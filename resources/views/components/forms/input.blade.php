@@ -1,23 +1,17 @@
 @props([
-    'id' => $attributes->has('id') || $attributes->has('label'),
+    'id' => $attributes->has('id'),
     'type' => $attributes->get('type') ?? 'text',
-    'required' => null,
     'label' => $attributes->has('label'),
-    'helper' => $attributes->has('helper'),
-    'noLabel' => $attributes->has('noLabel'),
-    'noDirty' => $attributes->has('noDirty'),
+    'required' => null,
     'disabled' => null,
+    'helper' => $attributes->has('helper'),
+    'noDirty' => $attributes->has('noDirty'),
 ])
-
 <div {{ $attributes->merge(['class' => 'w-full form-control']) }}>
-    @if (!$noLabel)
+    @if ($label)
         <label class="label">
             <span class="label-text">
-                @if ($label)
-                    {{ $label }}
-                @else
-                    {{ $id }}
-                @endif
+                {{ $label }}
                 @if ($required)
                     <span class="text-warning">*</span>
                 @endif
@@ -41,9 +35,11 @@
             </span>
         </label>
     @endif
-    <input {{ $attributes }} type={{ $type }} name={{ $id }} wire:model.defer={{ $id }}
-        @if ($disabled !== null) disabled @endif @if ($required !== null) required @endif
-        @if (!$noDirty) wire:dirty.class="input-warning" @endif />
+    <input type={{ $type }}
+        @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endisset
+        @if ($disabled !== null) disabled @endif
+        @if ($required !== null) required @endif
+        @if (!$noDirty && $id) wire:dirty.class="input-warning" @endif {{ $attributes }} />
     @error($id)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>

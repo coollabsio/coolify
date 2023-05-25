@@ -1,5 +1,7 @@
 {
     "auth.login": "Login",
+    "auth.already-registered": "Already registered?",
+    "auth.register-now": "Register now!",
     "auth.logout": "Logout",
     "auth.register": "Register",
     "auth.registration_disabled": "Registration is disabled.",
@@ -11,5 +13,6 @@
     "input.name": "Name",
     "input.email": "Email",
     "input.password": "Password",
-    "input.password.again": "Password Again"
+    "input.password.again": "Password Again",
+    "button.save": "Save"
 }
