@@ -43,9 +43,15 @@ return [
             'throw' => false,
         ],
 
+        'ssh-mux' => [
+            'driver' => 'local',
+            'root' => storage_path('app/ssh/mux'),
+            'visibility' => 'private',
+            'throw' => false,
+        ],
         'ssh-keys' => [
             'driver' => 'local',
-            'root' => storage_path('app/ssh-keys'),
+            'root' => storage_path('app/ssh/keys'),
             'visibility' => 'private',
             'throw' => false,
         ],

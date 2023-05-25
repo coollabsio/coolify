@@ -4,11 +4,8 @@ namespace App\Providers;
 
 use App\Jobs\CoolifyTask;
 use Illuminate\Queue\Events\JobProcessed;
-use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Str;
-use LocalStorage;
 
 class AppServiceProvider extends ServiceProvider
 {

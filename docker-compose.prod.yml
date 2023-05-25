@@ -7,7 +7,8 @@ services:
         source: /data/coolify/source/.env
         target: /var/www/html/.env
         read_only: true
-      - /data/coolify:/var/www/html/storage/app/
+      - /data/coolify/ssh:/var/www/html/storage/app/ssh
+      - /data/coolify/deployments:/var/www/html/storage/app/deployments
     environment:
       - APP_ENV=production
       - APP_DEBUG
