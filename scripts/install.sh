@@ -25,8 +25,8 @@ if ! [ -x "$(command -v docker)" ]; then
 fi
 
 mkdir -p /data/coolify/deployments
-mkdir -p /data/coolify/ssh-keys
-mkdir -p /data/coolify/proxy
+mkdir -p /data/coolify/ssh/keys
+mkdir -p /data/coolify/ssh/mux
 mkdir -p /data/coolify/source
 
 chown -R 9999:root /data
@@ -46,14 +46,14 @@ if [ ! -f /data/coolify/source/.env ]; then
     sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
 
-# Generate an ssh key (ed25519) at /data/coolify/ssh-keys/id.root@host.docker.internal
-if [ ! -f /data/coolify/ssh-keys/id.root@host.docker.internal ]; then
-    ssh-keygen -t ed25519 -f /data/coolify/ssh-keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh-keys/id.root@host.docker.internal
+# Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
+if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
+    ssh-keygen -t ed25519 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
+    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
 fi
 
 addSshKey() {
-    cat /data/coolify/ssh-keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
 }
 
