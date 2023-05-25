@@ -2,9 +2,9 @@
 
 namespace App\Console;
 
-use App\Jobs\InstanceAutoUpdate;
+use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\InstanceProxyCheckJob;
-use App\Jobs\InstanceDockerCleanup;
+use App\Jobs\InstanceDockerCleanupJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -17,8 +17,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('horizon:snapshot')->everyFiveMinutes();
 
-        $schedule->job(new InstanceDockerCleanup)->everyFiveMinutes();
-        $schedule->job(new InstanceAutoUpdate)->everyFifteenMinutes();
+        $schedule->job(new InstanceDockerCleanupJob)->everyFiveMinutes();
+        $schedule->job(new InstanceAutoUpdateJob)->everyFifteenMinutes();
         $schedule->job(new InstanceProxyCheckJob)->everyMinute();
     }
 
