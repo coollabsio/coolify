@@ -31,7 +31,6 @@
                         label="{{ __('input.password.again') }}" />
                 </div>
                 @endenv
-
                 <x-forms.button type="submit">{{ __('auth.register') }}</x-forms.button>
             </form>
             @if ($errors->any())
