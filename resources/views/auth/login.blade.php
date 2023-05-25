@@ -6,7 +6,8 @@
                 <h1 class="pb-0">{{ __('auth.login') }}</h1>
                 @if ($is_registration_enabled)
                     <a href="/register" class="flex justify-center pt-2 hover:no-underline">
-                        <x-forms.button type="submit">{{ __('auth.register-now') }}</x-forms.button>
+                        <button
+                            class="normal-case btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.register-now') }}</button>
                     </a>
                 @else
                     <div class="text-sm text-center">{{ __('auth.registration_disabled') }}</div>

@@ -5,7 +5,8 @@
             <div class="flex items-center gap-2">
                 <h1 class="pb-0">{{ __('auth.register') }}</h1>
                 <a href="/login" class="flex justify-center pt-2 hover:no-underline">
-                    <x-forms.button type="submit">{{ __('auth.already-registered') }}</x-forms.button>
+                    <button
+                        class="normal-case btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already-registered') }}</button>
                 </a>
             </div>
             <form action="/register" method="POST" class="flex flex-col gap-2">
