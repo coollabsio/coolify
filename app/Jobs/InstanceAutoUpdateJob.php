@@ -19,7 +19,7 @@ class InstanceAutoUpdateJob implements ShouldQueue
     private string $latest_version;
     private string $current_version;
     private Server $server;
-    private string $server_name = 'host.docker.internal';
+    private string $server_name = 'localhost';
 
     public function __construct(private bool $force = false)
     {
@@ -28,7 +28,7 @@ class InstanceAutoUpdateJob implements ShouldQueue
         }
 
         $instance_settings = InstanceSettings::get();
-        $this->server = Server::where('ip', $this->server_name)->first();
+        $this->server = Server::whereFirst('name', $this->server_name);
 
         if (!$instance_settings->is_auto_update_enabled || !$this->server) {
             return $this->delete();
