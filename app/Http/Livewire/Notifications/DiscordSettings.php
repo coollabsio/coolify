@@ -32,7 +32,7 @@ class DiscordSettings extends Component
             session(['currentTeam' => $this->model]);
         }
     }
-    public function sentTestMessage()
+    public function sendTestNotification()
     {
         Notification::send($this->model, new DemoNotification);
     }

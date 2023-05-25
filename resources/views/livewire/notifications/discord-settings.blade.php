@@ -14,7 +14,7 @@
             </x-inputs.button>
             <x-inputs.button
                 class="mt-4 btn btn-xs no-animation normal-case text-white btn-primary"
-                wire:click="sentTestMessage"
+                wire:click="sendTestNotification"
             >
                 Send test message
             </x-inputs.button>

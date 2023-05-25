@@ -4,6 +4,8 @@ namespace App\Http\Livewire\Notifications;
 
 use App\Models\Server;
 use App\Models\Team;
+use App\Notifications\DemoNotification;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class EmailSettings extends Component
@@ -48,7 +50,7 @@ class EmailSettings extends Component
     }
     public function sendTestNotification()
     {
-
+        Notification::send($this->model, new DemoNotification);
     }
     public function render()
     {
