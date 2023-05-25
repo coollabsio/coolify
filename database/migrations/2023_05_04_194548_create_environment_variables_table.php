@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('environment_variables', function (Blueprint $table) {
-            $table->id()->primary();
+            $table->id();
 
             $table->string('key');
             $table->string('value')->nullable();

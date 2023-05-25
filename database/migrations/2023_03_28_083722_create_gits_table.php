@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('gits', function (Blueprint $table) {
-            $table->id()->primary();
+            $table->id();
             $table->enum('type', ['github', 'gitlab', 'bitbucket', 'custom']);
 
             $table->string('api_url');

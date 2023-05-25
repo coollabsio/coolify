@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('standalone_dockers', function (Blueprint $table) {
-            $table->id()->primary();
+            $table->id();
             $table->string('name');
             $table->string('uuid')->unique();
             $table->string('network');

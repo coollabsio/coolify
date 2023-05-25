@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('local_persistent_volumes', function (Blueprint $table) {
-            $table->id()->primary();
+            $table->id();
             $table->string('uuid')->unique();
             $table->string('name');
             $table->string('mount_path');
