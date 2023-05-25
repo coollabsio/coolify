@@ -59,10 +59,10 @@ if (!function_exists('getProxyConfiguration')) {
                     "labels" => [
                         "traefik.enable=true",
                         "traefik.http.routers.traefik.entrypoints=http",
-                        'traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)',
                         "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
                         "traefik.http.routers.traefik.service=api@internal",
                         "traefik.http.services.traefik.loadbalancer.server.port=8080",
+                        // Global Middlewares
                         "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
                         "traefik.http.middlewares.gzip.compress=true",
                     ],

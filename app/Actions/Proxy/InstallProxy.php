@@ -2,12 +2,9 @@
 
 namespace App\Actions\Proxy;
 
-use App\Enums\ActivityTypes;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
-use Spatie\Url\Url;
 
 class InstallProxy
 {
@@ -37,16 +34,16 @@ class InstallProxy
         $server->extra_attributes->last_applied_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
 
-        $env_file_base64 = base64_encode(
-            $this->getEnvContents()
-        );
+        // $env_file_base64 = base64_encode(
+        //     $this->getEnvContents()
+        // );
         $activity = remote_process([
             ...$create_networks_command,
             "echo 'Docker networks created...'",
             "mkdir -p $proxy_path",
             "cd $proxy_path",
             "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
-            "echo '$env_file_base64' | base64 -d > $proxy_path/.env",
+            // "echo '$env_file_base64' | base64 -d > $proxy_path/.env",
             "echo 'Docker compose file created...'",
             "echo 'Pulling docker image...'",
             'docker compose pull -q',
@@ -60,18 +57,15 @@ class InstallProxy
         return $activity;
     }
 
-    protected function getEnvContents()
-    {
-        $instance_fqdn = InstanceSettings::get()->fqdn ?? config('app.url');
-        $url = Url::fromString($instance_fqdn);
-        $data = [
-            'TRAEFIK_DASHBOARD_HOST' => $url->getHost(),
-            'LETS_ENCRYPT_EMAIL' => '',
-        ];
+    // protected function getEnvContents()
+    // {
+    //     $data = [
+    //         'LETS_ENCRYPT_EMAIL' => '',
+    //     ];
 
-        return collect($data)
-            ->map(fn ($v, $k) => "{$k}={$v}")
-            ->push(PHP_EOL)
-            ->implode(PHP_EOL);
-    }
+    //     return collect($data)
+    //         ->map(fn ($v, $k) => "{$k}={$v}")
+    //         ->push(PHP_EOL)
+    //         ->implode(PHP_EOL);
+    // }
 }
