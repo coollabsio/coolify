@@ -15,7 +15,6 @@ class Form extends Component
     public $do_not_track;
     public $is_auto_update_enabled;
     public $is_registration_enabled;
-    public $is_https_forced;
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
@@ -28,14 +27,12 @@ class Form extends Component
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        $this->is_https_forced = $this->settings->is_https_forced;
     }
     public function instantSave()
     {
         $this->settings->do_not_track = $this->do_not_track;
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
-        $this->settings->is_https_forced = $this->is_https_forced;
         $this->settings->save();
         $this->emit('saved', 'Settings updated!');
     }

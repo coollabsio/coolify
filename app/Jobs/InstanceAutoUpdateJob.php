@@ -32,13 +32,15 @@ class InstanceAutoUpdateJob implements ShouldQueue
         Log::info($this->server);
         Log::info('Force: ' . $this->force);
 
-        if (!$instance_settings->is_auto_update_enabled || !$this->server) {
-            return $this->delete();
-        }
-
         $this->latest_version = get_latest_version_of_coolify();
+        Log::info('Latest version: ' . $this->latest_version);
         $this->current_version = config('version');
+        Log::info('Current version: ' . $this->current_version);
+
         if (!$this->force) {
+            if (!$instance_settings->is_auto_update_enabled || !$this->server) {
+                return $this->delete();
+            }
             Log::info('Checking if update available');
             try {
                 $this->check_if_update_available();
