@@ -29,6 +29,8 @@ class InstanceAutoUpdateJob implements ShouldQueue
 
         $instance_settings = InstanceSettings::get();
         $this->server = Server::where('name', $this->server_name)->firstOrFail();
+        Log::info($this->server);
+        Log::info('Force: ' . $this->force);
 
         if (!$instance_settings->is_auto_update_enabled || !$this->server) {
             return $this->delete();
