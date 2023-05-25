@@ -29,7 +29,6 @@ class InstanceAutoUpdateJob implements ShouldQueue
 
         $instance_settings = InstanceSettings::get();
         $this->server = Server::where('name', $this->server_name)->firstOrFail();
-        Log::info($this->server);
         Log::info('Force: ' . $this->force);
 
         $this->latest_version = get_latest_version_of_coolify();
@@ -38,6 +37,7 @@ class InstanceAutoUpdateJob implements ShouldQueue
         Log::info('Current version: ' . $this->current_version);
 
         if (!$this->force) {
+            Log::info("Checking if auto update enabled");
             if (!$instance_settings->is_auto_update_enabled || !$this->server) {
                 return $this->delete();
             }
