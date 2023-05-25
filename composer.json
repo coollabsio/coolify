@@ -26,7 +26,8 @@
         "spatie/laravel-schemaless-attributes": "^2.4",
         "spatie/url": "^2.2",
         "symfony/yaml": "^6.2",
-        "visus/cuid2": "^2.0.0"
+        "visus/cuid2": "^2.0.0",
+        "serversideup/spin": "^v1.1.0"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^2.13",
@@ -37,7 +38,6 @@
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^v2.4.0",
         "phpunit/phpunit": "^10.0.19",
-        "serversideup/spin": "^v1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^6.2",
         "toshy/bunnynet-php": "^3.0"
