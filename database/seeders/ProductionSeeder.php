@@ -14,6 +14,7 @@ use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
+use LocalStorage;
 
 class ProductionSeeder extends Seeder
 {
@@ -56,7 +57,7 @@ class ProductionSeeder extends Seeder
 
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";
-        $coolify_key = Storage::disk('local')->get("ssh-keys/{$coolify_key_name}");
+        $coolify_key = LocalStorage::ssh_keys()->get("{$coolify_key_name}");
 
         if ($coolify_key) {
             $private_key = PrivateKey::find(0);

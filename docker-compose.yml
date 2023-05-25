@@ -10,6 +10,7 @@ services:
             - coolify
         depends_on:
             - postgres
+            - redis
 
     postgres:
         image: postgres:15-alpine

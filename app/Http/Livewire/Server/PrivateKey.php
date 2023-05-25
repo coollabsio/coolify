@@ -7,6 +7,7 @@ use App\Models\Server;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
+use LocalStorage;
 
 class PrivateKey extends Component
 {
@@ -19,8 +20,7 @@ class PrivateKey extends Component
             'private_key_id' => $private_key_id
         ]);
         // Delete the old ssh mux file to force a new one to be created
-        Storage::disk('local')->delete(".ssh/ssh_mux_{$server->first()->ip}_{$server->first()->port}_{$server->first()->user}");
-
+        LocalStorage::ssh_mux()->delete("{$server->first()->ip}_{$server->first()->port}_{$server->first()->user}");
         return redirect()->route('server.show', $this->parameters['server_uuid']);
     }
     public function mount()

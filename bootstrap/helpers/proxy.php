@@ -7,6 +7,9 @@ if (!function_exists('getProxyConfiguration')) {
     function getProxyConfiguration(Server $server)
     {
         $proxy_path = config('coolify.proxy_config_path');
+        if (config('app.env') === 'local') {
+            $proxy_path = $proxy_path . '/testing-host-1/';
+        }
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();

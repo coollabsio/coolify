@@ -21,7 +21,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
         public string|null $application_id = null,
     ) {
         if ($this->application_id) {
-            $this->application = Application::find($this->application_id)->first();
+            $this->application = Application::find($this->application_id);
         }
     }
     public function uniqueId(): string

@@ -53,6 +53,8 @@ class Deploy extends Component
 
     public function stop()
     {
-        dispatch(new ContainerStopJob($this->application->id, $this->destination->server));
+        instant_remote_process(["docker rm -f {$this->application->uuid}"], $this->application->destination->server);
+        $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
+        $this->application->save();
     }
 }

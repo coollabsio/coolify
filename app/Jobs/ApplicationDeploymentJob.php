@@ -18,6 +18,8 @@ use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
+use LocalStorage;
+use Log;
 use Spatie\Url\Url;
 
 class ApplicationDeploymentJob implements ShouldQueue
@@ -203,7 +205,7 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
             $this->fail();
         } finally {
             if (isset($this->docker_compose)) {
-                Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
+                LocalStorage::deployments()->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
             }
             $this->execute_now(["docker rm -f {$this->deployment_uuid} >/dev/null 2>&1"], hideFromOutput: true);
         }

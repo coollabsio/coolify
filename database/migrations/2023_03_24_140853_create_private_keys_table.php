@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('private_keys', function (Blueprint $table) {
-            $table->id();
+            $table->bigIncrements('id');
             $table->string('uuid')->unique();
             $table->string('name');
             $table->string('description')->nullable();

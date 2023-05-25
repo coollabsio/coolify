@@ -2,8 +2,12 @@
 
 namespace App\Http\Livewire\Settings;
 
+use App\Enums\ActivityTypes;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
+use App\Models\Server;
 use Livewire\Component;
+use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
 class Form extends Component
 {
@@ -44,5 +48,59 @@ class Form extends Component
         }
         $this->validate();
         $this->settings->save();
+        if (isset($this->settings->fqdn)) {
+            if (config('app.env') == 'local') {
+                $server = Server::findOrFail(1);
+                $dynamic_config_path = '/data/coolify/proxy/dynamic';
+            } else {
+                $server = Server::findOrFail(0);
+                $dynamic_config_path = '/traefik/dynamic';
+            }
+            $url = Url::fromString($this->settings->fqdn);
+            $host = $url->getHost();
+            $schema = $url->getScheme();
+            $entryPoints = [
+                0 => 'http',
+            ];
+            if ($schema === 'https') {
+                $entryPoints[] = 'https';
+            }
+            $traefik_dynamic_conf = [
+                'http' =>
+                [
+                    'routers' =>
+                    [
+                        'coolify' =>
+                        [
+                            'entryPoints' => $entryPoints,
+                            'service' => 'coolify',
+                            'rule' => "Host(`{$host}`)",
+                        ],
+                    ],
+                    'services' =>
+                    [
+                        'coolify' =>
+                        [
+                            'loadBalancer' =>
+                            [
+                                'servers' =>
+                                [
+                                    0 =>
+                                    [
+                                        'url' => 'http://coolify:80',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+            $yaml = Yaml::dump($traefik_dynamic_conf);
+            $base64 = base64_encode($yaml);
+            remote_process([
+                "mkdir -p $dynamic_config_path",
+                "echo '$base64' | base64 -d > $dynamic_config_path/coolify.yaml",
+            ], $server, ActivityTypes::INLINE->value);
+        }
     }
 }
