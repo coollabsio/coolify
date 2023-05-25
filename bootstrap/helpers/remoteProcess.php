@@ -2,6 +2,7 @@
 
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
+use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Process;
@@ -16,7 +17,7 @@ use Spatie\Activitylog\Models\Activity;
 function remote_process(
     array   $command,
     Server  $server,
-    string $type,
+    string $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
 ): Activity {

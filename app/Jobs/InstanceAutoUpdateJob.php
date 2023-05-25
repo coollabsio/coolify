@@ -10,77 +10,79 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Log;
 
 class InstanceAutoUpdateJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct()
-    {
-        $instance_settings = InstanceSettings::get();
-        if (!$instance_settings->is_auto_update_enabled) {
-            $this->delete();
-        }
-    }
+    private string $latest_version;
+    private string $current_version;
+    private Server $server;
+    private string $server_name = 'host.docker.internal';
 
-    /**
-     * Execute the job.
-     */
-    public function handle(): void
+    public function __construct(private bool $force = false)
     {
         if (config('app.env') === 'local') {
-            $latest_version = get_latest_version_of_coolify();
-            $current_version = config('version');
-            if ($latest_version === $current_version) {
-                return;
-            }
-            if (version_compare($latest_version, $current_version, '<')) {
-                return;
-            }
+            $this->server_name = 'coolify-testing-host';
+        }
 
-            $server = Server::where('ip', 'coolify-testing-host')->first();
-            if (!$server) {
-                return;
-            }
-            instant_remote_process([
-                "sleep 2"
-            ], $server);
-            remote_process([
-                "sleep 10"
-            ], $server, ActivityTypes::INLINE->value);
-        } else {
-            $latest_version = get_latest_version_of_coolify();
-            $current_version = config('version');
-            if ($latest_version === $current_version) {
-                return;
-            }
-            if (version_compare($latest_version, $current_version, '<')) {
-                return;
-            }
+        $instance_settings = InstanceSettings::get();
+        $this->server = Server::where('ip', $this->server_name)->first();
 
-            $cdn = "https://coolify-cdn.b-cdn.net/files";
-            $server = Server::where('ip', 'host.docker.internal')->first();
-            if (!$server) {
-                return;
+        if (!$instance_settings->is_auto_update_enabled || !$this->server) {
+            return $this->delete();
+        }
+
+        $this->latest_version = get_latest_version_of_coolify();
+        $this->current_version = config('version');
+        if (!$this->force) {
+            try {
+                $this->check_if_update_available();
+            } catch (\Exception $e) {
+                Log::error($e->getMessage());
+                return $this->delete();
             }
+        }
+    }
+    private function check_if_update_available()
+    {
+        if ($this->latest_version === $this->current_version) {
+            throw new \Exception("Already on latest version");
+        }
+        if (version_compare($this->latest_version, $this->current_version, '<')) {
+            throw new \Exception("Already on latest version");
+        }
+    }
+    public function handle(): void
+    {
+        try {
+            if (config('app.env') === 'local') {
+                instant_remote_process([
+                    "sleep 2"
+                ], $this->server);
+                remote_process([
+                    "sleep 10"
+                ], $this->server);
+            } else {
+                $cdn = "https://coolify-cdn.b-cdn.net/files";
+                instant_remote_process([
+                    "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
+                    "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
+                    "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
+                    "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                ], $this->server);
 
-            instant_remote_process([
-                "curl -fsSL $cdn/docker-compose.yml -o /data/coolify/source/docker-compose.yml",
-                "curl -fsSL $cdn/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml",
-                "curl -fsSL $cdn/.env.production -o /data/coolify/source/.env.production",
-                "curl -fsSL $cdn/upgrade.sh -o /data/coolify/source/upgrade.sh",
-            ], $server);
+                instant_remote_process([
+                    "docker compose -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml pull",
+                ], $this->server);
 
-            instant_remote_process([
-                "docker compose -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml pull",
-            ], $server);
-
-            remote_process([
-                "bash /data/coolify/source/upgrade.sh $latest_version"
-            ], $server, ActivityTypes::INLINE->value);
+                remote_process([
+                    "bash /data/coolify/source/upgrade.sh $this->latest_version"
+                ], $this->server, ActivityTypes::INLINE->value);
+            }
+        } catch (\Exception $e) {
+            Log::error($e->getMessage());
         }
     }
 }
