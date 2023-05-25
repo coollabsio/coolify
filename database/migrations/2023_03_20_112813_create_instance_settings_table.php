@@ -20,16 +20,11 @@ return new class extends Migration
             $table->integer('public_port_min')->default(9000);
             $table->integer('public_port_max')->default(9100);
             // $table->string('custom_dns_servers')->default('1.1.1.1,8.8.8.8');
-
             $table->boolean('do_not_track')->default(false);
-
             $table->boolean('is_auto_update_enabled')->default(true);
             // $table->boolean('is_dns_check_enabled')->default(true);
             $table->boolean('is_registration_enabled')->default(true);
             $table->boolean('is_https_forced')->default(true);
-
-            $table->schemalessAttributes('extra_attributes');
-
             $table->timestamps();
         });
     }

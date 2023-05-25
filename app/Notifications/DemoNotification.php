@@ -2,13 +2,14 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Channels\CoolifyEmailChannel;
 use App\Notifications\Channels\DiscordChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TestMessage extends Notification
+class DemoNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -27,7 +28,10 @@ class TestMessage extends Notification
      */
     public function via(object $notifiable): array
     {
-        return ['mail', DiscordChannel::class];
+        $channels = [];
+        $notifiable->extra_attributes?->get('smtp_active') && $channels[] = CoolifyEmailChannel::class;
+        $notifiable->extra_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
+        return $channels;
     }
 
     /**
@@ -35,33 +39,16 @@ class TestMessage extends Notification
      */
     public function toMail(object $notifiable): MailMessage
     {
-        $smtp = [
-            "transport" => "smtp",
-            "host" => "mailpit",
-            "port" => 1025,
-            "encryption" => 'tls',
-            "username" => null,
-            "password" => null,
-            "timeout" => null,
-            "local_domain" => null,
-        ];
-        config()->set('mail.mailers.smtp', $smtp);
-
-        \Illuminate\Support\Facades\Mail::mailer('smtp')
-            ->to('ask@me.com')
-            ->send(new \App\Mail\ExampleMail);
-
-
-
         return (new MailMessage)
+                    ->subject('Coolify demo notification')
                     ->line('Welcome to Coolify!')
+                    ->error()
                     ->action('Go to dashboard', url('/'))
                     ->line('We need your attention for disk usage.');
     }
 
     public function toDiscord(object $notifiable): string
     {
-        ray('1111');
         return 'Welcome to Coolify! We need your attention for disk usage. [Go to dashboard]('.url('/').')';
     }
 
