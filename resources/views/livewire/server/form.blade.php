@@ -13,8 +13,8 @@
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
                 @if ($server->id === 0)
-                    <x-forms.input id="server.name" label="Name" readonly />
-                    <x-forms.input id="server.description" label="Description" readonly required />
+                    <x-forms.input id="server.name" label="Name" readonly required />
+                    <x-forms.input id="server.description" label="Description" readonly />
                 @else
                     <x-forms.input id="server.name" label="Name" required />
                     <x-forms.input id="server.description" label="Description" />
@@ -25,11 +25,11 @@
             </div>
             <div class="flex flex-col">
                 @if ($server->id === 0)
-                    <x-forms.input id="server.ip" label="IP Address" readonly />
-                    <x-forms.input id="server.user" label="User" readonly />
-                    <x-forms.input type="number" id="server.port" label="Port" readonly />
+                    <x-forms.input id="server.ip" label="IP Address" readonly required />
+                    <x-forms.input id="server.user" label="User" readonly required />
+                    <x-forms.input type="number" id="server.port" label="Port" readonly required />
                 @else
-                    <x-forms.input id="server.ip" label="IP Address" required readonly />
+                    <x-forms.input id="server.ip" label="IP Address" readonly required />
                     <div class="flex gap-2">
                         <x-forms.input id="server.user" label="User" required />
                         <x-forms.input type="number" id="server.port" label="Port" required />
