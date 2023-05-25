@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Enums\ActivityTypes;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -19,29 +18,27 @@ class InstanceAutoUpdateJob implements ShouldQueue
     private string $latest_version;
     private string $current_version;
     private Server $server;
-    private string $server_name = 'localhost';
 
-    public function __construct(private bool $force = false)
+    public function __construct(private bool $force = false, Server|null $server = null)
     {
-        if (config('app.env') === 'local') {
-            $this->server_name = 'coolify-testing-host';
+        if (is_null($server)) {
+            if (config('app.env') === 'local') {
+                $server_name = 'testing-local-docker-container';
+            } else {
+                $server_name = 'localhost';
+            }
+            $this->server = Server::where('name', $server_name)->first();
+        } else {
+            $this->server = $server;
         }
-
         $instance_settings = InstanceSettings::get();
-        $this->server = Server::where('name', $this->server_name)->firstOrFail();
-        Log::info('Force: ' . $this->force);
 
         $this->latest_version = get_latest_version_of_coolify();
-        Log::info('Latest version: ' . $this->latest_version);
         $this->current_version = config('version');
-        Log::info('Current version: ' . $this->current_version);
-
         if (!$this->force) {
-            Log::info("Checking if auto update enabled");
-            if (!$instance_settings->is_auto_update_enabled || !$this->server) {
+            if (!$instance_settings->is_auto_update_enabled) {
                 return $this->delete();
             }
-            Log::info('Checking if update available');
             try {
                 $this->check_if_update_available();
             } catch (\Exception $e) {
@@ -70,11 +67,9 @@ class InstanceAutoUpdateJob implements ShouldQueue
                     "sleep 10"
                 ], $this->server);
             } else {
-                Log::info('Downloading upgrade script');
                 instant_remote_process([
                     "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /data/coolify/source/upgrade.sh",
                 ], $this->server);
-                Log::info('Running upgrade script');
                 remote_process([
                     "bash /data/coolify/source/upgrade.sh $this->latest_version"
                 ], $this->server);
