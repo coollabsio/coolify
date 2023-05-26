@@ -2,11 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-    @apply min-h-screen h-full bg-coolgray-100;
-}
 .scrollbar {
   @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
+}
+
+html {
+    @apply min-h-screen h-full bg-coolgray-100;
 }
 
 body {
