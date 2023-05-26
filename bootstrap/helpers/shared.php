@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Route;
 use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
 
+function is_https()
+{
+    return request()->secure();
+}
 function general_error_handler(\Throwable $e, $that = null, $isJson = false)
 {
     try {
