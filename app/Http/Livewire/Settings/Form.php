@@ -61,19 +61,6 @@ class Form extends Component
             $url = Url::fromString($this->settings->fqdn);
             $host = $url->getHost();
             $schema = $url->getScheme();
-            $middlewares = [];
-            $tls = [];
-            $entryPoints = [
-                0 => 'http',
-            ];
-            if ($schema === 'https') {
-                $entryPoints[] = 'https';
-                $middlewares[] = 'redirect-to-https@docker';
-                $tls = [
-                    'certresolver' => 'letsencrypt',
-                ];
-            }
-
             $traefik_dynamic_conf = [
                 'http' =>
                 [
@@ -81,11 +68,8 @@ class Form extends Component
                     [
                         'coolify' =>
                         [
-                            'entryPoints' => $entryPoints,
                             'service' => 'coolify',
                             'rule' => "Host(`{$host}`)",
-                            'middlewares' => $middlewares,
-                            'tls' => $tls,
                         ],
                     ],
                     'services' =>
@@ -106,6 +90,22 @@ class Form extends Component
                     ],
                 ],
             ];
+            $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'] = [
+                0 => 'http',
+            ];
+            if ($schema === 'https') {
+                $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'][] = 'https';
+                $traefik_dynamic_conf['http']['routers']['coolify']['tls'] = [
+                    'certresolver' => 'letsencrypt',
+                ];
+                $traefik_dynamic_conf['http']['routers']['coolify']['middlewares'] = [
+                    0 => 'redirect-to-https@docker',
+                ];
+            } else {
+                $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'] = [
+                    0 => 'http',
+                ];
+            }
             $yaml = Yaml::dump($traefik_dynamic_conf);
             if (config('app.env') == 'local') {
                 dump($yaml);
