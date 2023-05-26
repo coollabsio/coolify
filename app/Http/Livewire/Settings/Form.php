@@ -66,8 +66,11 @@ class Form extends Component
                 [
                     'routers' =>
                     [
-                        'coolify' =>
+                        'coolify-http' =>
                         [
+                            'entryPoints' => [
+                                0 => 'http',
+                            ],
                             'service' => 'coolify',
                             'rule' => "Host(`{$host}`)",
                         ],
@@ -90,26 +93,25 @@ class Form extends Component
                     ],
                 ],
             ];
-            $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'] = [
-                0 => 'http',
-            ];
+
             if ($schema === 'https') {
-                $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'][] = 'https';
-                $traefik_dynamic_conf['http']['routers']['coolify']['tls'] = [
-                    'certresolver' => 'letsencrypt',
-                ];
-                $traefik_dynamic_conf['http']['routers']['coolify']['middlewares'] = [
+                $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
                     0 => 'redirect-to-https@docker',
                 ];
-            } else {
-                $traefik_dynamic_conf['http']['routers']['coolify']['entryPoints'] = [
-                    0 => 'http',
+                $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
+                    'entryPoints' => [
+                        0 => 'https',
+                    ],
+                    'service' => 'coolify',
+                    'rule' => "Host(`{$host}`)",
+                    'tls' => [
+                        'certresolver' => 'letsencrypt',
+                    ],
                 ];
             }
-            $yaml = Yaml::dump($traefik_dynamic_conf);
+            $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
             if (config('app.env') == 'local') {
                 dump($yaml);
-                return;
             }
             $base64 = base64_encode($yaml);
             remote_process([
