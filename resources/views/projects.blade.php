@@ -12,7 +12,11 @@
             <a href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}"
                 class="box">{{ $project->name }}</a>
         @empty
-            No project found.
+            <div x-data>
+                No project found. Use the <button x-on:click="$dispatch('slash')" class='text-white underline'>magic
+                    bar</button> to create a new
+                project.
+            </div>
         @endforelse
     </div>
 </x-layout>

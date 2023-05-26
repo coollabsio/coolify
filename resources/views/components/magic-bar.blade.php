@@ -1,4 +1,4 @@
-<div x-data="magicsearchbar" @slash.window="mainMenu = true">
+<div x-data="magicbar" @slash.window="mainMenu = true">
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>
@@ -211,7 +211,7 @@
 
 <script>
     document.addEventListener('alpine:init', () => {
-        Alpine.data('magicsearchbar', () => ({
+        Alpine.data('magicbar', () => ({
             isMainMenu() {
                 return !this.serverMenu &&
                     !this.destinationMenu &&
