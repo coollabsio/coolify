@@ -47,12 +47,15 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
                     $instance_settings = InstanceSettings::get();
                     if (!$instance_settings->is_auto_update_enabled) {
                         $this->fail('Auto update is disabled');
+                        return;
                     }
                     if ($latest_version === $current_version) {
                         $this->fail("Already on latest version");
+                        return;
                     }
                     if (version_compare($latest_version, $current_version, '<')) {
                         $this->fail("Latest version is lower than current version?!");
+                        return;
                     }
                 }
                 instant_remote_process([
@@ -64,6 +67,7 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
         } catch (\Exception $e) {
             Log::error($e->getMessage());
             $this->fail($e->getMessage());
+            return;
         }
     }
 }
