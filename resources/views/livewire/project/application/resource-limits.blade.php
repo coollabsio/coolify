@@ -16,6 +16,5 @@
             id="application.limits_memory_swappiness" />
         <x-forms.input placeholder="69b or 420k or 1337m or 1g" label="Soft Limit"
             id="application.limits_memory_reservation" />
-        <x-forms.checkbox label="Disable OOM kill" id="application.limits_memory_oom_kill" />
     </form>
 </div>

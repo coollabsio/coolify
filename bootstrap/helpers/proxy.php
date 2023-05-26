@@ -27,7 +27,6 @@ if (!function_exists('getProxyConfiguration')) {
             "networks" => $array_of_networks->toArray(),
             "services" => [
                 "traefik" => [
-                    "oom_kill_disable" => true,
                     "container_name" => "coolify-proxy",
                     "image" => "traefik:v2.10",
                     "restart" => "always",

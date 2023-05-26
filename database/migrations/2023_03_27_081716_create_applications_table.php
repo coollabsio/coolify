@@ -59,7 +59,6 @@ return new class extends Migration
             $table->string('limits_memory_swap')->default("0");
             $table->integer('limits_memory_swappiness')->default(60);
             $table->string('limits_memory_reservation')->default("0");
-            $table->boolean('limits_memory_oom_kill')->default(false);
 
             $table->string('limits_cpus')->default("0");
             $table->string('limits_cpuset')->nullable()->default("0");

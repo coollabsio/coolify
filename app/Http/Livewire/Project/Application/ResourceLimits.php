@@ -13,7 +13,6 @@ class ResourceLimits extends Component
         'application.limits_memory_swap' => 'required|string',
         'application.limits_memory_swappiness' => 'required|integer|min:0|max:100',
         'application.limits_memory_reservation' => 'required|string',
-        'application.limits_memory_oom_kill' => 'boolean',
         'application.limits_cpus' => 'nullable',
         'application.limits_cpuset' => 'nullable',
         'application.limits_cpu_shares' => 'nullable',
