@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire\Settings;
 
-use App\Enums\ActivityTypes;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;

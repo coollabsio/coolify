@@ -3,9 +3,12 @@
 namespace App\Providers;
 
 use App\Jobs\CoolifyTask;
+use App\Models\InstanceSettings;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Str;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,9 +17,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        // if (config('app.env') === 'production' && Str::contains(config('version'), ['nightly'])) {
-        //     Process::run('php artisan migrate:fresh --force --seed --seeder=ProductionSeeder');
-        // }
     }
 
     /**
@@ -24,10 +24,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Queue::after(function (JobProcessed $event) {
-            // @TODO: Remove `coolify-builder` container after the remote_process job is finishged and remote_process->type == `deployment`.
-            if ($event->job->resolveName() === CoolifyTask::class) {
-            }
-        });
+        $settings = InstanceSettings::first();
+        if ($this->app->environment('local') && Str::startsWith($settings->fqdn, 'https')) {
+            URL::forceScheme('https');
+        }
     }
 }
