@@ -27,3 +27,4 @@ RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
 RUN echo "alias mfs='php artisan migrate:fresh --seed'" >>/etc/bash.bashrc
 RUN echo "alias cda='composer dump-autoload'" >>/etc/bash.bashrc
 RUN echo "alias run='./scripts/run'" >>/etc/bash.bashrc
+RUN echo "alias logs='logs -f storage/logs/laravel.log'" >>/etc/bash.bashrc
