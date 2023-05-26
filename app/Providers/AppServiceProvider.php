@@ -24,9 +24,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        $settings = InstanceSettings::first();
-        if ($this->app->environment('local') && Str::startsWith($settings->fqdn, 'https')) {
-            URL::forceScheme('https');
+        if ($this->app->environment('production')) {
+            $settings = InstanceSettings::first();
+            if (Str::startsWith($settings->fqdn, 'https')) {
+                URL::forceScheme('https');
+            }
         }
     }
 }
