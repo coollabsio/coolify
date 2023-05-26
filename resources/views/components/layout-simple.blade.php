@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
-    g
+    {{ dd(request()->schemeAndHttpHost(), str_starts_with(request()->schemeAndHttpHost(), 'https')) }}
     @if (str_starts_with(request()->schemeAndHttpHost(), 'https'))
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
     @else
