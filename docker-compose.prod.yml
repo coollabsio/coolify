@@ -1,6 +1,7 @@
 version: '3.8'
 services:
   coolify:
+    oom_kill_disable: true
     image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-nightly.0}"
     volumes:
       - type: bind
@@ -41,6 +42,7 @@ services:
       postgres:
         condition: service_healthy
   postgres:
+    oom_kill_disable: true
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
@@ -59,6 +61,7 @@ services:
       retries: 5
       timeout: 2s
   redis:
+    oom_kill_disable: true
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"

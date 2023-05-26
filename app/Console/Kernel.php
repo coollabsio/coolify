@@ -19,7 +19,8 @@ class Kernel extends ConsoleKernel
 
         $schedule->job(new InstanceDockerCleanupJob)->everyFiveMinutes();
         $schedule->job(new InstanceAutoUpdateJob)->everyFifteenMinutes();
-        $schedule->job(new InstanceProxyCheckJob)->everyMinute();
+        // Disabled for now, added oom_kill_disable: true to docker-compose.yml
+        // $schedule->job(new InstanceProxyCheckJob)->everyMinute();
     }
 
     /**
