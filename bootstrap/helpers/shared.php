@@ -1,16 +1,11 @@
 <?php
 
-use App\Models\InstanceSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
 
-function is_https()
-{
-    return Str::of(InstanceSettings::get()->fqdn)->startsWith('https');
-}
 function general_error_handler(\Throwable $e, $that = null, $isJson = false)
 {
     try {
