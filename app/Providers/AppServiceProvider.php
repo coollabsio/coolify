@@ -24,15 +24,15 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        if ($this->app->environment('production')) {
-            try {
-                $settings = InstanceSettings::first();
-                if (Str::startsWith($settings->fqdn, 'https')) {
-                    URL::forceScheme('https');
-                }
-            } catch (\Exception $e) {
-                // do nothing
-            }
-        }
+        // if ($this->app->environment('production')) {
+        //     try {
+        //         $settings = InstanceSettings::first();
+        //         if (Str::startsWith($settings->fqdn, 'https')) {
+        //             URL::forceScheme('https');
+        //         }
+        //     } catch (\Exception $e) {
+        //         // do nothing
+        //     }
+        // }
     }
 }

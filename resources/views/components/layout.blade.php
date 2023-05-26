@@ -25,6 +25,11 @@
 </head>
 
 <body>
+    {{-- @if (is_https())
+        <script>
+            console.log('asd')
+        </script>
+    @else --}}
     @livewireScripts
     @auth
         <x-navbar />
@@ -60,6 +65,7 @@
             })
         </script>
     @endauth
+    {{-- @endif --}}
 
 </body>
 
