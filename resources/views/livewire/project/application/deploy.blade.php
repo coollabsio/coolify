@@ -9,10 +9,10 @@
             <ul tabindex="0"
                 class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
-                    <div wire:click='deploy'>Restart</div>
+                    <div class="hover:bg-coollabs" wire:click='deploy'>Restart</div>
                 </li>
                 <li>
-                    <div wire:click='deploy(true)'>Force deploy without cache</div>
+                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Force deploy without cache</div>
                 </li>
                 <li>
                     <div class="hover:bg-red-500" wire:click='stop'>Stop</div>
@@ -29,10 +29,10 @@
             <ul tabindex="0"
                 class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
-                    <div wire:click='deploy'>Deploy</div>
+                    <div class="hover:bg-coollabs" wire:click='deploy'>Deploy</div>
                 </li>
                 <li>
-                    <div wire:click='deploy(true)'>Deploy without cache</div>
+                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Deploy without cache</div>
                 </li>
             </ul>
         </div>

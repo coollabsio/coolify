@@ -7,16 +7,13 @@
                 Commits
                 <x-external-link />
             </a>
+            <a target="_blank" href="{{ $application->gitBranchLocation }}">
+                Open Repository
+                <x-external-link />
+            </a>
         </div>
-        {{-- <div>{{ data_get($application, 'source.name') }}
-            @if (data_get($application, 'source.is_public'))
-                <span class="text-xs">public</span>
-            @endif
-        </div> --}}
         <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository" label="Repository" />
         <x-forms.input placeholder="main" id="application.git_branch" label=" Branch" />
         <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
-
     </form>
-
 </div>

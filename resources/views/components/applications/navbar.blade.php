@@ -20,31 +20,32 @@
     <div class="dropdown dropdown-bottom">
         <button tabindex="0"
             class="flex items-center justify-center h-full text-white normal-case bg-transparent border-none rounded btn btn-xs no-animation">
-            Links
+            Open
             <x-chevron-down />
         </button>
         <ul tabindex="0"
             class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
-            <li>
-                <a class="text-xs" target="_blank" href="{{ $application->gitBranchLocation }}">
-                    Open on Git
-                    <x-external-link />
-                </a>
-            </li>
+            @if (data_get($application, 'fqdn'))
+                <li>
+                    <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
+                        href="{{ $application->fqdn }}">
+                        {{ $application->fqdn }}
+                    </a>
+                </li>
+            @endif
             @if (data_get($application, 'ports_mappings_array'))
                 @foreach ($application->ports_mappings_array as $port)
                     @if (config('app.env') === 'local')
                         <li>
-                            <a class="text-xs " target="_blank"
-                                href="http://localhost:{{ explode(':', $port)[0] }}">Open
+                            <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
+                                href="http://localhost:{{ explode(':', $port)[0] }}">Port
                                 {{ explode(':', $port)[0] }}
-                                <x-external-link />
                             </a>
                         </li>
                     @else
                         <li>
-                            <a class="text-xs" target="_blank"
-                                href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Open
+                            <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
+                                href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Port
                                 {{ $port }}</a>
                         </li>
                     @endif

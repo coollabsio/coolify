@@ -67,7 +67,7 @@ class Form extends Component
             ];
             if ($schema === 'https') {
                 $entryPoints[] = 'https';
-                $middlewares[] = 'redirect-to-https';
+                $middlewares[] = 'redirect-to-https@docker';
             }
 
             $traefik_dynamic_conf = [
