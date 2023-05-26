@@ -19,6 +19,7 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
     private string $latest_version;
     private string $current_version;
     private Server $server;
+    private string $localhost_name = 'localhost';
     public $tries = 1;
     public $timeout = 120;
     public function uniqueId(): int
@@ -27,39 +28,32 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
     }
     public function __construct(private bool $force = false)
     {
-        if (config('app.env') === 'local') {
-            $server_name = 'testing-local-docker-container';
-        } else {
-            $server_name = 'localhost';
-        }
-        $server = Server::where('name', $server_name)->first();
-        if (is_null($server)) {
-            throw new \Exception("Server not found");
-        }
-        $this->server = $server;
-        $this->latest_version = get_latest_version_of_coolify();
-        $this->current_version = config('version');
+        try {
+            if (config('app.env') === 'local') {
+                $localhost_name = 'testing-local-docker-container';
+            }
+            $this->server = Server::where('name', $localhost_name)->firstOrFail();
+            $this->latest_version = get_latest_version_of_coolify();
+            $this->current_version = config('version');
 
-        if (!$this->force) {
-            $instance_settings = InstanceSettings::get();
-            if (!$instance_settings->is_auto_update_enabled) {
-                return $this->delete();
-            }
-            try {
+            if (!$this->force) {
+                $instance_settings = InstanceSettings::get();
+                if (!$instance_settings->is_auto_update_enabled) {
+                    return $this->fail('Auto update is disabled');
+                }
                 $this->check_if_update_available();
-            } catch (\Exception $e) {
-                Log::error($e->getMessage());
-                return $this->delete();
             }
+        } catch (\Exception $e) {
+            $this->fail($e->getMessage());
         }
     }
     private function check_if_update_available()
     {
         if ($this->latest_version === $this->current_version) {
-            throw new \Exception("Already on latest version");
+            $this->fail("Already on latest version");
         }
         if (version_compare($this->latest_version, $this->current_version, '<')) {
-            throw new \Exception("Already on latest version");
+            $this->fail("Latest version is lower than current version?!");
         }
     }
     public function handle(): void
@@ -77,6 +71,7 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
+            $this->fail($e->getMessage());
         }
     }
 }
