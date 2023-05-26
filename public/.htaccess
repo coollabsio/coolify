@@ -19,3 +19,7 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+<IfModule mod_headers.c>
+Header always set Content-Security-Policy "upgrade-insecure-requests;"
+</IfModule>
