@@ -5,20 +5,26 @@ namespace App\Jobs;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Log;
 
-class InstanceAutoUpdateJob implements ShouldQueue
+class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     private string $latest_version;
     private string $current_version;
     private Server $server;
-
+    public $tries = 1;
+    public $timeout = 120;
+    public function uniqueId(): int
+    {
+        return 1;
+    }
     public function __construct(private bool $force = false)
     {
         if (config('app.env') === 'local') {
