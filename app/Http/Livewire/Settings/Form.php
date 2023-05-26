@@ -46,12 +46,11 @@ class Form extends Component
         $this->validate();
         $this->settings->save();
 
+        $dynamic_config_path = '/data/coolify/proxy/dynamic';
         if (config('app.env') == 'local') {
             $server = Server::findOrFail(1);
-            $dynamic_config_path = '/data/coolify/proxy/dynamic';
         } else {
             $server = Server::findOrFail(0);
-            $dynamic_config_path = '/traefik/dynamic';
         }
 
         if (empty($this->settings->fqdn)) {
