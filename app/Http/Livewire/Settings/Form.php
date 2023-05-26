@@ -61,12 +61,15 @@ class Form extends Component
             $url = Url::fromString($this->settings->fqdn);
             $host = $url->getHost();
             $schema = $url->getScheme();
+            $middlewares = [];
             $entryPoints = [
                 0 => 'http',
             ];
             if ($schema === 'https') {
                 $entryPoints[] = 'https';
+                $middlewares[] = 'redirect-to-https';
             }
+
             $traefik_dynamic_conf = [
                 'http' =>
                 [
@@ -77,6 +80,7 @@ class Form extends Component
                             'entryPoints' => $entryPoints,
                             'service' => 'coolify',
                             'rule' => "Host(`{$host}`)",
+                            'middlewares' => $middlewares,
                         ],
                     ],
                     'services' =>
