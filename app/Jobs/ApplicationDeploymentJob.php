@@ -400,8 +400,8 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
                 $http_label = "{$this->application->uuid}-{$slug}-http";
                 $https_label = "{$this->application->uuid}-{$slug}-https";
 
-                // Set labels for https
                 if ($schema === 'https') {
+                    // Set labels for https
                     $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
                     $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
                     if ($path !== '/') {
@@ -411,6 +411,9 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
 
                     $labels[] = "traefik.http.routers.{$https_label}.tls=true";
                     $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
+
+                    // Set labels for http (redirect to https)
+                    $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
                     if ($this->application->settings->is_force_https) {
                         $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
                     }
