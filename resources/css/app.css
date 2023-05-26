@@ -5,8 +5,12 @@
 html {
     @apply min-h-screen h-full bg-coolgray-100;
 }
+.scrollbar {
+  @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
+}
+
 body {
-    @apply min-h-screen bg-coolgray-100 text-neutral-400 antialiased scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
+    @apply scrollbar min-h-screen bg-coolgray-100 text-neutral-400 antialiased ;
 }
 main {
     @apply px-32 xl:px-14 mx-auto max-w-screen-xl;
