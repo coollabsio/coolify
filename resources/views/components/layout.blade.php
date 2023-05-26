@@ -8,6 +8,8 @@
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @if (request()->secure())
         <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+    @else
+        http {{ request()->secure() }}
     @endif
     @env('local')
     <title>Coolify - localhost</title>
