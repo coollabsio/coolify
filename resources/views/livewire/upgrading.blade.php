@@ -1,4 +1,4 @@
-<div x-data="{ visible: @entangle('visible') }" class="fixed text-xs text-white top-3 right-28">
+<div x-data="{ visible: @entangle('visible') }" class="flex text-xs text-white">
     <template x-if="visible">
         <div class="bg-coollabs-gradient">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 mx-auto text-pink-500 lds-heart" viewBox="0 0 24 24"

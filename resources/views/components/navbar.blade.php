@@ -104,11 +104,6 @@
                         </svg> Team
                     </a>
                 </li>
-                @if (auth()->user()->isPartOfRootTeam())
-                    <li>
-                        <livewire:force-upgrade />
-                    </li>
-                @endif
                 <form action="/logout" method="POST">
                     <li>
                         @csrf

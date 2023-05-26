@@ -6,11 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
-    @if (str_starts_with(request()->schemeAndHttpHost(), 'https'))
-        <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
-    @else
-        http
-    @endif
     @env('local')
     <title>Coolify - localhost</title>
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
@@ -40,7 +35,6 @@
     <main>
         {{ $slot }}
     </main>
-    <livewire:upgrading />
     <a
         class="fixed text-xs cursor-pointer right-2 bottom-1 opacity-60 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @auth
