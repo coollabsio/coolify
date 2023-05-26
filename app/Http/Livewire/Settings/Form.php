@@ -62,12 +62,16 @@ class Form extends Component
             $host = $url->getHost();
             $schema = $url->getScheme();
             $middlewares = [];
+            $tls = [];
             $entryPoints = [
                 0 => 'http',
             ];
             if ($schema === 'https') {
                 $entryPoints[] = 'https';
                 $middlewares[] = 'redirect-to-https@docker';
+                $tls = [
+                    'certresolver' => 'letsencrypt',
+                ];
             }
 
             $traefik_dynamic_conf = [
@@ -81,6 +85,7 @@ class Form extends Component
                             'service' => 'coolify',
                             'rule' => "Host(`{$host}`)",
                             'middlewares' => $middlewares,
+                            'tls' => $tls,
                         ],
                     ],
                     'services' =>
@@ -102,6 +107,10 @@ class Form extends Component
                 ],
             ];
             $yaml = Yaml::dump($traefik_dynamic_conf);
+            if (config('app.env') == 'local') {
+                dump($yaml);
+                return;
+            }
             $base64 = base64_encode($yaml);
             remote_process([
                 "mkdir -p $dynamic_config_path",
