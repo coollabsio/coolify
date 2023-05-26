@@ -111,7 +111,7 @@ class Form extends Component
             }
             $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
             if (config('app.env') == 'local') {
-                dump($yaml);
+                // dump($yaml);
             }
             $base64 = base64_encode($yaml);
             remote_process([
