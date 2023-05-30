@@ -594,7 +594,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                     $commands = [$this->execute_in_builder($git_clone_command)];
 
                     if ($this->pull_request_id) {
-                        $commands[] = $this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name");
+                        $commands[] = $this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name >/dev/null 2>&1 && git checkout $pr_branch_name >/dev/null 2>&1");
                     }
                     return $commands;
                 } else {
