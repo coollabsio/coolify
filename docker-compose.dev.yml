@@ -62,3 +62,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - "./_data/coolify/proxy/testing-host-2:/data/coolify/proxy"
+  buggregator:
+    image: ghcr.io/buggregator/server:latest
+    container_name: coolify-debug
+    ports:
+      - 8001:8000
+    networks:
+      - coolify
