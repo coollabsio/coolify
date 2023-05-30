@@ -127,3 +127,6 @@ a {
 .bg-coollabs-gradient {
 	@apply text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
 }
+.bold-helper {
+ @apply inline-block font-bold text-warning
+}

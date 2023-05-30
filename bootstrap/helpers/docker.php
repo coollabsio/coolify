@@ -38,3 +38,12 @@ function get_container_status(Server $server, string $container_id, bool $throwE
     $container = format_docker_command_output_to_json($container);
     return $container[0]['Status'];
 }
+
+function generate_container_name(string $uuid, int|null $pull_request_id = null)
+{
+    if ($pull_request_id) {
+        return $uuid . '_pr_' . $pull_request_id;
+    } else {
+        return $uuid;
+    }
+}

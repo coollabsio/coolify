@@ -10,15 +10,10 @@ class ApplicationDeploymentQueue extends Model
 {
     protected $fillable = [
         'application_id',
+        'deployment_uuid',
+        'pull_request_id',
+        'force_rebuild',
+        'commit',
         'status',
-        'extra_attributes',
     ];
-
-    public $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
-    ];
-    public function scopeWithExtraAttributes(): Builder
-    {
-        return $this->extra_attributes->modelScope();
-    }
 }

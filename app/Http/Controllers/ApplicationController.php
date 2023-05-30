@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
 
@@ -21,7 +22,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        return view('project.application.configuration', ['application' => $application,]);
+        return view('project.application.configuration', ['application' => $application]);
     }
     public function deployments()
     {
@@ -64,9 +65,18 @@ class ApplicationController extends Controller
                 'application_uuid' => $application->uuid,
             ]);
         }
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deployment_uuid)->first();
+        if (!$deployment) {
+            return redirect()->route('project.application.deployments', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'application_uuid' => $application->uuid,
+            ]);
+        }
         return view('project.application.deployment', [
             'application' => $application,
             'activity' => $activity,
+            'deployment' => $deployment,
             'deployment_uuid' => $deployment_uuid,
         ]);
     }

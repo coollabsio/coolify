@@ -18,18 +18,15 @@ class Rollback extends Component
     {
         $this->parameters = get_parameters();
     }
-    public function rollbackImage($tag)
+    public function rollbackImage($commit)
     {
         $deployment_uuid = new Cuid2(7);
 
         queue_application_deployment(
-            application: $this->application,
-            extra_attributes: [
-                'deployment_uuid' => $deployment_uuid,
-                'application_uuid' => $this->application->uuid,
-                'force_rebuild' => false,
-                'commit' => $tag,
-            ]
+            application_id: $this->application->id,
+            deployment_uuid: $deployment_uuid,
+            commit: $commit,
+            force_rebuild: false,
         );
 
         return redirect()->route('project.application.deployments', [

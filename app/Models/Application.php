@@ -41,13 +41,6 @@ class Application extends BaseModel
         'private_key_id'
     ];
 
-    public $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
-    ];
-    public function scopeWithExtraAttributes(): Builder
-    {
-        return $this->extra_attributes->modelScope();
-    }
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
@@ -130,6 +123,10 @@ class Application extends BaseModel
     {
         return $this->belongsTo(Environment::class);
     }
+    public function previews()
+    {
+        return $this->hasMany(ApplicationPreview::class);
+    }
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
@@ -149,9 +146,7 @@ class Application extends BaseModel
 
     public function deployments()
     {
-        $asd = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->get();
-        return $asd;
-        // return Activity::where('subject_id', $this->id)->where('properties->type', '=', 'deployment')->orderBy('created_at', 'desc')->get();
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->get();
     }
     public function get_deployment(string $deployment_uuid)
     {

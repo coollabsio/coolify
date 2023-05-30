@@ -13,5 +13,10 @@
     </div>
     <x-applications.navbar :application="$application" />
     <div class="pt-2 text-sm">{{ data_get($activity, 'properties.status') }}</div>
+    @if (data_get($activity, 'properties.status') === 'in_progress' ||
+            data_get($deployment, 'metadata.status') !== 'error' ||
+            data_get($deployment, 'metadata.status') !== 'finished')
+        <livewire:project.application.deployment-cancel :activity="$activity" :application="$application" :deployment_uuid="$deployment_uuid" />
+    @endif
     <livewire:project.application.deployment-logs :activity="$activity" :deployment_uuid="$deployment_uuid" />
 </x-layout>

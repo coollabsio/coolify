@@ -28,6 +28,11 @@ class Server extends BaseModel
         'extra_attributes' => SchemalessAttributes::class,
     ];
 
+    public function scopeWithExtraAttributes(): Builder
+    {
+        return $this->extra_attributes->modelScope();
+    }
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
@@ -38,10 +43,7 @@ class Server extends BaseModel
         return $this->hasMany(SwarmDocker::class);
     }
 
-    public function scopeWithExtraAttributes(): Builder
-    {
-        return $this->extra_attributes->modelScope();
-    }
+
 
     public function privateKey()
     {

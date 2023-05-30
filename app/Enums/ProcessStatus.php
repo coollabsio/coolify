@@ -8,4 +8,5 @@ enum ProcessStatus: string
     case IN_PROGRESS = 'in_progress';
     case FINISHED = 'finished';
     case ERROR = 'error';
+    case CANCELLED = 'cancelled';
 }

@@ -41,8 +41,6 @@ return new class extends Migration
             $table->string('base_directory')->default('/');
             $table->string('publish_directory')->nullable();
 
-            $table->schemalessAttributes('extra_attributes');
-
             $table->string('health_check_path')->default('/');
             $table->string('health_check_port')->nullable();
             $table->string('health_check_host')->default('localhost');
@@ -65,6 +63,7 @@ return new class extends Migration
             $table->integer('limits_cpu_shares')->default(1024);
 
             $table->string('status')->default('exited');
+            $table->string('preview_url_template')->default('{{pr_id}}.{{domain}}');
 
             $table->nullableMorphs('destination');
             $table->nullableMorphs('source');

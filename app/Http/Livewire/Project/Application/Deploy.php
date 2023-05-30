@@ -37,12 +37,9 @@ class Deploy extends Component
         $this->set_deployment_uuid();
 
         queue_application_deployment(
-            application: $this->application,
-            extra_attributes: [
-                'deployment_uuid' => $this->deployment_uuid,
-                'application_uuid' => $this->application->uuid,
-                'force_rebuild' => $force,
-            ]
+            application_id: $this->application->id,
+            deployment_uuid: $this->deployment_uuid,
+            force_rebuild: $force,
         );
         return redirect()->route('project.application.deployments', [
             'project_uuid' => $this->parameters['project_uuid'],

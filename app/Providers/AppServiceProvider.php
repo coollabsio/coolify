@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -18,5 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Http::macro('github', function (string $api_url) {
+            return Http::withHeaders([
+                'Accept' => 'application/vnd.github.v3+json'
+            ])->baseUrl($api_url);
+        });
     }
 }

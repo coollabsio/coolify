@@ -85,7 +85,7 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
-        Log::info($process->errorOutput());
+        ray($process->errorOutput());
         if (!$throwError) {
             return null;
         }

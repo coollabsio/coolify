@@ -1,17 +1,22 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
-use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 
-function queue_application_deployment(Application $application, $extra_attributes)
+function queue_application_deployment(int $application_id, string $deployment_uuid, int|null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false)
 {
+    ray('Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
     $deployment = ApplicationDeploymentQueue::create([
-        'application_id' => $application->id,
-        'extra_attributes' => $extra_attributes,
+        'application_id' => $application_id,
+        'deployment_uuid' => $deployment_uuid,
+        'pull_request_id' => $pull_request_id,
+        'force_rebuild' => $force_rebuild,
+        'commit' => $commit,
     ]);
-    $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->get()->sortByDesc('created_at');
-    $running_deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'in_progress')->get()->sortByDesc('created_at');
+    $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'queued')->get()->sortByDesc('created_at');
+    $running_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'in_progress')->get()->sortByDesc('created_at');
+    ray('Queued deployments: ' . $queued_deployments->count());
+    ray('Running deployments: ' . $running_deployments->count());
     if ($queued_deployments->count() > 1) {
         $queued_deployments = $queued_deployments->skip(1);
         $queued_deployments->each(function ($queued_deployment, $key) {
@@ -24,9 +29,10 @@ function queue_application_deployment(Application $application, $extra_attribute
     }
     dispatch(new ApplicationDeploymentJob(
         application_deployment_queue_id: $deployment->id,
-        deployment_uuid: $extra_attributes['deployment_uuid'],
-        application_uuid: $extra_attributes['application_uuid'],
-        force_rebuild: $extra_attributes['force_rebuild'],
-        commit: $extra_attributes['commit'] ?? null,
+        application_id: $application_id,
+        deployment_uuid: $deployment_uuid,
+        force_rebuild: $force_rebuild,
+        rollback_commit: $commit,
+        pull_request_id: $pull_request_id,
     ));
 }

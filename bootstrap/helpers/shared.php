@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 function general_error_handler(\Throwable $e, $that = null, $isJson = false)
 {
     try {
+        ray('ERROR OCCURED: ' . $e->getMessage());
         if ($e instanceof QueryException) {
             if ($e->errorInfo[0] === '23505') {
                 throw new \Exception('Duplicate entry found.', '23505');
@@ -29,7 +30,7 @@ function general_error_handler(\Throwable $e, $that = null, $isJson = false)
                 'error' => $error->getMessage(),
             ]);
         } else {
-            // dump($error);
+            ray($error);
         }
     }
 }

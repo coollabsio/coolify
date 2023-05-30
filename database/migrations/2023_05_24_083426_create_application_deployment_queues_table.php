@@ -14,8 +14,10 @@ return new class extends Migration
         Schema::create('application_deployment_queues', function (Blueprint $table) {
             $table->id();
             $table->string('application_id');
+            $table->string('deployment_uuid')->unique();
             $table->integer('pull_request_id')->default(0);
-            $table->schemalessAttributes('extra_attributes');
+            $table->boolean('force_rebuild')->default(false);
+            $table->string('commit')->default('HEAD');
             $table->string('status')->default('queued');
             $table->timestamps();
         });

@@ -26,6 +26,7 @@ class ApplicationSeeder extends Seeder
 
         Application::create([
             'name' => 'coollabsio/coolify-examples:nodejs-fastify',
+            'fqdn' => 'http://foo.com',
             'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
             'git_branch' => 'nodejs-fastify',
@@ -36,17 +37,7 @@ class ApplicationSeeder extends Seeder
             'destination_id' => $standalone_docker_1->id,
             'destination_type' => StandaloneDocker::class,
             'source_id' => $github_public_source->id,
-            'source_type' => GithubApp::class,
-            'previews' => [
-                ApplicationPreview::from([
-                    'pullRequestId' => 1,
-                    'branch' => 'nodejs-fastify'
-                ]),
-                ApplicationPreview::from([
-                    'pullRequestId' => 2,
-                    'branch' => 'nodejs-fastify'
-                ])
-            ]
+            'source_type' => GithubApp::class
         ]);
     }
 }
