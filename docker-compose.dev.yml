@@ -21,8 +21,6 @@ services:
       SSL_MODE: "off"
       AUTORUN_LARAVEL_STORAGE_LINK: "false"
       AUTORUN_LARAVEL_MIGRATION: "false"
-    env_file:
-      - .env
     volumes:
       - .:/var/www/html/:cached
   postgres:
