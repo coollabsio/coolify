@@ -45,10 +45,13 @@ class Previews extends Component
     {
         try {
             $this->set_deployment_uuid();
-            ApplicationPreview::create([
-                'application_id' => $this->application->id,
-                'pull_request_id' => $pull_request_id,
-            ]);
+            $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
+            if (!$found) {
+                ApplicationPreview::create([
+                    'application_id' => $this->application->id,
+                    'pull_request_id' => $pull_request_id,
+                ]);
+            }
             queue_application_deployment(
                 application_id: $this->application->id,
                 deployment_uuid: $this->deployment_uuid,

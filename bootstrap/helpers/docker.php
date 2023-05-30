@@ -42,7 +42,7 @@ function get_container_status(Server $server, string $container_id, bool $throwE
 function generate_container_name(string $uuid, int|null $pull_request_id = null)
 {
     if ($pull_request_id) {
-        return $uuid . '_pr_' . $pull_request_id;
+        return $uuid . '-pr-' . $pull_request_id;
     } else {
         return $uuid;
     }

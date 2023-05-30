@@ -202,8 +202,8 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     }
     private function deploy_pull_request()
     {
-        $this->build_image_name = "{$this->application->uuid}:pr_{$this->pull_request_id}-build";
-        $this->production_image_name = "{$this->application->uuid}:pr_{$this->pull_request_id}";
+        $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
+        $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
         $this->container_name = generate_container_name($this->application->uuid, $this->pull_request_id);
         // Deploy pull request
         $this->execute_now([
@@ -577,7 +577,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     {
         $git_clone_command = "git clone -q -b {$this->application->git_branch}";
         if ($this->pull_request_id) {
-            $pr_branch_name = "pr_{$this->pull_request_id}_coolify";
+            $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
 
         if ($this->application->deploymentType() === 'source') {
