@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('application_id');
             $table->integer('pull_request_id')->default(0);
-            $table->schemalessAttributes('metadata');
+            $table->schemalessAttributes('extra_attributes');
             $table->string('status')->default('queued');
             $table->timestamps();
         });

@@ -11,14 +11,14 @@ class ApplicationDeploymentQueue extends Model
     protected $fillable = [
         'application_id',
         'status',
-        'metadata',
+        'extra_attributes',
     ];
 
     public $casts = [
-        'metadata' => SchemalessAttributes::class,
+        'extra_attributes' => SchemalessAttributes::class,
     ];
     public function scopeWithExtraAttributes(): Builder
     {
-        return $this->metadata->modelScope();
+        return $this->extra_attributes->modelScope();
     }
 }

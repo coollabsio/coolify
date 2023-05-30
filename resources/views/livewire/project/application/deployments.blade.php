@@ -13,7 +13,7 @@
              'border-error hover:bg-error' => $deployment->status === 'error',
              'border-success hover:bg-success' => $deployment->status === 'finished',
          ]) @if ($deployment->status !== 'cancelled by system' && $deployment->status !== 'queued')
-             href="{{ $current_url . '/' . $deployment->metadata['deployment_uuid'] }}"
+             href="{{ $current_url . '/' . $deployment->extra_attributes['deployment_uuid'] }}"
      @endif
      class="hover:no-underline">
      <div class="flex flex-col justify-start">

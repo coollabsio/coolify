@@ -4,11 +4,11 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 
-function queue_application_deployment(Application $application, $metadata)
+function queue_application_deployment(Application $application, $extra_attributes)
 {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application->id,
-        'metadata' => $metadata,
+        'extra_attributes' => $extra_attributes,
     ]);
     $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->get()->sortByDesc('created_at');
     $running_deployments = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'in_progress')->get()->sortByDesc('created_at');
@@ -24,9 +24,9 @@ function queue_application_deployment(Application $application, $metadata)
     }
     dispatch(new ApplicationDeploymentJob(
         application_deployment_queue_id: $deployment->id,
-        deployment_uuid: $metadata['deployment_uuid'],
-        application_uuid: $metadata['application_uuid'],
-        force_rebuild: $metadata['force_rebuild'],
-        commit: $metadata['commit'] ?? null,
+        deployment_uuid: $extra_attributes['deployment_uuid'],
+        application_uuid: $extra_attributes['application_uuid'],
+        force_rebuild: $extra_attributes['force_rebuild'],
+        commit: $extra_attributes['commit'] ?? null,
     ));
 }

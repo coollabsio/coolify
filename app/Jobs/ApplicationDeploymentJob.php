@@ -229,9 +229,9 @@ COPY --from={$this->application->uuid}:{$this->git_commit}-build /app/{$this->ap
         if ($next_found) {
             dispatch(new ApplicationDeploymentJob(
                 application_deployment_queue_id: $next_found->id,
-                deployment_uuid: $next_found->metadata['deployment_uuid'],
-                application_uuid: $next_found->metadata['application_uuid'],
-                force_rebuild: $next_found->metadata['force_rebuild'],
+                deployment_uuid: $next_found->extra_attributes['deployment_uuid'],
+                application_uuid: $next_found->extra_attributes['application_uuid'],
+                force_rebuild: $next_found->extra_attributes['force_rebuild'],
             ));
         }
     }

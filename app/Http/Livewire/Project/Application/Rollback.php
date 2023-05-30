@@ -24,7 +24,7 @@ class Rollback extends Component
 
         queue_application_deployment(
             application: $this->application,
-            metadata: [
+            extra_attributes: [
                 'deployment_uuid' => $deployment_uuid,
                 'application_uuid' => $this->application->uuid,
                 'force_rebuild' => false,
