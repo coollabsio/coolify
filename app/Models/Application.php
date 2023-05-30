@@ -42,11 +42,11 @@ class Application extends BaseModel
     ];
 
     public $casts = [
-        'previews' => SchemalessAttributes::class,
+        'extra_attributes' => SchemalessAttributes::class,
     ];
     public function scopeWithExtraAttributes(): Builder
     {
-        return $this->previews->modelScope();
+        return $this->extra_attributes->modelScope();
     }
     public function publishDirectory(): Attribute
     {
