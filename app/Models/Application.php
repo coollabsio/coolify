@@ -144,9 +144,10 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function deployments()
+    public function deployments(int $skip = 0, int $take = 10)
     {
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->get();
+        ray('Skip ' . $skip . ' Take ' . $take);
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->skip($skip)->take($take)->get();
     }
     public function get_deployment(string $deployment_uuid)
     {

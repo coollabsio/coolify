@@ -10,16 +10,32 @@ class Deployments extends Component
     public int $application_id;
     public $deployments = [];
     public string $current_url;
+    public int $skip = 0;
+    public int $default_take = 8;
+    public bool $show_next = true;
+
     public function mount()
     {
         $this->current_url = url()->current();
     }
-    public function reloadDeployments()
+    public function reload_deployments()
     {
-        $this->loadDeployments();
+        $this->load_deployments();
     }
-    public function loadDeployments()
+    public function load_deployments(int|null $take = null)
     {
-        $this->deployments = Application::find($this->application_id)->deployments();
+        ray('Take' . $take);
+        if ($take) {
+            ray('Take is not null');
+            $this->skip = $this->skip + $take;
+        }
+
+        $take = $this->default_take;
+        $this->deployments = Application::find($this->application_id)->deployments($this->skip, $take);
+
+        if (count($this->deployments) !== 0 && count($this->deployments) < $take) {
+            $this->show_next = false;
+            return;
+        }
     }
 }
