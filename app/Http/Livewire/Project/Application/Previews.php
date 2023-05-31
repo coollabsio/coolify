@@ -39,9 +39,9 @@ class Previews extends Component
     {
         ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = get_from_git_api($this->application->source, "/repos/{$this->application->git_repository}/pulls");
         $this->rate_limit_remaining = $rate_limit_remaining;
-        $this->pull_requests = $data;
+        $this->pull_requests = $data->sortBy('number')->values();
     }
-    public function deploy(int $pull_request_id)
+    public function deploy(int $pull_request_id, string|null $pull_request_html_url)
     {
         try {
             $this->set_deployment_uuid();
@@ -50,6 +50,7 @@ class Previews extends Component
                 ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
+                    'pull_request_html_url' => $pull_request_html_url
                 ]);
             }
             queue_application_deployment(
@@ -58,6 +59,11 @@ class Previews extends Component
                 force_rebuild: true,
                 pull_request_id: $pull_request_id,
             );
+            return redirect()->route('project.application.deployments', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'application_uuid' => $this->parameters['application_uuid'],
+                'environment_name' => $this->parameters['environment_name'],
+            ]);
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }

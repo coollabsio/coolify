@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->integer('pull_request_id');
+            $table->string('pull_request_html_url');
 
             $table->string('fqdn')->unique()->nullable();
             $table->string('status')->default('exited');

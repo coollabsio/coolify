@@ -40,10 +40,10 @@ select {
     @apply text-warning opacity-100;
 }
 button[type="button"] {
-    @apply btn btn-xs bg-coolgray-200 no-animation normal-case text-white rounded-none;
+    @apply btn btn-xs mt-1 bg-coolgray-200 no-animation normal-case text-white rounded;
 }
 button[type="submit"] {
-    @apply btn btn-xs no-animation normal-case text-white btn-primary rounded-none;
+    @apply btn btn-xs mt-1 no-animation normal-case text-white btn-primary rounded;
 }
 button[isWarning] {
     @apply text-error;
@@ -74,7 +74,7 @@ a {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center text-sm rounded-none cursor-pointer h-14 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+    @apply flex items-center justify-center text-sm rounded-none min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
 }
 
 .main-menu {

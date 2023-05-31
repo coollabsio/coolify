@@ -7,6 +7,7 @@ class ApplicationPreview extends BaseModel
     protected $fillable = [
         'uuid',
         'pull_request_id',
+        'pull_request_html_url',
         'fqdn',
         'status',
         'application_id',

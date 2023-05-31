@@ -18,7 +18,6 @@
                 <x-forms.input type="number" id="settings.public_port_min" label="Public Port Min" />
                 <x-forms.input type="number" id="settings.public_port_max" label="Public Port Max" />
             </div>
-
         </div>
     </form>
 

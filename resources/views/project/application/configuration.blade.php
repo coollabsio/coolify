@@ -31,6 +31,7 @@
             </a>
             <a :class="activeTab === 'previews' && 'text-white'"
                 @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
+                Deployments
             </a>
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback

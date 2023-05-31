@@ -1,4 +1,4 @@
-<nav class="flex gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+<nav class="flex items-center gap-4 py-2 border-b-2 border-solid border-coolgray-200">
     <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', [
             'project_uuid' => Route::current()->parameters()['project_uuid'],
@@ -18,18 +18,18 @@
     <div class="flex-1"></div>
 
     <div class="dropdown dropdown-bottom">
-        <button tabindex="0"
-            class="flex items-center justify-center h-full text-white normal-case bg-transparent border-none rounded btn btn-xs no-animation">
+        <x-forms.button tabindex="0">
             Open
             <x-chevron-down />
-        </button>
+        </x-forms.button>
         <ul tabindex="0"
-            class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+            class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
             @if (data_get($application, 'fqdn'))
                 <li>
                     <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
                         href="{{ $application->fqdn }}">
                         {{ $application->fqdn }}
+                        <x-external-link />
                     </a>
                 </li>
             @endif
@@ -40,13 +40,16 @@
                             <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
                                 href="http://localhost:{{ explode(':', $port)[0] }}">Port
                                 {{ explode(':', $port)[0] }}
+                                <x-external-link />
                             </a>
                         </li>
                     @else
                         <li>
                             <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
                                 href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Port
-                                {{ $port }}</a>
+                                {{ $port }}
+                                <x-external-link />
+                            </a>
                         </li>
                     @endif
                 @endforeach
