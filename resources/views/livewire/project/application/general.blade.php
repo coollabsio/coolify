@@ -11,7 +11,7 @@
             <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-forms.input class="w-full" id="application.name" label="Name" required />
                 <x-forms.input placeholder="https://coolify.io" class="w-full" id="application.fqdn" label="Domains"
-                    helper="You can specify one domain with path or more with comma.<br><span class='bold-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
+                    helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
 
             </div>
             @if ($wildcard_domain)

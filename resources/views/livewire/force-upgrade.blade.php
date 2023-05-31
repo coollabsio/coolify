@@ -1,6 +1,7 @@
 <div class="flex gap-10 text-xs text-white" x-data="{ visible: @entangle('visible') }">
     <button x-cloak x-show="!visible"
-        class="gap-2 text-white normal-case btn btn-ghost hover:no-underline hover:bg-coollabs" wire:click='upgrade'>
+        class="gap-2 text-white normal-case btn btn-ghost hover:no-underline bg-coollabs hover:bg-coollabs-100"
+        wire:click='upgrade'>
         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
             fill="none" stroke-linecap="round" stroke-linejoin="round">
             <path stroke="none" d="M0 0h24v24H0z" fill="none" />

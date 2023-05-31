@@ -7,15 +7,18 @@
             </x-forms.button>
         </div>
         <div class="flex flex-col gap-2">
-            <div class="flex flex-col gap-2 xl:flex-row">
+            <div class="flex gap-2">
                 <x-forms.input id="settings.fqdn" label="Coolify's Domain" />
                 <x-forms.input id="settings.wildcard_domain" label="Wildcard Domain"
-                    helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><br><span class='inline-block font-bold text-warning'>Example</span>https://example.com<br>Your applications will get https://randomthing.example.com" />
+                    helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>" />
+                <x-forms.input id="settings.default_redirect_404" label="Default Redirect 404"
+                    helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
             </div>
-            <div class="flex flex-col gap-2 xl:flex-row">
+            <div class="flex gap-2 ">
                 <x-forms.input type="number" id="settings.public_port_min" label="Public Port Min" />
                 <x-forms.input type="number" id="settings.public_port_max" label="Public Port Max" />
             </div>
+
         </div>
     </form>
 
@@ -26,6 +29,7 @@
         {{-- <x-forms.checkbox instantSave id="is_https_forced" label="Force https?" /> --}}
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
     </div>
+    <h3>Upgrade</h3>
     @if (auth()->user()->isPartOfRootTeam())
         <livewire:force-upgrade />
     @endif
