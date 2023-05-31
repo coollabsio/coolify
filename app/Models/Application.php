@@ -146,8 +146,13 @@ class Application extends BaseModel
 
     public function deployments(int $skip = 0, int $take = 10)
     {
-        ray('Skip ' . $skip . ' Take ' . $take);
-        return ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc')->skip($skip)->take($take)->get();
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+        $count = $deployments->count();
+        $deployments = $deployments->skip($skip)->take($take)->get();
+        return [
+            'count' => $count,
+            'deployments' => $deployments
+        ];
     }
     public function get_deployment(string $deployment_uuid)
     {

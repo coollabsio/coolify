@@ -3,13 +3,13 @@
      <div>
          <h3>Actions</h3>
          @if ($show_next)
-             <x-forms.button isHighlighted wire:click="load_deployments({{ $default_take }})">Load More
+             <x-forms.button isHighlighted wire:click="load_deployments({{ $default_take }})">Load Previous
                  Deployments</x-forms.button>
          @else
              <x-forms.button disabled>No More Deployments</x-forms.button>
          @endif
      </div>
-     <h3>Deployments</h3>
+     <h3>Deployments <span class="text-xs">({{ $deployments_count }})</span></h3>
      @foreach ($deployments as $deployment)
          <a @class([
              'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
@@ -28,7 +28,8 @@
      class="hover:no-underline">
      <div class="flex flex-col justify-start">
          <div>
-             {{ $deployment->deployment_uuid }} <span class="text-sm text-warning">></span>
+             {{ $deployment->id }} <span class="text-sm text-warning">></span> {{ $deployment->deployment_uuid }} <span
+                 class="text-sm text-warning">></span>
              {{ $deployment->status }}
          </div>
          @if (data_get($deployment, 'pull_request_id'))
@@ -47,7 +48,6 @@
                  @endif
              </div>
          @endif
-
          <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
              <div>Finished <span x-text="measure_since_started()">0s</span> in <span class="font-bold"
                      x-text="measure_finished_time()">0s</span></div>

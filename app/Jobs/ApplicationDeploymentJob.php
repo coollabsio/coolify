@@ -269,7 +269,6 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
 
     private function next(string $status)
     {
-        ray($this->application_deployment_queue->status, Str::of($this->application_deployment_queue->status)->startsWith('cancelled'));
         if (!Str::of($this->application_deployment_queue->status)->startsWith('cancelled')) {
             $this->application_deployment_queue->update([
                 'status' => $status,
@@ -522,7 +521,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         } else {
             $commandText = collect($command)->implode("\n");
         }
-        ray('Executing command', $commandText);
+        ray('Executing command: ' . $commandText);
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
         ]);
@@ -623,7 +622,6 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
         }
         $nixpacks_command .= " {$this->workdir}";
-        ray('Build command: ' . $nixpacks_command);
         return $this->execute_in_builder($nixpacks_command);
     }
     private function stop_running_container()

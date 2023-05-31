@@ -34,9 +34,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
     public function handle(): void
     {
         try {
-            ray('running ContainerStatusJob', $this->container_name, $this->pull_request_id);
             $status = get_container_status(server: $this->application->destination->server, container_id: $this->container_name, throwError: false);
-            ray('ContainerStatusJob', $status);
+            ray('Container ' . $this->container_name . ' statuus is ' . $status);
             if ($this->pull_request_id) {
                 $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
                 $preview->status = $status;

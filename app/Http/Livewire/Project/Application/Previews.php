@@ -41,12 +41,12 @@ class Previews extends Component
         $this->rate_limit_remaining = $rate_limit_remaining;
         $this->pull_requests = $data->sortBy('number')->values();
     }
-    public function deploy(int $pull_request_id, string|null $pull_request_html_url)
+    public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
     {
         try {
             $this->set_deployment_uuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if (!$found) {
+            if (!$found && !is_null($pull_request_html_url)) {
                 ApplicationPreview::create([
                     'application_id' => $this->application->id,
                     'pull_request_id' => $pull_request_id,
