@@ -19,6 +19,7 @@ return new class extends Migration
             $table->boolean('force_rebuild')->default(false);
             $table->string('commit')->default('HEAD');
             $table->string('status')->default('queued');
+            $table->boolean('is_webhook')->default(false);
             $table->timestamps();
         });
     }

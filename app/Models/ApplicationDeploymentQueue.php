@@ -15,5 +15,6 @@ class ApplicationDeploymentQueue extends Model
         'force_rebuild',
         'commit',
         'status',
+        'is_webhook',
     ];
 }

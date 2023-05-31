@@ -3,7 +3,7 @@
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\ApplicationDeploymentQueue;
 
-function queue_application_deployment(int $application_id, string $deployment_uuid, int|null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false)
+function queue_application_deployment(int $application_id, string $deployment_uuid, int|null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false)
 {
     ray('Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
     $deployment = ApplicationDeploymentQueue::create([
@@ -11,6 +11,7 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         'deployment_uuid' => $deployment_uuid,
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
+        'is_webhook' => $is_webhook,
         'commit' => $commit,
     ]);
     $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'queued')->get()->sortByDesc('created_at');

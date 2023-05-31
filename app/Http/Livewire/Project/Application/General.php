@@ -24,12 +24,12 @@ class General extends Component
     public string|null $global_wildcard_domain = null;
 
     public bool $is_static;
-    public bool $is_git_submodules_allowed;
-    public bool $is_git_lfs_allowed;
-    public bool $is_debug;
-    public bool $is_previews;
-    public bool $is_auto_deploy;
-    public bool $is_force_https;
+    public bool $is_git_submodules_enabled;
+    public bool $is_git_lfs_enabled;
+    public bool $is_debug_enabled;
+    public bool $is_preview_deployments_enabled;
+    public bool $is_auto_deploy_enabled;
+    public bool $is_force_https_enabled;
 
     protected $rules = [
         'application.name' => 'required|min:6',
@@ -51,12 +51,12 @@ class General extends Component
     {
         // @TODO: find another way - if possible
         $this->application->settings->is_static = $this->is_static;
-        $this->application->settings->is_git_submodules_allowed = $this->is_git_submodules_allowed;
-        $this->application->settings->is_git_lfs_allowed = $this->is_git_lfs_allowed;
-        $this->application->settings->is_debug = $this->is_debug;
-        $this->application->settings->is_previews = $this->is_previews;
-        $this->application->settings->is_auto_deploy = $this->is_auto_deploy;
-        $this->application->settings->is_force_https = $this->is_force_https;
+        $this->application->settings->is_git_submodules_enabled = $this->is_git_submodules_enabled;
+        $this->application->settings->is_git_lfs_enabled = $this->is_git_lfs_enabled;
+        $this->application->settings->is_debug_enabled = $this->is_debug_enabled;
+        $this->application->settings->is_preview_deployments_enabled = $this->is_preview_deployments_enabled;
+        $this->application->settings->is_auto_deploy_enabled = $this->is_auto_deploy_enabled;
+        $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
         $this->application->settings->save();
         $this->application->refresh();
         $this->emit('saved', 'Application settings updated!');
@@ -72,12 +72,12 @@ class General extends Component
     public function mount()
     {
         $this->is_static = $this->application->settings->is_static;
-        $this->is_git_submodules_allowed = $this->application->settings->is_git_submodules_allowed;
-        $this->is_git_lfs_allowed = $this->application->settings->is_git_lfs_allowed;
-        $this->is_debug = $this->application->settings->is_debug;
-        $this->is_previews = $this->application->settings->is_previews;
-        $this->is_auto_deploy = $this->application->settings->is_auto_deploy;
-        $this->is_force_https = $this->application->settings->is_force_https;
+        $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
+        $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
+        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+        $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
+        $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
+        $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
     }
     public function generateGlobalRandomDomain()

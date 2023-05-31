@@ -154,7 +154,14 @@ class Application extends BaseModel
     }
     public function isDeployable(): bool
     {
-        if ($this->settings->is_auto_deploy) {
+        if ($this->settings->is_auto_deploy_enabled) {
+            return true;
+        }
+        return false;
+    }
+    public function isPRDeployable(): bool
+    {
+        if ($this->settings->is_preview_deployments_enabled) {
             return true;
         }
         return false;

@@ -20,7 +20,20 @@
      class="hover:no-underline">
      <div class="flex flex-col justify-start">
          @if (data_get($deployment, 'pull_request_id'))
-             <div>Pull Request #{{ data_get($deployment, 'pull_request_id') }}</div>
+             <div>
+                 Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                 @if (data_get($deployment, 'is_webhook'))
+                     (Webhook)
+                 @endif
+             </div>
+         @elseif (data_get($deployment, 'is_webhook'))
+             <div>Webhook (commit
+                 @if (data_get($deployment, 'commit'))
+                     {{ data_get($deployment, 'commit') }})
+                 @else
+                     HEAD)
+                 @endif
+             </div>
          @else
              <div>Commit:
                  @if (data_get($deployment, 'commit'))

@@ -501,7 +501,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                     // Set labels for http (redirect to https)
                     $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
                     $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                    if ($this->application->settings->is_force_https) {
+                    if ($this->application->settings->is_force_https_enabled) {
                         $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
                     }
                 } else {
@@ -539,7 +539,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             'command' => $commandText,
         ]);
         $this->activity->save();
-        if ($isDebuggable && !$this->application->settings->is_debug) {
+        if ($isDebuggable && !$this->application->settings->is_debug_enabled) {
             $hideFromOutput = true;
         }
         $remote_process = resolve(RunRemoteProcess::class, [
@@ -565,10 +565,10 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         if ($this->application->git_commit_sha !== 'HEAD') {
             $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
         }
-        if ($this->application->settings->is_git_submodules_allowed) {
+        if ($this->application->settings->is_git_submodules_enabled) {
             $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
         }
-        if ($this->application->settings->is_git_lfs_allowed) {
+        if ($this->application->settings->is_git_lfs_enabled) {
             $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
         }
         return $git_clone_command;

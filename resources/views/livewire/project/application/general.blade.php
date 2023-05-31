@@ -69,17 +69,19 @@
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
-            <x-forms.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug"
+            <x-forms.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug_enabled"
                 label="Debug" />
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
-                instantSave id="is_force_https" label="Force Https" />
+                instantSave id="is_force_https_enabled" label="Force Https" />
             <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
-                id="is_auto_deploy" label="Auto Deploy" />
-            {{-- <x-forms.checkbox helper="Preview deployments" instantSave id="is_previews" label="Previews?" /> --}}
-            <x-forms.checkbox instantSave id="is_git_submodules_allowed" label="Git Submodules"
+                id="is_auto_deploy_enabled" label="Auto Deploy" />
+            <x-forms.checkbox
+                helper="Automatically deploy Preview Deployments for all opened PR's. Closed PRs deletes Preview Deployments."
+                instantSave id="is_preview_deployments_enabled" label="Auto Previews Deployments" />
+            <x-forms.checkbox instantSave id="is_git_submodules_enabled" label="Git Submodules"
                 helper="Allow Git Submodules during build process." />
-            <x-forms.checkbox instantSave id="is_git_lfs_allowed" label="Git LFS"
+            <x-forms.checkbox instantSave id="is_git_lfs_enabled" label="Git LFS"
                 helper="Allow Git LFS during build process." />
             {{-- <x-forms.checkbox disabled instantSave id="is_dual_cert" label="Dual Certs?" />
             <x-forms.checkbox disabled instantSave id="is_custom_ssl" label="Is Custom SSL?" />

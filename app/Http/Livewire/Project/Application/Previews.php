@@ -75,10 +75,7 @@ class Previews extends Component
             ray('Stopping container: ' . $container_name);
 
             instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);
-            $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
-            if ($found) {
-                $found->delete();
-            }
+            ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();
             $this->application->refresh();
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);

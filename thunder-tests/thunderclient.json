@@ -46,5 +46,101 @@
       "form": []
     },
     "tests": []
+  },
+  {
+    "_id": "b5386afc-ad91-428f-88ac-0f449c5c26fd",
+    "colId": "e6458286-eef1-401c-be84-860b111d66f0",
+    "containerId": "b8cfd093-5467-44a2-9221-ad0207717310",
+    "name": "PR - Opened",
+    "url": "http://localhost:8000/webhooks/source/github/events",
+    "method": "POST",
+    "sortNum": 20000,
+    "created": "2023-05-31T08:23:28.904Z",
+    "modified": "2023-05-31T09:07:17.450Z",
+    "headers": [
+      {
+        "name": "X-GitHub-Delivery",
+        "value": "9b4bc300-ee63-11ed-9133-5f71dd83487d"
+      },
+      {
+        "name": "X-GitHub-Event",
+        "value": "pull_request"
+      },
+      {
+        "name": "X-GitHub-Hook-ID",
+        "value": "400873078"
+      },
+      {
+        "name": "X-GitHub-Hook-Installation-Target-ID",
+        "value": "292941"
+      },
+      {
+        "name": "X-GitHub-Hook-Installation-Target-Type",
+        "value": "integration"
+      },
+      {
+        "name": "X-Hub-Signature-256",
+        "value": "sha256=d5c8d05cc6de14422ab3661d37ec4b98e71f4fdd63d1116f5dedfcb0213ee03d"
+      },
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"action\": \"opened\",\n  \"number\": 1,\n  \"pull_request\": {\n    \"html_url\": \"https://github.com/{{repository_name}}/pull/1\",\n    \"head\": {\n      \"ref\":\"{{repository_ref_pr}}\"\n    },\n    \"base\": {\n      \"ref\":\"{{repository_ref}}\"\n    }\n  },\n  \"repository\": {\n    \"id\": \"{{repository_id}}\",\n    \"full_name\": \"{{repository_name}}\"\n  }\n}",
+      "form": []
+    },
+    "tests": []
+  },
+  {
+    "_id": "7e7a3abd-dc01-454f-aa80-eaeb2c18aa56",
+    "colId": "e6458286-eef1-401c-be84-860b111d66f0",
+    "containerId": "b8cfd093-5467-44a2-9221-ad0207717310",
+    "name": "PR - Closed",
+    "url": "http://localhost:8000/webhooks/source/github/events",
+    "method": "POST",
+    "sortNum": 30000,
+    "created": "2023-05-31T09:15:15.833Z",
+    "modified": "2023-05-31T09:15:29.822Z",
+    "headers": [
+      {
+        "name": "X-GitHub-Delivery",
+        "value": "9b4bc300-ee63-11ed-9133-5f71dd83487d"
+      },
+      {
+        "name": "X-GitHub-Event",
+        "value": "pull_request"
+      },
+      {
+        "name": "X-GitHub-Hook-ID",
+        "value": "400873078"
+      },
+      {
+        "name": "X-GitHub-Hook-Installation-Target-ID",
+        "value": "292941"
+      },
+      {
+        "name": "X-GitHub-Hook-Installation-Target-Type",
+        "value": "integration"
+      },
+      {
+        "name": "X-Hub-Signature-256",
+        "value": "sha256=d5c8d05cc6de14422ab3661d37ec4b98e71f4fdd63d1116f5dedfcb0213ee03d"
+      },
+      {
+        "name": "Content-Type",
+        "value": "application/json"
+      }
+    ],
+    "params": [],
+    "body": {
+      "type": "json",
+      "raw": "{\n  \"action\": \"closed\",\n  \"number\": 1,\n  \"pull_request\": {\n    \"html_url\": \"https://github.com/{{repository_name}}/pull/1\",\n    \"head\": {\n      \"ref\":\"{{repository_ref_pr}}\"\n    },\n    \"base\": {\n      \"ref\":\"{{repository_ref}}\"\n    }\n  },\n  \"repository\": {\n    \"id\": \"{{repository_id}}\",\n    \"full_name\": \"{{repository_name}}\"\n  }\n}",
+      "form": []
+    },
+    "tests": []
   }
 ]
