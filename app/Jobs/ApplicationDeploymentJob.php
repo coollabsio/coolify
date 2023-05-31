@@ -167,6 +167,9 @@ class ApplicationDeploymentJob implements ShouldQueue
             $this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile"),
             $this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile"),
         ], isDebuggable: true);
+        $this->execute_now([
+            "echo 'Done... '",
+        ]);
     }
     private function build_image()
     {
