@@ -18,10 +18,12 @@
     <div class="flex-1"></div>
 
     <div class="dropdown dropdown-bottom">
-        <x-forms.button tabindex="0">
-            Open
-            <x-chevron-down />
-        </x-forms.button>
+        <label tabindex="0">
+            <x-forms.button>
+                Open
+                <x-chevron-down />
+            </x-forms.button>
+        </label>
         <ul tabindex="0"
             class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
             @if (data_get($application, 'fqdn'))

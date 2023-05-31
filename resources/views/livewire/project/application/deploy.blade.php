@@ -20,10 +20,12 @@
         </div>
     @else
         <div class="dropdown dropdown-bottom">
-            <x-forms.button isHighlighted tabindex="0" class="">
-                Actions
-                <x-chevron-down />
-            </x-forms.button>
+            <label tabindex="0">
+                <x-forms.button isHighlighted>
+                    Actions
+                    <x-chevron-down />
+                </x-forms.button>
+            </label>
             <ul tabindex="0"
                 class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
