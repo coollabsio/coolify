@@ -20,11 +20,19 @@ class Deploy extends Component
     protected array $command = [];
     protected $source;
 
+    protected $listeners = [
+        'applicationStatusChanged' => 'applicationStatusChanged',
+    ];
+
     public function mount()
     {
         $this->parameters = get_parameters();
         $this->application = Application::where('id', $this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
+    }
+    public function applicationStatusChanged()
+    {
+        $this->application->refresh();
     }
     protected function set_deployment_uuid()
     {

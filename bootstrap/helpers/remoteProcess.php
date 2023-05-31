@@ -7,6 +7,7 @@ use App\Models\Server;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Sleep;
 use Spatie\Activitylog\Models\Activity;
 
 /**
@@ -76,7 +77,7 @@ function generate_ssh_command(string $private_key_location, string $server_ip, s
     return $ssh_command;
 }
 
-function instant_remote_process(array $command, Server $server, $throwError = true)
+function instant_remote_process(array $command, Server $server, $throwError = true, $repeat = 1)
 {
     $command_string = implode("\n", $command);
     $private_key_location = save_private_key_for_server($server);
@@ -85,6 +86,11 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
+        if ($repeat > 1) {
+            Sleep::for(200)->milliseconds();
+            ray('executing again');
+            return instant_remote_process($command, $server, $throwError, $repeat - 1);
+        }
         ray($process->errorOutput());
         if (!$throwError) {
             return null;

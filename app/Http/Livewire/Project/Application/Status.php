@@ -9,11 +9,9 @@ class Status extends Component
 {
     public Application $application;
 
-    protected $listeners = [
-        'applicationStatusChanged' => 'pollingStatus',
-    ];
-    public function pollingStatus()
+    public function applicationStatusChanged()
     {
+        $this->emit('applicationStatusChanged');
         $this->application->refresh();
     }
 }

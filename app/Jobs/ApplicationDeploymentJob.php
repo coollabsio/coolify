@@ -50,8 +50,8 @@ class ApplicationDeploymentJob implements ShouldQueue
         public string $deployment_uuid,
         public string $application_id,
         public bool $force_rebuild = false,
-        public string|null $rollback_commit = null,
-        public string|null $pull_request_id = null,
+        public string $rollback_commit = 'HEAD',
+        public int $pull_request_id = 0,
     ) {
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($this->application_deployment_queue_id);
         $this->application_deployment_queue->update([
@@ -104,8 +104,6 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->deploy();
             }
         } catch (\Exception $e) {
-            ray('Oops something is not okay, are you okay? 😢');
-            ray($e);
             $this->execute_now([
                 "echo '\nOops something is not okay, are you okay? 😢'",
                 "echo '\n\n{$e->getMessage()}'",
@@ -230,6 +228,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
         ]);
         $this->start_builder_image();
+        ray('Rollback Commit: ' . $this->rollback_commit);
         if ($this->rollback_commit === 'HEAD') {
             $this->clone_repository();
         }
@@ -265,35 +264,24 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
 
     public function failed(): void
     {
-        ray('failed job');
-        $this->activity->properties = $this->activity->properties->merge([
-            'exitCode' => 1,
-            'status' =>  ProcessStatus::ERROR->value,
-        ]);
-        $this->activity->save();
         $this->next(ProcessStatus::ERROR->value);
-        $this->fail();
     }
 
     private function next(string $status)
     {
+        ray($this->application_deployment_queue->status, Str::of($this->application_deployment_queue->status)->startsWith('cancelled'));
+        if (!Str::of($this->application_deployment_queue->status)->startsWith('cancelled')) {
+            $this->application_deployment_queue->update([
+                'status' => $status,
+            ]);
+        }
         dispatch(new ContainerStatusJob(
             application: $this->application,
             container_name: $this->container_name,
             pull_request_id: $this->pull_request_id
         ));
-        $this->application_deployment_queue->update([
-            'status' => $status,
-        ]);
-        $next_found = ApplicationDeploymentQueue::where('application_id', $this->application->id)->where('status', 'queued')->first();
-        if ($next_found) {
-            dispatch(new ApplicationDeploymentJob(
-                application_deployment_queue_id: $next_found->id,
-                application_id: $next_found->application_id,
-                deployment_uuid: $next_found->deployment_uuid,
-                force_rebuild: $next_found->force_rebuild,
-            ));
-        }
+
+        queue_next_deployment($this->application);
     }
     private function execute_in_builder(string $command)
     {
@@ -534,7 +522,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         } else {
             $commandText = collect($command)->implode("\n");
         }
-
+        ray('Executing command', $commandText);
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
         ]);
@@ -665,8 +653,5 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         $this->execute_now([
             $this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml")
         ], hideFromOutput: true);
-        $this->execute_now([
-            "echo 'Done.'",
-        ]);
     }
 }

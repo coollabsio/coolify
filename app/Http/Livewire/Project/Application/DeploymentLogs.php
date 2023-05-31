@@ -3,16 +3,17 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Enums\ActivityTypes;
+use App\Models\Application;
 use Illuminate\Support\Facades\Redis;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
 class DeploymentLogs extends Component
 {
+    public Application $application;
     public $activity;
     public $isKeepAliveOn = true;
     public $deployment_uuid;
-
     public function polling()
     {
         if (is_null($this->activity) && isset($this->deployment_uuid)) {
