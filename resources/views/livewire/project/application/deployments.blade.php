@@ -10,6 +10,9 @@
          @endif
      </div>
      <h3>Deployments</h3>
+     <div wire:loading wire:target='load_deployments'>
+         <x-loading />
+     </div>
      @foreach ($deployments as $deployment)
          <a @class([
              'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
