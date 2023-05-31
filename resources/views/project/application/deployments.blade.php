@@ -1,7 +1,7 @@
 <x-layout>
     <h1 class="pb-0">Deployments</h1>
     <div class="pb-10 text-sm breadcrumbs">
-        <ul>
+        <ul>`
             <li><a
                     href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">{{ $application->environment->project->name }}</a>
             </li>

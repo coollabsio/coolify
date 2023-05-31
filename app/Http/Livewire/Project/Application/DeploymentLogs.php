@@ -16,6 +16,7 @@ class DeploymentLogs extends Component
     public $deployment_uuid;
     public function polling()
     {
+        $this->emit('deploymentFinished');
         if (is_null($this->activity) && isset($this->deployment_uuid)) {
             $this->activity = Activity::query()
                 ->where('properties->type', '=', ActivityTypes::DEPLOYMENT->value)

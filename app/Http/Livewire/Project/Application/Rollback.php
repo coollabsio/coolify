@@ -29,9 +29,10 @@ class Rollback extends Component
             force_rebuild: false,
         );
 
-        return redirect()->route('project.application.deployments', [
+        return redirect()->route('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $deployment_uuid,
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }

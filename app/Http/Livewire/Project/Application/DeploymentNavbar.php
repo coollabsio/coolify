@@ -12,6 +12,11 @@ class DeploymentNavbar extends Component
     public Application $application;
     public $activity;
     public string $deployment_uuid;
+    protected $listeners = ['deploymentFinished'];
+    public function deploymentFinished()
+    {
+        $this->activity->refresh();
+    }
     public function cancel()
     {
         try {

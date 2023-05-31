@@ -49,9 +49,10 @@ class Deploy extends Component
             deployment_uuid: $this->deployment_uuid,
             force_rebuild: $force,
         );
-        return redirect()->route('project.application.deployments', [
+        return redirect()->route('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $this->deployment_uuid,
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }

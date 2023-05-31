@@ -1,4 +1,4 @@
- <div class="flex flex-col gap-2 pt-2 " wire:init='load_deployments'
+ <div class="flex flex-col gap-2" wire:init='load_deployments'
      @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
      <div>
          <h3>Actions</h3>
@@ -10,9 +10,6 @@
          @endif
      </div>
      <h3>Deployments</h3>
-     <div wire:loading wire:target='load_deployments'>
-         <x-loading />
-     </div>
      @foreach ($deployments as $deployment)
          <a @class([
              'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
@@ -52,7 +49,7 @@
          @endif
 
          <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
-             <div>Finished <span x-text="measure_since_started()">0s</span> in <span class="font-bold text-white"
+             <div>Finished <span x-text="measure_since_started()">0s</span> in <span class="font-bold"
                      x-text="measure_finished_time()">0s</span></div>
          </div>
      </div>
