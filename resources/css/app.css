@@ -65,7 +65,7 @@ a {
 }
 
 .main-navbar {
-    @apply fixed top-0 left-0 min-h-screen overflow-hidden;
+    @apply fixed h-full overflow-hidden;
 }
 .icon {
     @apply w-6 h-6;

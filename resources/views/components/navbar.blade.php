@@ -49,8 +49,7 @@
                         </svg>
                     </a>
                 </li>
-                <li class="{{ request()->is('settings') ? 'absolute bottom-0 pb-4 text-warning' : 'absolute bottom-0 pb-4' }}"
-                    title="Settings">
+                <li class="{{ request()->is('settings') ? 'text-warning' : ' ' }}" title="Settings">
                     <a @if (!request()->is('settings')) href="/settings" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                             stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -64,7 +63,7 @@
             @endif
         </ul>
     </nav>
-    <div class="absolute top-0 right-0 p-2">
+    <div class="fixed top-0 right-0 p-2">
         <div class="dropdown dropdown-left dropdown-hover">
             <label tabindex="0" class="btn btn-ghost no-animation hover:bg-transparent hover:text-warning">
                 <div class="flex items-center justify-center gap-2 placeholder">

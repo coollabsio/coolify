@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Source;
+namespace App\Http\Livewire\Source\Github;
 
 use App\Models\GithubApp;
 use Livewire\Component;

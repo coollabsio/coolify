@@ -1,6 +1,6 @@
 <x-layout>
     <h1 class="pb-0">Server</h1>
-    <div class="text-sm border-b-2 border-solid breadcrumbs border-coolgray-200">
+    <div class="text-sm breadcrumbs">
         <ul>
             <li>{{ data_get($server, 'name') }}</li>
         </ul>

@@ -25,14 +25,20 @@
                     <x-forms.button x-on:click.prevent="deleteSource = true">
                         Delete
                     </x-forms.button>
-                    <form x-data>
-                        <x-forms.button isHighlighted x-on:click.prevent="createGithubApp">Create GitHub Application
-                        </x-forms.button>
-                    </form>
+
                 @endif
             </div>
         </div>
-
+        @if (!$github_app->app_id)
+            <div class="pb-4">
+                <div class="text-sm">You need to register a GitHub App before using this source!</div>
+                <form>
+                    <x-forms.button isHighlighted x-on:click.prevent="createGithubApp">Register a GitHub
+                        Application
+                    </x-forms.button>
+                </form>
+            </div>
+        @endif
         <x-forms.input id="github_app.name" label="App Name" required />
 
         @if ($github_app->app_id)
@@ -41,10 +47,15 @@
         @else
             <x-forms.input id="github_app.organization" label="Organization" placeholder="Personal user if empty" />
         @endif
-        <x-forms.input id="github_app.api_url" label="API Url" disabled />
         <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-        <x-forms.input id="github_app.custom_user" label="User" required />
-        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+        <x-forms.input id="github_app.api_url" label="API Url" disabled />
+        @if ($github_app->html_url === 'https://github.com')
+            <x-forms.input id="github_app.custom_user" label="User" disabled />
+            <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
+        @else
+            <x-forms.input id="github_app.custom_user" label="User" required />
+            <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+        @endif
 
         @if ($github_app->app_id)
             <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />

@@ -1,10 +1,12 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
-        <div class="flex items-center gap-2 border-b-2 border-solid border-coolgray-200">
-            <h1>Settings</h1>
+        <div class="flex gap-2">
+            <h1 class="pb-2">Settings</h1>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
+        </div>
+        <div class="pb-4 text-sm">Instance wide settings for Coolify.
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
@@ -22,13 +24,12 @@
     </form>
 
     <h3>Advanced</h3>
-    <div class="flex flex-col pt-4 text-right w-52">
+    <div class="flex flex-col text-right w-52">
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         {{-- <x-forms.checkbox instantSave id="is_https_forced" label="Force https?" /> --}}
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
     </div>
-    <h3>Upgrade</h3>
     @if (auth()->user()->isPartOfRootTeam())
         <livewire:force-upgrade />
     @endif
