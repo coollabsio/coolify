@@ -23,17 +23,18 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_username' => 'nullable',
         'model.extra_attributes.smtp_password' => 'nullable',
         'model.extra_attributes.smtp_timeout' => 'nullable',
-        'model.extra_attributes.test_notification_email' => 'nullable|email',
+        'model.extra_attributes.test_notification_recipients' => 'nullable',
     ];
     protected $validationAttributes = [
-        'model.extra_attributes.from_address' => 'From Address',
-        'model.extra_attributes.from_name' => 'From Name',
-        'model.extra_attributes.recipients' => 'Recipients',
-        'model.extra_attributes.smtp_host' => 'Host',
-        'model.extra_attributes.smtp_port' => 'Port',
-        'model.extra_attributes.smtp_encryption' => 'Encryption',
-        'model.extra_attributes.smtp_username' => 'Username',
-        'model.extra_attributes.smtp_password' => 'Password',
+        'model.extra_attributes.from_address' => '',
+        'model.extra_attributes.from_name' => '',
+        'model.extra_attributes.recipients' => '',
+        'model.extra_attributes.smtp_host' => '',
+        'model.extra_attributes.smtp_port' => '',
+        'model.extra_attributes.smtp_encryption' => '',
+        'model.extra_attributes.smtp_username' => '',
+        'model.extra_attributes.smtp_password' => '',
+        'model.extra_attributes.test_notification_recipients' => '',
     ];
     public function mount($model)
     {
@@ -43,6 +44,8 @@ class EmailSettings extends Component
     {
         $this->resetErrorBag();
         $this->validate();
+        $this->model->extra_attributes->recipients = str_replace(' ', '', $this->model->extra_attributes->recipients);
+        $this->model->extra_attributes->test_notification_recipients = str_replace(' ', '', $this->model->extra_attributes->test_notification_recipients);
         $this->saveModel();
     }
     private function saveModel()

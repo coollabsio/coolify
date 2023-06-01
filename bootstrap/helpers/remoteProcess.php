@@ -91,7 +91,7 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
             ray('executing again');
             return instant_remote_process($command, $server, $throwError, $repeat - 1);
         }
-        ray($process->errorOutput());
+        ray('ERROR OCCURED: ' . $process->errorOutput());
         if (!$throwError) {
             return null;
         }

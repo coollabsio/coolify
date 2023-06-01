@@ -9,11 +9,12 @@
         <div class="flex flex-col w-96">
             <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />
         </div>
-        <x-forms.input id="model.extra_attributes.test_notification_email" label="Test Notification Email" />
+        <x-forms.input id="model.extra_attributes.test_notification_recipients" label="Test Notification Recipient(s)"
+            helper="Emails separated by comma." />
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
-                <x-forms.input required id="model.extra_attributes.recipients" helper="Emails separated by comma"
-                    label="Recipients" />
+                <x-forms.input required id="model.extra_attributes.recipients" helper="Emails separated by comma."
+                    label="Recipient(s)" />
             </div>
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
