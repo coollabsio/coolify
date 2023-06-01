@@ -1,12 +1,26 @@
 <x-layout>
-    <div class="flex items-center gap-2">
-        <h1>Resources</h1>
-        <livewire:project.delete :project_id="$project->id" :resource_count="$project->applications->count()" />
+    <div class="flex flex-col">
+        <div class="flex items-center gap-2">
+            <h1 class="pb-0">Resources</h1>
+            <livewire:project.delete-environment :environment_id="$environment->id" :resource_count="$environment->applications->count()" />
+        </div>
+        <div class="pb-10 text-sm breadcrumbs">
+            <ul>
+                <li>
+                    <a href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                        {{ $project->name }}
+                    </a>
+                </li>
+                <li>
+                    {{ request()->route('environment_name') }}
+                </li>
+            </ul>
+        </div>
     </div>
     @if ($environment->applications->count() === 0)
-        <p>No resources yet.</p>
+        <p>No resources found.</p>
     @endif
-    <div class="flex gap-2">
+    <div class="flex flex-col gap-2">
         @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">

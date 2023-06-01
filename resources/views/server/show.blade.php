@@ -1,6 +1,11 @@
 <x-layout>
-    <h1>Server</h1>
-    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-6">
+    <h1 class="pb-0">Server</h1>
+    <div class="text-sm breadcrumbs">
+        <ul>
+            <li>{{ data_get($server, 'name') }}</li>
+        </ul>
+    </div>
+    <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex pt-10">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>

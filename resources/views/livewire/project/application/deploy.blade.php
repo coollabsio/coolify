@@ -1,38 +1,40 @@
 <div class="flex items-center gap-2">
     @if ($application->status === 'running')
-        <div class="btn-group">
-            <x-inputs.button isWarning wire:click='stop'>Stop</x-inputs.button>
-            <div class="border-none dropdown dropdown-hover btn btn-xs bg-coollabs hover:bg-coollabs-100 no-animation">
-                <button tabindex="0" class="flex items-center justify-center h-full">👇</button>
-                <ul tabindex="0"
-                    class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
-                    <li>
-                        <div wire:click='forceRebuild'>Force deploy without cache</div>
-                    </li>
-                </ul>
-            </div>
+        <div class="dropdown dropdown-bottom">
+            <x-forms.button isHighlighted tabindex="0" class="">
+                Actions
+                <x-chevron-down />
+            </x-forms.button>
+            <ul tabindex="0"
+                class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+                <li>
+                    <div class="hover:bg-coollabs" wire:click='deploy'>Restart</div>
+                </li>
+                <li>
+                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Force deploy without cache</div>
+                </li>
+                <li>
+                    <div class="hover:bg-red-500" wire:click='stop'>Stop</div>
+                </li>
+            </ul>
         </div>
     @else
-        <div class="btn-group">
-            <x-inputs.button isHighlighted wire:click='start'>Deploy</x-inputs.button>
-            <div class="border-none dropdown dropdown-hover btn btn-xs bg-coollabs hover:bg-coollabs-100 no-animation">
-                <button tabindex="0" class="flex items-center justify-center h-full">👇</button>
-                <ul tabindex="0"
-                    class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
-                    <li>
-                        <div wire:click='forceRebuild'>Deploy without cache</div>
-                    </li>
-                </ul>
-            </div>
+        <div class="dropdown dropdown-bottom">
+            <label tabindex="0">
+                <x-forms.button isHighlighted>
+                    Actions
+                    <x-chevron-down />
+                </x-forms.button>
+            </label>
+            <ul tabindex="0"
+                class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+                <li>
+                    <div class="hover:bg-coollabs" wire:click='deploy'>Deploy</div>
+                </li>
+                <li>
+                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Deploy without cache</div>
+                </li>
+            </ul>
         </div>
     @endif
-    <span wire:poll.5000ms='pollingStatus'>
-        {{-- @if ($application->status === 'running')
-            <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
-            <span class="text-green-500" wire:loading.remove.delay.longer>{{ $application->status }}</span>
-        @else
-            <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
-            <span class="text-red-500" wire:loading.remove.delay.longer>{{ $application->status }}</span>
-        @endif --}}
-    </span>
 </div>

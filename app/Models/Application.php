@@ -41,14 +41,6 @@ class Application extends BaseModel
         'private_key_id'
     ];
 
-    public $casts = [
-        'previews' => SchemalessAttributes::class,
-        'limits_memory_oom_kill' => 'boolean',
-    ];
-    public function scopeWithExtraAttributes(): Builder
-    {
-        return $this->previews->modelScope();
-    }
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
@@ -131,6 +123,10 @@ class Application extends BaseModel
     {
         return $this->belongsTo(Environment::class);
     }
+    public function previews()
+    {
+        return $this->hasMany(ApplicationPreview::class);
+    }
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);
@@ -148,9 +144,15 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-    public function deployments()
+    public function deployments(int $skip = 0, int $take = 10)
     {
-        return Activity::where('subject_id', $this->id)->where('properties->type', '=', 'deployment')->orderBy('created_at', 'desc')->get();
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+        $count = $deployments->count();
+        $deployments = $deployments->skip($skip)->take($take)->get();
+        return [
+            'count' => $count,
+            'deployments' => $deployments
+        ];
     }
     public function get_deployment(string $deployment_uuid)
     {
@@ -158,7 +160,14 @@ class Application extends BaseModel
     }
     public function isDeployable(): bool
     {
-        if ($this->settings->is_auto_deploy) {
+        if ($this->settings->is_auto_deploy_enabled) {
+            return true;
+        }
+        return false;
+    }
+    public function isPRDeployable(): bool
+    {
+        if ($this->settings->is_preview_deployments_enabled) {
             return true;
         }
         return false;

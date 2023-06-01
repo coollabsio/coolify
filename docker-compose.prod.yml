@@ -1,15 +1,14 @@
 version: '3.8'
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${APP_TAG:-4.0.0-nightly.0}"
+    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-nightly.0}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
         target: /var/www/html/.env
         read_only: true
+      - /data/coolify/ssh:/var/www/html/storage/app/ssh
       - /data/coolify/deployments:/var/www/html/storage/app/deployments
-      - /data/coolify/ssh-keys:/var/www/html/storage/app/ssh-keys
-      - /data/coolify/proxy:/var/www/html/storage/app/proxy
     environment:
       - APP_ENV=production
       - APP_DEBUG

@@ -1,0 +1,65 @@
+<?php
+
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
+use Illuminate\Support\Facades\Http;
+use Lcobucci\JWT\Encoding\ChainedFormatter;
+use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Rsa\Sha256;
+use Lcobucci\JWT\Token\Builder;
+
+function generate_github_installation_token(GithubApp $source)
+{
+    $signingKey = InMemory::plainText($source->privateKey->private_key);
+    $algorithm = new Sha256();
+    $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+    $now = new DateTimeImmutable();
+    $now = $now->setTime($now->format('H'), $now->format('i'));
+    $issuedToken = $tokenBuilder
+        ->issuedBy($source->app_id)
+        ->issuedAt($now)
+        ->expiresAt($now->modify('+10 minutes'))
+        ->getToken($algorithm, $signingKey)
+        ->toString();
+    $token = Http::withHeaders([
+        'Authorization' => "Bearer $issuedToken",
+        'Accept' => 'application/vnd.github.machine-man-preview+json'
+    ])->post("{$source->api_url}/app/installations/{$source->installation_id}/access_tokens");
+    if ($token->failed()) {
+        throw new \Exception("Failed to get access token for " . $source->name . " with error: " . $token->json()['message']);
+    }
+    return $token->json()['token'];
+}
+function generate_github_jwt_token(GithubApp $source)
+{
+    $signingKey = InMemory::plainText($source->privateKey->private_key);
+    $algorithm = new Sha256();
+    $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+    $now = new DateTimeImmutable();
+    $now = $now->setTime($now->format('H'), $now->format('i'));
+    $issuedToken = $tokenBuilder
+        ->issuedBy($source->app_id)
+        ->issuedAt($now->modify('-1 minute'))
+        ->expiresAt($now->modify('+10 minutes'))
+        ->getToken($algorithm, $signingKey)
+        ->toString();
+    return $issuedToken;
+}
+
+function get_from_git_api(GithubApp|GitlabApp $source, $endpoint)
+{
+    if ($source->getMorphClass() == 'App\Models\GithubApp') {
+        if ($source->is_public) {
+            $response = Http::github($source->api_url)->get($endpoint);
+        }
+    }
+    $json = $response->json();
+    if ($response->status() !== 200) {
+        throw new \Exception("Failed to get data from {$source->name} with error: " . $json['message']);
+    }
+    return [
+        'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
+        'data' => collect($json)
+    ];
+}

@@ -3,6 +3,8 @@ ARG POSTGRES_VERSION=15
 RUN apt-get update && apt-get install -y php-pgsql openssh-client git git-lfs postgresql-client
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
+COPY docker/dev-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
+
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
 RUN echo "alias mfs='php artisan migrate:fresh --seed'" >>/etc/bash.bashrc

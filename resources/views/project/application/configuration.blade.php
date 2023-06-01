@@ -1,6 +1,17 @@
 <x-layout>
+    <h1 class="pb-0">Configuration</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li><a href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                    {{ $application->environment->project->name }}</a>
+            </li>
+            <li><a
+                    href="{{ route('project.resources', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+            </li>
+            <li>{{ data_get($application, 'name') }}</li>
+        </ul>
+    </div>
     <x-applications.navbar :application="$application" />
-    <h1 class="py-10">Configuration</h1>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
@@ -17,6 +28,10 @@
             </a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
+            </a>
+            <a :class="activeTab === 'previews' && 'text-white'"
+                @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
+                Deployments
             </a>
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
@@ -48,6 +63,9 @@
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.application.storages.all :application="$application" />
             </div>
+            <div x-cloak x-show="activeTab === 'previews'">
+                <livewire:project.application.previews :application="$application" />
+            </div>
             <div x-cloak x-show="activeTab === 'rollback'">
                 <livewire:project.application.rollback :application="$application" />
             </div>
@@ -57,7 +75,6 @@
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.application.danger :application="$application" />
             </div>
-
         </div>
     </div>
 </x-layout>

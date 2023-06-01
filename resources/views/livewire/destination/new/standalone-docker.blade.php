@@ -1,15 +1,19 @@
 <div>
-    <form class="flex items-end gap-4" wire:submit.prevent='submit'>
-        <x-inputs.input id="name" label="Name" required />
-        <x-inputs.input id="network" label="Network" required />
-        <x-inputs.select id="server_id" label="Select a server" required>
+    <form class="flex flex-col gap-4" wire:submit.prevent='submit'>
+        <div class="flex gap-2">
+            <h1>New Destination</h1>
+            <x-forms.button type="submit">
+                Save
+            </x-forms.button>
+        </div>
+        <x-forms.input id="name" label="Name" required />
+        <x-forms.input id="network" label="Network" required />
+        <x-forms.select id="server_id" label="Select a server" required>
             @foreach ($servers as $server)
                 <option disabled>Select a server</option>
                 <option value="{{ $server->id }}">{{ $server->name }}</option>
             @endforeach
-        </x-inputs.select>
-        <x-inputs.button type="submit">
-            Submit
-        </x-inputs.button>
+        </x-forms.select>
+
     </form>
 </div>

@@ -67,5 +67,10 @@ services:
     ports:
       - '${FORWARD_MAILPIT_PORT:-1025}:1025'
       - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+  buggregator:
+    image: ghcr.io/buggregator/server:latest
+    container_name: coolify-debug
+    ports:
+      - 23517:8000
     networks:
       - coolify

@@ -180,7 +180,7 @@ return [
     */
 
     'defaults' => [
-        'supervisor-1' => [
+        's6' => [
             'connection' => 'redis',
             'queue' => ['default'],
             'balance' => 'auto',
@@ -190,25 +190,27 @@ return [
             'maxJobs' => 0,
             'memory' => 128,
             'tries' => 1,
-            'timeout' => 600,
+            'timeout' => 3600,
             'nice' => 0,
         ],
     ],
 
     'environments' => [
         'production' => [
-            'supervisor-1' => [
+            's6' => [
+                'autoScalingStrategy' => 'size',
                 'maxProcesses' => env('HORIZON_MAX_PROCESSES', 10),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
-                'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
+                'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
         ],
 
         'local' => [
-            'supervisor-1' => [
+            's6' => [
+                'autoScalingStrategy' => 'size',
                 'maxProcesses' => env('HORIZON_MAX_PROCESSES', 10),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
-                'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 3),
+                'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
         ],
     ],

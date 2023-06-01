@@ -1,8 +1,10 @@
 {
     "auth.login": "Login",
+    "auth.already-registered": "Already registered?",
+    "auth.register-now": "Register now!",
     "auth.logout": "Logout",
     "auth.register": "Register",
-    "auth.registration_disabled": "Registration is disabled.",
+    "auth.registration_disabled": "Registration is disabled. Please contact the administrator.",
     "auth.reset_password": "Reset Password",
     "auth.failed": "These credentials do not match our records.",
     "auth.failed.password": "The provided password is incorrect.",
@@ -11,5 +13,6 @@
     "input.name": "Name",
     "input.email": "Email",
     "input.password": "Password",
-    "input.password.again": "Password Again"
+    "input.password.again": "Password Again",
+    "button.save": "Save"
 }

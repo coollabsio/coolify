@@ -10,6 +10,8 @@ ARG POSTGRES_VERSION=15
 RUN apt-get update && apt-get install -y php-pgsql openssh-client git git-lfs jq
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
+COPY docker/prod-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
+
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
@@ -27,3 +29,4 @@ RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
 RUN echo "alias mfs='php artisan migrate:fresh --seed'" >>/etc/bash.bashrc
 RUN echo "alias cda='composer dump-autoload'" >>/etc/bash.bashrc
 RUN echo "alias run='./scripts/run'" >>/etc/bash.bashrc
+RUN echo "alias logs='tail -f storage/logs/laravel.log'" >>/etc/bash.bashrc

@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Server;
 
 use App\Models\PrivateKey as ModelsPrivateKey;
 use App\Models\Server;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
@@ -19,13 +18,12 @@ class PrivateKey extends Component
             'private_key_id' => $private_key_id
         ]);
         // Delete the old ssh mux file to force a new one to be created
-        Storage::disk('local')->delete(".ssh/ssh_mux_{$server->first()->ip}_{$server->first()->port}_{$server->first()->user}");
-
+        Storage::disk('ssh-mux')->delete("{$server->first()->ip}_{$server->first()->port}_{$server->first()->user}");
         return redirect()->route('server.show', $this->parameters['server_uuid']);
     }
     public function mount()
     {
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
         $this->private_keys = ModelsPrivateKey::where('team_id', session('currentTeam')->id)->get();
     }
 }

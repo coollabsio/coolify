@@ -19,45 +19,69 @@ function help {
     echo "Tasks:"
     compgen -A function | cat -n
 }
-function sync-bunny {
+
+function sync:bunny {
     php artisan sync:bunny --env=secrets
 }
+
 function queue {
     bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
 }
+
+function horizon {
+    bash vendor/bin/spin exec -u webuser coolify php artisan horizon -vvv  
+}
+
 function schedule {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
 }
-function schedule-run {
+
+function schedule:run {
     bash vendor/bin/spin exec -u webuser coolify php artisan schedule:run
 }
-function reset-db {
+
+function db:reset {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
+
 function mfs {
-    reset-db
+    db:reset
 }
-function reset-db-production {
+
+function db:reset-prod {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
+
 function coolify {
     bash vendor/bin/spin exec -u webuser coolify bash
 }
-function coolify-root {
+
+function coolify:root {
     bash vendor/bin/spin exec coolify bash
 }
+function coolify:proxy {
+   docker exec -ti coolify-proxy sh
+}
+
+function redis {
+    docker exec -ti coolify-redis redis-cli
+}
+
 function vite {
     bash vendor/bin/spin exec vite bash
 }
-function build-builder {
-    act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
-}
+
 function tinker {
     bash vendor/bin/spin exec -u webuser coolify php artisan tinker
 }
+
 function db {
     bash vendor/bin/spin exec -u webuser coolify php artisan db
+}
+
+function build:builder {
+    act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
 }
 function default {
     help

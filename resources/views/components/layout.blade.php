@@ -25,16 +25,18 @@
 </head>
 
 <body>
-
     @livewireScripts
     @auth
         <x-navbar />
     @endauth
-    <main class="min-h-full px-8 pt-10 mx-auto max-w-7xl">
+    <div class="flex justify-center w-full pt-4 min-h-12">
+        <x-magic-bar />
+    </div>
+    <main>
         {{ $slot }}
     </main>
     <a
-        class="fixed text-xs cursor-pointer left-2 bottom-1 opacity-20 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
+        class="fixed text-xs cursor-pointer right-2 bottom-1 opacity-60 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
     @auth
         <script>
             window.addEventListener("keydown", function(event) {
@@ -44,48 +46,6 @@
                         window.dispatchEvent(new CustomEvent('slash'));
                     }
                 }
-            })
-
-            function checkIfIamDead() {
-                console.log('Checking server\'s pulse...')
-                checkIfIamDeadInterval = setInterval(async () => {
-                    try {
-                        const res = await fetch('/api/health');
-                        if (res.ok) {
-                            console.log('I\'m alive. Waiting for server to be dead...');
-                        }
-                    } catch (error) {
-                        console.log('I\'m dead. Charging... Standby... Bzz... Bzz...')
-                        checkHealth();
-                        if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
-                    }
-
-                    return;
-                }, 2000);
-            }
-
-            function checkHealth() {
-                console.log('Checking server\'s health...')
-                checkHealthInterval = setInterval(async () => {
-                    try {
-                        const res = await fetch('/api/health');
-                        if (res.ok) {
-                            console.log('Server is back online. Reloading...')
-                            if (checkHealthInterval) clearInterval(checkHealthInterval);
-                            window.location.reload();
-                        }
-                    } catch (error) {
-                        console.log('Waiting for server to come back from dead...');
-                    }
-
-                    return;
-                }, 2000);
-            }
-            Livewire.on('updateInitiated', () => {
-                let checkHealthInterval = null;
-                let checkIfIamDeadInterval = null;
-                console.log('Update initiated. Waiting for server to be dead...')
-                checkIfIamDead();
             })
             Livewire.on('reloadWindow', () => {
                 window.location.reload();
@@ -100,7 +60,6 @@
             })
         </script>
     @endauth
-
 </body>
 
 </html>

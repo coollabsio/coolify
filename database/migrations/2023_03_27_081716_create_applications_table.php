@@ -41,8 +41,6 @@ return new class extends Migration
             $table->string('base_directory')->default('/');
             $table->string('publish_directory')->nullable();
 
-            $table->schemalessAttributes('previews');
-
             $table->string('health_check_path')->default('/');
             $table->string('health_check_port')->nullable();
             $table->string('health_check_host')->default('localhost');
@@ -59,13 +57,13 @@ return new class extends Migration
             $table->string('limits_memory_swap')->default("0");
             $table->integer('limits_memory_swappiness')->default(60);
             $table->string('limits_memory_reservation')->default("0");
-            $table->boolean('limits_memory_oom_kill')->default(false);
 
             $table->string('limits_cpus')->default("0");
             $table->string('limits_cpuset')->nullable()->default("0");
             $table->integer('limits_cpu_shares')->default(1024);
 
             $table->string('status')->default('exited');
+            $table->string('preview_url_template')->default('{{pr_id}}.{{domain}}');
 
             $table->nullableMorphs('destination');
             $table->nullableMorphs('source');

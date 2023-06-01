@@ -81,7 +81,7 @@ Route::middleware(['auth'])->group(function () {
 
             if ($is_new_project) {
                 $project = Project::create([
-                    'name' => request()->query('name') ?? generateRandomName(),
+                    'name' => request()->query('name') ?? generate_random_name(),
                     'team_id' => $id,
                 ]);
                 return response()->json([
@@ -92,7 +92,7 @@ Route::middleware(['auth'])->group(function () {
                 $environment = Project::where('uuid', request()->query('project'))->first()->environments->where('name', request()->query('name'))->first();
                 if (!$environment) {
                     $environment = Environment::create([
-                        'name' => request()->query('name') ?? generateRandomName(),
+                        'name' => request()->query('name') ?? generate_random_name(),
                         'project_id' => Project::where('uuid', request()->query('project'))->first()->id,
                     ]);
                 }
@@ -104,7 +104,7 @@ Route::middleware(['auth'])->group(function () {
                 'magic' => true,
             ]);
         } catch (\Throwable $e) {
-            return generalErrorHandler($e, isJson: true);
+            return general_error_handler($e, isJson: true);
         }
     });
     Route::get('/', function () {
@@ -133,7 +133,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('team');
 
     Route::get('/settings', function () {
-        $isRoot = auth()->user()->isRoot();
+        $isRoot = auth()->user()->isPartOfRootTeam();
         if ($isRoot) {
             $settings = InstanceSettings::get();
             return view('settings', [
@@ -189,6 +189,9 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
+    Route::get('/servers', fn () => view('servers', [
+        'servers' => Server::validated(),
+    ]))->name('servers');
     Route::get('/server/new', fn () => view('server.new', [
         'private_keys' => PrivateKey::where('team_id', session('currentTeam')->id)->get(),
     ]))->name('server.new');
@@ -236,9 +239,14 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get(
+        '/projects',
+        [ProjectController::class, 'all']
+    )->name('projects');
+
+    Route::get(
         '/project/{project_uuid}',
-        [ProjectController::class, 'environments']
-    )->name('project.environments');
+        [ProjectController::class, 'show']
+    )->name('project.show');
 
     Route::get(
         '/project/{project_uuid}/{environment_name}/new',

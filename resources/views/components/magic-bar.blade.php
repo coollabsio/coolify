@@ -1,4 +1,4 @@
-<div x-data="magicsearchbar" @slash.window="mainMenu = true">
+<div x-data="magicbar" @slash.window="mainMenu = true">
     {{-- Main --}}
     <template x-cloak x-if="isMainMenu">
         <div>
@@ -13,14 +13,10 @@
                 <template x-for="(item,index) in filteredItems" :key="item.name">
                     <div x-on:click="await set(item.next ?? 'server',item.name)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="w-12 badge badge-primary badge-sm" x-show="item.type === 'Apps'"
-                            x-text="item.type"></span>
-                        <span class="w-12 badge badge-secondary badge-sm" x-show="item.type === 'Add'"
-                            x-text="item.type"></span>
-                        <span class="w-12 badge badge-success badge-sm" x-show="item.type === 'Jump'"
-                            x-text="item.type"></span>
-                        <span class="w-12 badge badge-success badge-sm" x-show="item.type === 'New'"
-                            x-text="item.type"></span>
+                        <span class="magic-badge" x-show="item.type === 'Apps'" x-text="item.type"></span>
+                        <span class="magic-badge" x-show="item.type === 'Add'" x-text="item.type"></span>
+                        <span class="magic-badge" x-show="item.type === 'Jump'" x-text="item.type"></span>
+                        <span class="magic-badge" x-show="item.type === 'New'" x-text="item.type"></span>
                         <span x-text="item.name"></span>
                     </div>
                 </template>
@@ -42,7 +38,7 @@
                 <template x-for="(server,index) in filteredServers" :key="server.name ?? server">
                     <div x-on:click="await set('destination',server.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Server</span>
+                        <span class="magic-badge">Server</span>
                         <span x-text="server.name"></span>
                     </div>
                 </template>
@@ -65,7 +61,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('project',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class=" badge badge-primary badge-sm">Destination</span>
+                        <span class=" magic-badge">Destination</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -88,7 +84,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('environment',project.uuid)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Project</span>
+                        <span class="magic-badge">Project</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -98,7 +94,8 @@
     {{-- Environments --}}
     <template x-cloak x-if="environmentMenu">
         <div x-on:click.outside="closeMenus">
-            <input class="magic-input" x-ref="search" x-model="search" placeholder="Select a environment..."
+            <input class="magic-input" x-ref="search" x-model="search"
+                placeholder="Enter the new environment name or select one..."
                 x-on:keydown.down="focusNext(environments.length + 1)"
                 x-on:keydown.up="focusPrev(environments.length + 1)" x-on:keyup.escape="closeMenus"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jump',filteredEnvironments()[focusedIndex - 1]?.name)" />
@@ -106,12 +103,12 @@
                 <div x-on:click="await newEnvironment" :class="focusedIndex === 0 && 'magic-item-focused'"
                     class="magic-item">
                     <span>New Environment</span>
-                    <span x-text="search"></span>
+                    <span class="text-warning" x-text="search"></span>
                 </div>
                 <template x-for="(environment,index) in filteredEnvironments" :key="environment.name ?? environment">
                     <div x-on:click="await set('jump',environment.name)"
                         :class="focusedIndex === index + 1 && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Env</span>
+                        <span class="magic-badge">Env</span>
                         <span x-text="environment.name"></span>
                     </div>
                 </template>
@@ -121,9 +118,9 @@
     {{-- Projects --}}
     <template x-cloak x-if="projectsMenu">
         <div x-on:click.outside="closeMenus">
-            <input x-ref="search" x-model="search" class="magic-input" placeholder="Select a project..."
-                x-on:keyup.escape="closeMenus" x-on:keydown.down="focusNext(projects.length)"
-                x-on:keydown.up="focusPrev(projects.length)"
+            <input x-ref="search" x-model="search" class="magic-input"
+                placeholder="Enter the new project name or select one..." x-on:keyup.escape="closeMenus"
+                x-on:keydown.down="focusNext(projects.length)" x-on:keydown.up="focusPrev(projects.length)"
                 x-on:keyup.enter="focusedIndex !== '' && await set('jumpToProject',filteredProjects()[focusedIndex]?.uuid)" />
             <div class="magic-items">
                 <template x-if="projects.length === 0">
@@ -134,7 +131,7 @@
                 <template x-for="(project,index) in filteredProjects" :key="project.name ?? project">
                     <div x-on:click="await set('jumpToProject',project.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Jump</span>
+                        <span class="magic-badge">Jump</span>
                         <span x-text="project.name"></span>
                     </div>
                 </template>
@@ -157,7 +154,7 @@
                 <template x-for="(destination,index) in filteredDestinations" :key="destination.name ?? destination">
                     <div x-on:click="await set('jumpToDestination',destination.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Jump</span>
+                        <span class="magic-badge">Jump</span>
                         <span x-text="destination.name"></span>
                     </div>
                 </template>
@@ -180,7 +177,7 @@
                 <template x-for="(privateKey,index) in filteredPrivateKeys" :key="privateKey.name ?? privateKey">
                     <div x-on:click="await set('jumpToPrivateKey',privateKey.uuid)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Jump</span>
+                        <span class="magic-badge">Jump</span>
                         <span x-text="privateKey.name"></span>
                     </div>
                 </template>
@@ -203,7 +200,7 @@
                 <template x-for="(source,index) in filteredSources" :key="source.name ?? source">
                     <div x-on:click="await set('jumpToSource',source)"
                         :class="focusedIndex === index && 'magic-item-focused'" class="magic-item">
-                        <span class="badge badge-primary badge-sm">Jump</span>
+                        <span class="magic-badge">Jump</span>
                         <span x-text="source.name"></span>
                     </div>
                 </template>
@@ -214,7 +211,7 @@
 
 <script>
     document.addEventListener('alpine:init', () => {
-        Alpine.data('magicsearchbar', () => ({
+        Alpine.data('magicbar', () => ({
             isMainMenu() {
                 return !this.serverMenu &&
                     !this.destinationMenu &&

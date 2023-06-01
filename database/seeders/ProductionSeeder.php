@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Data\ServerMetadata;
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
-use App\Models\Project;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Storage;
@@ -53,7 +56,7 @@ class ProductionSeeder extends Seeder
 
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";
-        $coolify_key = Storage::disk('local')->get("ssh-keys/{$coolify_key_name}");
+        $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
 
         if ($coolify_key) {
             $private_key = PrivateKey::find(0);
@@ -72,23 +75,37 @@ class ProductionSeeder extends Seeder
         } else {
             // TODO: Add a command to generate a new SSH key for the Coolify host machine (localhost).
             echo "No SSH key found for the Coolify host machine (localhost).\n";
-            echo "Please generate one and save it in storage/app/ssh-keys/{$coolify_key_name}\n";
-            exit(1);
+            echo "Please generate one and save it in storage/app/ssh/keys/{$coolify_key_name}\n";
         }
 
         // Add Coolify host (localhost) as Server if it doesn't exist
         if (Server::find(0) == null) {
-            $server = Server::create([
+            $server_details = [
                 'id' => 0,
                 'name' => "localhost",
-                'description' => "This is the local machine",
+                'description' => "This is the server where Coolify is running on. Don't delete this!",
                 'user' => 'root',
                 'ip' => "host.docker.internal",
                 'team_id' => 0,
-                'private_key_id' => 0,
-            ]);
+                'private_key_id' => 0
+            ];
+            if (env('COOLIFY_DEFAULT_PROXY') == 'traefik') {
+                $server_details['extra_attributes'] = ServerMetadata::from([
+                    'proxy_type' => ProxyTypes::TRAEFIK_V2->value,
+                    'proxy_status' => ProxyStatus::EXITED->value
+                ]);
+            }
+            $server = Server::create($server_details);
             $server->settings->is_validated = true;
             $server->settings->save();
+        }
+        if (StandaloneDocker::find(0) == null) {
+            StandaloneDocker::create([
+                'id' => 0,
+                'name' => 'localhost-coolify',
+                'network' => 'coolify',
+                'server_id' => 0,
+            ]);
         }
     }
 }

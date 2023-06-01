@@ -10,6 +10,7 @@ services:
             - coolify
         depends_on:
             - postgres
+            - redis
 
     postgres:
         image: postgres:15-alpine
@@ -25,4 +26,5 @@ services:
             - coolify
 networks:
     coolify:
+        name: coolify
         driver: bridge

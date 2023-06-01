@@ -37,7 +37,7 @@ class PublicGitRepository extends Component
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
             $this->port = 3000;
         }
-        $this->parameters = getParameters();
+        $this->parameters = get_parameters();
         $this->query = request()->query();
     }
 
@@ -78,7 +78,7 @@ class PublicGitRepository extends Component
 
 
             $application_init = [
-                'name' => generateRandomName(),
+                'name' => generate_application_name($git_repository, $git_branch),
                 'git_repository' => $git_repository,
                 'git_branch' => $git_branch,
                 'build_pack' => 'nixpacks',
@@ -106,7 +106,7 @@ class PublicGitRepository extends Component
                 'application_uuid' => $application->uuid,
             ]);
         } catch (\Exception $e) {
-            return generalErrorHandler($e);
+            return general_error_handler($e);
         }
     }
 }

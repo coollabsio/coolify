@@ -2,7 +2,10 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The Laravel Framework.",
-    "keywords": ["framework", "laravel"],
+    "keywords": [
+        "framework",
+        "laravel"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
@@ -17,6 +20,7 @@
         "lcobucci/jwt": "^5.0.0",
         "livewire/livewire": "^v2.12.3",
         "nubs/random-name-generator": "^2.2",
+        "sentry/sentry-laravel": "^3.4",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
         "spatie/laravel-ray": "^1.32.4",
@@ -26,6 +30,8 @@
         "visus/cuid2": "^2.0.0"
     },
     "require-dev": {
+        "serversideup/spin": "^v1.1.0",
+        "barryvdh/laravel-ide-helper": "^2.13",
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v7.7.0",
         "laravel/pint": "^v1.8.0",
@@ -33,14 +39,13 @@
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^v2.4.0",
         "phpunit/phpunit": "^10.0.19",
-        "serversideup/spin": "^v1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^6.2",
         "toshy/bunnynet-php": "^3.0"
     },
     "autoload": {
         "files": [
-            "bootstrap/helpers.php"
+            "bootstrap/includeHelpers.php"
         ],
         "psr-4": {
             "App\\": "app/",
@@ -59,7 +64,16 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate",
+            "@php artisan ide-helper:generate",
+            "@php artisan ide-helper:meta",
+            "@php artisan ide-helper:models --nowrite"
+        ],
+        "post-install-cmd": [
+            "@php artisan ide-helper:generate",
+            "@php artisan ide-helper:meta",
+            "@php artisan ide-helper:models --nowrite"
         ],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""

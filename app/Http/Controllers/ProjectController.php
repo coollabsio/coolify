@@ -2,13 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use Spatie\Activitylog\Models\Activity;
+use App\Models\Project;
 
 class ProjectController extends Controller
 {
-    public function environments()
+    public function all()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $team_id = session('currentTeam')->id;
+
+        $projects = Project::where('team_id', $team_id)->get();
+        return view('projects', ['projects' => $projects]);
+    }
+
+    public function show()
+    {
+        $project_uuid = request()->route('project_uuid');
+        $team_id = session('currentTeam')->id;
+
+        $project = Project::where('team_id', $team_id)->where('uuid', $project_uuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -16,7 +27,7 @@ class ProjectController extends Controller
         if (count($project->environments) == 1) {
             return redirect()->route('project.resources', ['project_uuid' => $project->uuid, 'environment_name' => $project->environments->first()->name]);
         }
-        return view('project.environments', ['project' => $project]);
+        return view('project.show', ['project' => $project]);
     }
 
     public function new()
