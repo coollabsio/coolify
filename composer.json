@@ -30,15 +30,15 @@
         "visus/cuid2": "^2.0.0"
     },
     "require-dev": {
-        "serversideup/spin": "^v1.1.0",
-        "barryvdh/laravel-ide-helper": "^2.13",
         "fakerphp/faker": "^v1.21.0",
         "laravel/dusk": "^v7.7.0",
         "laravel/pint": "^v1.8.0",
         "mockery/mockery": "^1.5.1",
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^v2.4.0",
+        "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.0.19",
+        "serversideup/spin": "^v1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
         "symfony/http-client": "^6.2",
         "toshy/bunnynet-php": "^3.0"
@@ -65,16 +65,9 @@
         ],
         "post-update-cmd": [
             "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
-            "Illuminate\\Foundation\\ComposerScripts::postUpdate",
-            "@php artisan ide-helper:generate",
-            "@php artisan ide-helper:meta",
-            "@php artisan ide-helper:models --nowrite"
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate"
         ],
-        "post-install-cmd": [
-            "@php artisan ide-helper:generate",
-            "@php artisan ide-helper:meta",
-            "@php artisan ide-helper:models --nowrite"
-        ],
+        "post-install-cmd": [],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],
