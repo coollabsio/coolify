@@ -1,11 +1,14 @@
 {
     "auth.login": "Login",
-    "auth.already-registered": "Already registered?",
-    "auth.register-now": "Register now!",
+    "auth.already_registered": "Already registered?",
+    "auth.confirm_password": "Confirm password",
+    "auth.forgot_password": "Forgot password",
+    "auth.forgot_password_send_email": "Send password reset link via email",
+    "auth.register_now": "Register now!",
     "auth.logout": "Logout",
     "auth.register": "Register",
     "auth.registration_disabled": "Registration is disabled. Please contact the administrator.",
-    "auth.reset_password": "Reset Password",
+    "auth.reset_password": "Reset password",
     "auth.failed": "These credentials do not match our records.",
     "auth.failed.password": "The provided password is incorrect.",
     "auth.failed.email": "We can't find a user with that e-mail address.",
@@ -13,6 +16,8 @@
     "input.name": "Name",
     "input.email": "Email",
     "input.password": "Password",
-    "input.password.again": "Password Again",
+    "input.password.again": "Password again",
+    "input.code": "One-time code",
+    "input.recovery_code": "Recovery code",
     "button.save": "Save"
 }

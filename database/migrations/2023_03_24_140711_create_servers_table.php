@@ -22,6 +22,7 @@ return new class extends Migration
             $table->foreignId('team_id');
             $table->foreignId('private_key_id');
             $table->schemalessAttributes('extra_attributes');
+            $table->schemalessAttributes('smtp_attributes');
             $table->timestamps();
         });
     }

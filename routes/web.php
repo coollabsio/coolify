@@ -125,8 +125,10 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('dashboard');
 
-    Route::get('/profile', function () {
-        return view('profile');
+    Route::get('/profile', function (Request $request) {
+        return view('profile', [
+            'request' => $request,
+        ]);
     })->name('profile');
     Route::get('/profile/team', function () {
         return view('team');

@@ -2,42 +2,41 @@
 
 namespace App\Models;
 
-use App\Notifications\Channels\SendsCoolifyEmail;
+use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsDiscord;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Notifications\Notifiable;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 
-class Team extends BaseModel implements SendsDiscord, SendsCoolifyEmail
+class Team extends BaseModel implements SendsDiscord, SendsEmail
 {
     use Notifiable;
 
     protected $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
+        'smtp_attributes' => SchemalessAttributes::class,
         'personal_team' => 'boolean',
     ];
     protected $fillable = [
         'id',
         'name',
         'personal_team',
-        'extra_attributes',
+        'smtp_attributes',
     ];
 
     public function routeNotificationForDiscord()
     {
-        return $this->extra_attributes->get('discord_webhook');
+        return $this->smtp_attributes->get('discord_webhook');
     }
 
-    public function routeNotificationForCoolifyEmail()
+    public function routeNotificationForEmail(string $attribute = 'recipients')
     {
-        $recipients = $this->extra_attributes->get('recipients', '');
-
+        $recipients = $this->smtp_attributes->get($attribute, '');
         return explode(PHP_EOL, $recipients);
     }
 
     public function scopeWithExtraAttributes(): Builder
     {
-        return $this->extra_attributes->modelScope();
+        return $this->smtp_attributes->modelScope();
     }
 
     public function projects()

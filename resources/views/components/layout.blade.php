@@ -35,8 +35,7 @@
     <main>
         {{ $slot }}
     </main>
-    <a
-        class="fixed text-xs cursor-pointer right-2 bottom-1 opacity-60 hover:opacity-100 hover:text-white">v{{ config('version') }}</a>
+    <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
             window.addEventListener("keydown", function(event) {

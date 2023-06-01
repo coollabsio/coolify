@@ -6,8 +6,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="pb-4 text-sm">Instance wide settings for Coolify.
-        </div>
+        <div class="pb-4 text-sm">Instance wide settings for Coolify.</div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
                 <x-forms.input id="settings.fqdn" label="Coolify's Domain" />
@@ -22,7 +21,6 @@
             </div>
         </div>
     </form>
-
     <h3>Advanced</h3>
     <div class="flex flex-col text-right w-52">
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
@@ -30,7 +28,5 @@
         {{-- <x-forms.checkbox instantSave id="is_https_forced" label="Force https?" /> --}}
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
     </div>
-    @if (auth()->user()->isPartOfRootTeam())
-        <livewire:force-upgrade />
-    @endif
+
 </div>

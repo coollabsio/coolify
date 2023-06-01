@@ -2,14 +2,14 @@
 
 namespace App\Notifications;
 
-use App\Notifications\Channels\CoolifyEmailChannel;
+use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class DemoNotification extends Notification implements ShouldQueue
+class TestNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -29,8 +29,8 @@ class DemoNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $notifiable->extra_attributes?->get('smtp_active') && $channels[] = CoolifyEmailChannel::class;
-        $notifiable->extra_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
+        $notifiable->smtp_attributes?->get('smtp_active') && $channels[] = EmailChannel::class;
+        $notifiable->smtp_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
         return $channels;
     }
 
@@ -40,15 +40,14 @@ class DemoNotification extends Notification implements ShouldQueue
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-                    ->subject('Coolify demo notification')
-                    ->line('Welcome to Coolify!')
-                    ->action('Go to dashboard', url('/'))
-                    ->line('We need your attention for disk usage.');
+            ->subject('Coolify Test Notification')
+            ->line('Congratulations!')
+            ->line('You have successfully received a test Email notification from Coolify. 🥳');
     }
 
     public function toDiscord(object $notifiable): string
     {
-        return 'Welcome to Coolify! We need your attention for disk usage. [Go to dashboard]('.url('/').')';
+        return 'You have successfully received a test Discord notification from Coolify. 🥳 [Go to your dashboard](' . url('/') . ')';
     }
 
     /**

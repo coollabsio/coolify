@@ -55,10 +55,13 @@ h1 {
     @apply text-3xl font-bold pb-4 text-white;
 }
 h2 {
-    @apply text-2xl font-bold pb-4 text-white;
+    @apply text-2xl font-bold py-4 text-white;
 }
 h3 {
     @apply text-xl font-bold py-4 text-white;
+}
+h4 {
+    @apply text-base font-bold pb-4 text-white;
 }
 a {
     @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;

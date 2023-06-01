@@ -5,16 +5,12 @@
                 <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 <x-version />
             </div>
-
-            <div class="flex items-center gap-2">
-                <h1 class="pb-0">{{ __('auth.forgot_password') }}</h1>
-            </div>
             <div class="w-96">
-                <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
+                <form action="/user/confirm-password" method="POST" class="flex flex-col gap-2">
                     @csrf
-                    <x-forms.input required value="test@example.com" type="email" name="email"
-                        label="{{ __('input.email') }}" autofocus />
-                    <x-forms.button type="submit">{{ __('auth.forgot_password_send_email') }}</x-forms.button>
+                    <x-forms.input required type="password" name="password " label="{{ __('input.password') }}"
+                        autofocus />
+                    <x-forms.button type="submit">{{ __('auth.confirm_password') }}</x-forms.button>
                 </form>
                 @if ($errors->any())
                     <div class="text-center text-error">

@@ -64,13 +64,17 @@ services:
       - "./_data/coolify/proxy/testing-host-2:/data/coolify/proxy"
   mailpit:
     image: 'axllent/mailpit:latest'
+    container_name: coolify-mail
     ports:
       - '${FORWARD_MAILPIT_PORT:-1025}:1025'
       - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+    networks:
+      - coolify
+
   buggregator:
     image: ghcr.io/buggregator/server:latest
     container_name: coolify-debug
     ports:
-      - 23517:8000
+      - 8001:8000
     networks:
       - coolify

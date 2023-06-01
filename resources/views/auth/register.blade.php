@@ -1,12 +1,15 @@
 <x-layout-simple>
     <div class="flex items-center justify-center min-h-screen">
         <div>
-            <div class="pb-8 text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+            <div class="flex flex-col items-center pb-8">
+                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                <x-version />
+            </div>
             <div class="flex items-center gap-2">
                 <h1 class="pb-0">{{ __('auth.register') }}</h1>
                 <a href="/login" class="flex justify-center pt-2 hover:no-underline">
                     <button
-                        class="normal-case rounded-none btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already-registered') }}</button>
+                        class="normal-case rounded-none btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already_registered') }}</button>
                 </a>
             </div>
             <form action="/register" method="POST" class="flex flex-col gap-2">

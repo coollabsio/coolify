@@ -13,9 +13,7 @@ class DiscordChannel
     public function send(SendsDiscord $notifiable, Notification $notification): void
     {
         $message = $notification->toDiscord($notifiable);
-
         $webhookUrl = $notifiable->routeNotificationForDiscord();
-
         dispatch(new SendMessageToDiscordJob($message, $webhookUrl));
     }
 }

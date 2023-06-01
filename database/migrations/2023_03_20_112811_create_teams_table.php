@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->string('name');
             $table->boolean('personal_team')->default(false);
-            $table->schemalessAttributes('extra_attributes');
+            $table->schemalessAttributes('smtp_attributes');
             $table->timestamps();
         });
     }
