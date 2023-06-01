@@ -1,5 +1,16 @@
 <x-layout-simple>
-    <div class="flex items-center justify-center h-screen">
+    Forgot Password
+    <form>
+        @csrf
+        <x-forms.input required value="test@example.com" type="email" name="email" label="{{ __('input.email') }}"
+            autofocus />
+    </form>
+    @if (session('status'))
+        <div class="mb-4 text-sm font-medium text-green-600">
+            {{ session('status') }}
+        </div>
+    @endif
+    {{-- <div class="flex items-center justify-center h-screen">
         <div>
             <div class="pb-8 text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
             <div class="flex items-center gap-2">
@@ -35,5 +46,5 @@
                 </form>
             </div>
         </div>
-    </div>
+    </div> --}}
 </x-layout-simple>
