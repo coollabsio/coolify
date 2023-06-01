@@ -20,10 +20,8 @@ yarn-error.log
 /.npm
 /.bash_history
 /_data
-
-# Temp while developing Proxy deployment
-resources/recipes
-
+_testing_hosts/
+_volumes/
 .lesshst
 psysh_history
 .psql_history

@@ -62,6 +62,11 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - "./_data/coolify/proxy/testing-host-2:/data/coolify/proxy"
+  mailpit:
+    image: 'axllent/mailpit:latest'
+    ports:
+      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
+      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
   buggregator:
     image: ghcr.io/buggregator/server:latest
     container_name: coolify-debug

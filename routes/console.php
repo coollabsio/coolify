@@ -14,19 +14,6 @@ use Illuminate\Support\Facades\Artisan;
 |
 */
 
-// Artisan::command('inspire', function () {
-
-//     $activity = Spatie\Activitylog\Models\Activity::latest()->first();
-
-//     $this->info(
-//         collect(
-//             json_decode(data_get($activity, 'description'), associative: true, flags: JSON_THROW_ON_ERROR)
-//         )
-//             ->sortBy('order')
-//             ->map(fn($i) => $i['output'])
-//             ->implode("\n")
-//     );
-
-
-
-// })->purpose('Display an inspiring quote');
+Artisan::command('inspire', function () {
+    $this->comment(Inspiring::quote());
+})->purpose('Display an inspiring quote');

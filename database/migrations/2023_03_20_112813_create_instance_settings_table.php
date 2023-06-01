@@ -21,8 +21,8 @@ return new class extends Migration
             $table->boolean('do_not_track')->default(false);
             $table->boolean('is_auto_update_enabled')->default(true);
             $table->boolean('is_registration_enabled')->default(true);
-            // $table->string('preview_domain_separator')->default('.');
             // $table->string('custom_dns_servers')->default('1.1.1.1,8.8.8.8');
+            // $table->string('preview_domain_separator')->default('.');
             // $table->boolean('is_dns_check_enabled')->default(true);
             $table->timestamps();
         });
