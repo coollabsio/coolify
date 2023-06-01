@@ -29,8 +29,8 @@ class TestNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $notifiable->smtp_attributes?->get('smtp_active') && $channels[] = EmailChannel::class;
-        $notifiable->smtp_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
+        $notifiable->extra_attributes?->get('smtp_active') && $channels[] = EmailChannel::class;
+        $notifiable->extra_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
         return $channels;
     }
 

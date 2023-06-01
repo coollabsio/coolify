@@ -23,21 +23,15 @@ class Server extends BaseModel
         'team_id',
         'private_key_id',
         'extra_attributes',
-        'smtp_attributes',
     ];
 
     public $casts = [
         'extra_attributes' => SchemalessAttributes::class,
-        'smtp_attributes' => SchemalessAttributes::class,
     ];
 
     public function scopeWithExtraAttributes(): Builder
     {
         return $this->extra_attributes->modelScope();
-    }
-    public function scopeWithSmtpAttributes(): Builder
-    {
-        return $this->smtp_attributes->modelScope();
     }
 
     public function standaloneDockers()

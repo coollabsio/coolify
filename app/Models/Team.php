@@ -13,30 +13,32 @@ class Team extends BaseModel implements SendsDiscord, SendsEmail
     use Notifiable;
 
     protected $casts = [
-        'smtp_attributes' => SchemalessAttributes::class,
+        'extra_attributes' => SchemalessAttributes::class,
         'personal_team' => 'boolean',
     ];
     protected $fillable = [
         'id',
         'name',
         'personal_team',
-        'smtp_attributes',
+        'extra_attributes',
     ];
 
     public function routeNotificationForDiscord()
     {
-        return $this->smtp_attributes->get('discord_webhook');
+        return $this->extra_attributes->get('discord_webhook');
     }
-
     public function routeNotificationForEmail(string $attribute = 'recipients')
     {
-        $recipients = $this->smtp_attributes->get($attribute, '');
-        return explode(PHP_EOL, $recipients);
+        $recipients = $this->extra_attributes->get($attribute, '');
+        if (is_null($recipients) || $recipients === '') {
+            return [];
+        }
+        return explode(',', $recipients);
     }
 
     public function scopeWithExtraAttributes(): Builder
     {
-        return $this->smtp_attributes->modelScope();
+        return $this->extra_attributes->modelScope();
     }
 
     public function projects()

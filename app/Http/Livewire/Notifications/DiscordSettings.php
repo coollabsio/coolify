@@ -13,11 +13,11 @@ class DiscordSettings extends Component
     public Team|Server $model;
 
     protected $rules = [
-        'model.smtp_attributes.discord_active' => 'nullable|boolean',
-        'model.smtp_attributes.discord_webhook' => 'required|url',
+        'model.extra_attributes.discord_active' => 'nullable|boolean',
+        'model.extra_attributes.discord_webhook' => 'required|url',
     ];
     protected $validationAttributes = [
-        'model.smtp_attributes.discord_webhook' => 'Discord Webhook',
+        'model.extra_attributes.discord_webhook' => 'Discord Webhook',
     ];
     public function mount($model)
     {
@@ -28,8 +28,8 @@ class DiscordSettings extends Component
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->model->smtp_attributes->discord_active = false;
-            $this->addError('model.smtp_attributes.discord_webhook', $e->getMessage());
+            $this->model->extra_attributes->discord_active = false;
+            $this->validate();
         }
     }
     private function saveModel()

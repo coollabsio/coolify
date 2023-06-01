@@ -7,10 +7,10 @@
             </x-forms.button>
         </div>
         <div class="flex flex-col gap-2 xl:flex-row w-96">
-            <x-forms.checkbox instantSave id="model.smtp_attributes.discord_active" label="Notification Enabled" />
+            <x-forms.checkbox instantSave id="model.extra_attributes.discord_active" label="Notification Enabled" />
         </div>
         <div class="flex flex-col gap-2 xl:flex-row w-96">
-            <x-forms.input required id="model.smtp_attributes.discord_webhook" label="Webhook" />
+            <x-forms.input required id="model.extra_attributes.discord_webhook" label="Webhook" />
         </div>
         <div>
 
