@@ -8,13 +8,13 @@
             <ul tabindex="0"
                 class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
-                    <div class="hover:bg-coollabs" wire:click='deploy'>Restart</div>
+                    <div class="rounded-none hover:bg-coollabs" wire:click='deploy'>Restart</div>
                 </li>
                 <li>
-                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Force deploy without cache</div>
+                    <div class="rounded-none hover:bg-coollabs" wire:click='deploy(true)'>Force deploy without cache</div>
                 </li>
                 <li>
-                    <div class="hover:bg-red-500" wire:click='stop'>Stop</div>
+                    <div class="rounded-none hover:bg-red-500" wire:click='stop'>Stop</div>
                 </li>
             </ul>
         </div>
@@ -29,10 +29,10 @@
             <ul tabindex="0"
                 class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                 <li>
-                    <div class="hover:bg-coollabs" wire:click='deploy'>Deploy</div>
+                    <div class="rounded-none hover:bg-coollabs" wire:click='deploy'>Deploy</div>
                 </li>
                 <li>
-                    <div class="hover:bg-coollabs" wire:click='deploy(true)'>Deploy without cache</div>
+                    <div class="rounded-none hover:bg-coollabs" wire:click='deploy(true)'>Deploy without cache</div>
                 </li>
             </ul>
         </div>

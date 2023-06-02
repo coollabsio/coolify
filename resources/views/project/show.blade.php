@@ -1,6 +1,6 @@
 <x-layout>
     <div class="flex items-center gap-2">
-        <h1 class="pb-0">Environments</h1>
+        <h1>Environments</h1>
         <livewire:project.delete-project :project_id="$project->id" :resource_count="$project->applications->count()" />
     </div>
     <div class="pb-10 text-sm breadcrumbs">

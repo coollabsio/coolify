@@ -2,15 +2,12 @@
 
 namespace App\Http\Livewire\Notifications;
 
-use App\Models\Server;
 use App\Models\Team;
-use App\Notifications\TestNotification;
-use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class EmailSettings extends Component
 {
-    public Team|Server $model;
+    public Team $model;
 
     protected $rules = [
         'model.extra_attributes.smtp_active' => 'nullable|boolean',
@@ -36,10 +33,6 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_password' => '',
         'model.extra_attributes.test_notification_recipients' => '',
     ];
-    public function mount($model)
-    {
-        //
-    }
     public function submit()
     {
         $this->resetErrorBag();

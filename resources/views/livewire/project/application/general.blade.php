@@ -1,7 +1,7 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
-        <div class="flex gap-2">
-            <h2 class="pb-0">General</h2>
+        <div class="flex items-center gap-2">
+            <h2>General</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>

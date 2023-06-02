@@ -28,7 +28,7 @@
             class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
             @if (data_get($application, 'fqdn'))
                 <li>
-                    <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
+                    <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs" target="_blank"
                         href="{{ $application->fqdn }}">
                         {{ $application->fqdn }}
                         <x-external-link />
@@ -39,8 +39,8 @@
                 @foreach ($application->ports_mappings_array as $port)
                     @if (config('app.env') === 'local')
                         <li>
-                            <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
-                                href="http://localhost:{{ explode(':', $port)[0] }}">Port
+                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                                target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Port
                                 {{ explode(':', $port)[0] }}
                                 <x-external-link />
                             </a>

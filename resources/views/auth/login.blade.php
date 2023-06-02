@@ -6,7 +6,7 @@
                 <x-version />
             </div>
             <div class="flex items-center gap-2">
-                <h1 class="pb-0">{{ __('auth.login') }}</h1>
+                <h1>{{ __('auth.login') }}</h1>
                 @if ($is_registration_enabled)
                     <a href="/register" class="flex justify-center pt-2 hover:no-underline">
                         <button

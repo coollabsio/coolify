@@ -1,6 +1,6 @@
 <div class="flex flex-col gap-2">
     <div>
-        <h2 class="pb-0">Environment Variables</h2>
+        <h2>Environment Variables</h2>
         <div class="text-sm">Environment (secrets) configuration. You can set variables for your Preview Deployments as
             well
             here.</div>

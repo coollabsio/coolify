@@ -6,7 +6,7 @@
                 <x-version />
             </div>
             <div class="flex items-center gap-2">
-                <h1 class="pb-0">{{ __('auth.register') }}</h1>
+                <h1>{{ __('auth.register') }}</h1>
                 <a href="/login" class="flex justify-center pt-2 hover:no-underline">
                     <button
                         class="normal-case rounded-none btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already_registered') }}</button>

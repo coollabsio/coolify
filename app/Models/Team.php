@@ -60,4 +60,8 @@ class Team extends BaseModel implements SendsDiscord, SendsEmail
     {
         return $this->hasMany(PrivateKey::class);
     }
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id');
+    }
 }

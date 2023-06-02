@@ -1,9 +1,8 @@
-<div class="pt-4">
-    <h3>Switch Team</h3>
-    <div class="flex gap-2">
-        @foreach (auth()->user()->otherTeams() as $team)
-            <x-forms.button isHighlighted wire:key="{{ $team->id }}" wire:click="switch_to('{{ $team->id }}')">
-                {{ $team->name }}</x-forms.button>
+<div>
+    <x-forms.select wire:model="selectedTeamId" class="w-64 select-xs">
+        <option value="default" disabled selected>Switch team</option>
+        @foreach (auth()->user()->teams as $team)
+            <option value="{{ $team->id }}">{{ $team->name }}</option>
         @endforeach
-    </div>
+    </x-forms.select>
 </div>

@@ -1,5 +1,5 @@
 <x-layout>
-    <h1 class="pb-0">Configuration</h1>
+    <h1>Configuration</h1>
     <div class="pb-10 text-sm breadcrumbs">
         <ul>
             <li><a href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
@@ -43,9 +43,6 @@
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
-            {{-- <a :class="activeTab === 'previews' && 'text-white'"
-                @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
-            </a> --}}
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">

@@ -3,7 +3,7 @@
         message='Are you sure you would like to stop the proxy? All resources will be unavailable.' />
     @if ($server->settings->is_validated)
         <div class="flex items-center gap-2 mb-2">
-            <h2 class="pb-0">Proxy</h2>
+            <h2>Proxy</h2>
             @if ($server->extra_attributes->proxy_type)
                 <x-forms.button isHighlighted wire:click.prevent="installProxy">
                     Start/Reconfigure Proxy
@@ -16,8 +16,6 @@
                             $server->extra_attributes->last_saved_proxy_settings !== $server->extra_attributes->last_applied_proxy_settings)
                         <div class="text-red-500">Configuration out of sync.</div>
                     @endif
-
-
                 </div>
             @endif
             @if ($server->extra_attributes->proxy_status === 'running')

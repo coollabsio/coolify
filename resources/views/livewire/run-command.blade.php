@@ -12,7 +12,7 @@
                 @endif
             @endforeach
         </x-forms.select>
-        <x-forms.button class="btn-xl" type="submit">Run</x-forms.button>
+        <x-forms.button class="h-8" type="submit">Run</x-forms.button>
     </form>
     <div class="container w-full pt-10 mx-auto">
         <livewire:activity-monitor />

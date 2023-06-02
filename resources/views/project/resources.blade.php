@@ -1,7 +1,7 @@
 <x-layout>
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
-            <h1 class="pb-0">Resources</h1>
+            <h1>Resources</h1>
             <livewire:project.delete-environment :environment_id="$environment->id" :resource_count="$environment->applications->count()" />
         </div>
         <div class="pb-10 text-sm breadcrumbs">

@@ -13,7 +13,7 @@ class Deployments extends Component
     public string $current_url;
     public int $skip = 0;
     public int $default_take = 8;
-    public bool $show_next = true;
+    public bool $show_next = false;
 
     public function mount()
     {
@@ -33,8 +33,11 @@ class Deployments extends Component
         ['deployments' => $deployments, 'count' => $count] = Application::find($this->application_id)->deployments($this->skip, $take);
         $this->deployments = $deployments;
         $this->deployments_count = $count;
-        if (count($this->deployments) !== 0 && count($this->deployments) < $take) {
-            $this->show_next = false;
+        if (count($this->deployments) !== 0) {
+            $this->show_next = true;
+            if (count($this->deployments) < $take) {
+                $this->show_next = false;
+            }
             return;
         }
     }

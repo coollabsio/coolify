@@ -1,5 +1,5 @@
 <x-layout>
-    <h1 class="py-0">Projects</h1>
+    <h1>Projects</h1>
     <div class="pb-10 text-sm breadcrumbs">
         <ul>
             <li>

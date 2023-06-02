@@ -39,29 +39,33 @@ select {
 .breadcrumbs > ul > li::before {
     @apply text-warning opacity-100;
 }
+.loading {
+    @apply w-4 text-warning;
+}
+
 button[type="button"] {
-    @apply btn btn-xs mt-1 bg-coolgray-200 no-animation normal-case text-white rounded;
+    @apply hover:bg-coolgray-400 btn h-7 btn-xs border-none bg-coolgray-200 no-animation normal-case text-white rounded;
 }
 button[type="submit"] {
-    @apply btn btn-xs mt-1 no-animation normal-case text-white btn-primary rounded;
+    @apply btn btn-xs no-animation h-7 normal-case text-white btn-primary rounded;
 }
 button[isWarning] {
-    @apply text-error;
+    @apply bg-error;
 }
 button[isHighlighted] {
     @apply btn-primary text-white;
 }
 h1 {
-    @apply text-3xl font-bold pb-4 text-white;
+    @apply text-3xl font-bold text-white;
 }
 h2 {
-    @apply text-2xl font-bold pb-4 text-white;
+    @apply text-2xl font-bold text-white;
 }
 h3 {
-    @apply text-xl font-bold py-4 text-white;
+    @apply text-xl font-bold text-white;
 }
 h4 {
-    @apply text-base font-bold pb-4 text-white;
+    @apply text-base font-bold text-white;
 }
 a {
     @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;

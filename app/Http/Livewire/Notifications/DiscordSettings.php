@@ -10,19 +10,16 @@ use Livewire\Component;
 
 class DiscordSettings extends Component
 {
-    public Team|Server $model;
+    public Team $model;
 
     protected $rules = [
         'model.extra_attributes.discord_active' => 'nullable|boolean',
         'model.extra_attributes.discord_webhook' => 'required|url',
     ];
     protected $validationAttributes = [
-        'model.extra_attributes.discord_webhook' => 'Discord Webhook',
+        'model.extra_attributes.discord_webhook' => '',
     ];
-    public function mount($model)
-    {
-        //
-    }
+
     public function instantSave()
     {
         try {

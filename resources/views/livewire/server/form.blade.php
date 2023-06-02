@@ -37,7 +37,7 @@
                 @endif
             </div>
         </div>
-        <h3>Quick Actions</h3>
+        <h3 class="pt-8 pb-4">Quick Actions</h3>
         <div class="flex items-center gap-2">
             <x-forms.button wire:click.prevent='validateServer'>
                 @if ($server->settings->is_validated)

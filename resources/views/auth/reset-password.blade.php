@@ -6,7 +6,7 @@
                 <x-version />
             </div>
             <div class="flex items-center gap-2">
-                <h1 class="pb-0">{{ __('auth.reset_password') }}</h1>
+                <h1>{{ __('auth.reset_password') }}</h1>
             </div>
             <div>
                 <form action="/reset-password" method="POST" class="flex flex-col gap-2">

@@ -10,7 +10,7 @@ use Notification;
 
 class Test extends Component
 {
-    public Team|Server $model;
+    public Team $model;
     public function sendTestNotification()
     {
         Notification::send($this->model, new TestNotification);

@@ -1,6 +1,6 @@
 <div x-init="$wire.loadImages">
-    <div class="flex gap-2">
-        <h2 class="pb-0">Rollback</h2>
+    <div class="flex items-center gap-2">
+        <h2>Rollback</h2>
         <x-forms.button isHighlighted wire:click='loadImages'>Reload Available Images</x-forms.button>
     </div>
     <div class="pb-4 text-sm">You can easily rollback to a previously built image quickly.</div>

@@ -1,36 +1,43 @@
 <div>
-    <form wire:submit.prevent='submit' class="flex flex-col mt-2">
+    <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
-            <h3>E-mail (SMTP)</h3>
-            <x-forms.button class="w-16 mt-4" type="submit">
+            <h2>Email</h2>
+            <x-forms.button type="submit">
                 Save
             </x-forms.button>
         </div>
         <div class="flex flex-col w-96">
             <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />
         </div>
-        <x-forms.input id="model.extra_attributes.test_notification_recipients" label="Test Notification Recipient(s)"
-            helper="Emails separated by comma." />
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <div class="flex flex-col w-96">
-                <x-forms.input required id="model.extra_attributes.recipients" helper="Emails separated by comma."
-                    label="Recipient(s)" />
-            </div>
+
+        <div class="flex gap-2">
+            <x-forms.input required id="model.extra_attributes.recipients"
+                helper="Email list to send the all notifications to, separated by comma." label="Recipient(s)" />
+            <x-forms.input id="model.extra_attributes.test_notification_recipients"
+                label="Test Notification Recipient(s)"
+                helper="Email list to send the test notification to, separated by comma." />
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
             <div class="flex flex-col w-96">
-                <x-forms.input required id="model.extra_attributes.smtp_host" label="Host" />
-                <x-forms.input required id="model.extra_attributes.smtp_port" label="Port" />
-                <x-forms.input id="model.extra_attributes.smtp_encryption" label="Encryption" />
+                <x-forms.input required id="model.extra_attributes.smtp_host" helper="SMTP Hostname"
+                    placeholder="smtp.mailgun.org" label="Host" />
+                <x-forms.input required id="model.extra_attributes.smtp_port" helper="SMTP Port" placeholder="587"
+                    label="Port" />
+                <x-forms.input helper="If SMTP through SSL, set it to 'tls'." placeholder="tls"
+                    id="model.extra_attributes.smtp_encryption" label="Encryption" />
             </div>
             <div class="flex flex-col w-96">
-                <x-forms.input id="model.extra_attributes.smtp_username" label="Username" />
-                <x-forms.input id="model.extra_attributes.smtp_password" label="Password" />
-                <x-forms.input id="model.extra_attributes.smtp_timeout" label="Timeout" />
+                <x-forms.input id="model.extra_attributes.smtp_username" helper="SMTP Username" label="Username" />
+                <x-forms.input type="password" helper="SMTP Password" id="model.extra_attributes.smtp_password"
+                    label="Password" />
+                <x-forms.input id="model.extra_attributes.smtp_timeout" helper="Timeout value for sending emails."
+                    label="Timeout" />
             </div>
             <div class="flex flex-col w-96">
-                <x-forms.input required id="model.extra_attributes.from_address" label="From Address" />
-                <x-forms.input required id="model.extra_attributes.from_name" label="From Name" />
+                <x-forms.input required id="model.extra_attributes.from_name" helper="Name used in emails."
+                    label="From Name" />
+                <x-forms.input required id="model.extra_attributes.from_address" helper="Email address used in emails."
+                    label="From Address" />
             </div>
         </div>
     </form>

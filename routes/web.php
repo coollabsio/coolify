@@ -130,9 +130,13 @@ Route::middleware(['auth'])->group(function () {
             'request' => $request,
         ]);
     })->name('profile');
+
     Route::get('/profile/team', function () {
-        return view('team');
-    })->name('team');
+        return view('team.show');
+    })->name('team.show');
+    Route::get('/profile/team/notifications', function () {
+        return view('team.notifications');
+    })->name('team.notifications');
 
     Route::get('/settings', function () {
         $isRoot = auth()->user()->isPartOfRootTeam();
@@ -191,21 +195,39 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
+
+
     Route::get('/servers', fn () => view('servers', [
         'servers' => Server::validated(),
     ]))->name('servers');
+
     Route::get('/server/new', fn () => view('server.new', [
         'private_keys' => PrivateKey::where('team_id', session('currentTeam')->id)->get(),
     ]))->name('server.new');
+
     Route::get('/server/{server_uuid}', function () {
-        $server = session('currentTeam')->load(['servers'])->servers->firstWhere('uuid', request()->server_uuid);
+        $team_id = session('currentTeam')->id;
+        $server = Server::where('team_id', $team_id)->where('uuid', request()->server_uuid)->first();
         if (!$server) {
-            abort(404);
+            return redirect()->route('dashboard');
         }
         return view('server.show', [
             'server' => $server,
         ]);
     })->name('server.show');
+
+    Route::get('/server/{server_uuid}/proxy', function () {
+        $team_id = session('currentTeam')->id;
+        $server = Server::where('team_id', $team_id)->where('uuid', request()->server_uuid)->first();
+        if (!$server) {
+            return redirect()->route('dashboard');
+        }
+        return view('server.proxy', [
+            'server' => $server,
+        ]);
+    })->name('server.proxy');
+
+
     Route::get('/server/{server_uuid}/private-key', function () {
         return view('server.private-key');
     })->name('server.private-key');

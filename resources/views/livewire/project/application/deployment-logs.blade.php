@@ -1,6 +1,6 @@
-<div>
+<div class="pt-4">
+    <h2>Logs</h2>
     <livewire:project.application.deployment-navbar :activity="$activity" :application="$application" :deployment_uuid="$deployment_uuid" />
-    <h3 class="pb-0">Logs</h3>
     @if (data_get($activity, 'properties.status') === 'in_progress')
         <div class="pt-2 text-sm">Deployment is
             <span class="text-warning">{{ Str::headline(data_get($activity, 'properties.status')) }}</span>. Logs will

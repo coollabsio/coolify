@@ -37,9 +37,14 @@ class Previews extends Component
     }
     public function load_prs()
     {
-        ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = get_from_git_api($this->application->source, "/repos/{$this->application->git_repository}/pulls");
-        $this->rate_limit_remaining = $rate_limit_remaining;
-        $this->pull_requests = $data->sortBy('number')->values();
+        try {
+            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = get_from_git_api($this->application->source, "/repos/{$this->application->git_repository}/pulls");
+            $this->rate_limit_remaining = $rate_limit_remaining;
+            $this->pull_requests = $data->sortBy('number')->values();
+        } catch (\Throwable $th) {
+            $this->rate_limit_remaining = 0;
+            return general_error_handler($th, $this);
+        }
     }
     public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
     {

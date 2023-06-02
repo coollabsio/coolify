@@ -4,13 +4,14 @@
     'action' => 'delete',
 ])
 <div x-cloak x-show="{{ $show }}" x-transition class="modal modal-open">
-    <div class="relative modal-box">
+    <div class="relative text-center rounded modal-box bg-coolgray-100">
         <div class="pb-8 text-base font-bold text-white">{{ $message }}</div>
-        <div class="flex justify-end gap-4 text-xs">
-            <x-forms.button wire:click='{{ $action }}' x-on:click="{{ $show }} = false">
+        <div class="flex justify-center gap-4 text-xs">
+            <x-forms.button class="w-32" isWarning wire:click='{{ $action }}'
+                x-on:click="{{ $show }} = false">
                 Yes
             </x-forms.button>
-            <x-forms.button x-on:click="{{ $show }} = false">No</x-forms.button>
+            <x-forms.button class="w-32" x-on:click="{{ $show }} = false">No</x-forms.button>
         </div>
     </div>
 </div>

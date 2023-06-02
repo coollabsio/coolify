@@ -7,7 +7,7 @@
             </div>
 
             <div class="flex items-center gap-2">
-                <h1 class="pb-0">{{ __('auth.forgot_password') }}</h1>
+                <h1>{{ __('auth.forgot_password') }}</h1>
             </div>
             <div class="w-96">
                 <form action="/forgot-password" method="POST" class="flex flex-col gap-2">

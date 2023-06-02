@@ -2,7 +2,7 @@
     <livewire:project.application.preview.form :application="$application" />
     <h3>Pull Requests on Git</h3>
     <div>
-        <x-forms.button wire:click="load_prs">Load Opened Pull Requests
+        <x-forms.button wire:click="load_prs">Load Pull Requests (open)
         </x-forms.button>
         @isset($rate_limit_remaining)
             <div class="pt-1 text-sm">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>

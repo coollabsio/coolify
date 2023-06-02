@@ -1,5 +1,5 @@
 <x-layout>
-    <h1 class="pb-0">Deployments</h1>
+    <h1>Deployments</h1>
     <div class="pb-10 text-sm breadcrumbs">
         <ul>`
             <li><a
