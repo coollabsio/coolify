@@ -15,8 +15,8 @@
         ]) }}">
         <button>Deployments</button>
     </a>
+    <livewire:project.application.status :application="$application" />
     <div class="flex-1"></div>
-
     <div class="dropdown dropdown-bottom">
         <label tabindex="0">
             <x-forms.button>
@@ -60,5 +60,4 @@
     </div>
     </div>
     <livewire:project.application.deploy :applicationId="$application->id" />
-    <livewire:project.application.status :application="$application" />
 </nav>

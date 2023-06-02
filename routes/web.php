@@ -195,10 +195,8 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.github.show');
 });
 Route::middleware(['auth'])->group(function () {
-
-
     Route::get('/servers', fn () => view('servers', [
-        'servers' => Server::validated(),
+        'servers' => Server::where('team_id', session('currentTeam')->id)->get(),
     ]))->name('servers');
 
     Route::get('/server/new', fn () => view('server.new', [

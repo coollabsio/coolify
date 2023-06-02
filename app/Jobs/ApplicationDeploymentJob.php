@@ -277,7 +277,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                 'status' => $status,
             ]);
         }
-        dispatch(new ContainerStatusJob(
+        dispatch(new ApplicationContainerStatusJob(
             application: $this->application,
             container_name: $this->container_name,
             pull_request_id: $this->pull_request_id

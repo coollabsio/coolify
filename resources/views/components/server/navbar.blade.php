@@ -1,6 +1,6 @@
 <div class="pb-6">
     <h1>Server</h1>
-    <div class="text-sm breadcrumbs pb-11">
+    <div class="pb-10 text-sm breadcrumbs">
         <ul>
             <li>{{ data_get($server, 'name') }}</li>
         </ul>
@@ -18,5 +18,7 @@
             ]) }}">
             <button>Proxy</button>
         </a>
+        <div class="flex-1"></div>
+        <livewire:server.proxy.deploy :server="$server" />
     </nav>
 </div>

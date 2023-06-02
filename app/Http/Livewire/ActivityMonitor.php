@@ -8,6 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 
 class ActivityMonitor extends Component
 {
+    public bool $header = false;
     public $activityId;
     public $isPollingActive = false;
 
@@ -49,9 +50,5 @@ class ActivityMonitor extends Component
             'status' => $status,
         ]);
         $this->activity->save();
-    }
-    public function render()
-    {
-        return view('livewire.activity-monitor');
     }
 }

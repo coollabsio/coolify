@@ -1,1 +1,1 @@
-<span class="loading loading-spinner"></span>
+<span class="loading loading-bars"></span>

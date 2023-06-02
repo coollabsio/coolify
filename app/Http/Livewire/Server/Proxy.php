@@ -11,25 +11,21 @@ use Livewire\Component;
 
 class Proxy extends Component
 {
-    protected $listeners = ['serverValidated'];
     public Server $server;
 
     public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
     public $proxy_settings = null;
 
-    public function mount()
-    {
-        $this->proxyStatus();
-    }
+    protected $listeners = ['serverValidated', 'saveConfiguration'];
     public function serverValidated()
     {
-        $this->server->settings->refresh();
+        $this->server->refresh();
     }
     public function installProxy()
     {
         if (
-            $this->server->extra_attributes->last_applied_proxy_settings &&
-            $this->server->extra_attributes->last_saved_proxy_settings !== $this->server->extra_attributes->last_applied_proxy_settings
+            $this->server->extra_attributes->proxy_last_applied_settings &&
+            $this->server->extra_attributes->proxy_last_saved_settings !== $this->server->extra_attributes->proxy_last_applied_settings
         ) {
             $this->saveConfiguration($this->server);
         }
@@ -37,15 +33,9 @@ class Proxy extends Component
         $this->emit('newMonitorActivity', $activity->id);
     }
 
-    public function proxyStatus()
+    public function setProxy(string $proxy_type)
     {
-        $this->server->extra_attributes->proxy_status = get_container_status(server: $this->server, container_id: 'coolify-proxy');
-        $this->server->save();
-        $this->server->refresh();
-    }
-    public function setProxy()
-    {
-        $this->server->extra_attributes->proxy_type = $this->selectedProxy->value;
+        $this->server->extra_attributes->proxy_type = $proxy_type;
         $this->server->extra_attributes->proxy_status = 'exited';
         $this->server->save();
     }
@@ -57,17 +47,17 @@ class Proxy extends Component
         $this->server->extra_attributes->proxy_status = 'exited';
         $this->server->save();
     }
-    public function saveConfiguration()
+    public function saveConfiguration(Server $server)
     {
         try {
             $proxy_path = config('coolify.proxy_config_path');
             $this->proxy_settings = Str::of($this->proxy_settings)->trim()->value;
             $docker_compose_yml_base64 = base64_encode($this->proxy_settings);
-            $this->server->extra_attributes->last_saved_proxy_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
-            $this->server->save();
+            $server->extra_attributes->proxy_last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+            $server->save();
             instant_remote_process([
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
-            ], $this->server);
+            ], $server);
         } catch (\Exception $e) {
             return general_error_handler($e);
         }

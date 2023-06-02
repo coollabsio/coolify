@@ -58,6 +58,7 @@ class Server extends BaseModel
     {
         return Server::where('team_id', session('currentTeam')->id)->whereRelation('settings', 'is_validated', true)->get();
     }
+
     static public function destinations(string|null $server_uuid = null)
     {
         if ($server_uuid) {

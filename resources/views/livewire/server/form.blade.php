@@ -37,17 +37,20 @@
                 @endif
             </div>
         </div>
-        <h3 class="pt-8 pb-4">Quick Actions</h3>
-        <div class="flex items-center gap-2">
-            <x-forms.button wire:click.prevent='validateServer'>
-                @if ($server->settings->is_validated)
-                    Check Connection
-                @else
-                    Validate Server
-                @endif
+        @if (!$server->settings->is_validated)
+            <x-forms.button class="mt-4" isHighlighted wire:click.prevent='validateServer'>
+                Validate Server
             </x-forms.button>
-            {{-- <x-forms.button wire:click.prevent='installDocker'>Install Docker</x-forms.button> --}}
-        </div>
+        @endif
+        @if ($server->settings->is_validated)
+            <h3 class="pt-8 pb-4">Quick Actions</h3>
+            <div class="flex items-center gap-2">
+                <x-forms.button wire:click.prevent='validateServer'>
+                    Check Connection
+                </x-forms.button>
+                {{-- <x-forms.button wire:click.prevent='installDocker'>Install Docker</x-forms.button> --}}
+            </div>
+        @endif
         <div class="pt-3 text-sm">
             @isset($uptime)
                 <p>Uptime: {{ $uptime }}</p>
@@ -76,10 +79,12 @@
         </a>
     </div>
     <div>
-        @foreach ($server->standaloneDockers as $docker)
+        @forelse ($server->standaloneDockers as $docker)
             <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
                 <button class="text-white btn-link">{{ data_get($docker, 'network') }}</button>
             </a>
-        @endforeach
+        @empty
+            <div class="text-sm">No destinations added</div>
+        @endforelse
     </div>
 </div>

@@ -29,14 +29,17 @@ function format_docker_labels_to_json($rawOutput): Collection
         })[0];
 }
 
-function get_container_status(Server $server, string $container_id, bool $throwError = false)
+function get_container_status(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    $container = instant_remote_process(["docker inspect --format '{{json .State}}' {$container_id}"], $server, $throwError);
+    $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
     if (!$container) {
         return 'exited';
     }
     $container = format_docker_command_output_to_json($container);
-    return $container[0]['Status'];
+    if ($all_data) {
+        return $container[0];
+    }
+    return $container[0]['State']['Status'];
 }
 
 function generate_container_name(string $uuid, int|null $pull_request_id = null)

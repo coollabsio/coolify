@@ -36,10 +36,7 @@ class ServerSeeder extends Seeder
             'description' => "This is a test docker container",
             'ip' => "coolify-testing-host-2",
             'team_id' => $root_team->id,
-            'private_key_id' => $private_key_1->id,
-            'extra_attributes' => ServerMetadata::from([
-                //
-            ]),
+            'private_key_id' => $private_key_1->id
         ]);
     }
 }

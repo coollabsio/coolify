@@ -4,12 +4,11 @@
     'label' => $attributes->has('label'),
     'helper' => $attributes->has('helper'),
     'instantSave' => $attributes->has('instantSave'),
-    'noLabel' => $attributes->has('noLabel'),
     'noDirty' => $attributes->has('noDirty'),
 ])
 
 <div class=" form-control">
-    @if (!$noLabel)
+    @if ($label)
         <label class="label">
             <span class="label-text">
                 @if ($label)
