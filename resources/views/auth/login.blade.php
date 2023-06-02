@@ -20,17 +20,9 @@
                     @env('local')
                     <x-forms.input required value="test@example.com" type="email" name="email"
                         label="{{ __('input.email') }}" autofocus />
-                    {{-- @if (config('mail.default'))
-                        {{ dd('mailer configured') }}
-                    @else
-                        {{ dd('mailer not configured') }}
-                    @endif --}}
-
-                    @if (!config('mail.default'))
-                        <a href="/forgot-password" class="text-xs">
-                            {{ __('auth.forgot_password') }}?
-                        </a>
-                    @endif
+                    <a href="/forgot-password" class="text-xs">
+                        {{ __('auth.forgot_password') }}?
+                    </a>
                     <x-forms.input required value="password" type="password" name="password"
                         label="{{ __('input.password') }}" />
                 @else

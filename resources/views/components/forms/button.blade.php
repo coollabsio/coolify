@@ -16,7 +16,9 @@
             @isset($confirmAction)
         x-on:{{ explode('(', $confirmAction)[0] }}.window="$wire.{{ explode('(', $confirmAction)[0] }}"
     @endisset>
-            <span wire:target="submit" wire:loading.delay class="loading loading-spinner"></span>
+            @if ($attributes->whereStartsWith('wire:click')->first())
+                <span wire:target="submit" wire:loading.delay class="loading loading-spinner"></span>
+            @endif
             {{ $slot }}
         </button>
     @elseif($type === 'button')
@@ -27,8 +29,10 @@
             @isset($confirmAction)
         x-on:{{ explode('(', $confirmAction)[0] }}.window="$wire.{{ explode('(', $confirmAction)[0] }}"
     @endisset>
-            <span wire:target="{{ explode('(', $attributes->whereStartsWith('wire:click')->first())[0] }}"
-                wire:loading.delay class="loading loading-spinner"></span>
+            @if ($attributes->whereStartsWith('wire:click')->first())
+                <span wire:target="{{ explode('(', $attributes->whereStartsWith('wire:click')->first())[0] }}"
+                    wire:loading.delay class="loading loading-spinner"></span>
+            @endif
             {{ $slot }}
         </button>
     @endif
