@@ -5,7 +5,7 @@
 ])
 <div x-cloak x-show="{{ $show }}" x-transition class="modal modal-open">
     <div class="relative text-center rounded modal-box bg-coolgray-100">
-        <div class="pb-8 text-base font-bold text-white">{{ $message }}</div>
+        <div class="pb-8 text-base text-white">{{ $message }}</div>
         <div class="flex justify-center gap-4 text-xs">
             <x-forms.button class="w-32" isWarning wire:click='{{ $action }}'
                 x-on:click="{{ $show }} = false">
