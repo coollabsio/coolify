@@ -1,9 +1,10 @@
 import Alpine from "alpinejs";
-// import { createApp } from "vue";
-// import MagicSearchBar from "./components/MagicSearchBar.vue";
+
+import { createApp } from "vue";
+import MagicBar from "./components/MagicBar.vue";
 window.Alpine = Alpine;
 Alpine.start();
 
-// const app = createApp({});
-// app.component('magic-search-bar', MagicSearchBar);
-// app.mount('#vue');
+const app = createApp({});
+app.component("magic-bar", MagicBar);
+app.mount("#vue");

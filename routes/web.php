@@ -27,7 +27,35 @@ use Illuminate\Support\Str;
 
 
 
+Route::prefix('magic2')->middleware(['auth'])->group(function () {
+    Route::get('/servers', function () {
+        $id = session('currentTeam')->id;
+        return response()->json([
+            'servers' => Server::where('team_id', $id)->get()->sortBy('name')
+        ]);
+    });
+    Route::get('/destinations', function () {
+        $server_id = request()->query('server_id');
+        return response()->json([
+            'destinations' => Server::destinations($server_id)->sortBy('name')
+        ]);
+    });
+    Route::get('/projects', function () {
+        $id = session('currentTeam')->id;
+        return response()->json([
+            'projects' => Project::where('team_id', $id)->get()->sortBy('name')
+        ]);
+    });
+    Route::get('/environments', function () {
+        $id = session('currentTeam')->id;
+        $project_id = request()->query('project_id');
+        return response()->json([
+            'environments' => Project::where('team_id', $id)->where('id', $project_id)->first()->environments
+        ]);
+    });
+});
 Route::middleware(['auth'])->group(function () {
+
     Route::get('/magic', function () {
         try {
             $id = session('currentTeam')->id;

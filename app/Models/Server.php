@@ -59,10 +59,10 @@ class Server extends BaseModel
         return Server::where('team_id', session('currentTeam')->id)->whereRelation('settings', 'is_validated', true)->get();
     }
 
-    static public function destinations(string|null $server_uuid = null)
+    static public function destinations(string|null $server_id = null)
     {
-        if ($server_uuid) {
-            $server = Server::where('team_id', session('currentTeam')->id)->where('uuid', $server_uuid)->firstOrFail();
+        if ($server_id) {
+            $server = Server::where('team_id', session('currentTeam')->id)->where('id', $server_id)->firstOrFail();
             $standaloneDocker = collect($server->standaloneDockers->all());
             $swarmDocker = collect($server->swarmDockers->all());
             return $standaloneDocker->concat($swarmDocker);
