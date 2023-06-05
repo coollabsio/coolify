@@ -416,6 +416,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     }
     private function generate_local_persistent_volumes()
     {
+        $local_persistent_volumes = [];
         foreach ($this->application->persistentStorages as $persistentStorage) {
             $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
             if ($this->pull_request_id !== 0) {
@@ -424,11 +425,12 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
         }
         ray('local_persistent_volumes', $local_persistent_volumes);
-        return $local_persistent_volumes ?? [];
+        return $local_persistent_volumes;
     }
 
     private function generate_local_persistent_volumes_only_volume_names()
     {
+        $local_persistent_volumes_names = [];
         foreach ($this->application->persistentStorages as $persistentStorage) {
             if ($persistentStorage->host_path) {
                 continue;
@@ -444,7 +446,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                 'external' => false,
             ];
         }
-        return $local_persistent_volumes_names ?? [];
+        return $local_persistent_volumes_names;
     }
     private function generate_healthcheck_commands()
     {
