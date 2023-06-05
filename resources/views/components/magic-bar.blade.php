@@ -603,7 +603,7 @@
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=public&destination=${this.selectedDestination}`
                         } else if (this.selectedAction === 1) {
                             window.location =
-                                `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-gh-Apps&destination=${this.selectedDestination}`
+                                `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-gh-app&destination=${this.selectedDestination}`
                         } else if (this.selectedAction === 2) {
                             window.location =
                                 `/project/${this.selectedProject}/${this.selectedEnvironment}/new?type=private-deploy-key&destination=${this.selectedDestination}`

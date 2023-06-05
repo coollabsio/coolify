@@ -22,7 +22,9 @@
             {{ $slot }}
         </button>
     @elseif($type === 'button')
-        <button {{ $attributes }} @if ($disabled !== null) disabled @endif type="button"
+        <button
+            {{ $attributes->class(['btn btn-xs border-none no-animation normal-case text-white rounded', 'hover:bg-coolgray-400 bg-coolgray-200 h-7' => !$attributes->has('class')]) }}
+            @if ($disabled !== null) disabled @endif type="button"
             @isset($confirm)
         x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"
     @endisset

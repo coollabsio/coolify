@@ -21,7 +21,7 @@ input[type="checkbox"] {
     @apply toggle toggle-warning toggle-xs rounded;
 }
 input {
-    @apply input input-sm h-7  outline-none placeholder:text-neutral-700 text-white rounded-none;
+    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded-none;
 }
 input[type="text"],[type="number"],[type="email"],[type="password"] {
     @apply read-only:opacity-40;
@@ -34,7 +34,7 @@ textarea {
     @apply textarea placeholder:text-neutral-700 text-white rounded-none;
 }
 select {
-    @apply select select-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
+    @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
 }
 .breadcrumbs > ul > li::before {
     @apply text-warning opacity-100;
@@ -43,9 +43,6 @@ select {
     @apply w-4 text-warning;
 }
 
-button[type="button"] {
-    @apply hover:bg-coolgray-400 btn h-7 btn-xs border-none bg-coolgray-200 no-animation normal-case text-white rounded;
-}
 button[type="submit"] {
     @apply hover:bg-coolgray-400 btn h-7 btn-xs border-none bg-coolgray-200 no-animation normal-case text-white rounded;
 }

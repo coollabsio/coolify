@@ -22,6 +22,7 @@ class GithubPrivateRepository extends Component
     public $type;
 
     public int $selected_repository_id;
+    public int $selected_github_app_id;
     public string $selected_repository_owner;
     public string $selected_repository_repo;
 
@@ -36,6 +37,10 @@ class GithubPrivateRepository extends Component
 
     public $branches;
     public int $total_branches_count = 0;
+
+    public int $port = 3000;
+    public bool $is_static = false;
+    public string|null $publish_directory = null;
 
     protected function loadRepositoryByPage()
     {
@@ -67,6 +72,7 @@ class GithubPrivateRepository extends Component
     {
         $this->repositories = collect();
         $this->page = 1;
+        $this->selected_github_app_id = $github_app_id;
         $this->github_app = GithubApp::where('id', $github_app_id)->first();
         $this->token = generate_github_installation_token($this->github_app);
         $this->loadRepositoryByPage();
@@ -110,27 +116,41 @@ class GithubPrivateRepository extends Component
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
             $application = Application::create([
-                'name' => generate_random_name(),
+                'name' => generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name),
                 'repository_project_id' => $this->selected_repository_id,
                 'git_repository' => "{$this->selected_repository_owner}/{$this->selected_repository_repo}",
                 'git_branch' => $this->selected_branch_name,
                 'build_pack' => 'nixpacks',
-                'ports_exposes' => '3000',
+                'ports_exposes' => $this->port,
+                'publish_directory' => $this->publish_directory,
                 'environment_id' => $environment->id,
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
-                'source_type' => GithubApp::class,
+                'source_type' =>  $this->github_app->getMorphClass()
             ]);
+            $application->settings->is_static = $this->is_static;
+            $application->settings->save();
 
             redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
+                'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name
             ]);
         } catch (\Exception $e) {
             return general_error_handler($e, $this);
         }
+    }
+    public function instantSave()
+    {
+        if ($this->is_static) {
+            $this->port = 80;
+            $this->publish_directory = '/dist';
+        } else {
+            $this->port = 3000;
+            $this->publish_directory = null;
+        }
+        $this->emit('saved', 'Application settings updated!');
     }
     public function mount()
     {

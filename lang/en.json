@@ -19,5 +19,6 @@
     "input.password.again": "Password again",
     "input.code": "One-time code",
     "input.recovery_code": "Recovery code",
-    "button.save": "Save"
+    "button.save": "Save",
+    "repository.url": "<span class='text-helper'>Examples</span><br>https://github.com/coollabsio/coolify-examples  <span class='text-helper'>main</span> branch will be selected<br><br>https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify <span class='text-helper'>nodejs-fastify</span> branch will be selected"
 }
