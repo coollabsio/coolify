@@ -1,1 +1,1 @@
-<span class="loading loading-bars"></span>
+<span {{ $attributes->class(['bg-warning loading', 'loading-spinner' => !$attributes->has('class')]) }}></span>

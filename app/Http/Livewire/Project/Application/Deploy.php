@@ -21,7 +21,7 @@ class Deploy extends Component
     protected $source;
 
     protected $listeners = [
-        'applicationStatusChanged' => 'applicationStatusChanged',
+        'applicationStatusChanged',
     ];
 
     public function mount()
@@ -40,8 +40,12 @@ class Deploy extends Component
         $this->deployment_uuid = new Cuid2(7);
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
-    public function deploy(bool $force = false)
+    public function deploy(bool $force = false, bool|null $debug = null)
     {
+        if ($debug && !$this->application->settings->is_debug_enabled) {
+            $this->application->settings->is_debug_enabled = true;
+            $this->application->settings->save();
+        }
         $this->set_deployment_uuid();
 
         queue_application_deployment(
@@ -62,5 +66,6 @@ class Deploy extends Component
         instant_remote_process(["docker rm -f {$this->application->uuid}"], $this->application->destination->server);
         $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
         $this->application->save();
+        $this->emit('applicationStatusChanged');
     }
 }

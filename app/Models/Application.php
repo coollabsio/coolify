@@ -99,21 +99,39 @@ class Application extends BaseModel
                 : explode(',', $this->ports_exposes)
         );
     }
+    // Normal Deployments
     public function environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class);
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false);
     }
     public function runtime_environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'not like', 'NIXPACKS_%');
     }
     public function build_environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
     }
     public function nixpacks_environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('key', 'like', 'NIXPACKS_%');
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'like', 'NIXPACKS_%');
+    }
+    // Preview Deployments
+    public function environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true);
+    }
+    public function runtime_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function build_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function nixpacks_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'like', 'NIXPACKS_%');
     }
     public function private_key()
     {

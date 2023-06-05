@@ -22,7 +22,7 @@
         <h2>Invite a new member</h2>
         <form class="flex items-center gap-2">
             <x-forms.input type="email" name="email" placeholder="Email" />
-            <x-forms.button isHighlighted>Invite</x-forms.button>
+            <x-forms.button>Invite</x-forms.button>
         </form>
     </div>
 </x-layout>

@@ -11,7 +11,7 @@ class Status extends Component
 
     public function applicationStatusChanged()
     {
-        $this->emit('applicationStatusChanged');
         $this->application->refresh();
+        $this->emit('applicationStatusChanged');
     }
 }

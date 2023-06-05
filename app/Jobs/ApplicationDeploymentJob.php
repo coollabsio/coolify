@@ -63,7 +63,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
         $this->application = Application::find($this->application_id);
 
-        if ($this->pull_request_id) {
+        if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
         }
 
@@ -97,7 +97,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             }
 
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
-            if ($this->pull_request_id) {
+            if ($this->pull_request_id !== 0) {
                 ray('Deploying pull/' . $this->pull_request_id . '/head for application: ' . $this->application->name);
                 $this->deploy_pull_request();
             } else {
@@ -177,7 +177,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             "echo -n 'Building image... '",
         ]);
 
-        if ($this->application->settings->is_static) {
+        if ($this->application->settings->is_static && isset($this->application->build_command)) {
             $this->execute_now([
                 $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t { $this->build_image_name {$this->workdir}"),
             ], isDebuggable: true);
@@ -292,9 +292,17 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function generate_environment_variables($ports)
     {
         $environment_variables = collect();
-
-        foreach ($this->application->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->value");
+        ray('Generate Environment Variables');
+        if ($this->pull_request_id === 0) {
+            ray($this->application->runtime_environment_variables);
+            foreach ($this->application->runtime_environment_variables as $env) {
+                $environment_variables->push("$env->key=$env->value");
+            }
+        } else {
+            ray($this->application->runtime_environment_variables_preview);
+            foreach ($this->application->runtime_environment_variables_preview as $env) {
+                $environment_variables->push("$env->key=$env->value");
+            }
         }
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
@@ -305,17 +313,31 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function generate_env_variables()
     {
         $this->env_args = collect([]);
-        foreach ($this->application->nixpacks_environment_variables as $env) {
-            $this->env_args->push("--env {$env->key}={$env->value}");
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->nixpacks_environment_variables as $env) {
+                $this->env_args->push("--env {$env->key}={$env->value}");
+            }
+        } else {
+            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
+                $this->env_args->push("--env {$env->key}={$env->value}");
+            }
         }
+
         $this->env_args = $this->env_args->implode(' ');
     }
     private function generate_build_env_variables()
     {
         $this->build_args = collect(["--build-arg SOURCE_COMMIT={$this->git_commit}"]);
-        foreach ($this->application->build_environment_variables as $env) {
-            $this->build_args->push("--build-arg {$env->key}={$env->value}");
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->build_environment_variables as $env) {
+                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+            }
+        } else {
+            foreach ($this->application->build_environment_variables_preview as $env) {
+                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+            }
         }
+
         $this->build_args = $this->build_args->implode(' ');
     }
     private function add_build_env_variables_to_dockerfile()
@@ -336,15 +358,11 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function generate_docker_compose()
     {
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
-        if ($this->pull_request_id) {
-            $persistent_storages = [];
-            $volume_names = [];
-            $environment_variables = [];
-        } else {
-            $persistent_storages = $this->generate_local_persistent_volumes();
-            $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
-            $environment_variables = $this->generate_environment_variables($ports);
-        }
+
+        $persistent_storages = $this->generate_local_persistent_volumes();
+        $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
+        $environment_variables = $this->generate_environment_variables($ports);
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -385,7 +403,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                 ]
             ]
         ];
-        if (count($this->application->ports_mappings_array) > 0 && !$this->pull_request_id) {
+        if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
         if (count($persistent_storages) > 0) {
@@ -400,8 +418,12 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     {
         foreach ($this->application->persistentStorages as $persistentStorage) {
             $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
+            if ($this->pull_request_id !== 0) {
+                $volume_name = $volume_name . '-pr-' . $this->pull_request_id;
+            }
             $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
         }
+        ray('local_persistent_volumes', $local_persistent_volumes);
         return $local_persistent_volumes ?? [];
     }
 
@@ -411,8 +433,14 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             if ($persistentStorage->host_path) {
                 continue;
             }
-            $local_persistent_volumes_names[$persistentStorage->name] = [
-                'name' => $persistentStorage->name,
+            $name = $persistentStorage->name;
+
+            if ($this->pull_request_id !== 0) {
+                $name = $name . '-pr-' . $this->pull_request_id;
+            }
+
+            $local_persistent_volumes_names[$name] = [
+                'name' => $name,
                 'external' => false,
             ];
         }
@@ -443,11 +471,11 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         $labels[] = 'coolify.applicationId=' . $this->application->id;
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
-        if ($this->pull_request_id) {
+        if ($this->pull_request_id !== 0) {
             $labels[] = 'coolify.pullRequestId=' . $this->pull_request_id;
         }
         if ($this->application->fqdn) {
-            if ($this->pull_request_id) {
+            if ($this->pull_request_id !== 0) {
                 $preview_fqdn = data_get($this->preview, 'fqdn');
                 $template = $this->application->preview_url_template;
                 $url = Url::fromString($this->application->fqdn);
@@ -566,7 +594,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function importing_git_repository()
     {
         $git_clone_command = "git clone -q -b {$this->application->git_branch}";
-        if ($this->pull_request_id) {
+        if ($this->pull_request_id !== 0) {
             $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
 
@@ -583,7 +611,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
 
                     $commands = [$this->execute_in_builder($git_clone_command)];
 
-                    if ($this->pull_request_id) {
+                    if ($this->pull_request_id !== 0) {
                         $commands[] = $this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name >/dev/null 2>&1 && git checkout $pr_branch_name >/dev/null 2>&1");
                     }
                     return $commands;
@@ -592,7 +620,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
                     $commands = [
                         $this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}")
                     ];
-                    if ($this->pull_request_id) {
+                    if ($this->pull_request_id !== 0) {
                         $commands[] = $this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name");
                     }
                     return $commands;

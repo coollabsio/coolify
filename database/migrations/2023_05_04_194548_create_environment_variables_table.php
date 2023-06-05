@@ -17,14 +17,15 @@ return new class extends Migration
             $table->string('key');
             $table->string('value')->nullable();
             $table->boolean('is_build_time')->default(false);
+            $table->boolean('is_preview')->default(false);
 
             $table->foreignId('application_id')->nullable();
             $table->foreignId('service_id')->nullable();
             $table->foreignId('database_id')->nullable();
 
-            $table->unique(['key', 'application_id', 'is_build_time']);
-            $table->unique(['key', 'service_id', 'is_build_time']);
-            $table->unique(['key', 'database_id', 'is_build_time']);
+            $table->unique(['key', 'application_id', 'is_build_time', 'is_preview']);
+            $table->unique(['key', 'service_id', 'is_build_time', 'is_preview']);
+            $table->unique(['key', 'database_id', 'is_build_time', 'is_preview']);
             $table->timestamps();
         });
     }

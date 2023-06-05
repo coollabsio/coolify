@@ -18,11 +18,11 @@
                 <div class="pb-6">
                     <div class="text-sm">Set Random Domain</div>
                     @if ($global_wildcard_domain)
-                        <x-forms.button isHighlighted wire:click="generateGlobalRandomDomain">Global Wildcard
+                        <x-forms.button wire:click="generateGlobalRandomDomain">Global Wildcard
                         </x-forms.button>
                     @endif
                     @if ($project_wildcard_domain)
-                        <x-forms.button isHighlighted wire:click="generateProjectRandomDomain">Project Wildcard
+                        <x-forms.button wire:click="generateProjectRandomDomain">Project Wildcard
                         </x-forms.button>
                     @endif
                 </div>

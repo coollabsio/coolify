@@ -2,13 +2,28 @@
 
 namespace App\Models;
 
+use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
 class EnvironmentVariable extends Model
 {
-    protected $fillable = ['key', 'value', 'is_build_time', 'application_id'];
+    protected static function booted()
+    {
+        static::created(function ($environment_variable) {
+            if (!$environment_variable->is_preview) {
+                ModelsEnvironmentVariable::create([
+                    'key' => $environment_variable->key,
+                    'value' => $environment_variable->value,
+                    'is_build_time' => $environment_variable->is_build_time,
+                    'application_id' => $environment_variable->application_id,
+                    'is_preview' => true,
+                ]);
+            }
+        });
+    }
+    protected $fillable = ['key', 'value', 'is_build_time', 'application_id', 'is_preview'];
     protected $casts = [
         "key" => 'string',
         'value' => 'encrypted',

@@ -15,23 +15,32 @@
         ]) }}">
         <button>Deployments</button>
     </a>
-    <livewire:project.application.status :application="$application" />
     <div class="flex-1"></div>
-    <div class="dropdown dropdown-bottom">
-        <label tabindex="0">
-            <x-forms.button>
-                Open
-                <x-chevron-down />
-            </x-forms.button>
+    <div class="dropdown dropdown-bottom dropdown-hover">
+        <label tabindex="0" class="flex items-center gap-2 text-sm cursor-pointer hover:text-white"> Links
+            <x-chevron-down />
         </label>
         <ul tabindex="0"
-            class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+            class="text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
+            <li>
+                <a target="_blank" class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                    href="{{ $application->gitBranchLocation }}">
+                    <x-git-icon git="{{ $application->source->getMorphClass() }}" />
+                    Git Repository
+                </a>
+            </li>
             @if (data_get($application, 'fqdn'))
                 <li>
                     <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs" target="_blank"
                         href="{{ $application->fqdn }}">
-                        {{ $application->fqdn }}
-                        <x-external-link />
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
+                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                            <path d="M9 15l6 -6" />
+                            <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
+                            <path
+                                d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
+                        </svg>{{ $application->fqdn }}
                     </a>
                 </li>
             @endif
@@ -40,9 +49,16 @@
                     @if (config('app.env') === 'local')
                         <li>
                             <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
-                                target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">Port
-                                {{ explode(':', $port)[0] }}
-                                <x-external-link />
+                                target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M9 15l6 -6" />
+                                    <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
+                                    <path
+                                        d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
+                                </svg>{{ $port }}
                             </a>
                         </li>
                     @else
@@ -50,7 +66,6 @@
                             <a class="text-xs hover:no-underline hover:bg-coollabs" target="_blank"
                                 href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">Port
                                 {{ $port }}
-                                <x-external-link />
                             </a>
                         </li>
                     @endif

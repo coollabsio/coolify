@@ -2,15 +2,12 @@
 
 namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
 
-use App\Models\Application;
-use App\Models\EnvironmentVariable;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class Add extends Component
 {
     public $parameters;
+    public bool $is_preview = false;
     public string $key;
     public string $value;
     public bool $is_build_time = false;
@@ -32,6 +29,7 @@ class Add extends Component
             'key' => $this->key,
             'value' => $this->value,
             'is_build_time' => $this->is_build_time,
+            'is_preview' => $this->is_preview,
         ]);
     }
     public function clear()

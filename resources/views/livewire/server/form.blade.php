@@ -38,7 +38,7 @@
             </div>
         </div>
         @if (!$server->settings->is_validated)
-            <x-forms.button class="mt-4" isHighlighted wire:click.prevent='validateServer'>
+            <x-forms.button class="mt-4" wire:click.prevent='validateServer'>
                 Validate Server
             </x-forms.button>
         @endif

@@ -5,15 +5,17 @@
 ])
 
 <span {{ $attributes->merge(['class' => 'flex flex-col']) }}>
-    <label for={{ $id }}>
-        @if ($label)
-            {{ $label }}
-        @else
-            {{ $id }}
-        @endif
-        @if ($required)
-            <span class="text-warning">*</span>
-        @endif
+    <label class="label" for={{ $id }}>
+        <span class="label-text">
+            @if ($label)
+                {{ $label }}
+            @else
+                {{ $id }}
+            @endif
+            @if ($required)
+                <span class="text-warning">*</span>
+            @endif
+        </span>
     </label>
     <select {{ $attributes }} wire:model.defer={{ $id }}>
         {{ $slot }}

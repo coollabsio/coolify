@@ -2,7 +2,7 @@
     @if ($server->settings->is_validated)
         @if ($server->extra_attributes->proxy_status === 'running')
             <div class="dropdown dropdown-bottom">
-                <x-forms.button isHighlighted tabindex="0">
+                <x-forms.button tabindex="0">
                     Actions
                     <x-chevron-down />
                 </x-forms.button>
@@ -33,9 +33,9 @@
                 </ul>
             </div>
         @else
-            <x-forms.button isHighlighted wire:click='deploy'> <svg xmlns="http://www.w3.org/2000/svg" class="icon"
-                    width="44" height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                    fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <x-forms.button wire:click='deploy'> <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="44"
+                    height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                    stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M7 4v16l13 -8z" />
                 </svg>Start</x-forms.button>

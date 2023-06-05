@@ -2,14 +2,11 @@
      @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
      <h2 class="pt-4">Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
      @if (count($deployments) === 0)
-         <x-forms.button isHighlighted wire:click="load_deployments({{ $default_take }})">Load Deployments
+         <x-forms.button wire:click="load_deployments({{ $default_take }})">Load Deployments
          </x-forms.button>
      @endif
-     <div wire:loading wire:target='load_deployments'>
-         <x-loading />
-     </div>
      @if ($show_next)
-         <x-forms.button isHighlighted wire:click="load_deployments({{ $default_take }})">Show More
+         <x-forms.button wire:click="load_deployments({{ $default_take }})">Show More
          </x-forms.button>
      @endif
      @foreach ($deployments as $deployment)

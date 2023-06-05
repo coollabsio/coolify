@@ -1,13 +1,15 @@
 <div wire:poll.5000ms='applicationStatusChanged'>
     @if ($application->status === 'running')
-        <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
+        <x-loading wire:loading.delay.longer />
         <div class="flex items-center gap-2 text-sm" wire:loading.remove.delay.longer>
-            <div class="text-xs font-medium tracking-wide text-white badge border-success">Running</div>
+            <div class="badge badge-success badge-xs"></div>
+            <div class="text-xs font-medium tracking-wide">Running</div>
         </div>
     @else
-        <span class="text-xs text-pink-600" wire:loading.delay.longer>Loading current status...</span>
+        <x-loading wire:loading.delay.longer />
         <div class="flex items-center gap-2 text-sm" wire:loading.remove.delay.longer>
-            <div class="text-xs font-medium tracking-wide text-white badge border-error">Stopped</div>
+            <div class="badge badge-error badge-xs"></div>
+            <div class="text-xs font-medium tracking-wide">Stopped</div>
         </div>
     @endif
 </div>

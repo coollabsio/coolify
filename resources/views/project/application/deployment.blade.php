@@ -9,6 +9,9 @@
                     href="{{ route('project.resources', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
             </li>
             <li>{{ data_get($application, 'name') }}</li>
+            <li>
+                <livewire:project.application.status :application="$application" />
+            </li>
         </ul>
     </div>
     <x-applications.navbar :application="$application" />

@@ -21,6 +21,7 @@ class All extends Component
                 'key' => $data['key'],
                 'value' => $data['value'],
                 'is_build_time' => $data['is_build_time'],
+                'is_preview' => $data['is_preview'],
                 'application_id' => $this->application->id,
             ]);
             $this->application->refresh();

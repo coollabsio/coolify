@@ -33,7 +33,7 @@
             <div class="pb-4">
                 <div class="text-sm">You need to register a GitHub App before using this source!</div>
                 <form>
-                    <x-forms.button isHighlighted x-on:click.prevent="createGithubApp">Register a GitHub
+                    <x-forms.button x-on:click.prevent="createGithubApp">Register a GitHub
                         Application
                     </x-forms.button>
                 </form>
