@@ -4,8 +4,8 @@
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col">
-                <div class="flex items-end gap-2">
-                    <x-forms.input wire:keypress.enter='load_branches' id="repository_url" label="Repository URL"
+                <div class="flex flex-col gap-2">
+                    <x-forms.input wire:keydown.enter='load_branches' id="repository_url" label="Repository URL"
                         helper="{!! __('repository.url') !!}" />
                     <x-forms.button wire:click.prevent="load_branches">
                         Check repository

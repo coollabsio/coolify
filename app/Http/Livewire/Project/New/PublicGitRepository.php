@@ -60,6 +60,9 @@ class PublicGitRepository extends Component
     }
     public function load_branches()
     {
+        $this->validate([
+            'repository_url' => 'required|url'
+        ]);
         $this->get_git_source();
 
         try {

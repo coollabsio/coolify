@@ -19,7 +19,7 @@
                 </div>
             </div>
             <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
-                <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100"></div>
+                <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100" @click.self="resetState"></div>
                 <div class="fixed inset-0 w-3/5 p-4 mx-auto overflow-y-auto sm:p-6 md:px-20 min-w-fit"
                     @click.self="resetState">
                     <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5 ">
