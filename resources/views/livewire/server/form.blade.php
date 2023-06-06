@@ -38,9 +38,11 @@
             </div>
         </div>
         @if (!$server->settings->is_validated)
-            <x-forms.button class="mt-4" wire:click.prevent='validateServer'>
-                Validate Server
-            </x-forms.button>
+            <div class="w-full pt-4">
+                <x-forms.button isHighlighted wire:click.prevent='validateServer'>
+                    Validate Server
+                </x-forms.button>
+            </div>
         @endif
         @if ($server->settings->is_validated)
             <h3 class="pt-8 pb-4">Quick Actions</h3>

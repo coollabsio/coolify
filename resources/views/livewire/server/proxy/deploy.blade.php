@@ -2,32 +2,33 @@
     @if ($server->settings->is_validated)
         @if ($server->extra_attributes->proxy_status === 'running')
             <div class="dropdown dropdown-bottom">
-                <x-forms.button tabindex="0">
-                    Actions
+                <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Actions
                     <x-chevron-down />
-                </x-forms.button>
+                </label>
                 <ul tabindex="0"
                     class="mt-1 text-xs text-white normal-case rounded min-w-max dropdown-content menu bg-coolgray-200">
                     <li>
                         <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
-                                xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
+                                xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M9 4.55a8 8 0 0 1 6 14.9m0 -4.45v5h5" />
-                                <path d="M5.63 7.16l0 .01" />
-                                <path d="M4.06 11l0 .01" />
-                                <path d="M4.63 15.1l0 .01" />
-                                <path d="M7.16 18.37l0 .01" />
-                                <path d="M11 19.94l0 .01" />
+                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+                                <path d="M12 9l0 3" />
+                                <path d="M12 15l.01 0" />
                             </svg>Restart</div>
                     </li>
                     <li>
-                        <div class="rounded-none hover:bg-red-500" wire:click='stop'> <svg
-                                xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <div class="rounded-none hover:bg-red-500" wire:click='stop'><svg
+                                xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                <path d="M8 13v-7.5a1.5 1.5 0 0 1 3 0v6.5" />
+                                <path d="M11 5.5v-2a1.5 1.5 0 1 1 3 0v8.5" />
+                                <path d="M14 5.5a1.5 1.5 0 0 1 3 0v6.5" />
                                 <path
-                                    d="M5 5m0 2a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2z" />
+                                    d="M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47" />
                             </svg>Stop</div>
                     </li>
                 </ul>
@@ -38,7 +39,7 @@
                     stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M7 4v16l13 -8z" />
-                </svg>Start</x-forms.button>
+                </svg>Start Proxy</x-forms.button>
         @endif
     @endif
 </div>

@@ -5,7 +5,7 @@
             <li>{{ data_get($server, 'name') }}</li>
         </ul>
     </div>
-    <nav class="flex items-center gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+    <nav class="flex items-center h-12 gap-4 py-2 border-b-2 border-solid border-coolgray-200">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [
                 'server_uuid' => Route::current()->parameters()['server_uuid'],
@@ -18,7 +18,9 @@
             ]) }}">
             <button>Proxy</button>
         </a>
-        <div class="flex-1"></div>
-        <livewire:server.proxy.deploy :server="$server" />
+        @if (request()->routeIs('server.proxy'))
+            <div class="flex-1"></div>
+            <livewire:server.proxy.deploy :server="$server" />
+        @endif
     </nav>
 </div>
