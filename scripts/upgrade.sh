@@ -6,7 +6,7 @@
 ###########
 
 VERSION="1.0.0"
-CDN="https://coolify-cdn.b-cdn.net/files"
+CDN="https://cdn.coollabs.io/coolify"
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml

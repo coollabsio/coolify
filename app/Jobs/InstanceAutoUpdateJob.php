@@ -42,7 +42,7 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
         } else {
             ray('Running update on production server');
             instant_remote_process([
-                "curl -fsSL https://coolify-cdn.b-cdn.net/files/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
                 "bash /data/coolify/source/upgrade.sh $this->latest_version"
             ], $this->server);
             return;

@@ -42,7 +42,7 @@ function get_parameters()
 
 function get_latest_version_of_coolify()
 {
-    $response = Http::get('https://coolify-cdn.b-cdn.net/versions.json');
+    $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
     $versions = $response->json();
     return data_get($versions, 'coolify.v4.version');
 }

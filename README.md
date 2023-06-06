@@ -11,7 +11,7 @@ Thinks will be added here incrementally through PR's.
 # Installation
 
 ```bash
-curl -fsSL https://coolify-cdn.b-cdn.net/files/install.sh | bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 
 ## Support
