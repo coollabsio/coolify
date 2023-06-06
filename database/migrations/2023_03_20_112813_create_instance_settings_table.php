@@ -21,8 +21,20 @@ return new class extends Migration
             $table->boolean('do_not_track')->default(false);
             $table->boolean('is_auto_update_enabled')->default(true);
             $table->boolean('is_registration_enabled')->default(true);
+
+            // SMTP for transactional emails
+            $table->string('smtp_host')->nullable();
+            $table->integer('smtp_port')->nullable();
+            $table->string('smtp_encryption')->nullable();
+            $table->string('smtp_username')->nullable();
+            $table->string('smtp_password')->nullable();
+            $table->integer('smtp_timeout')->nullable();
+            $table->string('smtp_from_address')->nullable();
+            $table->string('smtp_from_name')->nullable();
+            $table->string('smtp_test_recipients')->nullable();
+            $table->string('smtp_recipients')->nullable();
+
             // $table->string('custom_dns_servers')->default('1.1.1.1,8.8.8.8');
-            // $table->string('preview_domain_separator')->default('.');
             // $table->boolean('is_dns_check_enabled')->default(true);
             $table->timestamps();
         });

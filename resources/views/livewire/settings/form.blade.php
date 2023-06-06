@@ -1,12 +1,13 @@
 <div>
-    <form wire:submit.prevent='submit' class="flex flex-col pb-8">
+    <form wire:submit.prevent='submit' class="flex flex-col">
+        <h1>Settings</h1>
+        <div class="pt-2 pb-4 text-sm">Instance wide settings for Coolify. </div>
         <div class="flex items-center gap-2">
-            <h1>Settings</h1>
+            <h3>General</h3>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
         </div>
-        <div class="pt-2 pb-4 text-sm">Instance wide settings for Coolify.</div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
                 <x-forms.input id="settings.fqdn" label="Coolify's Domain" />
@@ -21,11 +22,11 @@
             </div>
         </div>
     </form>
-    <h3>Advanced</h3>
+
+    <h3 class="pt-6">Advanced</h3>
     <div class="flex flex-col text-right w-52">
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
-        {{-- <x-forms.checkbox instantSave id="is_https_forced" label="Force https?" /> --}}
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
     </div>
 </div>
