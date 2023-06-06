@@ -26,13 +26,13 @@
                             </svg>
                             <input type="text" v-model="search" ref="searchInput"
                                 class="w-full h-10 pr-4 text-white rounded outline-none bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
-                                autofocus placeholder="Search, jump or create... magically... 🪄" role="combobox"
+                                placeholder="Search, jump or create... magically... 🪄" role="combobox"
                                 aria-expanded="false" aria-controls="options">
                         </div>
 
                         <ul class="px-4 pb-2 overflow-y-auto max-h-80 scroll-py-10 scroll-pb-2 scrollbar" id="options"
                             role="listbox">
-                            <li v-if="state.new">
+                            <li v-if="state.showNew">
                                 <ul class="mt-2 -mx-4 text-sm text-white ">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
                                         id="option-1" role="option" tabindex="-1" @click="next('redirect', -1, state.icon)">
@@ -72,7 +72,7 @@
                                 <ul class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
                                         id="option-1" role="option" tabindex="-1" v-for="action, index in data"
-                                        @click="next(state.next ?? action.next, index)">
+                                        @click="next(state.next ?? action.next, index, action.newAction)">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                             stroke-linejoin="round">
@@ -167,13 +167,21 @@ const appActions = [{
     tags: 'application,private,repository,github,gitlab,bitbucket,git',
     icon: 'git',
     next: 'server'
-}]
+},
+{
+    id: 3,
+    name: 'Servers',
+    tags: 'server,new',
+    icon: 'server',
+    next: 'server',
+}
+]
 const initialState = {
     title: null,
     icon: null,
     next: null,
     current: null,
-    new: false,
+    showNew: false,
     data: appActions
 }
 const state = ref({ ...initialState })
@@ -208,11 +216,11 @@ watch(showCommandPalette, async (value) => {
     }
 })
 
-
 function resetState() {
     showCommandPalette.value = false
     state.value = { ...initialState }
     selected = {}
+    search.value = ''
 }
 async function next(nextAction, index, newAction = null) {
     if (newAction) {
@@ -254,32 +262,32 @@ async function next(nextAction, index, newAction = null) {
 
         switch (nextAction) {
             case 'server':
-                await getServers()
+                await getServers(true)
                 state.value.title = 'Select a server'
                 state.value.icon = 'server'
-                state.value.new = true
+                state.value.showNew = true
                 break;
             case 'destination':
                 await getDestinations(state.value.data[index].id)
                 state.value.title = 'Select a destination'
                 state.value.icon = 'destination'
-                state.value.new = true
+                state.value.showNew = true
                 break;
             case 'project':
                 await getProjects()
                 state.value.title = 'Select a project'
                 state.value.icon = 'project'
-                state.value.new = true
+                state.value.showNew = true
                 break;
             case 'environment':
                 await getEnvironments(state.value.data[index].id)
                 state.value.title = 'Select an environment'
                 state.value.icon = 'environment'
-                state.value.new = true
+                state.value.showNew = true
                 break;
             case 'redirect':
                 await redirect();
-                state.value.new = false
+                state.value.showNew = false
                 break;
             default:
                 break;
@@ -307,14 +315,21 @@ async function redirect() {
             targetUrl.searchParams.append('type', 'private-deploy-key')
             targetUrl.searchParams.append('destination', selected.destination)
             break;
+        case 3:
+            targetUrl.pathname = `/server/${selected.server}/`
+            break;
     }
-    window.location.href = targetUrl.href
+    window.location.href = targetUrl;
 }
-async function getServers() {
+async function getServers(isJump = false) {
     const { data } = await axios.get(`${baseUrl}/servers`);
     state.value.data = data.servers
     state.value.current = 'server'
-    state.value.next = 'destination'
+    if (isJump) {
+        state.value.next = 'redirect'
+    } else {
+        state.value.next = 'destination'
+    }
 }
 async function getDestinations(serverId) {
     const { data } = await axios.get(`${baseUrl}/destinations?server_id=${serverId}`);
