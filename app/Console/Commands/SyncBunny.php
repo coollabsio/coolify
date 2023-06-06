@@ -82,7 +82,7 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$docker_install_script"),
-                $pool->purge("$bunny_cdn/$versions"),
+                $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
             echo "All files uploaded & purged...\n";
         } catch (\Exception $e) {
