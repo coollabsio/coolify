@@ -63,7 +63,7 @@
                     </div>
                     <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
                         helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-                    <x-forms.button class="w-full mt-8" type="submit">
+                    <x-forms.button type="submit">
                         Save New Application
                     </x-forms.button>
                 @endif

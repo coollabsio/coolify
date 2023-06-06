@@ -11,16 +11,17 @@
                                 d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
                                 clip-rule="evenodd" />
                         </svg>
-                        <input type="text" v-model="search"
+                        <input type="text"
                             class="w-full h-10 pr-4 text-white bg-transparent border-0 pl-11 placeholder:text-neutral-700 focus:ring-0 sm:text-sm"
-                            placeholder=" Search..." role="combobox" aria-expanded="false" aria-controls="options">
+                            placeholder="Search, jump or create... magically... 🪄" role="combobox" aria-expanded="false"
+                            aria-controls="options">
                     </div>
                 </div>
             </div>
-            <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette"
-                @keyup.esc="showCommandPalette = false">
+            <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
                 <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100"></div>
-                <div class="fixed inset-0 p-4 overflow-y-auto sm:p-6 md:px-20">
+                <div class="fixed inset-0 w-3/5 p-4 mx-auto overflow-y-auto sm:p-6 md:px-20 min-w-fit"
+                    @click.self="resetState">
                     <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5 ">
                         <div class="relative">
                             <svg class="absolute w-5 h-5 text-gray-400 pointer-events-none left-3 top-2.5"
@@ -29,20 +30,55 @@
                                     d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
                                     clip-rule="evenodd" />
                             </svg>
-                            <input type="text" v-model="search"
-                                class="w-full h-10 pr-4 text-white bg-transparent border-0 pl-11 placeholder:text-neutral-700 focus:ring-0 sm:text-sm"
-                                autofocus placeholder=" Search..." role="combobox" aria-expanded="false"
-                                aria-controls="options">
+                            <input type="text" v-model="search" ref="searchInput"
+                                class="w-full h-10 pr-4 text-white rounded outline-none bg-coolgray-400 pl-11 placeholder:text-neutral-700 sm:text-sm focus:outline-none"
+                                autofocus placeholder="Search, jump or create... magically... 🪄" role="combobox"
+                                aria-expanded="false" aria-controls="options">
                         </div>
-                        <ul class="p-4 pb-2 space-y-4 overflow-y-auto max-h-80 scroll-py-10 scroll-pb-2 scrollbar"
-                            id="options" role="listbox">
+
+                        <ul class="px-4 pb-2 overflow-y-auto max-h-80 scroll-py-10 scroll-pb-2 scrollbar" id="options"
+                            role="listbox">
+                            <li v-if="state.new">
+                                <ul class="mt-2 -mx-4 text-sm text-white ">
+                                    <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
+                                        id="option-1" role="option" tabindex="-1" @click="next('redirect', -1, state.icon)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M12 5l0 14" />
+                                            <path d="M5 12l14 0" />
+                                        </svg>
+                                        <span class="flex-auto ml-3 truncate">Add new {{ state.icon }}: <span
+                                                class="text-xs text-warning" v-if="search">{{ search }}</span>
+                                            <span v-else class="text-xs text-warning">with random name (or type
+                                                in one)</span></span>
+                                    </li>
+                                </ul>
+                            </li>
                             <li>
-                                <h2 class="text-xs font-semibold text-white">{{ state.title }}</h2>
+
+                                <ul v-if="data.length == 0" class="mt-2 -mx-4 text-sm text-white ">
+                                    <li class="flex items-center px-4 py-2 select-none group">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
+                                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                            stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                            <path d="M9 10l.01 0" />
+                                            <path d="M15 10l.01 0" />
+                                            <path d="M9 15l6 0" />
+                                        </svg>
+                                        <span class="flex-auto ml-3 truncate">Nothing found. Ooops.</span>
+                                    </li>
+                                </ul>
+                                <h2 v-if="data.length > 0 && state.title"
+                                    class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{ state.title }}
+                                </h2>
                                 <ul class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
-                                        id="option-1" role="option" tabindex="-1" v-for="action, index in state.data"
+                                        id="option-1" role="option" tabindex="-1" v-for="action, index in data"
                                         @click="next(state.next ?? action.next, index)">
-
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                             stroke-linejoin="round">
@@ -108,69 +144,146 @@
     </Transition>
 </template>
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import axios from "axios";
 
 const showCommandPalette = ref(false)
-const baseUrl = '/magic2'
+const search = ref()
+const searchInput = ref()
+const baseUrl = '/magic'
 let selected = {};
 
-const actions = [{
+const appActions = [{
+    id: 0,
     name: 'Public Repository',
     tags: 'application,public,repository,github,gitlab,bitbucket,git',
     icon: 'git',
     next: 'server'
 },
 {
+    id: 1,
     name: 'Private Repository (with GitHub Apps)',
     tags: 'application,private,repository,github,gitlab,bitbucket,git',
     icon: 'git',
     next: 'server'
 },
 {
+    id: 2,
     name: 'Private Repository (with Deploy Key)',
     tags: 'application,private,repository,github,gitlab,bitbucket,git',
     icon: 'git',
     next: 'server'
 }]
-const state = ref({
-    title: 'New',
+const initialState = {
+    title: null,
     icon: null,
     next: null,
     current: null,
-    data: actions
+    new: false,
+    data: appActions
+}
+const state = ref({ ...initialState })
+const data = computed(() => {
+    return state.value.data.filter(item => item.name.toLowerCase().includes(search.value?.toLowerCase() ?? ''))
 })
+function resetState() {
+    showCommandPalette.value = false
+    state.value = { ...initialState }
+    selected = {}
+}
+async function next(nextAction, index, newAction = null) {
+    if (newAction) {
+        let targetUrl = new URL(window.location.origin)
+        let newUrl = new URL(`${window.location.origin}${baseUrl}/${newAction}/new`);
+        if (search.value) newUrl.searchParams.append('name', search.value)
+        switch (newAction) {
+            case 'server':
+                targetUrl.pathname = '/server/new'
+                console.log(targetUrl.href);
+                window.location.href = targetUrl.href
+                break;
+            case 'destination':
+                targetUrl.pathname = '/destination/new'
+                window.location.href = targetUrl.href
+                break;
+            case 'project':
+                const { data: { new_project_uuid, new_project_id } } = await axios(newUrl.href)
+                selected.project = new_project_uuid
+                await getEnvironments(new_project_id)
+                state.value.title = 'Select an Environment'
+                state.value.icon = 'environment'
+                break;
+            case 'environment':
+                if (selected.project) newUrl.searchParams.append('project_uuid', selected.project)
+                const { data: { new_environment_name } } = await axios(newUrl.href)
+                selected.environment = new_environment_name
+                await redirect();
+                break;
+        }
+    } else {
+        if (state.value.current) {
+            if (state.value.current === 'environment') {
+                selected[state.value.current] = state.value.data[index].name
+            } else {
+                selected[state.value.current] = state.value.data[index].uuid
+            }
+        }
+        else selected['action'] = appActions[index].id
+        console.log(selected)
 
-async function next(nextAction, index) {
-    if (state.value.current) selected[state.value.current] = state.value.data[index].id
-    else selected['action'] = index
+        switch (nextAction) {
+            case 'server':
+                await getServers()
+                state.value.title = 'Select a server'
+                state.value.icon = 'server'
+                state.value.new = true
+                break;
+            case 'destination':
+                await getDestinations(state.value.data[index].id)
+                state.value.title = 'Select a destination'
+                state.value.icon = 'destination'
+                break;
+            case 'project':
+                await getProjects()
+                state.value.title = 'Select a project'
+                state.value.icon = 'project'
+                break;
+            case 'environment':
+                await getEnvironments(state.value.data[index].id)
+                state.value.title = 'Select an environment'
+                state.value.icon = 'environment'
+                break;
+            case 'redirect':
+                await redirect();
+                break;
+            default:
+                break;
+        }
+    }
+    search.value = ''
+    searchInput.value.focus()
+}
 
-    console.log(selected)
-
-    switch (nextAction) {
-        case 'server':
-            await getServers()
-            state.value.title = 'Select a Server'
-            state.value.icon = 'server'
+async function redirect() {
+    let targetUrl = new URL(window.location.origin)
+    switch (selected.action) {
+        case 0:
+            targetUrl.pathname = `/project/${selected.project}/${selected.environment}/new`
+            targetUrl.searchParams.append('type', 'public')
+            targetUrl.searchParams.append('destination', selected.destination)
             break;
-        case 'destination':
-            await getDestinations(state.value.data[index].id)
-            state.value.title = 'Select a Destination'
-            state.value.icon = 'destination'
+        case 1:
+            targetUrl.pathname = `/project/${selected.project}/${selected.environment}/new`
+            targetUrl.searchParams.append('type', 'private-gh-app')
+            targetUrl.searchParams.append('destination', selected.destination)
             break;
-        case 'project':
-            await getProjects()
-            state.value.title = 'Select a Project'
-            state.value.icon = 'project'
-            break;
-        case 'environment':
-            await getEnvironments(state.value.data[index].id)
-            state.value.title = 'Select an Environment'
-            state.value.icon = 'environment'
-            break;
-        default:
+        case 2:
+            targetUrl.pathname = `/project/${selected.project}/${selected.environment}/new`
+            targetUrl.searchParams.append('type', 'private-deploy-key')
+            targetUrl.searchParams.append('destination', selected.destination)
             break;
     }
+    window.location.href = targetUrl.href
 }
 async function getServers() {
     const { data } = await axios.get(`${baseUrl}/servers`);
@@ -194,6 +307,6 @@ async function getEnvironments(projectId) {
     const { data } = await axios.get(`${baseUrl}/environments?project_id=${projectId}`);
     state.value.data = data.environments
     state.value.current = 'environment'
-    state.value.next = 'server'
+    state.value.next = 'redirect'
 }
 </script>
