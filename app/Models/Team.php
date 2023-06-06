@@ -27,7 +27,7 @@ class Team extends BaseModel implements SendsDiscord, SendsEmail
     {
         return $this->extra_attributes->get('discord_webhook');
     }
-    public function routeNotificationForEmail(string $attribute = 'recipients')
+    public function routeNotificationForEmail(string $attribute = 'smtp_recipients')
     {
         $recipients = $this->extra_attributes->get($attribute, '');
         if (is_null($recipients) || $recipients === '') {

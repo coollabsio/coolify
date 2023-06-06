@@ -11,10 +11,9 @@
         </div>
 
         <div class="flex gap-2">
-            <x-forms.input required id="model.extra_attributes.recipients"
+            <x-forms.input required id="model.extra_attributes.smtp_recipients"
                 helper="Email list to send the all notifications to, separated by comma." label="Recipient(s)" />
-            <x-forms.input id="model.extra_attributes.test_notification_recipients"
-                label="Test Notification Recipient(s)"
+            <x-forms.input id="model.extra_attributes.smtp_test_recipients" label="Test Notification Recipient(s)"
                 helper="Email list to send the test notification to, separated by comma." />
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
@@ -34,10 +33,10 @@
                     label="Timeout" />
             </div>
             <div class="flex flex-col w-96">
-                <x-forms.input required id="model.extra_attributes.from_name" helper="Name used in emails."
+                <x-forms.input required id="model.extra_attributes.smtp_from_name" helper="Name used in emails."
                     label="From Name" />
-                <x-forms.input required id="model.extra_attributes.from_address" helper="Email address used in emails."
-                    label="From Address" />
+                <x-forms.input required id="model.extra_attributes.smtp_from_address"
+                    helper="Email address used in emails." label="From Address" />
             </div>
         </div>
     </form>

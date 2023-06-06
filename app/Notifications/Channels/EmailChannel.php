@@ -8,14 +8,12 @@ use Illuminate\Support\Facades\Mail;
 
 class EmailChannel
 {
-    /**
-     * Send the given notification.
-     */
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
+
         if ($notification instanceof \App\Notifications\TestNotification) {
-            $bcc = $notifiable->routeNotificationForEmail('test_notification_recipients');
+            $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');
             if (count($bcc) === 0) {
                 $bcc = $notifiable->routeNotificationForEmail();
             }
@@ -29,10 +27,9 @@ class EmailChannel
             [],
             fn (Message $message) => $message
                 ->from(
-                    $notifiable->extra_attributes?->get('from_address'),
-                    $notifiable->extra_attributes?->get('from_name')
+                    $notifiable->extra_attributes?->get('smtp_from_address'),
+                    $notifiable->extra_attributes?->get('smtp_from_name')
                 )
-                ->cc($bcc)
                 ->bcc($bcc)
                 ->subject($mailMessage->subject)
                 ->html((string)$mailMessage->render())
