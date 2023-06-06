@@ -14,7 +14,7 @@ body {
     @apply scrollbar min-h-screen bg-coolgray-100 text-neutral-400 antialiased;
 }
 main {
-    @apply px-32 xl:px-14 mx-auto max-w-screen-xl;
+    @apply px-32 xl:px-14 mx-auto max-w-screen-xl pt-4;
 }
 
 input[type="checkbox"] {
@@ -70,7 +70,7 @@ a {
 }
 
 .main-navbar {
-    @apply fixed h-full overflow-hidden;
+    @apply fixed h-full overflow-hidden pt-14;
 }
 .icon {
     @apply w-6 h-6;
@@ -82,13 +82,13 @@ a {
     @apply flex items-center justify-center text-sm rounded-none min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
 }
 
-.main-menu {
+/* .main-menu {
     @apply relative float-left;
 }
 .main-menu:after {
     content: "/";
-    @apply absolute border border-dotted rounded border-neutral-600 right-0 top-0 text-warning mx-1 px-2 mt-[0.3rem] text-sm;
-}
+    @apply absolute border border-dotted rounded border-neutral-600 right-1 top-0 text-warning mx-1 px-2 mt-[0.3rem] text-sm;
+} */
 .magic-badge {
     @apply min-w-fit px-2 rounded text-center border border-dotted border-primary text-white text-xs;
 }

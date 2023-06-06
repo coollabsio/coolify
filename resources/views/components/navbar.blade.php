@@ -1,6 +1,6 @@
 @auth
     <nav class="main-navbar">
-        <ul class="gap-4 menu ">
+        <ul class="gap-4 menu">
             <li>
                 <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="{{ request()->is('/') ? 'text-warning icon' : 'icon' }}"

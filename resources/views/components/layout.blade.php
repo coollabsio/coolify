@@ -29,8 +29,7 @@
     @auth
         <x-navbar />
     @endauth
-    <div class="flex justify-center w-full min-h-12" id="vue">
-        {{-- <x-magic-bar /> --}}
+    <div class="fixed top-3 left-4" id="vue">
         <magic-bar></magic-bar>
     </div>
     <main>

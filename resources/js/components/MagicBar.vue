@@ -1,28 +1,22 @@
 <template>
     <Transition name="fade">
-        <div class="z-10 mt-2">
-            <div class="overflow-hidden transition-all transform" v-if="!showCommandPalette"
+        <div class="z-10">
+            <div class="flex items-center p-1 px-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
                 @click="showCommandPalette = true">
-                <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5 ">
-                    <div class="relative">
-                        <svg class="absolute w-5 h-5 text-gray-400 pointer-events-none left-3 top-2.5" viewBox="0 0 20 20"
-                            fill="currentColor" aria-hidden="true">
-                            <path fill-rule="evenodd"
-                                d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z"
-                                clip-rule="evenodd" />
-                        </svg>
-                        <input type="text"
-                            class="w-full h-10 pr-4 text-white bg-transparent border-0 pl-11 placeholder:text-neutral-700 focus:ring-0 sm:text-sm"
-                            placeholder="Search, jump or create... magically... 🪄" role="combobox" aria-expanded="false"
-                            aria-controls="options">
-                    </div>
-                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24" stroke-width="2"
+                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                    <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+                    <path d="M21 21l-6 -6" />
+                </svg>
+                <span class="px-2 ml-2 text-xs border border-dashed rounded border-neutral-700 text-warning">/</span>
             </div>
             <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
-                <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100" @click.self="resetState"></div>
+                <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100" @click.self="resetState">
+                </div>
                 <div class="fixed inset-0 w-3/5 p-4 mx-auto overflow-y-auto sm:p-6 md:px-20 min-w-fit"
                     @click.self="resetState">
-                    <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5 ">
+                    <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5">
                         <div class="relative">
                             <svg class="absolute w-5 h-5 text-gray-400 pointer-events-none left-3 top-2.5"
                                 viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -52,13 +46,12 @@
                                         <span class="flex-auto ml-3 truncate">Add new {{ state.icon }}: <span
                                                 class="text-xs text-warning" v-if="search">{{ search }}</span>
                                             <span v-else class="text-xs text-warning">with random name (or type
-                                                in one)</span></span>
+                                                one)</span></span>
                                     </li>
                                 </ul>
                             </li>
                             <li>
-
-                                <ul v-if="data.length == 0" class="mt-2 -mx-4 text-sm text-white ">
+                                <ul v-if="data.length == 0" class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 select-none group">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -72,8 +65,9 @@
                                         <span class="flex-auto ml-3 truncate">Nothing found. Ooops.</span>
                                     </li>
                                 </ul>
-                                <h2 v-if="data.length > 0 && state.title"
-                                    class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{ state.title }}
+                                <h2 v-if="data.length != 0 && state.title"
+                                    class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
+                                        state.title }}
                                 </h2>
                                 <ul class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
@@ -144,7 +138,7 @@
     </Transition>
 </template>
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from "axios";
 
 const showCommandPalette = ref(false)
@@ -183,9 +177,38 @@ const initialState = {
     data: appActions
 }
 const state = ref({ ...initialState })
+
 const data = computed(() => {
-    return state.value.data.filter(item => item.name.toLowerCase().includes(search.value?.toLowerCase() ?? ''))
+    if (search?.value) {
+        return state.value.data.filter(item => item.name.toLowerCase().includes(search.value?.toLowerCase() ?? ''))
+    }
+    return state.value.data
 })
+
+function focusSearch(event) {
+    if (event.target.nodeName === 'BODY') {
+        if (event.key === '/') {
+            event.preventDefault();
+            showCommandPalette.value = true;
+        }
+    }
+}
+
+onMounted(() => {
+    window.addEventListener("keydown", focusSearch);
+})
+onUnmounted(() => {
+    window.removeEventListener("keydown", focusSearch);
+})
+
+watch(showCommandPalette, async (value) => {
+    if (value) {
+        await nextTick();
+        searchInput.value.focus();
+    }
+})
+
+
 function resetState() {
     showCommandPalette.value = false
     state.value = { ...initialState }
@@ -199,7 +222,6 @@ async function next(nextAction, index, newAction = null) {
         switch (newAction) {
             case 'server':
                 targetUrl.pathname = '/server/new'
-                console.log(targetUrl.href);
                 window.location.href = targetUrl.href
                 break;
             case 'destination':
@@ -229,7 +251,6 @@ async function next(nextAction, index, newAction = null) {
             }
         }
         else selected['action'] = appActions[index].id
-        console.log(selected)
 
         switch (nextAction) {
             case 'server':
@@ -242,19 +263,23 @@ async function next(nextAction, index, newAction = null) {
                 await getDestinations(state.value.data[index].id)
                 state.value.title = 'Select a destination'
                 state.value.icon = 'destination'
+                state.value.new = true
                 break;
             case 'project':
                 await getProjects()
                 state.value.title = 'Select a project'
                 state.value.icon = 'project'
+                state.value.new = true
                 break;
             case 'environment':
                 await getEnvironments(state.value.data[index].id)
                 state.value.title = 'Select an environment'
                 state.value.icon = 'environment'
+                state.value.new = true
                 break;
             case 'redirect':
                 await redirect();
+                state.value.new = false
                 break;
             default:
                 break;
