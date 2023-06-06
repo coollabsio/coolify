@@ -12,7 +12,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Log;
 
-class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
+class InstanceAutoUpdateJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -23,10 +23,6 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
     public string $latest_version;
     public string $current_version;
 
-    public function uniqueId(): int
-    {
-        return 1;
-    }
     public function __construct(private bool $force = false)
     {
     }
