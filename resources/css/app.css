@@ -47,9 +47,6 @@ select {
     @apply w-4 text-warning;
 }
 
-button[type="submit"] {
-    @apply hover:bg-coolgray-400 btn h-7 btn-xs border-none bg-coolgray-200 no-animation normal-case text-white rounded;
-}
 button[isWarning] {
     @apply bg-error hover:bg-error;
 }

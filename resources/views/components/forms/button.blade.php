@@ -9,7 +9,9 @@
     <div class="tooltip tooltip-warning" data-tip="{{ $tooltip }}">
     @endisset
     @if ($type === 'submit')
-        <button {{ $attributes }} type="submit" @if ($disabled !== null) disabled @endif
+        <button
+            {{ $attributes->class(['btn btn-xs border-none no-animation normal-case text-white rounded', 'hover:bg-coolgray-400 bg-coolgray-200 h-7' => !$attributes->has('class')]) }}
+            type="submit" @if ($disabled !== null) disabled @endif
             @isset($confirm)
         x-on:click="toggleConfirmModal('{{ $confirm }}', '{{ explode('(', $confirmAction)[0] }}')"
     @endisset
