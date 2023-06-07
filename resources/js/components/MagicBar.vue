@@ -306,6 +306,30 @@ const magicActions = [{
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
+},
+{
+    id: 11,
+    name: 'Goto: Notifications',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 12,
+    name: 'Goto: Profile',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 13,
+    name: 'Goto: Teams',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 14,
+    name: 'Goto: Switch Teams',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
 }
 ]
 const initialState = {
@@ -497,6 +521,18 @@ async function redirect() {
             break;
         case 10:
             targetUrl.pathname = `/command-center`
+            break;
+        case 11:
+            targetUrl.pathname = `/profile/team/notifications`
+            break;
+        case 12:
+            targetUrl.pathname = `/profile`
+            break;
+        case 13:
+            targetUrl.pathname = `/profile/team`
+            break;
+        case 14:
+            targetUrl.pathname = `/profile/team`
             break;
 
     }
