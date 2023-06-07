@@ -2,8 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Models\Activity;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 
 class Application extends BaseModel
 {
@@ -19,12 +22,13 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
         });
     }
-
     protected $fillable = [
         'name',
+        'project_id',
         'description',
         'git_repository',
         'git_branch',
+        'git_full_url',
         'build_pack',
         'environment_id',
         'destination_id',
@@ -34,12 +38,34 @@ class Application extends BaseModel
         'ports_mappings',
         'ports_exposes',
         'publish_directory',
+        'private_key_id'
     ];
 
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
             set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
+        );
+    }
+    public function gitBranchLocation(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+                    return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
+                }
+            }
+
+        );
+    }
+    public function gitCommits(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+                    return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
+                }
+            }
         );
     }
     public function baseDirectory(): Attribute
@@ -73,9 +99,51 @@ class Application extends BaseModel
                 : explode(',', $this->ports_exposes)
         );
     }
+    // Normal Deployments
+    public function environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false);
+    }
+    public function runtime_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function build_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function nixpacks_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->where('key', 'like', 'NIXPACKS_%');
+    }
+    // Preview Deployments
+    public function environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true);
+    }
+    public function runtime_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function build_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('is_build_time', true)->where('key', 'not like', 'NIXPACKS_%');
+    }
+    public function nixpacks_environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'like', 'NIXPACKS_%');
+    }
+    public function private_key()
+    {
+        return $this->belongsTo(PrivateKey::class);
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);
+    }
+    public function previews()
+    {
+        return $this->hasMany(ApplicationPreview::class);
     }
     public function settings()
     {
@@ -94,13 +162,42 @@ class Application extends BaseModel
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
 
-
-    public function deployments()
+    public function deployments(int $skip = 0, int $take = 10)
     {
-        return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '!=', null)->orderBy('created_at', 'desc')->get();
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');
+        $count = $deployments->count();
+        $deployments = $deployments->skip($skip)->take($take)->get();
+        return [
+            'count' => $count,
+            'deployments' => $deployments
+        ];
     }
     public function get_deployment(string $deployment_uuid)
     {
-        return Activity::where('subject_id', $this->id)->where('properties->deployment_uuid', '=', $deployment_uuid)->first();
+        return Activity::where('subject_id', $this->id)->where('properties->type_uuid', '=', $deployment_uuid)->first();
+    }
+    public function isDeployable(): bool
+    {
+        if ($this->settings->is_auto_deploy_enabled) {
+            return true;
+        }
+        return false;
+    }
+    public function isPRDeployable(): bool
+    {
+        if ($this->settings->is_preview_deployments_enabled) {
+            return true;
+        }
+        return false;
+    }
+    public function deploymentType()
+    {
+        if (data_get($this, 'source')) {
+            return 'source';
+        }
+        if (data_get($this, 'private_key_id')) {
+            return 'deploy_key';
+        }
+        throw new \Exception('No deployment type found');
     }
 }

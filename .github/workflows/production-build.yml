@@ -2,7 +2,7 @@ name: Production Build (v4)
 
 on:
   push:
-    branches: ["v4"]
+    branches: ["v4", "v4-next"]
 
 env:
   REGISTRY: ghcr.io

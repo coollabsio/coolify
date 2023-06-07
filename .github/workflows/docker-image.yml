@@ -1,10 +1,14 @@
 name: Docker Image CI
 
 on:
+  # push:
+  #   branches: [ "main" ]
+  # pull_request:
+  #   branches: [ "*" ]
   push:
-    branches: [ "main" ]
+    branches: ["this-does-not-exist"]
   pull_request:
-    branches: [ "*" ]
+    branches: ["this-does-not-exist"]
 
 jobs:
   build:

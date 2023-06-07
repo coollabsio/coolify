@@ -2,9 +2,8 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\DeployApplicationJob;
+use App\Jobs\ContainerStopJob;
 use App\Models\Application;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -21,67 +20,52 @@ class Deploy extends Component
     protected array $command = [];
     protected $source;
 
+    protected $listeners = [
+        'applicationStatusChanged',
+    ];
+
     public function mount()
     {
-        $this->parameters = Route::current()->parameters();
+        $this->parameters = get_parameters();
         $this->application = Application::where('id', $this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
-    protected function setDeploymentUuid()
+    public function applicationStatusChanged()
+    {
+        $this->application->refresh();
+    }
+    protected function set_deployment_uuid()
     {
         // Create Deployment ID
         $this->deployment_uuid = new Cuid2(7);
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
-    protected function redirectToDeployment()
+    public function deploy(bool $force = false, bool|null $debug = null)
     {
-        return redirect()->route('project.application.deployment', $this->parameters);
-    }
-    public function start()
-    {
-        $this->setDeploymentUuid();
+        if ($debug && !$this->application->settings->is_debug_enabled) {
+            $this->application->settings->is_debug_enabled = true;
+            $this->application->settings->save();
+        }
+        $this->set_deployment_uuid();
 
-        dispatch(new DeployApplicationJob(
+        queue_application_deployment(
+            application_id: $this->application->id,
             deployment_uuid: $this->deployment_uuid,
-            application_uuid: $this->application->uuid,
-            force_rebuild: false,
-        ));
-
-        return $this->redirectToDeployment();
-    }
-    public function forceRebuild()
-    {
-        $this->setDeploymentUuid();
-
-        dispatch(new DeployApplicationJob(
-            deployment_uuid: $this->deployment_uuid,
-            application_uuid: $this->application->uuid,
-            force_rebuild: true,
-        ));
-
-        return $this->redirectToDeployment();
-    }
-
-    public function delete()
-    {
-        $this->stop();
-        Application::find($this->applicationId)->delete();
-        return redirect()->route('project.resources', [
+            force_rebuild: $force,
+        );
+        return redirect()->route('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name']
+            'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $this->deployment_uuid,
+            'environment_name' => $this->parameters['environment_name'],
         ]);
     }
+
     public function stop()
     {
-        runRemoteCommandSync($this->destination->server, ["docker rm -f {$this->application->uuid}"]);
-        if ($this->application->status != 'exited') {
-            $this->application->status = 'exited';
-            $this->application->save();
-        }
-    }
-
-    public function pollingStatus()
-    {
-        $this->application->refresh();
+        instant_remote_process(["docker rm -f {$this->application->uuid}"], $this->application->destination->server);
+        $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
+        $this->application->save();
+        $this->emit('applicationStatusChanged');
     }
 }

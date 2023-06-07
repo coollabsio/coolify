@@ -1,3 +1,3 @@
 <?php
-$version = include 'config/coolify.php';
-echo $version['version'];
+$version = include 'config/version.php';
+echo $version;

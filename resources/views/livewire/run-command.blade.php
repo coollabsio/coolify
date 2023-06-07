@@ -1,26 +1,19 @@
 <div>
-    <div>
-        <label for="command">
-            <input autofocus id="command" wire:model.defer="command" type="text" wire:keydown.enter="runCommand" />
-            <select wire:model.defer="server">
-                @foreach ($servers as $server)
+    <form class="flex items-end justify-center gap-2" wire:submit.prevent='runCommand'>
+        <x-forms.input placeholder="ls -l" autofocus noDirty id="command" label="Command" required />
+        <x-forms.select label="Server" id="server" required>
+            @foreach ($servers as $server)
+                @if ($loop->first)
+                    <option selected value="{{ $server->uuid }}">{{ $server->name }}</option>
+                @else
                     <option value="{{ $server->uuid }}">{{ $server->name }}</option>
-                @endforeach
-            </select>
-        </label>
-        <button wire:click="runCommand">Run command</button>
-        <button wire:click="runSleepingBeauty">Run sleeping beauty</button>
-        <button wire:click="runDummyProjectBuild">Build DummyProject</button>
+                @endif
+            @endforeach
+        </x-forms.select>
+        <x-forms.button type="submit" class="h-8 hover:bg-coolgray-400 bg-coolgray-200">Execute Command
+        </x-forms.button>
+    </form>
+    <div class="container w-full pt-10 mx-auto">
+        <livewire:activity-monitor :header="true" />
     </div>
-
-    <div>
-        <input id="manualKeepAlive" name="manualKeepAlive" type="checkbox" wire:model="manualKeepAlive">
-        <label for="manualKeepAlive">Real-time logs</label>
-        @if ($isKeepAliveOn || $manualKeepAlive)
-            Polling...
-        @endif
-    </div>
-    @isset($activity?->id)
-        <pre style="width: 100%;overflow-y: scroll;" @if ($isKeepAliveOn || $manualKeepAlive) wire:poll.750ms="polling" @endif>{{ data_get($activity, 'description') }}</pre>
-    @endisset
 </div>

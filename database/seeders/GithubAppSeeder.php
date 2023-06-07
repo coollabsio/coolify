@@ -26,12 +26,13 @@ class GithubAppSeeder extends Seeder
             'team_id' => $root_team->id,
         ]);
         GithubApp::create([
-            'name' => 'coolify-laravel-development-private-github',
+            'name' => 'coolify-laravel-development-public',
+            'uuid' => '69420',
             'api_url' => 'https://api.github.com',
             'html_url' => 'https://github.com',
             'is_public' => false,
             'app_id' => 292941,
-            'installation_id' => 34157139,
+            'installation_id' => 37267016,
             'client_id' => 'Iv1.220e564d2b0abd8c',
             'client_secret' => '96b1b31f36ce0a34386d11798ff35b9b6d8aba3a',
             'webhook_secret' => '326a47b49054f03288f800d81247ec9414d0abf3',

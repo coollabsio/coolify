@@ -24,7 +24,7 @@ jobs:
         with:
           no-cache: true
           context: .
-          file: docker/builder/Dockerfile
+          file: docker/coolify-builder/Dockerfile
           platforms: linux/amd64
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest

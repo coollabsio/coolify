@@ -2,13 +2,24 @@
 
 namespace App\Http\Controllers;
 
-use Spatie\Activitylog\Models\Activity;
+use App\Models\Project;
 
 class ProjectController extends Controller
 {
-    public function environments()
+    public function all()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $team_id = session('currentTeam')->id;
+
+        $projects = Project::where('team_id', $team_id)->get();
+        return view('projects', ['projects' => $projects]);
+    }
+
+    public function show()
+    {
+        $project_uuid = request()->route('project_uuid');
+        $team_id = session('currentTeam')->id;
+
+        $project = Project::where('team_id', $team_id)->where('uuid', $project_uuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -16,10 +27,10 @@ class ProjectController extends Controller
         if (count($project->environments) == 1) {
             return redirect()->route('project.resources', ['project_uuid' => $project->uuid, 'environment_name' => $project->environments->first()->name]);
         }
-        return view('project.environments', ['project' => $project]);
+        return view('project.show', ['project' => $project]);
     }
 
-    public function resources_new()
+    public function new()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -29,7 +40,12 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        return view('project.new', ['project' => $project, 'environment' => $environment, 'type' => 'resource']);
+
+        $type = request()->query('type');
+
+        return view('project.new', [
+            'type' => $type
+        ]);
     }
     public function resources()
     {
@@ -41,64 +57,9 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        return view('project.resources', ['project' => $project, 'environment' => $environment]);
-    }
-
-    public function application_configuration()
-    {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (!$application) {
-            return redirect()->route('dashboard');
-        }
-        return view('project.application.configuration', ['application' => $application]);
-    }
-    public function application_deployments()
-    {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (!$application) {
-            return redirect()->route('dashboard');
-        }
-        return view('project.application.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
-    }
-
-    public function application_deployment()
-    {
-        $deployment_uuid = request()->route('deployment_uuid');
-
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (!$application) {
-            return redirect()->route('dashboard');
-        }
-        $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
-
-        return view('project.application.deployment', [
-            'application' => $application,
-            'activity' => $activity,
-            'deployment_uuid' => $deployment_uuid,
+        return view('project.resources', [
+            'project' => $project,
+            'environment' => $environment
         ]);
     }
 }

@@ -4,6 +4,6 @@ namespace App\Enums;
 
 enum ActivityTypes: string
 {
-    case REMOTE_PROCESS = 'remote_process';
+    case INLINE = 'inline';
     case DEPLOYMENT = 'deployment';
 }

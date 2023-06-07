@@ -2,21 +2,29 @@
     "name": "laravel/laravel",
     "type": "project",
     "description": "The Laravel Framework.",
-    "keywords": ["framework", "laravel"],
+    "keywords": [
+        "framework",
+        "laravel"
+    ],
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^v1.16.0",
         "laravel/framework": "^v10.7.1",
+        "laravel/horizon": "^5.15",
         "laravel/sanctum": "^v3.2.1",
         "laravel/tinker": "^v2.8.1",
+        "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "livewire/livewire": "^v2.12.3",
         "nubs/random-name-generator": "^2.2",
+        "sentry/sentry-laravel": "^3.4",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
         "spatie/laravel-ray": "^1.32.4",
+        "spatie/laravel-schemaless-attributes": "^2.4",
         "spatie/url": "^2.2",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0"
@@ -28,6 +36,7 @@
         "mockery/mockery": "^1.5.1",
         "nunomaduro/collision": "^v7.4.0",
         "pestphp/pest": "^v2.4.0",
+        "phpstan/phpstan": "^1.10",
         "phpunit/phpunit": "^10.0.19",
         "serversideup/spin": "^v1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
@@ -36,7 +45,7 @@
     },
     "autoload": {
         "files": [
-            "bootstrap/helpers.php"
+            "bootstrap/includeHelpers.php"
         ],
         "psr-4": {
             "App\\": "app/",
@@ -55,8 +64,10 @@
             "@php artisan package:discover --ansi"
         ],
         "post-update-cmd": [
-            "@php artisan vendor:publish --tag=laravel-assets --ansi --force"
+            "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
+            "Illuminate\\Foundation\\ComposerScripts::postUpdate"
         ],
+        "post-install-cmd": [],
         "post-root-package-install": [
             "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
         ],

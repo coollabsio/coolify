@@ -42,5 +42,10 @@ class TeamSeeder extends Seeder
             'user_id' => $normal_user->id,
             'role' => 'admin',
         ]);
+        DB::table('team_user')->insert([
+            'team_id' =>  $root_user_personal_team->id,
+            'user_id' => $normal_user->id,
+            'role' => 'admin',
+        ]);
     }
 }

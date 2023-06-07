@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('applications', function (Blueprint $table) {
             $table->id();
+            $table->integer('repository_project_id')->nullable();
             $table->string('uuid')->unique();
             $table->string('name');
 
@@ -21,7 +22,8 @@ return new class extends Migration
 
             $table->string('git_repository');
             $table->string('git_branch');
-            $table->string('git_commit_sha')->nullable();
+            $table->string('git_commit_sha')->default('HEAD');
+            $table->string('git_full_url')->nullable();
 
             $table->string('docker_registry_image_name')->nullable();
             $table->string('docker_registry_image_tag')->nullable();
@@ -51,11 +53,22 @@ return new class extends Migration
             $table->integer('health_check_retries')->default(10);
             $table->integer('health_check_start_period')->default(5);
 
+            $table->string('limits_memory')->default("0");
+            $table->string('limits_memory_swap')->default("0");
+            $table->integer('limits_memory_swappiness')->default(60);
+            $table->string('limits_memory_reservation')->default("0");
+
+            $table->string('limits_cpus')->default("0");
+            $table->string('limits_cpuset')->nullable()->default("0");
+            $table->integer('limits_cpu_shares')->default(1024);
+
             $table->string('status')->default('exited');
+            $table->string('preview_url_template')->default('{{pr_id}}.{{domain}}');
 
             $table->nullableMorphs('destination');
-            $table->morphs('source');
+            $table->nullableMorphs('source');
 
+            $table->foreignId('private_key_id')->nullable();
             $table->foreignId('environment_id');
             $table->timestamps();
         });

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Environment;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -25,8 +26,10 @@ class DatabaseSeeder extends Seeder
             GitlabAppSeeder::class,
             ApplicationSeeder::class,
             ApplicationSettingsSeeder::class,
+            ApplicationPreviewSeeder::class,
             DBSeeder::class,
             ServiceSeeder::class,
+            EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
         ]);
     }

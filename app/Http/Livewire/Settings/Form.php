@@ -3,7 +3,10 @@
 namespace App\Http\Livewire\Settings;
 
 use App\Models\InstanceSettings as ModelsInstanceSettings;
+use App\Models\Server;
 use Livewire\Component;
+use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
 class Form extends Component
 {
@@ -11,28 +14,173 @@ class Form extends Component
     public $do_not_track;
     public $is_auto_update_enabled;
     public $is_registration_enabled;
-    public $is_https_forced;
+    protected string $dynamic_config_path;
+    protected Server $server;
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
         'settings.wildcard_domain' => 'nullable',
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
+        'settings.default_redirect_404' => 'nullable',
     ];
     public function mount()
     {
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
-        $this->is_https_forced = $this->settings->is_https_forced;
     }
     public function instantSave()
     {
         $this->settings->do_not_track = $this->do_not_track;
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
-        $this->settings->is_https_forced = $this->is_https_forced;
         $this->settings->save();
+        $this->emit('saved', 'Settings updated!');
+    }
+    private function setup_instance_fqdn()
+    {
+        $file = "$this->dynamic_config_path/coolify.yaml";
+        if (empty($this->settings->fqdn)) {
+            remote_process([
+                "rm -f $file",
+            ], $this->server);
+        } else {
+            $url = Url::fromString($this->settings->fqdn);
+            $host = $url->getHost();
+            $schema = $url->getScheme();
+            $traefik_dynamic_conf = [
+                'http' =>
+                [
+                    'routers' =>
+                    [
+                        'coolify-http' =>
+                        [
+                            'entryPoints' => [
+                                0 => 'http',
+                            ],
+                            'service' => 'coolify',
+                            'rule' => "Host(`{$host}`)",
+                        ],
+                    ],
+                    'services' =>
+                    [
+                        'coolify' =>
+                        [
+                            'loadBalancer' =>
+                            [
+                                'servers' =>
+                                [
+                                    0 =>
+                                    [
+                                        'url' => 'http://coolify:80',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+
+            if ($schema === 'https') {
+                $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
+                    0 => 'redirect-to-https@docker',
+                ];
+                $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
+                    'entryPoints' => [
+                        0 => 'https',
+                    ],
+                    'service' => 'coolify',
+                    'rule' => "Host(`{$host}`)",
+                    'tls' => [
+                        'certresolver' => 'letsencrypt',
+                    ],
+                ];
+            }
+            $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
+        }
+    }
+    private function setup_default_redirect_404()
+    {
+        $file = "$this->dynamic_config_path/default_redirect_404.yaml";
+
+        if (empty($this->settings->default_redirect_404)) {
+            remote_process([
+                "rm -f $file",
+            ], $this->server);
+        } else {
+            $url = Url::fromString($this->settings->default_redirect_404);
+            $host = $url->getHost();
+            $schema = $url->getScheme();
+            $traefik_dynamic_conf = [
+                'http' =>
+                [
+                    'routers' =>
+                    [
+                        'catchall' =>
+                        [
+                            'entryPoints' => [
+                                0 => 'http',
+                                1 => 'https',
+                            ],
+                            'service' => 'noop',
+                            'rule' => "HostRegexp(`{catchall:.*}`)",
+                            'priority' => 1,
+                            'middlewares' => [
+                                0 => 'redirect-regexp@file',
+                            ],
+                        ],
+                    ],
+                    'services' =>
+                    [
+                        'noop' =>
+                        [
+                            'loadBalancer' =>
+                            [
+                                'servers' =>
+                                [
+                                    0 =>
+                                    [
+                                        'url' => '',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                    'middlewares' =>
+                    [
+                        'redirect-regexp' =>
+                        [
+                            'redirectRegex' =>
+                            [
+                                'regex' => '(.*)',
+                                'replacement' => $this->settings->default_redirect_404,
+                                'permanent' => false,
+                            ],
+                        ],
+                    ],
+                ],
+            ];
+            $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
+        }
+    }
+    private function save_configuration_to_disk(array $traefik_dynamic_conf, string $file)
+    {
+        $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
+        $yaml =
+            "# This file is automatically generated by Coolify.\n" .
+            "# Do not edit it manually (only if you know what are you doing).\n\n" .
+            $yaml;
+
+        $base64 = base64_encode($yaml);
+        remote_process([
+            "mkdir -p $this->dynamic_config_path",
+            "echo '$base64' | base64 -d > $file",
+        ], $this->server);
+
+        if (config('app.env') == 'local') {
+            ray($yaml);
+        }
     }
     public function submit()
     {
@@ -43,5 +191,14 @@ class Form extends Component
         }
         $this->validate();
         $this->settings->save();
+
+        $this->dynamic_config_path = '/data/coolify/proxy/dynamic';
+        if (config('app.env') == 'local') {
+            $this->server = Server::findOrFail(1);
+        } else {
+            $this->server = Server::findOrFail(0);
+        }
+        $this->setup_instance_fqdn();
+        $this->setup_default_redirect_404();
     }
 }

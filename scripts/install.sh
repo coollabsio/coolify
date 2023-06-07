@@ -2,32 +2,33 @@
 ## Do not modify this file. You will lost the ability to installation and autoupdate!
 
 ###########
-## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" if you update this file.
+## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
 ###########
 
 VERSION="1.0.0"
-CDN="https://coolify-cdn.b-cdn.net/files"
+DOCKER_VERSION="23.0"
+
+CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
 OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
-LATEST_VERSION=$(curl --silent https://get.coollabs.io/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
+LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 
-if [ "$EUID" -ne 0 ]; then
+if [ $EUID != 0 ]; then
     echo "Please run as root"
     exit
 fi
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
-    rm get-docker.sh
+    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
     echo "Docker installed successfully"
 fi
 
 mkdir -p /data/coolify/deployments
-mkdir -p /data/coolify/ssh-keys
-mkdir -p /data/coolify/proxy
+mkdir -p /data/coolify/ssh/keys
+mkdir -p /data/coolify/ssh/mux
 mkdir -p /data/coolify/source
+mkdir -p /data/coolify/proxy/dynamic
 
 chown -R 9999:root /data
 chmod -R 700 /data
@@ -43,16 +44,17 @@ if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.production /data/coolify/source/.env
     sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
+    sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
 
-# Generate an ssh key (ed25519) at /data/coolify/ssh-keys/id.root@host.docker.internal
-if [ ! -f /data/coolify/ssh-keys/id.root@host.docker.internal ]; then
-    ssh-keygen -t ed25519 -f /data/coolify/ssh-keys/id.root@host.docker.internal -q -N "" -C root@coolify
-    chown 9999 /data/coolify/ssh-keys/id.root@host.docker.internal
+# Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
+if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
+    ssh-keygen -t ed25519 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
+    chown 9999 /data/coolify/ssh/keys/id.root@host.docker.internal
 fi
 
 addSshKey() {
-    cat /data/coolify/ssh-keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
 }
 

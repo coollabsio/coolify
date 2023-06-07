@@ -1,6 +1,6 @@
 <div>
-    <button wire:loading.class="text-black bg-green-500" wire:loading.attr="disabled" wire:click='checkUpdate'>Check for
-        updates</button>
+    <x-forms.button wire:click='checkUpdate' type="submit">
+        Check Update</x-forms.button>
     @if ($updateAvailable)
         Update available
     @endif

@@ -19,7 +19,13 @@ yarn-error.log
 /.vscode
 /.npm
 /.bash_history
-/_volumes
-
+/_data
+_testing_hosts/
+_volumes/
 .lesshst
 psysh_history
+.psql_history
+_ide_helper.php
+.gitignore
+.phpstorm.meta.php
+_ide_helper_models.php

@@ -1,3 +1,139 @@
-/* @tailwind base; */
+@tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+.scrollbar {
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
+}
+
+html {
+    @apply min-h-screen h-full bg-coolgray-100;
+}
+
+body {
+    @apply scrollbar min-h-screen bg-coolgray-100 text-neutral-400 antialiased;
+}
+main {
+    @apply px-32 xl:px-14 mx-auto max-w-screen-xl pt-4;
+}
+
+input[type="checkbox"] {
+    @apply toggle toggle-warning toggle-xs rounded;
+}
+input {
+    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded-none;
+}
+input[type="text"],
+[type="number"],
+[type="email"],
+[type="password"] {
+    @apply read-only:opacity-40;
+}
+.label-text,
+label {
+    @apply text-neutral-400 text-sm;
+}
+
+textarea {
+    @apply textarea placeholder:text-neutral-700 text-white rounded-none;
+}
+select {
+    @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
+}
+.breadcrumbs > ul > li::before {
+    @apply text-warning opacity-100;
+}
+.loading {
+    @apply w-4 text-warning;
+}
+
+button[isWarning] {
+    @apply bg-error hover:bg-error;
+}
+button[isHighlighted] {
+    @apply btn-primary text-white;
+}
+h1 {
+    @apply text-3xl font-bold text-white;
+}
+h2 {
+    @apply text-2xl font-bold text-white;
+}
+h3 {
+    @apply text-xl font-bold text-white;
+}
+h4 {
+    @apply text-base font-bold text-white;
+}
+a {
+    @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
+}
+
+.main-navbar {
+    @apply fixed h-full overflow-hidden pt-14;
+}
+.kbd-custom {
+    @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;
+}
+.icon {
+    @apply w-6 h-6;
+}
+.icon:hover {
+    @apply text-white;
+}
+.box {
+    @apply flex items-center justify-center text-sm rounded-none min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+}
+
+/* .main-menu {
+    @apply relative float-left;
+}
+.main-menu:after {
+    content: "/";
+    @apply absolute border border-dotted rounded border-neutral-600 right-1 top-0 text-warning mx-1 px-2 mt-[0.3rem] text-sm;
+} */
+.magic-badge {
+    @apply min-w-fit px-2 rounded text-center border border-dotted border-primary text-white text-xs;
+}
+.magic-input {
+    @apply input input-sm w-80 xl:w-96 placeholder:text-neutral-700 text-sm rounded-none;
+}
+.magic-items {
+    @apply absolute top-12 mt-2 w-[24rem] bg-coolgray-200 rounded  z-50;
+}
+.magic-item {
+    @apply text-sm flex items-center gap-4 m-2 py-2 pl-4 cursor-pointer hover:bg-coolgray-500 text-neutral-400 hover:text-white transition-colors hover:shadow;
+}
+.magic-item-focused {
+    @apply bg-coolgray-400 text-white;
+}
+
+.lds-heart {
+    animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+}
+@keyframes lds-heart {
+    0% {
+        transform: scale(1);
+    }
+    5% {
+        transform: scale(1.2);
+    }
+    39% {
+        transform: scale(0.85);
+    }
+    45% {
+        transform: scale(1);
+    }
+    60% {
+        transform: scale(0.95);
+    }
+    100% {
+        transform: scale(0.9);
+    }
+}
+.bg-coollabs-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
+}
+.text-helper {
+    @apply inline-block font-bold text-warning;
+}

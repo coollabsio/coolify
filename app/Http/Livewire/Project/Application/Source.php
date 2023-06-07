@@ -15,8 +15,14 @@ class Source extends Component
         'application.git_branch' => 'required',
         'application.git_commit_sha' => 'nullable',
     ];
-    public function mount()
+
+    public function submit()
     {
-        $this->application = Application::where('id', $this->applicationId)->first();
+        $this->validate();
+        if (!$this->application->git_commit_sha) {
+            $this->application->git_commit_sha = 'HEAD';
+        }
+        $this->application->save();
+        $this->emit('saved', 'Application source updated!');
     }
 }

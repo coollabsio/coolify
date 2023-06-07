@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ApplicationDeploymentQueue;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Http\Request;
 use Spatie\Activitylog\Models\Activity;
 
 class ApplicationController extends Controller
 {
+    use AuthorizesRequests, ValidatesRequests;
     public function configuration()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -37,7 +41,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        return view('project.application.deployments', ['application' => $application, 'deployments' => $application->deployments()]);
+        return view('project.application.deployments', ['application' => $application]);
     }
 
     public function deployment()
@@ -56,11 +60,26 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        $activity = Activity::where('properties->deployment_uuid', '=', $deployment_uuid)->first();
-
+        $activity = Activity::where('properties->type_uuid', '=', $deployment_uuid)->first();
+        if (!$activity) {
+            return redirect()->route('project.application.deployments', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'application_uuid' => $application->uuid,
+            ]);
+        }
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deployment_uuid)->first();
+        if (!$deployment) {
+            return redirect()->route('project.application.deployments', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'application_uuid' => $application->uuid,
+            ]);
+        }
         return view('project.application.deployment', [
             'application' => $application,
             'activity' => $activity,
+            'deployment' => $deployment,
             'deployment_uuid' => $deployment_uuid,
         ]);
     }

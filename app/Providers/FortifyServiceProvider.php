@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -22,7 +23,17 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse
+        {
+            public function toResponse($request)
+            {
+                // First user (root) will be redirected to /settings instead of / on registration.
+                if ($request->user()->currentTeam->id === 0) {
+                    return redirect('/settings');
+                }
+                return redirect('/');
+            }
+        });
     }
 
     /**
@@ -30,8 +41,9 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            $settings = InstanceSettings::find(0);
+            $settings = InstanceSettings::get();
             if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
@@ -39,7 +51,7 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::loginView(function () {
-            $settings = InstanceSettings::find(0);
+            $settings = InstanceSettings::get();
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled
             ]);
@@ -55,10 +67,24 @@ class FortifyServiceProvider extends ServiceProvider
                 return $user;
             }
         });
-        Fortify::createUsersUsing(CreateNewUser::class);
+        Fortify::requestPasswordResetLinkView(function () {
+            return view('auth.forgot-password');
+        });
+        Fortify::resetPasswordView(function ($request) {
+            return view('auth.reset-password', ['request' => $request]);
+        });
+        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
         Fortify::updateUserProfileInformationUsing(UpdateUserProfileInformation::class);
         Fortify::updateUserPasswordsUsing(UpdateUserPassword::class);
-        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
+
+        Fortify::confirmPasswordView(function () {
+            return view('auth.confirm-password');
+        });
+
+        Fortify::twoFactorChallengeView(function () {
+            return view('auth.two-factor-challenge');
+        });
 
         RateLimiter::for('login', function (Request $request) {
             $email = (string) $request->email;

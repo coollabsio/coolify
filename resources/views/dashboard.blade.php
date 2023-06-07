@@ -1,20 +1,28 @@
 <x-layout>
-    <h1>Projects <a href="{{ route('project.new') }}"><button>New</button></a></h1>
-    @forelse ($projects as $project)
-        <a href="{{ route('project.environments', [$project->uuid]) }}">{{ data_get($project, 'name') }}</a>
-    @empty
-        <p>No projects found.</p>
-    @endforelse
-    <h1>Servers <a href="{{ route('server.new') }}"><button>New</button></a></h1>
-    @forelse ($servers as $server)
-        <a href="{{ route('server.show', [$server->uuid]) }}">{{ data_get($server, 'name') }}</a>
-    @empty
-        <p>No servers found.</p>
-    @endforelse
-    <h1>Destinations <a href="{{ route('destination.new') }}"><button>New</button></a></h1>
-    @forelse ($destinations as $destination)
-        <a href="{{ route('destination.show', [$destination->uuid]) }}">{{ data_get($destination, 'name') }}</a>
-    @empty
-        <p>No servers found.</p>
-    @endforelse
+    <h1>Dashboard</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li>
+                Something (more) useful will be here.
+            </li>
+        </ul>
+    </div>
+    <div class="w-full rounded shadow stats stats-vertical lg:stats-horizontal">
+        <div class="stat">
+            <div class="stat-title">Servers</div>
+            <div class="stat-value">{{ $servers }}</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-title">Projects</div>
+            <div class="stat-value">{{ $projects }}</div>
+        </div>
+
+        <div class="stat">
+            <div class="stat-title">Resources</div>
+            <div class="stat-value">{{ $resources }}</div>
+            <div class="stat-desc">Applications, databases, etc...</div>
+        </div>
+
+    </div>
 </x-layout>

@@ -4,8 +4,9 @@ namespace App\Enums;
 
 enum ProcessStatus: string
 {
-    case HOLDING = 'holding';
+    case QUEUED = 'queued';
     case IN_PROGRESS = 'in_progress';
     case FINISHED = 'finished';
     case ERROR = 'error';
+    case CANCELLED = 'cancelled';
 }

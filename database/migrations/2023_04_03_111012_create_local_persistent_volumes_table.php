@@ -20,6 +20,8 @@ return new class extends Migration
             $table->string('container_id')->nullable();
 
             $table->nullableMorphs('resource');
+
+            $table->unique(['name', 'resource_id', 'resource_type']);
             $table->timestamps();
         });
     }

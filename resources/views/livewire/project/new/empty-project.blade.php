@@ -1,1 +1,1 @@
-<button wire:click='createEmptyProject'>Empty Project</button>
+<x-forms.button wire:click='createEmptyProject'>Empty Project</x-forms.button>
