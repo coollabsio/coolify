@@ -51,7 +51,8 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
-    Route::get('/settings', [Controller::class, 'settings'])->name('settings');
+    Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
+    Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
     Route::get('/profile/team', fn () => view('team.show'))->name('team.show');
     Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');

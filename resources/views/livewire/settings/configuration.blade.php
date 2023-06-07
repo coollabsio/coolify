@@ -1,15 +1,7 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
-        <h1>Settings</h1>
-        <nav class="flex pt-2 pb-10 text-sm">
-            <ol class="inline-flex items-center">
-                <li class="inline-flex items-center">
-                    Instance wide settings for Coolify.
-                </li>
-            </ol>
-        </nav>
         <div class="flex items-center gap-2">
-            <h3>General</h3>
+            <h3>Configuration</h3>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
@@ -29,8 +21,7 @@
         </div>
     </form>
 
-    <h3 class="pt-6">Advanced</h3>
-    <div class="flex flex-col text-right w-52">
+    <div class="flex flex-col py-6 text-right w-52">
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />

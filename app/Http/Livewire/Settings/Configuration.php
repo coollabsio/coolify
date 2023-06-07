@@ -8,7 +8,7 @@ use Livewire\Component;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
-class Form extends Component
+class Configuration extends Component
 {
     public ModelsInstanceSettings $settings;
     public $do_not_track;

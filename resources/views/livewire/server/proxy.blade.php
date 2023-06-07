@@ -12,6 +12,10 @@
                         <form wire:submit.prevent='saveConfiguration({{ $server }})'>
                             <div class="flex items-center gap-2">
                                 <h2>Proxy</h2>
+                                <x-forms.button type="submit">Save</x-forms.button>
+                                <x-forms.button wire:click.prevent="resetProxy">
+                                    Reset to default
+                                </x-forms.button>
                                 <livewire:server.proxy.status :server="$server" />
                             </div>
                             <div class="pb-4 text-sm">Traefik v2</div>
@@ -21,13 +25,8 @@
                                 <div class="text-sm text-red-500">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif
-                            <x-forms.button type="submit">Save</x-forms.button>
-                            <x-forms.button wire:click.prevent="resetProxy">
-                                Reset to default
-                            </x-forms.button>
-                            <div class="pt-4 pb-0 text-xs">traefik.conf</div>
-                            <x-forms.textarea class="text-xs" noDirty name="proxy_settings"
-                                wire:model.defer="proxy_settings" rows="30" />
+                            <x-forms.textarea label="Configuration file: traefik.conf" class="text-xs" noDirty
+                                name="proxy_settings" wire:model.defer="proxy_settings" rows="30" />
                         </form>
                     @endif
                 @endisset

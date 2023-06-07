@@ -1,6 +1,6 @@
 <div class="flex gap-10 text-xs text-white" x-data="{ visible: @entangle('visible') }">
     <x-forms.button x-cloak x-show="!visible" wire:click='upgrade'>
-        Force Upgrade
+        Force Upgrade Your Instance
     </x-forms.button>
     <template x-if="visible">
         <div class="bg-coollabs-gradient">

@@ -1,4 +1,4 @@
-<div class="py-8">
+<div>
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h3>Transactional Emails</h3>

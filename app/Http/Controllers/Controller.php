@@ -33,7 +33,18 @@ class Controller extends BaseController
     {
         if (auth()->user()->isAdmin()) {
             $settings = InstanceSettings::get();
-            return view('settings', [
+            return view('settings.configuration', [
+                'settings' => $settings
+            ]);
+        } else {
+            return redirect()->route('dashboard');
+        }
+    }
+    public function emails()
+    {
+        if (auth()->user()->isAdmin()) {
+            $settings = InstanceSettings::get();
+            return view('settings.emails', [
                 'settings' => $settings
             ]);
         } else {
