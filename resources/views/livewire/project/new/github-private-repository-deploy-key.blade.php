@@ -1,5 +1,5 @@
 <div>
-    <h1>New Application</h1>
+    <h1>Create a new Application</h1>
     <div class="pb-4 text-sm">Deploy any public or private git repositories through a Deploy Key.</div>
     <h3 class="py-2">Select a private key</h3>
     @foreach ($private_keys as $key)

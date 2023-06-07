@@ -1,13 +1,13 @@
 <div>
+    <h1>Create a new Server</h1>
+    <div class="pb-5 text-sm breadcrumbs">
+        <ul>
+            <li>
+                Servers are the main blocks of your infrastructure.
+            </li>
+        </ul>
+    </div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
-        <h1>Create a new Server</h1>
-        <div class="pb-5 text-sm breadcrumbs">
-            <ul>
-                <li>
-                    Servers are the main blocks of your infrastructure.
-                </li>
-            </ul>
-        </div>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="description" label="Description" />

@@ -1,5 +1,5 @@
 <div>
-    <h1>New Application</h1>
+    <h1>Create a new Application</h1>
     <div class="pb-4 text-sm">Deploy any public git repositories.</div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex flex-col gap-2">

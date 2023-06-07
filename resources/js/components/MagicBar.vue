@@ -85,8 +85,8 @@
                                 </h2>
                                 <ul v-if="magic.length != 0" class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 transition-all cursor-pointer select-none group hover:bg-coolgray-400"
-                                        :class="{ 'bg-coolgray-400': currentFocus === index }" id="option-1" role="option"
-                                        tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(action.id)">
+                                        :class="{ 'bg-coollabs': currentFocus === index }" id="option-1" role="option"
+                                        tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(index)">
                                         <div class="relative">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -213,19 +213,19 @@ const uuidSelector = ['project', 'destination']
 const nameSelector = ['environment']
 const possibleSequences = {
     server: {
-        newTitle: 'Create a Server',
+        newTitle: 'Create a new Server',
         title: 'Select a server'
     },
     destination: {
-        newTitle: 'Create a Destination',
+        newTitle: 'Create a new Destination',
         title: 'Select a destination'
     },
     project: {
-        newTitle: 'Create a Project',
+        newTitle: 'Create a new Project',
         title: 'Select a project'
     },
     environment: {
-        newTitle: 'Create an Environment',
+        newTitle: 'Create a new Environment',
         title: 'Select an environment'
     },
 }
@@ -397,7 +397,6 @@ async function goThroughSequence(actionId) {
         sequenceState.value.selected = {
             main: id
         }
-
     } else {
         currentSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex]
         nextSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex + 1]
@@ -413,7 +412,6 @@ async function goThroughSequence(actionId) {
             [currentSequence]: selectedId
         }
     }
-
     switch (nextSequence) {
         case 'server':
             sequenceState.value.magicActions = await getServers();
@@ -436,6 +434,7 @@ async function goThroughSequence(actionId) {
     sequenceState.value.currentActionIndex += 1
     search.value = ''
     searchInput.value.focus()
+    currentFocus.value = 0
 }
 async function getServers() {
     const { data: { servers } } = await axios.get(`${baseUrl}/servers`);

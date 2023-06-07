@@ -1,5 +1,5 @@
 <div>
-    <h1>New Application</h1>
+    <h1>Create a new Application</h1>
     <div class="pb-4 text-sm">Deploy any public or private git repositories through a GitHub App.</div>
     @if ($github_apps->count() > 0)
         <form class="flex flex-col" wire:submit.prevent='submit'>
