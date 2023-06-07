@@ -181,7 +181,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from "axios";
-const currentFocus = ref()
+const currentFocus = ref(0)
 function focusNext(length) {
     if (currentFocus.value === undefined) {
         currentFocus.value = 0
@@ -337,6 +337,9 @@ watch(showCommandPalette, async (value) => {
         await nextTick();
         searchInput.value.focus();
     }
+})
+watch(search, async () => {
+    currentFocus.value = 0
 })
 const magic = computed(() => {
     if (search.value) {
