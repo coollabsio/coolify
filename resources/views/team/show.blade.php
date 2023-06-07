@@ -18,11 +18,11 @@
             </tbody>
         </table>
     </div>
-    <div class="py-4">
-        <h2>Invite a new member</h2>
+    {{-- <div class="py-4">
+        <h3>Invite a new member</h3>
         <form class="flex items-center gap-2">
             <x-forms.input type="email" name="email" placeholder="Email" />
             <x-forms.button>Invite</x-forms.button>
         </form>
-    </div>
+    </div> --}}
 </x-layout>

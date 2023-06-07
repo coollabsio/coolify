@@ -1,5 +1,4 @@
 <div>
-    <h1 class="pb-2">Command Center</h1>
     <div class="pb-4 text-sm">Outputs are not saved at the moment, only available until you refresh or navigate.</div>
     <form class="flex items-end justify-center gap-2" wire:submit.prevent='runCommand'>
         <x-forms.input placeholder="ls -l" autofocus noDirty id="command" label="Command" required />

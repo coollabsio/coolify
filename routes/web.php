@@ -86,101 +86,18 @@ Route::prefix('magic')->middleware(['auth'])->group(function () {
     });
 });
 Route::middleware(['auth'])->group(function () {
-
-    // Route::get('/magic', function () {
-    //     try {
-    //         $id = session('currentTeam')->id;
-    //         $is_new_project = request()->query('project') === 'new';
-    //         $is_new_environment = request()->query('environment') === 'new';
-    //         // Get servers
-    //         if (request()->query('servers') === 'true') {
-    //             $servers = Server::where('team_id', $id)->get();
-    //             return response()->json([
-    //                 'servers' => $servers,
-    //             ]);
-    //         }
-
-    //         // Get destinations
-    //         if ((request()->query('server') && request()->query('destinations') === 'true') || request()->query('destinations') === 'true') {
-    //             $destinations = Server::destinations(request()->query('server'));
-    //             return response()->json([
-    //                 'destinations' => $destinations->toArray(),
-    //             ]);
-    //         }
-    //         // Get private Keys
-    //         if (request()->query('privateKeys') === 'true') {
-    //             $privateKeys = PrivateKey::where('team_id', $id)->get();
-    //             return response()->json([
-    //                 'privateKeys' => $privateKeys->toArray(),
-    //             ]);
-    //         }
-    //         // Get sources
-    //         if (request()->query('sources') === 'true') {
-    //             $github_apps = GithubApp::private();
-    //             $sources = $github_apps;
-    //             return response()->json([
-    //                 'sources' => $sources->toArray(),
-    //             ]);
-    //         }
-    //         // Get projects
-    //         if ((request()->query('server') && request()->query('destination') && request()->query('projects') === 'true') || request()->query('projects') === 'true') {
-    //             $projects = Project::where('team_id', $id)->get()->sortBy('name');
-    //             return response()->json([
-    //                 'projects' => $projects->toArray(),
-    //             ]);
-    //         }
-
-    //         // Get environments
-    //         if (request()->query('server') && request()->query('destination') && request()->query('project') && request()->query('environments') === 'true') {
-    //             $environments = Project::where('team_id', $id)->where('uuid', request()->query('project'))->first()->environments;
-    //             return response()->json([
-    //                 'environments' => $environments->toArray(),
-    //             ]);
-    //         }
-
-    //         if ($is_new_project) {
-    //             $project = Project::create([
-    //                 'name' => request()->query('name') ?? generate_random_name(),
-    //                 'team_id' => $id,
-    //             ]);
-    //             return response()->json([
-    //                 'project_uuid' => $project->uuid
-    //             ]);
-    //         }
-    //         if ($is_new_environment) {
-    //             $environment = Project::where('uuid', request()->query('project'))->first()->environments->where('name', request()->query('name'))->first();
-    //             if (!$environment) {
-    //                 $environment = Environment::create([
-    //                     'name' => request()->query('name') ?? generate_random_name(),
-    //                     'project_id' => Project::where('uuid', request()->query('project'))->first()->id,
-    //                 ]);
-    //             }
-    //             return response()->json([
-    //                 'environment_name' => $environment->name
-    //             ]);
-    //         }
-    //         return response()->json([
-    //             'magic' => true,
-    //         ]);
-    //     } catch (\Throwable $e) {
-    //         return general_error_handler($e, isJson: true);
-    //     }
-    // });
     Route::get('/', function () {
         $id = session('currentTeam')->id;
         $projects = Project::where('team_id', $id)->get();
-        $servers = Server::where('team_id', $id)->get();
-        $destinations = $servers->map(function ($server) {
-            return $server->standaloneDockers->merge($server->swarmDockers);
-        })->flatten();
-        $private_keys = PrivateKey::where('team_id', $id)->get();
-        $github_apps = GithubApp::private();
+        $servers = Server::where('team_id', $id)->get()->count();
+        $resources = 0;
+        foreach ($projects as $project) {
+            $resources += $project->applications->count();
+        }
         return view('dashboard', [
-            'servers' => $servers->sortBy('name'),
-            'projects' => $projects->sortBy('name'),
-            'destinations' => $destinations->sortBy('name'),
-            'private_keys' => $private_keys->sortBy('name'),
-            'github_apps' => $github_apps->sortBy('name'),
+            'servers' => $servers,
+            'projects' => $projects->count(),
+            'resources' => $resources,
         ]);
     })->name('dashboard');
 
@@ -215,9 +132,6 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/command-center', function () {
         $servers = Server::validated();
-        if ($servers->count() === 0) {
-            return redirect()->route('dashboard');
-        }
         return view('command-center', [
             'servers' => $servers,
         ]);

@@ -1,15 +1,15 @@
 <x-layout-simple>
-    <div class="flex items-center justify-center min-h-screen">
-        <div>
+    <div class="flex items-center justify-center min-h-screen ">
+        <div class="w-1/2">
             <div class="flex flex-col items-center pb-8">
                 <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 <x-version />
             </div>
             <div class="flex items-center gap-2">
                 <h1>{{ __('auth.register') }}</h1>
-                <a href="/login" class="flex justify-center pt-2 hover:no-underline">
-                    <button
-                        class="normal-case rounded-none btn btn-sm btn-primary bg-coollabs-gradient">{{ __('auth.already_registered') }}</button>
+                <a href="/login"
+                    class="text-xs text-center text-white normal-case bg-transparent border-none rounded no-animation hover:no-underline btn btn-sm bg-coollabs-gradient">
+                    {{ __('auth.already_registered') }}
                 </a>
             </div>
             <form action="/register" method="POST" class="flex flex-col gap-2">
@@ -37,10 +37,8 @@
                 <x-forms.button type="submit">{{ __('auth.register') }}</x-forms.button>
             </form>
             @if ($errors->any())
-                <div class="fixed top-0 text-xs alert alert-error">
-                    <ul>
-                        <li>{{ __('auth.failed') }}</li>
-                    </ul>
+                <div class="text-xs text-center text-error">
+                    <span>{{ __('auth.failed') }}</span>
                 </div>
             @endif
         </div>

@@ -47,6 +47,11 @@ function remote_process(
 }
 function save_private_key_for_server(Server $server)
 {
+    if (data_get($server, 'privateKey.private_key') === null) {
+        $server->settings->is_validated = false;
+        $server->settings->save();
+        throw new \Exception("Server {$server->name} does not have a private key");
+    }
     $temp_file = "id.root@{$server->ip}";
     Storage::disk('ssh-keys')->put($temp_file, $server->privateKey->private_key);
     Storage::disk('ssh-mux')->makeDirectory('.');
@@ -91,7 +96,7 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
             ray('executing again');
             return instant_remote_process($command, $server, $throwError, $repeat - 1);
         }
-        ray('ERROR OCCURED: ' . $process->errorOutput());
+        // ray('ERROR OCCURED: ' . $process->errorOutput());
         if (!$throwError) {
             return null;
         }

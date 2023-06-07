@@ -4,7 +4,7 @@
     "auth.confirm_password": "Confirm password",
     "auth.forgot_password": "Forgot password",
     "auth.forgot_password_send_email": "Send password reset link via email",
-    "auth.register_now": "Register now!",
+    "auth.register_now": "Register a new account",
     "auth.logout": "Logout",
     "auth.register": "Register",
     "auth.registration_disabled": "Registration is disabled. Please contact the administrator.",

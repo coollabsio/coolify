@@ -68,12 +68,22 @@
     <div class="flex items-center gap-2 py-4">
         <h3>Private Key</h3>
         <a href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">
-            <x-forms.button>Change</x-forms.button>
+            <x-forms.button>
+                @if (data_get($server, 'privateKey.uuid'))
+                    Change
+                @else
+                    Add
+                @endif
+            </x-forms.button>
         </a>
     </div>
-    <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
-        <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
-    </a>
+    @if (data_get($server, 'privateKey.uuid'))
+        <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
+            <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
+        </a>
+    @else
+        <div class="text-sm">No private key attached.</div>
+    @endif
     <div class="flex items-center gap-2 py-4">
         <h3>Destinations</h3>
         <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">

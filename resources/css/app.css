@@ -72,6 +72,9 @@ a {
 .main-navbar {
     @apply fixed h-full overflow-hidden pt-14;
 }
+.kbd-custom {
+    @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;
+}
 .icon {
     @apply w-6 h-6;
 }

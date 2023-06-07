@@ -1,7 +1,14 @@
 <x-layout>
     <h1>Profile</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li>
+                Your user profile settings.
+            </li>
+        </ul>
+    </div>
     <livewire:profile.form :request="$request" />
-    <h3>2FA</h3>
+    <h3 class="py-4">Two-factor Authentication</h3>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 text-sm font-medium">
             Please finish configuring two factor authentication below. Read the QR code or enter the secret key
@@ -15,10 +22,10 @@
             </form>
             <div>
                 <div>{!! $request->user()->twoFactorQrCodeSvg() !!}</div>
-                <div x-data="{ showCode: false }">
+                <div x-data="{ showCode: false }" class="py-2">
                     <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually enter</x-forms.button>
                     <template x-if="showCode">
-                        <div class="text-sm">{!! decrypt($request->user()->two_factor_secret) !!}</div>
+                        <div class="py-2 text-sm">{!! decrypt($request->user()->two_factor_secret) !!}</div>
                     </template>
                 </div>
             </div>
@@ -63,7 +70,7 @@
                 </div>
             @endif
         @else
-            <div class="text-sm">Two factor authentication is <span class="text-helper">disabled</span>.</div>
+            <div class="pb-2 text-sm">Two factor authentication is <span class="text-helper">disabled</span>.</div>
             <form action="/user/two-factor-authentication" method="POST">
                 @csrf
                 <x-forms.button type="submit">Configure 2FA</x-forms.button>

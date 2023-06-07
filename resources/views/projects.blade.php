@@ -12,10 +12,14 @@
             <a href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}"
                 class="box">{{ $project->name }}</a>
         @empty
-            <div x-data>
-                No project found. Use the <button x-on:click="$dispatch('slash')" class='text-white underline'>magic
-                    bar</button> to create a new
+            <div>
+                No project found. Use the magic
+                bar (press <span class="kbd-custom">/</span>) to create a new
                 project.
+            </div>
+            <div>
+                If you do not have a project yet, just create a resource (application, database, etc.) first, it will
+                create a new project for you automatically.
             </div>
         @endforelse
     </div>
