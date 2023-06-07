@@ -1,9 +1,9 @@
 @props([
-    'id' => $attributes->has('id') || $attributes->has('label'),
-    'required' => $attributes->has('required'),
+    'id' => $attributes->has('id'),
     'label' => $attributes->has('label'),
+    'required' => null,
+    'disabled' => null,
     'helper' => $attributes->has('helper'),
-    'instantSave' => $attributes->has('instantSave'),
     'noDirty' => $attributes->has('noDirty'),
 ])
 
@@ -39,7 +39,10 @@
             </span>
         </label>
     @endif
-    <textarea {{ $attributes }} name={{ $id }} wire:model.defer={{ $value ?? $id }}
+    <textarea {{ $attributes }}
+        @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endisset
+        @if ($disabled !== null) disabled @endif
+        @if ($required !== null) required @endif name={{ $id }} wire:model.defer={{ $value ?? $id }}
         @if (!$noDirty) wire:dirty.class="input-warning" @endif></textarea>
     @error($id)
         <label class="label">

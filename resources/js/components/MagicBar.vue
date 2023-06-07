@@ -213,25 +213,25 @@ const uuidSelector = ['project', 'destination']
 const nameSelector = ['environment']
 const possibleSequences = {
     server: {
-        newTitle: 'Add a new server',
+        newTitle: 'Create a Server',
         title: 'Select a server'
     },
     destination: {
-        newTitle: 'Add a new destination',
+        newTitle: 'Create a Destination',
         title: 'Select a destination'
     },
     project: {
-        newTitle: 'Add a new project',
+        newTitle: 'Create a Project',
         title: 'Select a project'
     },
     environment: {
-        newTitle: 'Add a new environment',
+        newTitle: 'Create an Environment',
         title: 'Select an environment'
     },
 }
 const magicActions = [{
     id: 0,
-    name: 'Deploy a Public Repository',
+    name: 'Deploy: Public Repository',
     tags: 'git,github,public',
     icon: 'git',
     new: true,
@@ -239,7 +239,7 @@ const magicActions = [{
 },
 {
     id: 1,
-    name: 'Deploy a Private Repository (with GitHub Apps)',
+    name: 'Deploy: Private Repository (with GitHub Apps)',
     tags: 'git,github,private',
     icon: 'git',
     new: true,
@@ -247,7 +247,7 @@ const magicActions = [{
 },
 {
     id: 2,
-    name: 'Deploy a Private Repository (with Deploy Key)',
+    name: 'Deploy: Private Repository (with Deploy Key)',
     tags: 'git,github,private,deploy,key',
     icon: 'git',
     new: true,
@@ -255,7 +255,7 @@ const magicActions = [{
 },
 {
     id: 3,
-    name: 'Add a Private Key',
+    name: 'Create: Private Key',
     tags: 'key,private,ssh',
     icon: 'key',
     new: true,
@@ -263,7 +263,7 @@ const magicActions = [{
 },
 {
     id: 4,
-    name: 'Add a Server',
+    name: 'Create: Server',
     tags: 'server,ssh,new,create',
     icon: 'server',
     new: true,
@@ -271,7 +271,7 @@ const magicActions = [{
 },
 {
     id: 5,
-    name: 'Add a Destination',
+    name: 'Create: Destination',
     tags: 'destination,docker,network,new,create',
     icon: 'destination',
     new: true,
@@ -279,31 +279,31 @@ const magicActions = [{
 },
 {
     id: 6,
-    name: 'Goto Dashboard',
+    name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 7,
-    name: 'Goto Servers',
+    name: 'Goto: Servers',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 8,
-    name: 'Goto Projects',
+    name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 9,
-    name: 'Goto Settings',
+    name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 10,
-    name: 'Goto Command Center',
+    name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 }
@@ -475,13 +475,13 @@ async function redirect() {
             targetUrl.searchParams.append('destination', destination)
             break;
         case 3:
-            targetUrl.pathname = `/private-key/new/`
+            targetUrl.pathname = `/private-key/new`
             break;
         case 4:
-            targetUrl.pathname = `/server/new/`
+            targetUrl.pathname = `/server/new`
             break;
         case 5:
-            targetUrl.pathname = `/destination/new/`
+            targetUrl.pathname = `/destination/new`
             targetUrl.searchParams.append('server', server)
             break;
         case 6:
