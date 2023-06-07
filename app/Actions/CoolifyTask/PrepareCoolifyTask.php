@@ -14,9 +14,11 @@ use Spatie\Activitylog\Models\Activity;
 class PrepareCoolifyTask
 {
     protected Activity $activity;
-
+    protected CoolifyTaskArgs $remoteProcessArgs;
     public function __construct(CoolifyTaskArgs $remoteProcessArgs)
     {
+        $this->remoteProcessArgs = $remoteProcessArgs;
+
         if ($remoteProcessArgs->model) {
             $properties = $remoteProcessArgs->toArray();
             unset($properties['model']);
@@ -36,7 +38,7 @@ class PrepareCoolifyTask
 
     public function __invoke(): Activity
     {
-        $job = new CoolifyTask($this->activity);
+        $job = new CoolifyTask($this->activity, ignore_errors: $this->remoteProcessArgs->ignore_errors);
         dispatch($job);
         $this->activity->refresh();
         return $this->activity;

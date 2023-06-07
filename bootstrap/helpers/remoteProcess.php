@@ -21,6 +21,7 @@ function remote_process(
     string $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
+    bool    $ignore_errors = false
 ): Activity {
 
     $command_string = implode("\n", $command);
@@ -42,6 +43,7 @@ function remote_process(
             type: $type,
             type_uuid: $type_uuid,
             model: $model,
+            ignore_errors: $ignore_errors
         ),
     ])();
 }

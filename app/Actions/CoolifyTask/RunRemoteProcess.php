@@ -17,26 +17,26 @@ class RunRemoteProcess
 {
     public Activity $activity;
 
-    public bool $hideFromOutput;
+    public bool $hide_from_output;
 
-    public bool $isFinished;
+    public bool $is_finished;
 
-    public bool $ignoreErrors;
+    public bool $ignore_errors;
 
-    protected $timeStart;
+    protected $time_start;
 
-    protected $currentTime;
+    protected $current_time;
 
-    protected $lastWriteAt = 0;
+    protected $last_write_at = 0;
 
-    protected $throttleIntervalMS = 500;
+    protected $throttle_interval_ms = 500;
 
     protected int $counter = 1;
 
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hideFromOutput = false, bool $isFinished = false, bool $ignoreErrors = false)
+    public function __construct(Activity $activity, bool $hide_from_output = false, bool $is_finished = false, bool $ignore_errors = false)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::INLINE->value && $activity->getExtraProperty('type') !== ActivityTypes::DEPLOYMENT->value) {
@@ -44,14 +44,14 @@ class RunRemoteProcess
         }
 
         $this->activity = $activity;
-        $this->hideFromOutput = $hideFromOutput;
-        $this->isFinished = $isFinished;
-        $this->ignoreErrors = $ignoreErrors;
+        $this->hide_from_output = $hide_from_output;
+        $this->is_finished = $is_finished;
+        $this->ignore_errors = $ignore_errors;
     }
 
     public function __invoke(): ProcessResult
     {
-        $this->timeStart = hrtime(true);
+        $this->time_start = hrtime(true);
 
         $status = ProcessStatus::IN_PROGRESS;
 
@@ -60,10 +60,10 @@ class RunRemoteProcess
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
-            if (($processResult->exitCode() == 0 && $this->isFinished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
+            if (($processResult->exitCode() == 0 && $this->is_finished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
                 $status = ProcessStatus::FINISHED;
             }
-            if ($processResult->exitCode() != 0 && !$this->ignoreErrors) {
+            if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
                 $status = ProcessStatus::ERROR;
             }
         }
@@ -76,7 +76,7 @@ class RunRemoteProcess
         ]);
         $this->activity->save();
 
-        if ($processResult->exitCode() != 0 && !$this->ignoreErrors) {
+        if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
             throw new \RuntimeException($processResult->errorOutput());
         }
 
@@ -105,17 +105,17 @@ class RunRemoteProcess
 
     protected function handleOutput(string $type, string $output)
     {
-        if ($this->hideFromOutput) {
+        if ($this->hide_from_output) {
             return;
         }
-        $this->currentTime = $this->elapsedTime();
+        $this->current_time = $this->elapsedTime();
         $this->activity->description = $this->encodeOutput($type, $output);
 
         if ($this->isAfterLastThrottle()) {
             // Let's write to database.
             DB::transaction(function () {
                 $this->activity->save();
-                $this->lastWriteAt = $this->currentTime;
+                $this->last_write_at = $this->current_time;
             });
         }
     }
@@ -165,16 +165,16 @@ class RunRemoteProcess
     protected function isAfterLastThrottle()
     {
         // If DB was never written, then we immediately decide we have to write.
-        if ($this->lastWriteAt === 0) {
+        if ($this->last_write_at === 0) {
             return true;
         }
 
-        return ($this->currentTime - $this->throttleIntervalMS) > $this->lastWriteAt;
+        return ($this->current_time - $this->throttle_interval_ms) > $this->last_write_at;
     }
 
     protected function elapsedTime(): int
     {
-        $timeMs = (hrtime(true) - $this->timeStart) / 1_000_000;
+        $timeMs = (hrtime(true) - $this->time_start) / 1_000_000;
 
         return intval($timeMs);
     }

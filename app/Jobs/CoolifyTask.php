@@ -19,6 +19,7 @@ class CoolifyTask implements ShouldQueue
      */
     public function __construct(
         public Activity $activity,
+        public bool $ignore_errors = false,
     ) {
     }
 
@@ -27,8 +28,10 @@ class CoolifyTask implements ShouldQueue
      */
     public function handle(): void
     {
+
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
+            'ignore_errors' => $this->ignore_errors,
         ]);
 
         $remote_process();
