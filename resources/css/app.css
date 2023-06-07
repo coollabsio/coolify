@@ -27,7 +27,7 @@ input[type="text"],
 [type="number"],
 [type="email"],
 [type="password"] {
-    @apply read-only:opacity-40;
+    @apply read-only:bg-coolgray-200/50 read-only:text-opacity-25;
 }
 .label-text,
 label {
@@ -39,9 +39,6 @@ textarea {
 }
 select {
     @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
-}
-.breadcrumbs > ul > li::before {
-    @apply text-warning opacity-100;
 }
 .loading {
     @apply w-4 text-warning;

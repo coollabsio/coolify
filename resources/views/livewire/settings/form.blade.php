@@ -1,13 +1,13 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
         <h1>Settings</h1>
-        <div class="pb-10 text-sm breadcrumbs">
-            <ul>
-                <li>
+        <nav class="flex pt-2 pb-10 text-sm">
+            <ol class="inline-flex items-center">
+                <li class="inline-flex items-center">
                     Instance wide settings for Coolify.
                 </li>
-            </ul>
-        </div>
+            </ol>
+        </nav>
         <div class="flex items-center gap-2">
             <h3>General</h3>
             <x-forms.button type="submit">

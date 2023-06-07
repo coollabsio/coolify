@@ -1,12 +1,12 @@
 <x-layout>
     <h1>Servers</h1>
-    <div class="pb-10 text-sm breadcrumbs">
-        <ul>
-            <li>
+    <nav class="flex pt-2 pb-10 text-sm">
+        <ol class="inline-flex items-center">
+            <li class="inline-flex items-center">
                 All Servers
             </li>
-        </ul>
-    </div>
+        </ol>
+    </nav>
     <div class="grid grid-cols-2 gap-2">
         @forelse ($servers as $server)
             <a class="text-center hover:no-underline box group"

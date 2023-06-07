@@ -1,12 +1,13 @@
 <x-layout>
     <h1>Dashboard</h1>
-    <div class="pb-10 text-sm breadcrumbs">
-        <ul>
-            <li>
+    <nav class="flex pt-2 pb-10 text-sm">
+        <ol class="inline-flex items-center">
+            <li class="inline-flex items-center">
                 Something (more) useful will be here.
             </li>
-        </ul>
-    </div>
+
+        </ol>
+    </nav>
     <div class="w-full rounded shadow stats stats-vertical lg:stats-horizontal">
         <div class="stat">
             <div class="stat-title">Servers</div>

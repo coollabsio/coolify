@@ -1,6 +1,6 @@
 <template>
     <Transition name="fade">
-        <div class="z-10">
+        <div>
             <div class="flex items-center p-1 px-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
                 @click="showCommandPalette = true">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24" stroke-width="2"
@@ -12,9 +12,9 @@
                 <span class="ml-2 kbd-custom">/</span>
             </div>
             <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
-                <div class="fixed inset-0 transition-opacity bg-opacity-75 bg-coolgray-100" @click.self="resetState">
+                <div class="fixed inset-0 transition-opacity bg-opacity-90 bg-coolgray-100" @click.self="resetState">
                 </div>
-                <div class="fixed inset-0 w-3/5 p-4 mx-auto overflow-y-auto sm:p-6 md:px-20 min-w-fit"
+                <div class="fixed inset-0 p-4 mx-auto overflow-y-auto md:w-[70rem] sm:p-10 md:px-20"
                     @click.self="resetState">
                     <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5">
                         <div class="relative">
@@ -31,8 +31,8 @@
                                 aria-expanded="false" aria-controls="options">
                         </div>
 
-                        <ul class="px-4 pb-2 overflow-y-auto lg:max-h-screen max-h-80 scroll-py-10 scroll-pb-2 scrollbar"
-                            id="options" role="listbox">
+                        <ul class="px-4 pb-2 overflow-y-auto max-h-96 scroll-py-10 scroll-pb-2 scrollbar" id="options"
+                            role="listbox">
                             <li v-if="sequenceState.sequence.length !== 0">
                                 <h2 v-if="sequenceState.sequence[sequenceState.currentActionIndex] && possibleSequences[sequenceState.sequence[sequenceState.currentActionIndex]]"
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{

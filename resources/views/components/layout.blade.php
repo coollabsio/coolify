@@ -38,14 +38,6 @@
     <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
-            window.addEventListener("keydown", function(event) {
-                if (event.target.nodeName === 'BODY') {
-                    if (event.key === '/') {
-                        event.preventDefault();
-                        window.dispatchEvent(new CustomEvent('slash'));
-                    }
-                }
-            })
             Livewire.on('reloadWindow', () => {
                 window.location.reload();
             })

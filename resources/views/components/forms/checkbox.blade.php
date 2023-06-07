@@ -9,24 +9,23 @@
     'disabled' => null,
 ])
 <label {{ $attributes->merge(['class' => 'flex cursor-pointer w-64 label']) }}>
-    <div class="label-text">
+    <div class="flex gap-1 label-text">
         @if ($label)
             {{ $label }}
         @else
             {{ $id }}
         @endif
         @if ($helper)
-            <div class="-mb-1 dropdown dropdown-right dropdown-hover">
-                <label tabindex="0" class="cursor-pointer text-warning">
+            <div class="group">
+                <div class="cursor-pointer text-warning">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                         class="w-4 h-4 stroke-current">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                </label>
-                <div tabindex="0"
-                    class="border rounded shadow border-coolgray-400 card compact dropdown-content bg-coolgray-200 w-96">
-                    <div class="card-body">
+                </div>
+                <div class="absolute hidden text-xs group-hover:block border-coolgray-400 bg-coolgray-500">
+                    <div class="p-4 card-body">
                         {!! $helper !!}
                     </div>
                 </div>

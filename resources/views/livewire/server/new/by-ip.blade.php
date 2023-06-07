@@ -1,12 +1,12 @@
 <div>
     <h1>Create a new Server</h1>
-    <div class="pb-5 text-sm breadcrumbs">
-        <ul>
-            <li>
+    <nav class="flex pt-2 pb-10 text-sm">
+        <ol class="inline-flex items-center">
+            <li class="inline-flex items-center">
                 Servers are the main blocks of your infrastructure.
             </li>
-        </ul>
-    </div>
+        </ol>
+    </nav>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
