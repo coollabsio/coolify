@@ -22,6 +22,11 @@ class Project extends BaseModel
         'team_id',
         'project_id'
     ];
+    static public function ownedByCurrentTeam()
+    {
+        return Project::whereTeamId(session('currentTeam')->id);
+    }
+
     public function environments()
     {
         return $this->hasMany(Environment::class);

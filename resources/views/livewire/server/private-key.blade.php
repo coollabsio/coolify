@@ -1,10 +1,10 @@
-<div class="flex flex-wrap gap-2">
+<div class="grid grid-cols-2">
     @forelse ($private_keys as $private_key)
-        <div class="w-64 box">
-            <button wire:click='setPrivateKey({{ $private_key->id }})'>{{ $private_key->name }}
-            </button>
-        </div>
+        <x-forms.button wire:click='setPrivateKey({{ $private_key->id }})'>{{ $private_key->name }}
+        </x-forms.button>
     @empty
-        <p>No private keys found</p>
+        <div>No private keys found.
+            <x-use-magic-bar />
+        </div>
     @endforelse
 </div>

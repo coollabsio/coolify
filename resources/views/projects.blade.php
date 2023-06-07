@@ -7,15 +7,14 @@
             </li>
         </ul>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="grid grid-cols-2 gap-2">
         @forelse ($projects as $project)
             <a href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}"
                 class="box">{{ $project->name }}</a>
         @empty
             <div>
-                No project found. Use the magic
-                bar (press <span class="kbd-custom">/</span>) to create a new
-                project.
+                No project found.
+                <x-use-magic-bar />
             </div>
             <div>
                 If you do not have a project yet, just create a resource (application, database, etc.) first, it will

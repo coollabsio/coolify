@@ -8,7 +8,7 @@
             <li>{{ $project->name }} </li>
         </ul>
     </div>
-    <div class="flex flex-col gap-2">
+    <div class="grid grid-cols-2 gap-2">
         @forelse ($project->environments as $environment)
             <a class="box" href="{{ route('project.resources', [$project->uuid, $environment->name]) }}">
                 {{ $environment->name }}

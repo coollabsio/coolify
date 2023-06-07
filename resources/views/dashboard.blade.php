@@ -1,7 +1,11 @@
 <x-layout>
-    <h1 class="pb-2">Dashboard</h1>
-    <div class="pb-10 text-sm">
-        Something (more) useful will be here.
+    <h1>Dashboard</h1>
+    <div class="pb-10 text-sm breadcrumbs">
+        <ul>
+            <li>
+                Something (more) useful will be here.
+            </li>
+        </ul>
     </div>
     <div class="w-full rounded shadow stats stats-vertical lg:stats-horizontal">
         <div class="stat">

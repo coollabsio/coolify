@@ -1,5 +1,5 @@
 <x-layout>
-    <h1 class="py-0">Servers</h1>
+    <h1>Servers</h1>
     <div class="pb-10 text-sm breadcrumbs">
         <ul>
             <li>
@@ -7,7 +7,7 @@
             </li>
         </ul>
     </div>
-    <div class="grid grid-cols-2">
+    <div class="grid grid-cols-2 gap-2">
         @forelse ($servers as $server)
             <a class="text-center hover:no-underline box group"
                 href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
@@ -21,7 +21,7 @@
         @empty
             <div class="flex flex-col">
                 <div>Without a server, you won't be able to do much.</div>
-                <div>Let's <a class="text-lg underline text-warning" href="{{ route('server.new') }}">create</a> your
+                <div>Let's <a class="text-lg underline text-warning" href="{{ route('server.create') }}">create</a> your
                     first one.</div>
             </div>
         @endforelse

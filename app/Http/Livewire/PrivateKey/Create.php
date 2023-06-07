@@ -26,7 +26,7 @@ class Create extends Component
             'team_id' => session('currentTeam')->id
         ]);
         if ($this->from === 'server') {
-            return redirect()->route('server.new');
+            return redirect()->route('server.create');
         }
         return redirect()->route('private-key.show', ['private_key_uuid' => $private_key->uuid]);
     }

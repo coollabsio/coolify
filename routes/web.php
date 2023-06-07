@@ -1,152 +1,71 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ServerController;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Models\Environment;
 use App\Models\GithubApp;
-use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register web routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "web" middleware group. Make something great!
-|
-*/
-
-
 
 Route::prefix('magic')->middleware(['auth'])->group(function () {
-    Route::get('/servers', function () {
-        $id = session('currentTeam')->id;
-        return response()->json([
-            'servers' => Server::where('team_id', $id)->get()->sortBy('name')
-        ]);
-    });
-    Route::get('/destinations', function () {
-        $server_id = request()->query('server_id');
-        return response()->json([
-            'destinations' => Server::destinations($server_id)->sortBy('name')
-        ]);
-    });
-    Route::get('/projects', function () {
-        $id = session('currentTeam')->id;
-        return response()->json([
-            'projects' => Project::where('team_id', $id)->get()->sortBy('name')
-        ]);
-    });
-    Route::get('/project/new', function () {
-        $id = session('currentTeam')->id;
-        $name = request()->query('name') ?? generate_random_name();
-        ray($id, $name);
-        $project = Project::create([
-            'name' => $name,
-            'team_id' => $id,
-        ]);
-        return response()->json([
-            'new_project_id' => $project->id,
-            'new_project_uuid' => $project->uuid
-        ]);
-    });
-    Route::get('/environments', function () {
-        $id = session('currentTeam')->id;
-        $project_id = request()->query('project_id');
-        return response()->json([
-            'environments' => Project::where('team_id', $id)->where('id', $project_id)->first()->environments
-        ]);
-    });
-    Route::get('/environment/new', function () {
-        $id = session('currentTeam')->id;
-        $project_uuid = request()->query('project_uuid');
-        $name = request()->query('name') ?? generate_random_name();
-        ray($project_uuid, $name);
-        $project = Project::where('team_id', $id)->where('uuid', $project_uuid)->first();
-        $environment = $project->environments->where('name', $name)->first();
-        if (!$environment) {
-            $environment = Environment::create([
-                'name' => $name,
-                'project_id' => $project->id,
-            ]);
-        }
-        return response()->json([
-            'new_environment_name' => $environment->name,
-            'project_id' => $project->id,
-        ]);
-    });
+    Route::get('/servers', [MagicController::class, 'servers']);
+    Route::get('/destinations', [MagicController::class, 'destinations']);
+    Route::get('/projects', [MagicController::class, 'projects']);
+    Route::get('/environments', [MagicController::class, 'environments']);
+    Route::get('/project/new', [MagicController::class, 'new_project']);
+    Route::get('/environment/new', [MagicController::class, 'new_environment']);
 });
+
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', function () {
-        $id = session('currentTeam')->id;
-        $projects = Project::where('team_id', $id)->get();
-        $servers = Server::where('team_id', $id)->get()->count();
-        $resources = 0;
-        foreach ($projects as $project) {
-            $resources += $project->applications->count();
-        }
-        return view('dashboard', [
-            'servers' => $servers,
-            'projects' => $projects->count(),
-            'resources' => $resources,
-        ]);
-    })->name('dashboard');
+    Route::get('/projects', [ProjectController::class, 'all'])->name('projects');
+    Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
+    Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
+    Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ApplicationController::class, 'configuration'])->name('project.application.configuration');
 
-    Route::get('/profile', function (Request $request) {
-        return view('profile', [
-            'request' => $request,
-        ]);
-    })->name('profile');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment',        [ApplicationController::class, 'deployments'])->name('project.application.deployments');
 
-    Route::get('/profile/team', function () {
-        return view('team.show');
-    })->name('team.show');
-    Route::get('/profile/team/notifications', function () {
-        return view('team.notifications');
-    })->name('team.notifications');
+    Route::get(
+        '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
+        [ApplicationController::class, 'deployment']
+    )->name('project.application.deployment');
+});
 
-    Route::get('/settings', function () {
-        $isRoot = auth()->user()->isPartOfRootTeam();
-        if ($isRoot) {
-            $settings = InstanceSettings::get();
-            return view('settings', [
-                'settings' => $settings
-            ]);
-        } else {
-            return redirect()->route('dashboard');
-        }
-    })->name('settings');
+Route::middleware(['auth'])->group(function () {
+    Route::get('/servers', [ServerController::class, 'all'])->name('server.all');
+    Route::get('/server/new', [ServerController::class, 'create'])->name('server.create');
+    Route::get('/server/{server_uuid}', [ServerController::class, 'show'])->name('server.show');
+    Route::get('/server/{server_uuid}/proxy', [ServerController::class, 'proxy'])->name('server.proxy');
+    Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key'))->name('server.private-key');
+});
 
-    Route::get('/update', function () {
-        return view('update');
-    })->name('update');
 
-    Route::get('/command-center', function () {
-        $servers = Server::validated();
-        return view('command-center', [
-            'servers' => $servers,
-        ]);
-    })->name('command-center');
+Route::middleware(['auth'])->group(function () {
+    Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::get('/settings', [Controller::class, 'settings'])->name('settings');
+    Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
+    Route::get('/profile/team', fn () => view('team.show'))->name('team.show');
+    Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
+    Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
 });
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
-    Route::get('/private-key/{private_key_uuid}', function () {
-        $private_key = PrivateKey::where('uuid', request()->private_key_uuid)->first();
-        return view('private-key.show', [
-            'private_key' => $private_key,
-        ]);
-    })->name('private-key.show');
+    Route::get('/private-key/{private_key_uuid}', fn () => view('private-key.show', [
+        'private_key' => PrivateKey::ownedByCurrentTeam()->whereUuid(request()->private_key_uuid)->firstOrFail()
+    ]))->name('private-key.show');
 });
+
+
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
@@ -167,46 +86,10 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.github.show');
 });
-Route::middleware(['auth'])->group(function () {
-    Route::get('/servers', fn () => view('servers', [
-        'servers' => Server::where('team_id', session('currentTeam')->id)->get(),
-    ]))->name('servers');
-
-    Route::get('/server/new', fn () => view('server.new', [
-        'private_keys' => PrivateKey::where('team_id', session('currentTeam')->id)->get(),
-    ]))->name('server.new');
-
-    Route::get('/server/{server_uuid}', function () {
-        $team_id = session('currentTeam')->id;
-        $server = Server::where('team_id', $team_id)->where('uuid', request()->server_uuid)->first();
-        if (!$server) {
-            return redirect()->route('dashboard');
-        }
-        return view('server.show', [
-            'server' => $server,
-        ]);
-    })->name('server.show');
-
-    Route::get('/server/{server_uuid}/proxy', function () {
-        $team_id = session('currentTeam')->id;
-        $server = Server::where('team_id', $team_id)->where('uuid', request()->server_uuid)->first();
-        if (!$server) {
-            return redirect()->route('dashboard');
-        }
-        return view('server.proxy', [
-            'server' => $server,
-        ]);
-    })->name('server.proxy');
-
-
-    Route::get('/server/{server_uuid}/private-key', function () {
-        return view('server.private-key');
-    })->name('server.private-key');
-});
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/destination/new', function () {
-        $servers = Server::validated();
+        $servers = Server::validated()->get();
         $pre_selected_server_uuid = data_get(request()->query(), 'server');
         if ($pre_selected_server_uuid) {
             $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);
@@ -230,41 +113,4 @@ Route::middleware(['auth'])->group(function () {
             'destination' => $destination->load(['server']),
         ]);
     })->name('destination.show');
-});
-
-Route::middleware(['auth'])->group(function () {
-    Route::get(
-        '/projects',
-        [ProjectController::class, 'all']
-    )->name('projects');
-
-    Route::get(
-        '/project/{project_uuid}',
-        [ProjectController::class, 'show']
-    )->name('project.show');
-
-    Route::get(
-        '/project/{project_uuid}/{environment_name}/new',
-        [ProjectController::class, 'new']
-    )->name('project.resources.new');
-
-    Route::get(
-        '/project/{project_uuid}/{environment_name}',
-        [ProjectController::class, 'resources']
-    )->name('project.resources');
-
-    Route::get(
-        '/project/{project_uuid}/{environment_name}/application/{application_uuid}',
-        [ApplicationController::class, 'configuration']
-    )->name('project.application.configuration');
-
-    Route::get(
-        '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment',
-        [ApplicationController::class, 'deployments']
-    )->name('project.application.deployments');
-
-    Route::get(
-        '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
-        [ApplicationController::class, 'deployment']
-    )->name('project.application.deployment');
 });

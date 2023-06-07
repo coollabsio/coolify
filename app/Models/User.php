@@ -34,7 +34,7 @@ class User extends Authenticatable
             $model->uuid = (string) new Cuid2(7);
         });
     }
-    public function isPartOfRootTeam()
+    public function isAdmin()
     {
         $found_root_team = auth()->user()->teams->filter(function ($team) {
             if ($team->id == 0) {

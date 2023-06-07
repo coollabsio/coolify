@@ -1,11 +1,6 @@
 <div>
     <form class="flex flex-col gap-1" wire:submit.prevent='submit'>
-        <div class="flex items-center gap-2">
-            <h1>New Server</h1>
-            <x-forms.button type="submit">
-                Save
-            </x-forms.button>
-        </div>
+        <h1>New Server</h1>
         <x-forms.input id="name" label="Name" required />
         <x-forms.input id="description" label="Description" />
         <x-forms.input id="ip" label="IP Address" required
@@ -24,6 +19,8 @@
             @endforeach
         </x-forms.select>
         <x-forms.checkbox instantSave noDirty id="is_part_of_swarm" label="Is it part of a Swarm cluster?" />
-
+        <x-forms.button type="submit">
+            Save
+        </x-forms.button>
     </form>
 </div>

@@ -53,28 +53,21 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
+    static public function ownedByCurrentTeam()
+    {
+        return Server::whereTeamId(session('currentTeam')->id);
+    }
 
     static public function validated()
     {
-        return Server::where('team_id', session('currentTeam')->id)->whereRelation('settings', 'is_validated', true)->get();
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_validated', true);
     }
 
-    static public function destinations(string|null $server_id = null)
+    static public function destinationsByServer(string $server_id)
     {
-        if ($server_id) {
-            $server = Server::where('team_id', session('currentTeam')->id)->where('id', $server_id)->firstOrFail();
-            $standaloneDocker = collect($server->standaloneDockers->all());
-            $swarmDocker = collect($server->swarmDockers->all());
-            return $standaloneDocker->concat($swarmDocker);
-        } else {
-            $servers = Server::where('team_id', session('currentTeam')->id)->get();
-            $standaloneDocker = $servers->map(function ($server) {
-                return $server->standaloneDockers;
-            })->flatten();
-            $swarmDocker = $servers->map(function ($server) {
-                return $server->swarmDockers;
-            })->flatten();
-            return $standaloneDocker->concat($swarmDocker);
-        }
+        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
+        $standaloneDocker = collect($server->standaloneDockers->all());
+        $swarmDocker = collect($server->swarmDockers->all());
+        return $standaloneDocker->concat($swarmDocker);
     }
 }
