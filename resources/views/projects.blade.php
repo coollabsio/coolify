@@ -16,10 +16,6 @@
                 No project found.
                 <x-use-magic-bar />
             </div>
-            <div>
-                If you do not have a project yet, just create a resource (application, database, etc.) first, it will
-                create a new project for you automatically.
-            </div>
         @endforelse
     </div>
 </x-layout>

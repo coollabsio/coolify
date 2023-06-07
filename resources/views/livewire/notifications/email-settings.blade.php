@@ -5,6 +5,15 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
+            @if (auth()->user()->isAdmin())
+                <x-forms.button wire:click='copySMTP'>
+                    Copy from Instance Settings
+                </x-forms.button>
+            @endif
+            <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                wire:click="sendTestNotification">
+                Send Test Notifications
+            </x-forms.button>
         </div>
         <div class="flex flex-col w-96">
             <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />

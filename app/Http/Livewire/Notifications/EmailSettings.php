@@ -2,7 +2,10 @@
 
 namespace App\Http\Livewire\Notifications;
 
+use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Notifications\TestNotification;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class EmailSettings extends Component
@@ -33,6 +36,22 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_password' => '',
         'model.extra_attributes.smtp_test_recipients' => '',
     ];
+    public function copySMTP()
+    {
+        $settings = InstanceSettings::get();
+        $this->model->extra_attributes->smtp_active = true;
+        $this->model->extra_attributes->smtp_from_address = $settings->extra_attributes->smtp_from_address;
+        $this->model->extra_attributes->smtp_from_name = $settings->extra_attributes->smtp_from_name;
+        $this->model->extra_attributes->smtp_recipients = $settings->extra_attributes->smtp_recipients;
+        $this->model->extra_attributes->smtp_host = $settings->extra_attributes->smtp_host;
+        $this->model->extra_attributes->smtp_port = $settings->extra_attributes->smtp_port;
+        $this->model->extra_attributes->smtp_encryption = $settings->extra_attributes->smtp_encryption;
+        $this->model->extra_attributes->smtp_username = $settings->extra_attributes->smtp_username;
+        $this->model->extra_attributes->smtp_password = $settings->extra_attributes->smtp_password;
+        $this->model->extra_attributes->smtp_timeout = $settings->extra_attributes->smtp_timeout;
+        $this->model->extra_attributes->smtp_test_recipients = $settings->extra_attributes->smtp_test_recipients;
+        $this->saveModel();
+    }
     public function submit()
     {
         $this->resetErrorBag();
@@ -47,6 +66,10 @@ class EmailSettings extends Component
         if (is_a($this->model, Team::class)) {
             session(['currentTeam' => $this->model]);
         }
+    }
+    public function sendTestNotification()
+    {
+        Notification::send($this->model, new TestNotification);
     }
     public function instantSave()
     {

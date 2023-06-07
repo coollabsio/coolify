@@ -17,7 +17,7 @@ class DiscordSettings extends Component
         'model.extra_attributes.discord_webhook' => 'required|url',
     ];
     protected $validationAttributes = [
-        'model.extra_attributes.discord_webhook' => '',
+        'model.extra_attributes.discord_webhook' => 'Discord Webhook',
     ];
 
     public function instantSave()

@@ -19,10 +19,9 @@
                 </div>
             </a>
         @empty
-            <div class="flex flex-col">
-                <div>Without a server, you won't be able to do much.</div>
-                <div>Let's <a class="text-lg underline text-warning" href="{{ route('server.create') }}">create</a> your
-                    first one.</div>
+            <div>
+                <div>No servers found. Without a server, you won't be able to do much.</div>
+                <x-use-magic-bar />
             </div>
         @endforelse
     </div>
