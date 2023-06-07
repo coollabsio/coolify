@@ -69,7 +69,7 @@
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
                                         state.title }}
                                 </h2>
-                                <ul class="mt-2 -mx-4 text-sm text-white">
+                                <ul v-if="data.length != 0" class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
                                         id="option-1" role="option" tabindex="-1" v-for="action, index in data"
                                         @click="next(state.next ?? action.next, index, action.newAction)">
@@ -167,13 +167,6 @@ const appActions = [{
     tags: 'application,private,repository,github,gitlab,bitbucket,git',
     icon: 'git',
     next: 'server'
-},
-{
-    id: 3,
-    name: 'Servers',
-    tags: 'server,new',
-    icon: 'server',
-    next: 'server',
 }
 ]
 const initialState = {
@@ -223,6 +216,7 @@ function resetState() {
     search.value = ''
 }
 async function next(nextAction, index, newAction = null) {
+    console.log({ nextAction, index, newAction })
     if (newAction) {
         let targetUrl = new URL(window.location.origin)
         let newUrl = new URL(`${window.location.origin}${baseUrl}/${newAction}/new`);
@@ -259,10 +253,10 @@ async function next(nextAction, index, newAction = null) {
             }
         }
         else selected['action'] = appActions[index].id
-
+        console.log({ selected })
         switch (nextAction) {
             case 'server':
-                await getServers(true)
+                await getServers()
                 state.value.title = 'Select a server'
                 state.value.icon = 'server'
                 state.value.showNew = true
@@ -321,15 +315,11 @@ async function redirect() {
     }
     window.location.href = targetUrl;
 }
-async function getServers(isJump = false) {
+async function getServers() {
     const { data } = await axios.get(`${baseUrl}/servers`);
     state.value.data = data.servers
     state.value.current = 'server'
-    if (isJump) {
-        state.value.next = 'redirect'
-    } else {
-        state.value.next = 'destination'
-    }
+    state.value.next = 'destination'
 }
 async function getDestinations(serverId) {
     const { data } = await axios.get(`${baseUrl}/destinations?server_id=${serverId}`);
