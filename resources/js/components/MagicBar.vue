@@ -86,7 +86,8 @@
                                 <ul v-if="magic.length != 0" class="mt-2 -mx-4 text-sm text-white">
                                     <li class="flex items-center px-4 py-2 transition-all cursor-pointer select-none group hover:bg-coolgray-400"
                                         :class="{ 'bg-coollabs': currentFocus === index }" id="option-1" role="option"
-                                        tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(index)">
+                                        tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(index)"
+                                        ref="magicItems">
                                         <div class="relative">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -182,6 +183,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from "axios";
 const currentFocus = ref(0)
+const magicItems = ref()
 function focusNext(length) {
     if (currentFocus.value === undefined) {
         currentFocus.value = 0
@@ -189,6 +191,9 @@ function focusNext(length) {
         if (length > currentFocus.value + 1) {
             currentFocus.value = currentFocus.value + 1
         }
+    }
+    if (currentFocus.value > 4) {
+        magicItems.value[currentFocus.value].scrollIntoView({ block: "center", inline: "center", behavior: 'auto' })
     }
 }
 function focusPrev(length) {
@@ -198,6 +203,9 @@ function focusPrev(length) {
         if (currentFocus.value > 0) {
             currentFocus.value = currentFocus.value - 1
         }
+    }
+    if (currentFocus.value < length - 4) {
+        magicItems.value[currentFocus.value].scrollIntoView({ block: "center", inline: "center", behavior: 'auto' })
     }
 }
 async function callAction() {

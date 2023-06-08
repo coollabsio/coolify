@@ -1,13 +1,6 @@
 <x-layout>
     <h1>Profile</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
-            <li class="inline-flex items-center">
-                Your user profile settings.
-            </li>
-
-        </ol>
-    </nav>
+    <div class="pt-2 pb-10 text-sm">Your user profile settings.</div>
     <livewire:profile.form :request="$request" />
     <h3 class="py-4">Two-factor Authentication</h3>
     @if (session('status') == 'two-factor-authentication-enabled')

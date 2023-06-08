@@ -2,12 +2,15 @@
 
 namespace App\Exceptions;
 
+use App\Models\InstanceSettings;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Throwable;
 use Sentry\Laravel\Integration;
 
 class Handler extends ExceptionHandler
 {
+
+    private InstanceSettings $settings;
     /**
      * A list of exception types with their corresponding custom log levels.
      *
@@ -43,6 +46,10 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
+            $this->settings = InstanceSettings::get();
+            if ($this->settings->do_no_track) {
+                return;
+            }
             Integration::captureUnhandledException($e);
         });
     }

@@ -1,12 +1,6 @@
 <div>
     <h1>Create a new Destination</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
-            <li class="inline-flex items-center">
-                Destinations are used to separate resources in a server.
-            </li>
-        </ol>
-    </nav>
+    <div class="pt-2 pb-10 text-sm">Destinations are used to segregate resources by network.</div>
     <form class="flex flex-col gap-4" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />

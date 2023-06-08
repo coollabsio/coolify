@@ -1,12 +1,6 @@
 <div class="pb-6">
     <h1>Settings</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
-            <li class="inline-flex items-center">
-                Instance wide settings for Coolify.
-            </li>
-        </ol>
-    </nav>
+    <div class="pt-2 pb-10 text-sm">Instance wide settings for Coolify.</div>
     <nav class="flex items-center gap-4 py-2 border-b-2 border-solid border-coolgray-200">
         <a class="{{ request()->routeIs('settings.configuration') ? 'text-white' : '' }}"
             href="{{ route('settings.configuration') }}">

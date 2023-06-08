@@ -1,12 +1,6 @@
 <x-layout>
     <h1>Command Center</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
-            <li class="inline-flex items-center">
-                Execute commands on your servers without leaving the browser.
-            </li>
-        </ol>
-    </nav>
+    <div class="pt-2 pb-10 text-sm">Execute commands on your servers without leaving the browser.</div>
     @if ($servers->count() > 0)
         <livewire:run-command :servers="$servers" />
     @else

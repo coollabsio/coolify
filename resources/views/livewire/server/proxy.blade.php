@@ -33,7 +33,8 @@
             </div>
         @else
             <div>
-                <h2>Select a Proxy</h2>
+                <h2>Proxy</h2>
+
                 <x-forms.button wire:click="setProxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">Traefik v2
                 </x-forms.button>
             </div>

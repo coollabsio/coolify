@@ -1,13 +1,6 @@
 <div class="pb-6">
     <h1>Server</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
-            <li class="inline-flex items-center">
-                {{ data_get($server, 'name') }}
-            </li>
-
-        </ol>
-    </nav>
+    <div class="pt-2 pb-10 text-sm">{{ data_get($server, 'name') }}</div>
     <nav class="flex items-center h-12 gap-4 py-2 border-b-2 border-solid border-coolgray-200">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [
