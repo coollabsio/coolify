@@ -55,8 +55,8 @@
             </div>
         @endif
         @isset($uptime)
-            <h3>Server Info</h3>
-            <div class="pt-3 text-sm">
+            <h3 class="py-3">Server Info</h3>
+            <div class="text-sm">
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
                     <p>Docker Engine {{ $dockerVersion }}</p>

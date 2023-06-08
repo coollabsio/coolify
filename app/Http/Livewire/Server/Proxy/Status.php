@@ -12,7 +12,6 @@ class Status extends Component
     protected $listeners = ['proxyStatusUpdated', 'serverValidated' => 'proxyStatusUpdated'];
     public function proxyStatusUpdated()
     {
-        ray('Status: ' . $this->server->extra_attributes->proxy_status);
         $this->server->refresh();
     }
     public function proxyStatus()

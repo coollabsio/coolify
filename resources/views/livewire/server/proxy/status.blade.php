@@ -1,6 +1,6 @@
 <div>
     @if ($server->settings->is_validated)
-        <div wire:poll.5000ms="proxyStatus">
+        <div wire:poll.10000ms="proxyStatus">
             @if ($server->extra_attributes->proxy_status === 'running')
                 <x-loading wire:loading.delay.longer />
                 <div class="flex items-center gap-2" wire:loading.remove.delay.longer>

@@ -21,6 +21,11 @@ class Proxy extends Component
     {
         $this->server->refresh();
     }
+    public function switchProxy()
+    {
+        $this->server->extra_attributes->proxy_type = null;
+        $this->server->save();
+    }
     public function installProxy()
     {
         if (

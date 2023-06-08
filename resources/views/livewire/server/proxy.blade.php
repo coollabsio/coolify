@@ -13,9 +13,9 @@
                             <div class="flex items-center gap-2">
                                 <h2>Proxy</h2>
                                 <x-forms.button type="submit">Save</x-forms.button>
-                                <x-forms.button wire:click.prevent="resetProxy">
-                                    Reset to default
-                                </x-forms.button>
+                                @if ($server->extra_attributes->proxy_status === 'exited')
+                                    <x-forms.button wire:click.prevent="switchProxy">Switch Proxy</x-forms.button>
+                                @endif
                                 <livewire:server.proxy.status :server="$server" />
                             </div>
                             <div class="pb-4 text-sm">Traefik v2</div>
@@ -25,8 +25,13 @@
                                 <div class="text-sm text-red-500">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif
-                            <x-forms.textarea label="Configuration file: traefik.conf" class="text-xs" noDirty
-                                name="proxy_settings" wire:model.defer="proxy_settings" rows="30" />
+                            <div class="flex flex-col gap-2">
+                                <x-forms.textarea label="Configuration file: traefik.conf" class="text-xs" noDirty
+                                    name="proxy_settings" wire:model.defer="proxy_settings" rows="30" />
+                                <x-forms.button wire:click.prevent="resetProxy">
+                                    Reset configuration to default
+                                </x-forms.button>
+                            </div>
                         </form>
                     @endif
                 @endisset
@@ -34,9 +39,19 @@
         @else
             <div>
                 <h2>Proxy</h2>
-
-                <x-forms.button wire:click="setProxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">Traefik v2
-                </x-forms.button>
+                <div class="pt-2 pb-10 text-sm">Select a proxy you would like to use on this server.</div>
+                <div class="flex gap-2">
+                    <x-forms.button class="w-32 box" wire:click="setProxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">
+                        Traefik
+                        v2
+                    </x-forms.button>
+                    <x-forms.button disabled class="w-32 box">
+                        Nginx
+                    </x-forms.button>
+                    <x-forms.button disabled class="w-32 box">
+                        Caddy
+                    </x-forms.button>
+                </div>
             </div>
         @endif
         <div class="container w-full pt-4 mx-auto">

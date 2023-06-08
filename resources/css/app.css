@@ -35,7 +35,7 @@ label {
 }
 
 textarea {
-    @apply textarea placeholder:text-neutral-700 text-white rounded-none;
+    @apply textarea placeholder:text-neutral-700 text-white rounded-none scrollbar;
 }
 select {
     @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
