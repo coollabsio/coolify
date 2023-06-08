@@ -177,7 +177,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             "echo -n 'Building image... '",
         ]);
 
-        if ($this->application->settings->is_static && isset($this->application->build_command)) {
+        if ($this->application->settings->is_static) {
             $this->execute_now([
                 $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t { $this->build_image_name {$this->workdir}"),
             ], isDebuggable: true);
