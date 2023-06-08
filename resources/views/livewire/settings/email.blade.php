@@ -12,11 +12,8 @@
                 helper="Email list to send the all notifications to, separated by comma." label="Recipient(s)" />
             <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipient(s)"
                 helper="Email list to send a test email to, separated by comma." />
-            {{-- <x-forms.button wire:click='test_email_local'>
-                Send Test Email (local Mailpit)
-            </x-forms.button> --}}
             <x-forms.button wire:click='test_email'>
-                Send Test Email (SMTP)
+                Send Test Email
             </x-forms.button>
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
@@ -29,9 +26,10 @@
                     helper="If SMTP through SSL, set it to 'tls'." placeholder="tls" label="Encryption" />
             </div>
             <div class="flex flex-col w-96">
-                <x-forms.input id="settings.extra_attributes.smtp_username" helper="SMTP Username" label="Username" />
+                <x-forms.input id="settings.extra_attributes.smtp_username" helper="SMTP Username"
+                    label="SMTP Username" />
                 <x-forms.input id="settings.extra_attributes.smtp_password" type="password" helper="SMTP Password"
-                    label="Password" />
+                    label="SMTP Password" />
                 <x-forms.input id="settings.extra_attributes.smtp_timeout" helper="Timeout value for sending emails."
                     label="Timeout" />
             </div>
