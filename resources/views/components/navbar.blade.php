@@ -41,7 +41,7 @@
             </li>
 
 
-            @if (auth()->user()->isAdmin())
+            @if (auth()->user()->isInstanceAdmin())
                 <li title="Command Center">
                     <a class="hover:bg-transparent" @if (!request()->is('command-center')) href="/command-center" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg"

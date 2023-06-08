@@ -10,6 +10,5 @@
             <button>Emails</button>
         </a>
         <div class="flex-1"></div>
-        <livewire:switch-team />
     </nav>
 </div>

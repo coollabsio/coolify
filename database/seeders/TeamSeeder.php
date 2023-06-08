@@ -27,6 +27,10 @@ class TeamSeeder extends Seeder
             'name' => 'Normal Team',
             'personal_team' => true,
         ]);
+        // $root_user->teams()->attach($root_user_personal_team);
+        // $root_user->teams()->attach($root_user_other_team);
+        // $normal_user->teams()->attach($normal_user_personal_team);
+        // $normal_user->teams()->attach($root_user_personal_team);
         DB::table('team_user')->insert([
             'team_id' => $root_user_personal_team->id,
             'user_id' => $root_user->id,
@@ -35,17 +39,14 @@ class TeamSeeder extends Seeder
         DB::table('team_user')->insert([
             'team_id' =>  $root_user_other_team->id,
             'user_id' => $root_user->id,
-            'role' => 'admin',
         ]);
         DB::table('team_user')->insert([
             'team_id' =>  $normal_user_personal_team->id,
             'user_id' => $normal_user->id,
-            'role' => 'admin',
         ]);
         DB::table('team_user')->insert([
             'team_id' =>  $root_user_personal_team->id,
             'user_id' => $normal_user->id,
-            'role' => 'admin',
         ]);
     }
 }

@@ -32,7 +32,8 @@
             @endif
         </span>
     </label>
-    <select {{ $attributes }} wire:model.defer={{ $id }}>
+    <select {{ $attributes }}
+        @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endif>
         {{ $slot }}
     </select>
 

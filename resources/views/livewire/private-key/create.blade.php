@@ -6,7 +6,7 @@
         </div>
         <x-forms.textarea id="value" rows="10" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
             label="Private Key" required />
-        <x-forms.button type="submit" wire.click.prevent>
+        <x-forms.button type="submit">
             Save Private Key
         </x-forms.button>
     </form>

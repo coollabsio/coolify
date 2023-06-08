@@ -31,7 +31,7 @@ class Controller extends BaseController
     }
     public function settings()
     {
-        if (auth()->user()->isAdmin()) {
+        if (auth()->user()->isInstanceAdmin()) {
             $settings = InstanceSettings::get();
             return view('settings.configuration', [
                 'settings' => $settings
@@ -42,7 +42,7 @@ class Controller extends BaseController
     }
     public function emails()
     {
-        if (auth()->user()->isAdmin()) {
+        if (auth()->user()->isInstanceAdmin()) {
             $settings = InstanceSettings::get();
             return view('settings.emails', [
                 'settings' => $settings

@@ -36,6 +36,11 @@ class User extends Authenticatable
     }
     public function isAdmin()
     {
+        ray(session('currentTeam'));
+        return session('currentTeam');
+    }
+    public function isInstanceAdmin()
+    {
         $found_root_team = auth()->user()->teams->filter(function ($team) {
             if ($team->id == 0) {
                 return true;
@@ -49,10 +54,10 @@ class User extends Authenticatable
         return $this->belongsToMany(Team::class);
     }
 
-    public function currentTeam()
-    {
-        return $this->belongsTo(Team::class);
-    }
+    // public function currentTeam()
+    // {
+    //     return $this->belongsTo(Team::class);
+    // }
 
     public function otherTeams()
     {

@@ -8,8 +8,10 @@ use Livewire\Component;
 class Member extends Component
 {
     public User $member;
-    public function render()
+    public function remove()
     {
-        return view('livewire.team.member');
+        $this->member->teams()->detach(session('currentTeam'));
+        session(['currentTeam' => session('currentTeam')->fresh()]);
+        $this->emit('reloadWindow');
     }
 }

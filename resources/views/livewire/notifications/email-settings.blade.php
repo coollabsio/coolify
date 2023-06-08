@@ -5,7 +5,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if (auth()->user()->isAdmin())
+            @if (auth()->user()->isInstanceAdmin())
                 <x-forms.button wire:click='copySMTP'>
                     Copy from Instance Settings
                 </x-forms.button>
