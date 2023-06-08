@@ -35,6 +35,7 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             $status = get_container_status(server: $this->application->destination->server, container_id: $this->container_name, throwError: false);
+            ray('ApplicationContainerStatusJob', $status);
             if ($this->pull_request_id) {
                 $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
                 $preview->status = $status;
@@ -45,13 +46,6 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
-        }
-    }
-    protected function check_container_status()
-    {
-        if ($this->application->destination->server) {
-            $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
-            $this->application->save();
         }
     }
 }

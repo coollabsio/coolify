@@ -1,4 +1,4 @@
-<div class="flex items-center gap-2">
+<div class="flex items-center gap-2" wire:poll="pollStatus">
     <div class="group">
         <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Actions
             <x-chevron-down />
@@ -8,8 +8,9 @@
                 <ul tabindex="0" class="text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
                     <li>
                         <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
-                                xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
-                                stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                 <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
                                 <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />

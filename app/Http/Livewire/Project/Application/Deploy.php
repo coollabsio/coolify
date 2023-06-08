@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\Application;
 
+use App\Jobs\ApplicationContainerStatusJob;
 use App\Jobs\ContainerStopJob;
 use App\Models\Application;
 use Livewire\Component;
@@ -67,5 +68,13 @@ class Deploy extends Component
         $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
         $this->application->save();
         $this->emit('applicationStatusChanged');
+    }
+
+    public function pollStatus()
+    {
+        dispatch(new ApplicationContainerStatusJob(
+            application: $this->application,
+            container_name: generate_container_name($this->application->uuid),
+        ));
     }
 }

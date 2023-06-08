@@ -54,15 +54,11 @@
                 <div class="flex flex-col p-4 bg-coolgray-200 " x-init="$wire.loadStatus('{{ data_get($preview, 'pull_request_id') }}')">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
                         @if (data_get($preview, 'status') === 'running')
-                            <div class="flex items-center gap-2">
-                                <div class="badge badge-success badge-xs"></div>
-                                <div class="text-xs font-medium tracking-wide">Running</div>
-                            </div>
+                            <x-status.running />
+                        @elseif (data_get($preview, 'status') === 'restarting')
+                            <x-status.restarting />
                         @else
-                            <div class="flex items-center gap-2">
-                                <div class="badge badge-error badge-xs"></div>
-                                <div class="text-xs font-medium tracking-wide">Stopped</div>
-                            </div>
+                            <x-status.stopped />
                         @endif
                         @if (data_get($preview, 'status') !== 'exited')
                             | <a target="_blank" href="{{ data_get($preview, 'fqdn') }}">Open Preview
