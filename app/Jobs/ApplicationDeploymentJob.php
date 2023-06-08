@@ -565,13 +565,14 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         ]);
         $this->activity->save();
         if ($isDebuggable && !$this->application->settings->is_debug_enabled) {
+            ray('Debugging is disabled for this application. Skipping command.');
             $hideFromOutput = true;
         }
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
-            'hideFromOutput' => $hideFromOutput,
-            'isFinished' => $isFinished,
-            'ignoreErrors' => $ignoreErrors,
+            'hide_from_output' => $hideFromOutput,
+            'is_finished' => $isFinished,
+            'ingore_errors' => $ignoreErrors,
         ]);
         $result = $remote_process();
         if ($propertyName) {

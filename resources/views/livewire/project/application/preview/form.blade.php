@@ -2,7 +2,7 @@
     <div class="flex items-center gap-2">
         <h2>Previews Deployments</h2>
         <x-forms.button type="submit">Save</x-forms.button>
-        <x-forms.button wire:click="resetToDefault">Reset to default</x-forms.button>
+        <x-forms.button wire:click="resetToDefault">Reset template to default</x-forms.button>
     </div>
     <div class="pb-4 text-sm">Preview Deployments based on pull requests are here.</div>
     <div class="flex flex-col gap-2 pb-4">
