@@ -48,14 +48,18 @@
              </div>
          @endif
          <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
-             <div>Finished <span x-text="measure_since_started()">0s</span> in <span class="font-bold"
-                     x-text="measure_finished_time()">0s</span></div>
+             <div>
+                 @if ($deployment->status !== 'in_progress')
+                     Finished <span x-text="measure_since_started()">0s</span> in
+                 @else
+                     Running for
+                 @endif
+                 <span class="font-bold" x-text="measure_finished_time()">0s</span>
+             </div>
          </div>
      </div>
      </a>
      @endforeach
-
-
      <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
      <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
      <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>

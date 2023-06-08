@@ -1,12 +1,11 @@
 <div class="pt-4">
-    <h2>Logs</h2>
     <livewire:project.application.deployment-navbar :activity="$activity" :application="$application" :deployment_uuid="$deployment_uuid" />
     @if (data_get($activity, 'properties.status') === 'in_progress')
         <div class="flex items-center gap-1 pt-2 text-sm">Deployment is
             <div class="text-warning"> {{ Str::headline(data_get($activity, 'properties.status')) }}.</div>
             <x-loading class="loading-ring" />
         </div>
-        <div>Logs will be updated automatically.</div>
+        <div class="text-sm">Logs will be updated automatically.</div>
     @else
         <div class="pt-2 text-sm">Deployment is <span
                 class="text-warning">{{ Str::headline(data_get($activity, 'properties.status')) }}</span>.

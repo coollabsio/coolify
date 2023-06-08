@@ -273,9 +273,14 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function next(string $status)
     {
         if (!Str::of($this->application_deployment_queue->status)->startsWith('cancelled')) {
+            ray('Next Status: ' . $status);
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
+            $this->activity->properties = $this->activity->properties->merge([
+                'status' => $status,
+            ]);
+            $this->activity->save();
         }
         dispatch(new ApplicationContainerStatusJob(
             application: $this->application,
