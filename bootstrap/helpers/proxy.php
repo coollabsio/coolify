@@ -39,11 +39,19 @@ if (!function_exists('getProxyConfiguration')) {
                         "443:443",
                         "8080:8080",
                     ],
+                    "healthcheck" => [
+                        "test" => "wget -qO- http://localhost:80/ping || exit 1",
+                        "interval" => "4s",
+                        "timeout" => "2s",
+                        "retries" => 5,
+                    ],
                     "volumes" => [
                         "/var/run/docker.sock:/var/run/docker.sock:ro",
                         "{$proxy_path}:/traefik",
                     ],
                     "command" => [
+                        "--ping=true",
+                        "--ping.entrypoint=http",
                         "--api.dashboard=true",
                         "--api.insecure=true",
                         "--entrypoints.http.address=:80",
