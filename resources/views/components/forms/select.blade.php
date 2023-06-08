@@ -10,8 +10,6 @@
         <span class="label-text">
             @if ($label)
                 {{ $label }}
-            @else
-                {{ $id }}
             @endif
             @if ($required)
                 <span class="text-warning">*</span>

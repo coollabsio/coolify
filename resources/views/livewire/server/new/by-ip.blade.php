@@ -12,7 +12,7 @@
             <x-forms.input id="user" label="User" required />
             <x-forms.input type="number" id="port" label="Port" required />
         </div>
-        <x-forms.select label="Private Key" wire:model.defer="private_key_id">
+        <x-forms.select label="Private Key" id="private_key_id">
             <option disabled>Select a private key</option>
             @foreach ($private_keys as $key)
                 @if ($loop->first)

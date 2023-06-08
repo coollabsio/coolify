@@ -264,7 +264,7 @@ const magicActions = [{
 {
     id: 3,
     name: 'Create: Private Key',
-    tags: 'key,private,ssh',
+    tags: 'private,key,ssh,new,create',
     icon: 'key',
     new: true,
     sequence: ['main', 'redirect']
