@@ -10,10 +10,12 @@
                     Copy from Instance Settings
                 </x-forms.button>
             @endif
-            <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
-                wire:click="sendTestNotification">
-                Send Test Notifications
-            </x-forms.button>
+            @if ($model->extra_attributes->smtp_active)
+                <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                    wire:click="sendTestNotification">
+                    Send Test Notifications
+                </x-forms.button>
+            @endif
         </div>
         <div class="flex flex-col w-96">
             <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />

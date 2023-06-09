@@ -51,4 +51,16 @@ class Controller extends BaseController
             return redirect()->route('dashboard');
         }
     }
+    public function team()
+    {
+        ray(auth()->user()->isAdmin());
+        $invitations = [];
+        if (auth()->user()->isAdmin()) {
+            $invitations = auth()->user()->currentTeam()->invitations;
+        }
+        return view('team.show', [
+            'transactional_emails_active' => data_get(InstanceSettings::get(), 'extra_attributes.smtp_host') ? true : false,
+            'invitations' => $invitations,
+        ]);
+    }
 }

@@ -46,13 +46,13 @@ class ProductionSeeder extends Seeder
         }
 
         // Add first Team if it doesn't exist
-        if (Team::find(0) == null) {
-            Team::create([
-                'id' => 0,
-                'name' => "Root's Team",
-                'personal_team' => true,
-            ]);
-        }
+        // if (Team::find(0) == null) {
+        //     Team::create([
+        //         'id' => 0,
+        //         'name' => "Root's Team",
+        //         'personal_team' => true,
+        //     ]);
+        // }
 
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";

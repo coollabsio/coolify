@@ -41,9 +41,9 @@ class Previews extends Component
             ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = get_from_git_api($this->application->source, "/repos/{$this->application->git_repository}/pulls");
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
-        } catch (\Throwable $th) {
+        } catch (\Throwable $e) {
             $this->rate_limit_remaining = 0;
-            return general_error_handler($th, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
     public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
@@ -70,8 +70,8 @@ class Previews extends Component
                 'deployment_uuid' => $this->deployment_uuid,
                 'environment_name' => $this->parameters['environment_name'],
             ]);
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
     public function stop(int $pull_request_id)
@@ -83,8 +83,8 @@ class Previews extends Component
             instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();
             $this->application->refresh();
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

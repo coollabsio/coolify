@@ -13,11 +13,14 @@ class UserSeeder extends Seeder
             'id' => 0,
             'name' => 'Root User',
             'email' => 'test@example.com',
-            'is_root_user' => true,
         ]);
         User::factory()->create([
-            'name' => 'Normal User',
+            'name' => 'Normal User (but in root team)',
             'email' => 'test2@example.com',
+        ]);
+        User::factory()->create([
+            'name' => 'Normal User (not in root team)',
+            'email' => 'test3@example.com',
         ]);
     }
 }

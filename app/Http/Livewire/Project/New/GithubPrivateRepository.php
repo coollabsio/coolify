@@ -138,7 +138,7 @@ class GithubPrivateRepository extends Component
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
     public function instantSave()

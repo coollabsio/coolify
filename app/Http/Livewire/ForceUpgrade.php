@@ -14,7 +14,7 @@ class ForceUpgrade extends Component
             $this->visible = true;
             dispatch(new InstanceAutoUpdateJob(force: true));
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

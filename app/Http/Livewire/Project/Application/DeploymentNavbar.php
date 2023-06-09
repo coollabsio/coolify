@@ -37,8 +37,8 @@ class DeploymentNavbar extends Component
             // Remove builder container
             instant_remote_process(["docker rm -f {$this->deployment_uuid}"], $this->application->destination->server, throwError: false, repeat: 25);
             queue_next_deployment($this->application);
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

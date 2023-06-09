@@ -43,7 +43,7 @@ class Create extends Component
             ]);
             redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

@@ -37,7 +37,7 @@ Route::get('/source/github/redirect', function () {
         $github_app->save();
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     } catch (\Exception $e) {
-        return general_error_handler($e);
+        return general_error_handler(err: $e);
     }
 });
 
@@ -53,7 +53,7 @@ Route::get('/source/github/install', function () {
         }
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     } catch (\Exception $e) {
-        return general_error_handler($e);
+        return general_error_handler(err: $e);
     }
 });
 Route::post('/source/github/events', function () {
@@ -166,6 +166,6 @@ Route::post('/source/github/events', function () {
             }
         }
     } catch (\Exception $e) {
-        return general_error_handler($e);
+        return general_error_handler(err: $e);
     }
 });

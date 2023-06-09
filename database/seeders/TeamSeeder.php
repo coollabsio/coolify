@@ -11,42 +11,13 @@ class TeamSeeder extends Seeder
 {
     public function run(): void
     {
-        $root_user = User::find(0);
-        $normal_user = User::find(1);
+        $normal_user_in_root_team = User::find(1);
+        $root_user_personal_team = Team::find(0);
 
-        $root_user_personal_team = Team::create([
-            'id' => 0,
-            'name' => "Root Team",
-            'personal_team' => true,
-        ]);
-        $root_user_other_team = Team::create([
-            'name' => "Root User's Other Team",
-            'personal_team' => false,
-        ]);
-        $normal_user_personal_team = Team::create([
-            'name' => 'Normal Team',
-            'personal_team' => true,
-        ]);
-        // $root_user->teams()->attach($root_user_personal_team);
-        // $root_user->teams()->attach($root_user_other_team);
-        // $normal_user->teams()->attach($normal_user_personal_team);
-        // $normal_user->teams()->attach($root_user_personal_team);
-        DB::table('team_user')->insert([
-            'team_id' => $root_user_personal_team->id,
-            'user_id' => $root_user->id,
-            'role' => 'admin',
-        ]);
-        DB::table('team_user')->insert([
-            'team_id' =>  $root_user_other_team->id,
-            'user_id' => $root_user->id,
-        ]);
-        DB::table('team_user')->insert([
-            'team_id' =>  $normal_user_personal_team->id,
-            'user_id' => $normal_user->id,
-        ]);
-        DB::table('team_user')->insert([
-            'team_id' =>  $root_user_personal_team->id,
-            'user_id' => $normal_user->id,
-        ]);
+        $normal_user_in_root_team->teams()->attach($root_user_personal_team);
+
+        $normal_user_not_in_root_team = User::find(2);
+        $normal_user_in_root_team_personal_team = Team::find(1);
+        $normal_user_not_in_root_team->teams()->attach($normal_user_in_root_team_personal_team, ['role' => 'admin']);
     }
 }

@@ -26,15 +26,15 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_test_recipients' => 'nullable',
     ];
     protected $validationAttributes = [
-        'model.extra_attributes.smtp_from_address' => '',
-        'model.extra_attributes.smtp_from_name' => '',
-        'model.extra_attributes.smtp_recipients' => '',
-        'model.extra_attributes.smtp_host' => '',
-        'model.extra_attributes.smtp_port' => '',
-        'model.extra_attributes.smtp_encryption' => '',
-        'model.extra_attributes.smtp_username' => '',
-        'model.extra_attributes.smtp_password' => '',
-        'model.extra_attributes.smtp_test_recipients' => '',
+        'model.extra_attributes.smtp_from_address' => 'From Address',
+        'model.extra_attributes.smtp_from_name' => 'From Name',
+        'model.extra_attributes.smtp_recipients' => 'Recipients',
+        'model.extra_attributes.smtp_host' => 'Host',
+        'model.extra_attributes.smtp_port' => 'Port',
+        'model.extra_attributes.smtp_encryption' => 'Encryption',
+        'model.extra_attributes.smtp_username' => 'Username',
+        'model.extra_attributes.smtp_password' => 'Password',
+        'model.extra_attributes.smtp_test_recipients' => 'Test Recipients',
     ];
     public function copySMTP()
     {

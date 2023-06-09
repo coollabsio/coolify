@@ -61,7 +61,7 @@ class ByIp extends Component
             $server->settings->save();
             return redirect()->route('server.show', $server->uuid);
         } catch (\Exception $e) {
-            return general_error_handler($e);
+            return general_error_handler(err: $e);
         }
     }
 }

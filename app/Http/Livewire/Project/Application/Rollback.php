@@ -63,7 +63,7 @@ class Rollback extends Component
                 ];
             })->toArray();
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

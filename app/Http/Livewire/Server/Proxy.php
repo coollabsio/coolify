@@ -64,7 +64,7 @@ class Proxy extends Component
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             ], $server);
         } catch (\Exception $e) {
-            return general_error_handler($e);
+            return general_error_handler(err: $e);
         }
     }
     public function resetProxy()
@@ -72,7 +72,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server, true);
         } catch (\Exception $e) {
-            return general_error_handler($e);
+            return general_error_handler(err: $e);
         }
     }
     public function checkProxySettingsInSync()
@@ -80,7 +80,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server);
         } catch (\Exception $e) {
-            return general_error_handler($e);
+            return general_error_handler(err: $e);
         }
     }
 }

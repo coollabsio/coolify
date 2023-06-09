@@ -6,30 +6,31 @@ use Illuminate\Support\Facades\Route;
 use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
 
-function general_error_handler(\Throwable $e, $that = null, $isJson = false)
+function general_error_handler(\Throwable|null $err = null, $that = null, $isJson = false, $customErrorMessage = null)
 {
     try {
-        ray('ERROR OCCURED: ' . $e->getMessage());
-        if ($e instanceof QueryException) {
-            if ($e->errorInfo[0] === '23505') {
-                throw new \Exception('Duplicate entry found.', '23505');
-            } else if (count($e->errorInfo) === 4) {
-                throw new \Exception($e->errorInfo[3]);
+        ray('ERROR OCCURED: ' . $err->getMessage());
+        if ($err instanceof QueryException) {
+            if ($err->errorInfo[0] === '23505') {
+                throw new \Exception($customErrorMessage ?? 'Duplicate entry found.', '23505');
+            } else if (count($err->errorInfo) === 4) {
+                throw new \Exception($customErrorMessage ?? $err->errorInfo[3]);
             } else {
-                throw new \Exception($e->errorInfo[2]);
+                throw new \Exception($customErrorMessage ?? $err->errorInfo[2]);
             }
         } else {
-            throw new \Exception($e->getMessage());
+            throw new \Exception($customErrorMessage ?? $err->getMessage());
         }
     } catch (\Throwable $error) {
         if ($that) {
-            return $that->emit('error', $error->getMessage());
+            return $that->emit('error', $customErrorMessage ?? $error->getMessage());
         } elseif ($isJson) {
             return response()->json([
                 'code' => $error->getCode(),
                 'error' => $error->getMessage(),
             ]);
         } else {
+            ray($customErrorMessage);
             ray($error);
         }
     }

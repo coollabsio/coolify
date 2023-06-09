@@ -28,8 +28,8 @@ class Form extends Component
             User::where('id', $this->userId)->update([
                 'name' => $this->name,
             ]);
-        } catch (\Throwable $error) {
-            return general_error_handler($error, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

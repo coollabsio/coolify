@@ -5,10 +5,12 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
-                wire:click="sendTestNotification">
-                Send Test Notifications
-            </x-forms.button>
+            @if ($model->extra_attributes->discord_active)
+                <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                    wire:click="sendTestNotification">
+                    Send Test Notifications
+                </x-forms.button>
+            @endif
         </div>
         <div class="flex flex-col gap-2 xl:flex-row w-96">
             <x-forms.checkbox instantSave id="model.extra_attributes.discord_active" label="Notification Enabled" />

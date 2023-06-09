@@ -54,7 +54,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
-    Route::get('/profile/team', fn () => view('team.show'))->name('team.show');
+    Route::get('/profile/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
 });

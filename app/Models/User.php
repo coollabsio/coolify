@@ -33,11 +33,37 @@ class User extends Authenticatable
         static::creating(function (Model $model) {
             $model->uuid = (string) new Cuid2(7);
         });
+        static::created(function (User $user) {
+            $team = [
+                'name' => $user->name . "'s Team",
+                'personal_team' => true,
+            ];
+            if ($user->id === 0) {
+                $team['id'] = 0;
+                $team['name'] = 'Root Team';
+            }
+            $new_team = Team::create($team);
+            $user->teams()->attach($new_team, ['role' => 'owner']);
+        });
     }
     public function isAdmin()
     {
-        ray(session('currentTeam'));
-        return session('currentTeam');
+        if (auth()->user()->id === 0) {
+            ray('is root user');
+            return true;
+        }
+        $teams = $this->teams()->get();
+
+        $is_part_of_root_team = $teams->where('id', 0)->first();
+        $is_admin_of_root_team = $is_part_of_root_team &&
+            ($is_part_of_root_team->pivot->role === 'admin' || $is_part_of_root_team->pivot->role === 'owner');
+
+        if ($is_part_of_root_team && $is_admin_of_root_team) {
+            ray('is admin of root team');
+            return true;
+        }
+        $role = $teams->where('id', session('currentTeam')->id)->first()->pivot->role;
+        return $role === 'admin' || $role === 'owner';
     }
     public function isInstanceAdmin()
     {
@@ -51,20 +77,25 @@ class User extends Authenticatable
     }
     public function teams()
     {
-        return $this->belongsToMany(Team::class);
+        return $this->belongsToMany(Team::class)->withPivot('role');
     }
-
-    // public function currentTeam()
-    // {
-    //     return $this->belongsTo(Team::class);
-    // }
-
+    public function currentTeam()
+    {
+        return $this->teams()->where('team_id', session('currentTeam')->id)->first();
+    }
     public function otherTeams()
     {
         $team_id = session('currentTeam')->id;
         return auth()->user()->teams->filter(function ($team) use ($team_id) {
             return $team->id != $team_id;
         });
+    }
+    public function role()
+    {
+        if ($this->teams()->where('team_id', 0)->first()) {
+            return 'admin';
+        }
+        return $this->teams()->where('team_id', session('currentTeam')->id)->first()->pivot->role;
     }
     public function resources()
     {

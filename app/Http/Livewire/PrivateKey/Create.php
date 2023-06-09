@@ -38,7 +38,7 @@ class Create extends Component
             }
             return redirect()->route('private-key.show', ['private_key_uuid' => $private_key->uuid]);
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

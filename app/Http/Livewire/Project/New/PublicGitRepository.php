@@ -68,8 +68,8 @@ class PublicGitRepository extends Component
         try {
             ['data' => $data] = get_from_git_api($this->git_source, "/repos/{$this->git_repository}/branches");
             $this->branches = collect($data)->pluck('name')->toArray();
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
     private function get_git_source()
@@ -135,7 +135,7 @@ class PublicGitRepository extends Component
                 'application_uuid' => $application->uuid,
             ]);
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }

@@ -44,7 +44,7 @@ class ResourceLimits extends Component
             $this->validate();
             $this->application->save();
         } catch (\Exception $e) {
-            return general_error_handler($e, $this);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 }
