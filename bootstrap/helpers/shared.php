@@ -65,3 +65,19 @@ function is_transactional_emails_active()
 {
     return data_get(InstanceSettings::get(), 'extra_attributes.smtp_host');
 }
+
+function set_transanctional_email_settings()
+{
+    $settings = InstanceSettings::get();
+    config()->set('mail.default', 'smtp');
+    config()->set('mail.mailers.smtp', [
+        "transport" => "smtp",
+        "host" => $settings->extra_attributes?->get('smtp_host'),
+        "port" => $settings->extra_attributes?->get('smtp_port'),
+        "encryption" => $settings->extra_attributes?->get('smtp_encryption'),
+        "username" => $settings->extra_attributes?->get('smtp_username'),
+        "password" => $settings->extra_attributes?->get('smtp_password'),
+        "timeout" => $settings->extra_attributes?->get('smtp_timeout'),
+        "local_domain" => null,
+    ]);
+}
