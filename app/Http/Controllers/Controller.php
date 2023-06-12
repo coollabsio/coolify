@@ -61,7 +61,6 @@ class Controller extends BaseController
             $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
         }
         return view('team.show', [
-            'transactional_emails_active' => is_transactional_emails_active(),
             'invitations' => $invitations,
         ]);
     }

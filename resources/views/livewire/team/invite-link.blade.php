@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='inviteByLink' class="flex items-center gap-2">
+    <form wire:submit.prevent='viaLink' class="flex items-center gap-2">
         <x-forms.input id="email" type="email" name="email" placeholder="Email" />
         <x-forms.select id="role" name="role">
             <option value="admin">Admin</option>

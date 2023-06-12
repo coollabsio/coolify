@@ -72,7 +72,7 @@ class InviteLink extends Component
             return general_error_handler(err: $e, that: $this, customErrorMessage: $error_message);
         }
     }
-    public function inviteByLink()
+    public function viaLink()
     {
         $this->generate_invite_link();
     }

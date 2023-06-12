@@ -19,32 +19,22 @@
         </table>
     </div>
     @if (auth()->user()->isAdmin())
-        @if (!$transactional_emails_active)
-            <div class="py-4">
+        <div class="py-4">
+            @if (is_transactional_emails_active())
                 <h3 class="pb-4">Invite a new member</h3>
-                <form class="flex items-center gap-2">
-                    <x-forms.input type="email" name="email" placeholder="Email" />
-                    <x-forms.button>Invite</x-forms.button>
-                </form>
-            </div>
-        @else
-            <div class="py-4">
-                @if (!is_transactional_emails_active())
-                    <h3>Invite a new member</h3>
-                    <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a
-                        new
-                        member
-                        via
-                        email.
-                    </div>
-                @else
-                    <h3 class="pb-4">Invite a new member</h3>
-                @endif
-                <livewire:team.invite-link />
-            </div>
+            @else
+                <h3>Invite a new member</h3>
+                <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a
+                    new
+                    member
+                    via
+                    email.
+                </div>
+            @endif
+            <livewire:team.invite-link />
+        </div>
 
 
-            <livewire:team.invitations :invitations="$invitations" />
-        @endif
+        <livewire:team.invitations :invitations="$invitations" />
     @endif
 </x-layout>
