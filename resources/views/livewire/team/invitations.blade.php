@@ -2,9 +2,9 @@
     @if ($invitations->count() > 0)
         <h4 class="pb-2">Pending Invitations</h4>
         <div class="overflow-x-auto">
-            <table class="table">
+            <table>
                 <thead>
-                    <tr class="font-bold text-white uppercase border-coolgray-200">
+                    <tr>
                         <th>Email</th>
                         <th>Via</th>
                         <th>Role</th>
@@ -15,7 +15,7 @@
                 <tbody x-data>
 
                     @foreach ($invitations as $invite)
-                        <tr class="border-coolgray-200">
+                        <tr>
                             <td>{{ $invite->email }}</td>
                             <td>{{ $invite->via }}</td>
                             <td>{{ $invite->role }}</td>

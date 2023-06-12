@@ -134,3 +134,27 @@ a {
 .text-helper {
     @apply inline-block font-bold text-warning;
 }
+table {
+    @apply min-w-full divide-y divide-coolgray-200;
+}
+thead {
+    @apply uppercase text-sm;
+}
+tbody {
+    @apply divide-y divide-coolgray-200;
+}
+tr {
+    @apply text-sm text-neutral-400;
+}
+tr th {
+    @apply px-3 py-3.5 text-left text-white;
+}
+tr th:first-child {
+    @apply py-3.5 pl-4 pr-3 sm:pl-6;
+}
+tr td {
+    @apply px-3 py-4 whitespace-nowrap;
+}
+tr td:first-child {
+    @apply pl-4 pr-3 sm:pl-6 font-bold;
+}

@@ -10,11 +10,11 @@
             <div class="pt-1 text-sm">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
         @if (count($pull_requests) > 0)
-            <div wire:loading.remove wire:target='load_prs' class="flex gap-4 py-4">
+            <div wire:loading.remove wire:target='load_prs'>
                 <div class="overflow-x-auto table-md">
-                    <table class="table">
+                    <table>
                         <thead>
-                            <tr class="text-warning border-coolgray-200">
+                            <tr>
                                 <th>PR Number</th>
                                 <th>PR Title</th>
                                 <th>Git</th>
@@ -23,7 +23,7 @@
                         </thead>
                         <tbody>
                             @foreach ($pull_requests as $pull_request)
-                                <tr class="border-coolgray-200">
+                                <tr>
                                     <th>{{ data_get($pull_request, 'number') }}</th>
                                     <td>{{ data_get($pull_request, 'title') }}</td>
                                     <td>
@@ -33,7 +33,7 @@
                                             <x-external-link />
                                         </a>
                                     </td>
-                                    <td class="flex items-center justify-center gap-2">
+                                    <td>
                                         <x-forms.button
                                             wire:click="deploy('{{ data_get($pull_request, 'number') }}', '{{ data_get($pull_request, 'html_url') }}')">
                                             Deploy

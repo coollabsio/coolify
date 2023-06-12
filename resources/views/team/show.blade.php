@@ -1,10 +1,10 @@
 <x-layout>
     <x-team.navbar :team="session('currentTeam')" />
     <h2>Members</h2>
-    <div class="overflow-x-auto">
-        <table class="table">
+    <div class="overflow-hidden">
+        <table>
             <thead>
-                <tr class="font-bold text-white uppercase border-coolgray-200">
+                <tr>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
@@ -33,8 +33,6 @@
             @endif
             <livewire:team.invite-link />
         </div>
-
-
         <livewire:team.invitations :invitations="$invitations" />
     @endif
 </x-layout>

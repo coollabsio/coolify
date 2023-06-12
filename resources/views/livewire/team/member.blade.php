@@ -1,8 +1,9 @@
-<tr class="border-coolgray-200">
-    {{-- <th class="text-warning">{{ $member->id }}</th> --}}
-    <th>{{ $member->name }}</th>
+<tr>
+    <td>
+        {{ $member->name }}</th>
     <td>{{ $member->email }}</td>
-    <td>{{ data_get($member, 'pivot.role') }}</td>
+    <td>
+        {{ data_get($member, 'pivot.role') }}</td>
     <td>
         {{-- TODO: This is not good --}}
         @if (auth()->user()->isAdmin())
