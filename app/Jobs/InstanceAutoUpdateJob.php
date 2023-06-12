@@ -12,16 +12,16 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Log;
 
-class InstanceAutoUpdateJob implements ShouldQueue
+class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 1;
     public $timeout = 120;
 
     public Server $server;
     public string $latest_version;
     public string $current_version;
+
 
     public function __construct(private bool $force = false)
     {
