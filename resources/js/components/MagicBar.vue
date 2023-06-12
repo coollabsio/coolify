@@ -503,7 +503,6 @@ async function redirect() {
     let targetUrl = new URL(window.location.origin)
     const selected = sequenceState.value.selected
     const { main, destination = null, project = null, environment = null, server = null } = selected
-    console.log({ main })
     switch (main) {
         case 1:
             targetUrl.pathname = `/project/${project}/${environment}/new`

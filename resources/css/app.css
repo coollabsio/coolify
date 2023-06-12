@@ -21,7 +21,7 @@ input[type="checkbox"] {
     @apply toggle toggle-warning toggle-xs rounded;
 }
 input {
-    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded-none;
+    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded;
 }
 input[type="text"],
 [type="number"],
@@ -35,10 +35,10 @@ label {
 }
 
 textarea {
-    @apply textarea placeholder:text-neutral-700 text-white rounded-none scrollbar;
+    @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar;
 }
 select {
-    @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded-none;
+    @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
 }
 .loading {
     @apply w-4 text-warning;
@@ -79,7 +79,7 @@ a {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center text-sm rounded-none min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+    @apply flex items-center justify-center text-sm rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
 }
 
 /* .main-menu {
@@ -93,7 +93,7 @@ a {
     @apply min-w-fit px-2 rounded text-center border border-dotted border-primary text-white text-xs;
 }
 .magic-input {
-    @apply input input-sm w-80 xl:w-96 placeholder:text-neutral-700 text-sm rounded-none;
+    @apply input input-sm w-80 xl:w-96 placeholder:text-neutral-700 text-sm rounded;
 }
 .magic-items {
     @apply absolute top-12 mt-2 w-[24rem] bg-coolgray-200 rounded  z-50;

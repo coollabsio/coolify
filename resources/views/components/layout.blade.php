@@ -38,6 +38,17 @@
     <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
+            function changeType(id) {
+                console.log(id)
+                const input = document.getElementById(id);
+                console.log(input)
+                if (input.type === 'password') {
+                    input.type = 'text';
+                } else {
+                    input.type = 'password';
+                }
+            }
+
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text);
                 Livewire.emit('message', 'Copied to clipboard.');

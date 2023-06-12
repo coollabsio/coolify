@@ -71,7 +71,7 @@
             <div class="flex gap-2">
                 <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
                 <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
-                <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
+                <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
             </div>
             <x-forms.checkbox noDirty label="System Wide?"
                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
