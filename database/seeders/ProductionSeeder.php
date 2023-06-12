@@ -89,12 +89,10 @@ class ProductionSeeder extends Seeder
                 'team_id' => 0,
                 'private_key_id' => 0
             ];
-            if (env('COOLIFY_DEFAULT_PROXY') == 'traefik') {
-                $server_details['extra_attributes'] = ServerMetadata::from([
-                    'proxy_type' => ProxyTypes::TRAEFIK_V2->value,
-                    'proxy_status' => ProxyStatus::EXITED->value
-                ]);
-            }
+            $server_details['extra_attributes'] = ServerMetadata::from([
+                'proxy_type' => ProxyTypes::TRAEFIK_V2->value,
+                'proxy_status' => ProxyStatus::EXITED->value
+            ]);
             $server = Server::create($server_details);
             $server->settings->is_validated = true;
             $server->settings->save();
