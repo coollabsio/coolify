@@ -39,7 +39,6 @@ curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.p
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
-
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.production /data/coolify/source/.env

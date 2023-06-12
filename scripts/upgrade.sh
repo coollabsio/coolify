@@ -12,4 +12,7 @@ curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
 curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 
+# Merge .env and .env.production. New values will be added to .env
+sort -u -t '=' -k 1,1 /data/coolify/source/.env.production /data/coolify/source/.env | sed '/^$/d' > /data/coolify/source/.env
+
 docker run --pull always -v /data/coolify/source:/data/coolify/source -v /var/run/docker.sock:/var/run/docker.sock --rm ghcr.io/coollabsio/coolify-builder bash -c "LATEST_IMAGE=${1:-} docker compose --env-file /data/coolify/source/.env -f /data/coolify/source/docker-compose.yml -f /data/coolify/source/docker-compose.prod.yml up -d --pull always --remove-orphans --force-recreate"
