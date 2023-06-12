@@ -3,11 +3,11 @@
 return [
 
     // @see https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-    'dsn' => env('SENTRY_LARAVEL_DSN', env('SENTRY_DSN')),
+    'dsn' => 'https://fc21c062604d4526a4a9f263a0addeac@o1082494.ingest.sentry.io/4504672605372416',
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => env('SENTRY_RELEASE'),
+    'release' => config('version'),
 
     // When left empty or `null` the Laravel environment will be used
     'environment' => env('SENTRY_ENVIRONMENT'),
@@ -77,7 +77,7 @@ return [
     'send_default_pii' => env('SENTRY_SEND_DEFAULT_PII', false),
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#traces-sample-rate
-    'traces_sample_rate' => env('SENTRY_TRACES_SAMPLE_RATE') === null ? null : (float)env('SENTRY_TRACES_SAMPLE_RATE'),
+    'traces_sample_rate' => 0.2,
 
     'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float)env('SENTRY_PROFILES_SAMPLE_RATE'),
 
