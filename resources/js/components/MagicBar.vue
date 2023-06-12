@@ -238,7 +238,6 @@ const possibleSequences = {
     },
 }
 const magicActions = [{
-    id: 0,
     name: 'Deploy: Public Repository',
     tags: 'git,github,public',
     icon: 'git',
@@ -246,7 +245,6 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
-    id: 1,
     name: 'Deploy: Private Repository (with GitHub Apps)',
     tags: 'git,github,private',
     icon: 'git',
@@ -254,7 +252,6 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
-    id: 2,
     name: 'Deploy: Private Repository (with Deploy Key)',
     tags: 'git,github,private,deploy,key',
     icon: 'git',
@@ -262,15 +259,6 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
-    id: 3,
-    name: 'Create: Private Key',
-    tags: 'private,key,ssh,new,create',
-    icon: 'key',
-    new: true,
-    sequence: ['main', 'redirect']
-},
-{
-    id: 4,
     name: 'Create: Server',
     tags: 'server,ssh,new,create',
     icon: 'server',
@@ -278,7 +266,20 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
-    id: 5,
+    name: 'Create: Source',
+    tags: 'source,git,gitlab,github,bitbucket,gitea,new,create',
+    icon: 'git',
+    new: true,
+    sequence: ['main', 'redirect']
+},
+{
+    name: 'Create: Private Key',
+    tags: 'private,key,ssh,new,create',
+    icon: 'key',
+    new: true,
+    sequence: ['main', 'redirect']
+},
+{
     name: 'Create: Destination',
     tags: 'destination,docker,network,new,create',
     icon: 'destination',
@@ -286,55 +287,46 @@ const magicActions = [{
     sequence: ['main', 'server', 'redirect']
 },
 {
-    id: 6,
     name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 7,
     name: 'Goto: Servers',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 8,
     name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 9,
     name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 10,
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 11,
     name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 12,
     name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 13,
     name: 'Goto: Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 14,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -427,12 +419,14 @@ async function goThroughSequence(actionId) {
         nextSequence = sequence[sequenceState.value.currentActionIndex + 1]
         sequenceState.value.sequence = sequence
         sequenceState.value.selected = {
-            main: id
+            // main: id
+            main: actionId + 1
         }
     } else {
         currentSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex]
         nextSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex + 1]
-        let selectedId = sequenceState.value.magicActions[actionId].id
+        // let selectedId = sequenceState.value.magicActions[actionId].id
+        let selectedId = actionId + 1
         if (uuidSelector.includes(currentSequence)) {
             selectedId = sequenceState.value.magicActions[actionId].uuid
         }
@@ -490,59 +484,61 @@ async function redirect() {
     const selected = sequenceState.value.selected
     const { main, destination = null, project = null, environment = null, server = null } = selected
     switch (main) {
-        case 0:
+        case 1:
             targetUrl.pathname = `/project/${project}/${environment}/new`
             targetUrl.searchParams.append('type', 'public')
             targetUrl.searchParams.append('destination', destination)
             break;
-        case 1:
+        case 2:
             targetUrl.pathname = `/project/${project}/${environment}/new`
             targetUrl.searchParams.append('type', 'private-gh-app')
             targetUrl.searchParams.append('destination', destination)
             break;
-        case 2:
+        case 3:
             targetUrl.pathname = `/project/${project}/${environment}/new`
             targetUrl.searchParams.append('type', 'private-deploy-key')
             targetUrl.searchParams.append('destination', destination)
-            break;
-        case 3:
-            targetUrl.pathname = `/private-key/new`
             break;
         case 4:
             targetUrl.pathname = `/server/new`
             break;
         case 5:
+            targetUrl.pathname = `/source/new`
+            break;
+        case 6:
+            targetUrl.pathname = `/private-key/new`
+            break;
+        case 7:
             targetUrl.pathname = `/destination/new`
             targetUrl.searchParams.append('server', server)
             break;
-        case 6:
+        case 8:
             targetUrl.pathname = `/`
             break;
-        case 7:
+        case 9:
             targetUrl.pathname = `/servers`
             break;
-        case 8:
+        case 10:
             targetUrl.pathname = `/projects`
             break;
-        case 9:
+        case 11:
             targetUrl.pathname = `/settings`
             break;
-        case 10:
+        case 12:
             targetUrl.pathname = `/command-center`
             break;
-        case 11:
+        case 13:
             targetUrl.pathname = `/profile/team/notifications`
             break;
-        case 12:
+        case 14:
             targetUrl.pathname = `/profile`
             break;
-        case 13:
+        case 15:
             targetUrl.pathname = `/profile/team`
             break;
-        case 14:
+        case 16:
             targetUrl.pathname = `/profile/team`
             break;
-
     }
     window.location.href = targetUrl;
 }

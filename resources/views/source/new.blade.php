@@ -1,7 +1,8 @@
 <x-layout>
     <h1>New Source</h1>
+    <div class="pt-2 pb-10 text-sm">Add source providers for your applications.</div>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : '' }">
-        <div class="flex justify-center h-full gap-2">
+        <div class="flex justify-center h-full gap-2 pb-6">
             <a class="flex items-center justify-center w-1/2 p-2 text-sm transition-colors rounded-none min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white hover:no-underline"
                 :class="activeTab === 'github' && 'bg-coollabs text-white'"
                 @click.prevent="activeTab = 'github'; window.location.hash = 'github'" href="#">GitHub
@@ -15,7 +16,7 @@
             <livewire:source.github.create />
         </div>
         <div x-cloak x-show="activeTab === 'gitlab'" class="h-full">
-            GitLab here
+            WIP
         </div>
     </div>
 </x-layout>

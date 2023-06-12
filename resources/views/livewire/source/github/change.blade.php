@@ -3,7 +3,7 @@
     <form wire:submit.prevent='submit'>
         <div class="flex items-center gap-2">
             <h1>GitHub App</h1>
-            <div class="flex gap-2 ">
+            <div class="flex gap-2">
                 @if ($github_app->app_id)
                     <x-forms.button type="submit">Save</x-forms.button>
                     <x-forms.button x-on:click.prevent="deleteSource = true">
@@ -29,9 +29,10 @@
                 @endif
             </div>
         </div>
+        <div class="pt-2 pb-10 text-sm">Your Private GitHub App for private repositories.</div>
         @if (!$github_app->app_id)
-            <div class="pb-4">
-                <div class="text-sm">You need to register a GitHub App before using this source!</div>
+            <div class="flex items-center gap-4 pt-2 pb-10">
+                <div class="text-sm">You need to register a GitHub App before using this source:</div>
                 <form>
                     <x-forms.button x-on:click.prevent="createGithubApp">Register a GitHub
                         Application
@@ -39,36 +40,46 @@
                 </form>
             </div>
         @endif
-        <x-forms.input id="github_app.name" label="App Name" required />
+        <div class="flex gap-2">
+            <x-forms.input id="github_app.name" label="App Name" required />
 
+            @if ($github_app->app_id)
+                <x-forms.input id="github_app.organization" label="Organization" disabled
+                    placeholder="Personal user if empty" />
+            @else
+                <x-forms.input id="github_app.organization" label="Organization" placeholder="Personal user if empty" />
+            @endif
+        </div>
+        <div class="flex gap-2">
+            <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
+            <x-forms.input id="github_app.api_url" label="API Url" disabled />
+        </div>
+        <div class="flex gap-2">
+            @if ($github_app->html_url === 'https://github.com')
+                <x-forms.input id="github_app.custom_user" label="User" disabled />
+                <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
+            @else
+                <x-forms.input id="github_app.custom_user" label="User" required />
+                <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+            @endif
+        </div>
         @if ($github_app->app_id)
-            <x-forms.input id="github_app.organization" label="Organization" disabled
-                placeholder="Personal user if empty" />
-        @else
-            <x-forms.input id="github_app.organization" label="Organization" placeholder="Personal user if empty" />
-        @endif
-        <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-        <x-forms.input id="github_app.api_url" label="API Url" disabled />
-        @if ($github_app->html_url === 'https://github.com')
-            <x-forms.input id="github_app.custom_user" label="User" disabled />
-            <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-        @else
-            <x-forms.input id="github_app.custom_user" label="User" required />
-            <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
-        @endif
-
-        @if ($github_app->app_id)
-            <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
-            <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
-            <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
-            <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
-            <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
-            <x-forms.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
-        @else
-            <x-forms.checkbox noDirty label="System Wide?" instantSave id="is_system_wide" />
-            <div class="py-2">
-
+            <div class="flex gap-2">
+                <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+                <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
             </div>
+            <div class="flex gap-2">
+                <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
+                <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" disabled />
+                <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" disabled />
+            </div>
+            <x-forms.checkbox noDirty label="System Wide?"
+                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                instantSave id="is_system_wide" />
+        @else
+            <x-forms.checkbox
+                helper="If checked, this GitHub App will be available for everyone in this Coolify instance." noDirty
+                label="System Wide?" instantSave id="is_system_wide" />
         @endif
     </form>
     @if (!$github_app->app_id)

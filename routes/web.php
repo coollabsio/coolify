@@ -10,6 +10,7 @@ use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\Server;
 use App\Models\User;
 use App\Notifications\TransactionalEmails\ResetPasswordEmail;
@@ -92,6 +93,12 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
+    Route::get('/sources', function () {
+        $sources = session('currentTeam')->sources();
+        return view('source.all', [
+            'sources' => $sources,
+        ]);
+    })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
         $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
         $name = Str::of(Str::kebab($github_app->name))->start('coolify-');
@@ -109,6 +116,13 @@ Route::middleware(['auth'])->group(function () {
             'installation_url' => $installation_url,
         ]);
     })->name('source.github.show');
+
+    Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
+        $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
+        return view('source.gitlab.show', [
+            'gitlab_app' => $gitlab_app,
+        ]);
+    })->name('source.gitlab.show');
 });
 
 Route::middleware(['auth'])->group(function () {
