@@ -31,8 +31,7 @@
                                 @endif
                             @endforeach
                         </x-forms.select>
-                        <x-forms.button class="h-8 hover:bg-coolgray-400 bg-coolgray-200"
-                            wire:click.prevent="loadBranches"> Check
+                        <x-forms.button wire:click.prevent="loadBranches"> Check
                             repository</x-forms.button>
                     </div>
                 @endif

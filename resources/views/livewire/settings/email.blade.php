@@ -6,7 +6,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="pt-2 pb-4 text-sm">SMTP settings for password reset, invitation, etc.</div>
+        <div class="pt-2 pb-4 text-sm">SMTP settings for password resets, invitations, etc.</div>
         <div class="flex items-end gap-2">
             <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipient(s)"
                 helper="Email list to send a test email to, separated by comma." />

@@ -7,7 +7,7 @@
             <button>Configuration</button>
         </a>
         <a class="{{ request()->routeIs('settings.emails') ? 'text-white' : '' }}" href="{{ route('settings.emails') }}">
-            <button>Emails</button>
+            <button>SMTP</button>
         </a>
         <div class="flex-1"></div>
     </nav>

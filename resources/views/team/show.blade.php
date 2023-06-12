@@ -29,12 +29,17 @@
             </div>
         @else
             <div class="py-4">
-                <h3>Invite a new member</h3>
-                <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a new
-                    member
-                    via
-                    email.
-                </div>
+                @if (!is_transactional_emails_active())
+                    <h3>Invite a new member</h3>
+                    <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a
+                        new
+                        member
+                        via
+                        email.
+                    </div>
+                @else
+                    <h3 class="pb-4">Invite a new member</h3>
+                @endif
                 <livewire:team.invite-link />
             </div>
 
