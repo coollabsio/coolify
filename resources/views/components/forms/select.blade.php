@@ -8,7 +8,7 @@
 <div {{ $attributes->merge(['class' => 'flex flex-col']) }}>
     @if ($label)
         <label class="label" for={{ $id }}>
-            <span class="label-text">
+            <span class="flex gap-1 label-text">
                 {{ $label }}
                 @if ($required)
                     <span class="text-warning">*</span>
