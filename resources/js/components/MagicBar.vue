@@ -238,6 +238,7 @@ const possibleSequences = {
     },
 }
 const magicActions = [{
+    id: 1,
     name: 'Deploy: Public Repository',
     tags: 'git,github,public',
     icon: 'git',
@@ -245,6 +246,7 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
+    id: 2,
     name: 'Deploy: Private Repository (with GitHub Apps)',
     tags: 'git,github,private',
     icon: 'git',
@@ -252,6 +254,7 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
+    id: 3,
     name: 'Deploy: Private Repository (with Deploy Key)',
     tags: 'git,github,private,deploy,key',
     icon: 'git',
@@ -259,6 +262,7 @@ const magicActions = [{
     sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
 },
 {
+    id: 4,
     name: 'Create: Server',
     tags: 'server,ssh,new,create',
     icon: 'server',
@@ -266,6 +270,7 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
+    id: 5,
     name: 'Create: Source',
     tags: 'source,git,gitlab,github,bitbucket,gitea,new,create',
     icon: 'git',
@@ -273,6 +278,7 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
+    id: 6,
     name: 'Create: Private Key',
     tags: 'private,key,ssh,new,create',
     icon: 'key',
@@ -280,6 +286,7 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
+    id: 7,
     name: 'Create: Destination',
     tags: 'destination,docker,network,new,create',
     icon: 'destination',
@@ -287,46 +294,61 @@ const magicActions = [{
     sequence: ['main', 'server', 'redirect']
 },
 {
+    id: 8,
     name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 9,
     name: 'Goto: Servers',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 10,
     name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 11,
+    name: 'Goto: Sources',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 12,
     name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 13,
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 14,
     name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 15,
     name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 16,
     name: 'Goto: Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
+    id: 17,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -419,14 +441,12 @@ async function goThroughSequence(actionId) {
         nextSequence = sequence[sequenceState.value.currentActionIndex + 1]
         sequenceState.value.sequence = sequence
         sequenceState.value.selected = {
-            // main: id
-            main: actionId + 1
+            main: id
         }
     } else {
         currentSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex]
         nextSequence = sequenceState.value.sequence[sequenceState.value.currentActionIndex + 1]
-        // let selectedId = sequenceState.value.magicActions[actionId].id
-        let selectedId = actionId + 1
+        let selectedId = sequenceState.value.magicActions[actionId].id
         if (uuidSelector.includes(currentSequence)) {
             selectedId = sequenceState.value.magicActions[actionId].uuid
         }
@@ -483,6 +503,7 @@ async function redirect() {
     let targetUrl = new URL(window.location.origin)
     const selected = sequenceState.value.selected
     const { main, destination = null, project = null, environment = null, server = null } = selected
+    console.log({ main })
     switch (main) {
         case 1:
             targetUrl.pathname = `/project/${project}/${environment}/new`
@@ -522,21 +543,24 @@ async function redirect() {
             targetUrl.pathname = `/projects`
             break;
         case 11:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/sources`
             break;
         case 12:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/settings`
             break;
         case 13:
-            targetUrl.pathname = `/profile/team/notifications`
+            targetUrl.pathname = `/command-center`
             break;
         case 14:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/profile/team/notifications`
             break;
         case 15:
-            targetUrl.pathname = `/profile/team`
+            targetUrl.pathname = `/profile`
             break;
         case 16:
+            targetUrl.pathname = `/profile/team`
+            break;
+        case 17:
             targetUrl.pathname = `/profile/team`
             break;
     }
