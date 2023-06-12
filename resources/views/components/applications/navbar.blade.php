@@ -25,7 +25,7 @@
                 <li>
                     <a target="_blank" class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
                         href="{{ $application->gitBranchLocation }}">
-                        <x-git-icon git="{{ $application->source->getMorphClass() }}" />
+                        <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
                         Git Repository
                     </a>
                 </li>

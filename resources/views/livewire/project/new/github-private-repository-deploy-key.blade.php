@@ -1,7 +1,7 @@
 <div>
     <h1>Create a new Application</h1>
-    <div class="pb-4 text-sm">Deploy any public or private git repositories through a Deploy Key.</div>
-    <h3 class="py-2">Select a private key</h3>
+    <div class="pt-2 pb-10 text-sm">Deploy any public or private GIT repositories through a Deploy Key.</div>
+    <h3 class="py-2">Select a Private Key</h3>
     @foreach ($private_keys as $key)
         @if ($private_key_id == $key->id)
             <x-forms.button class="bg-coollabs hover:bg-coollabs-100"
@@ -12,19 +12,21 @@
             </x-forms.button>
         @endif
     @endforeach
+    <a href="{{ route('private-key.new') }}">
+        <x-forms.button isHighlighted>+</x-forms.button>
+    </a>
     @isset($private_key_id)
-        <form class="pt-6" wire:submit.prevent='submit'>
-            <div class="flex items-end gap-2 pb-2">
-                <x-forms.input class="w-96" id="repository_url" label="Repository URL" />
-                @if ($is_static)
-                    <x-forms.input id="publish_directory" label="Publish Directory" />
-                @else
-                    <x-forms.input type="number" id="port" label="Port" :readonly="$is_static" />
-                @endif
-                <x-forms.checkbox instantSave id="is_static" label="Static Site?" />
-            </div>
+        <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
+            <x-forms.input id="repository_url" label="Repository URL" helper="{!! __('repository.url') !!}" />
+            <x-forms.input id="branch" label="Branch" />
+            <x-forms.checkbox instantSave id="is_static" label="Static Site?" />
+            @if ($is_static)
+                <x-forms.input id="publish_directory" label="Publish Directory" />
+            @else
+                <x-forms.input type="number" id="port" label="Port" :readonly="$is_static" />
+            @endif
             <x-forms.button type="submit">
-                Add New Application
+                Save New Application
             </x-forms.button>
         </form>
     @endisset

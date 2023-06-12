@@ -3,6 +3,8 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Application;
+use App\Models\GithubApp;
+use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
@@ -16,23 +18,40 @@ class GithubPrivateRepositoryDeployKey extends Component
     public $query;
     public $private_keys;
     public int $private_key_id;
-    public string $repository_url;
 
     public int $port = 3000;
     public string $type;
 
     public bool $is_static = false;
     public null|string $publish_directory = null;
+
+    public string $repository_url;
+    private object $repository_url_parsed;
+    public string $branch;
+
+    private GithubApp|GitlabApp $git_source;
+    private string $git_host;
+    private string $git_repository;
+    private string $git_branch;
+
     protected $rules = [
         'repository_url' => 'required|url',
+        'branch' => 'required|string',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
     ];
+    protected $validationAttributes = [
+        'repository_url' => 'Repository',
+        'branch' => 'Branch',
+        'port' => 'Port',
+        'is_static' => 'Is static',
+        'publish_directory' => 'Publish directory',
+    ];
     public function mount()
     {
         if (config('app.env') === 'local') {
-            $this->repository_url = 'https://github.com/coollabsio/coolify-examples/tree/nodejs-fastify';
+            $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
         $this->parameters = get_parameters();
         $this->query = request()->query();
@@ -52,15 +71,29 @@ class GithubPrivateRepositoryDeployKey extends Component
     {
         $this->private_key_id = $private_key_id;
     }
+    private function get_git_source()
+    {
+        $this->repository_url_parsed = Url::fromString($this->repository_url);
+        $this->git_host = $this->repository_url_parsed->getHost();
+        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+        if ($this->branch) {
+            $this->git_branch = $this->branch;
+        } else {
+            $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
+        }
+
+        if ($this->git_host == 'github.com') {
+            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+        } elseif ($this->git_host == 'gitlab.com') {
+            $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
+        } elseif ($this->git_host == 'bitbucket.org') {
+            // Not supported yet
+        }
+    }
     public function submit()
     {
+        $this->validate();
         try {
-            $this->validate();
-            $url = Url::fromString($this->repository_url);
-            $git_host = $url->getHost();
-            $git_repository = $url->getSegment(1) . '/' . $url->getSegment(2);
-            $git_branch = $url->getSegment(4) ?? 'main';
-
             $destination_uuid = $this->query['destination'];
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (!$destination) {
@@ -71,13 +104,15 @@ class GithubPrivateRepositoryDeployKey extends Component
             }
             $destination_class = $destination->getMorphClass();
 
+            $this->get_git_source();
+
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
             $application_init = [
                 'name' => generate_random_name(),
-                'git_repository' => $git_repository,
-                'git_branch' => $git_branch,
-                'git_full_url' => "git@$git_host:$git_repository.git",
+                'git_repository' => $this->git_repository,
+                'git_branch' => $this->git_branch,
+                'git_full_url' => "git@$this->git_host:$this->git_repository.git",
                 'build_pack' => 'nixpacks',
                 'ports_exposes' => $this->port,
                 'publish_directory' => $this->publish_directory,
@@ -85,6 +120,8 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'private_key_id' => $this->private_key_id,
+                'source_id' => $this->git_source->id,
+                'source_type' =>  $this->git_source->getMorphClass()
             ];
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;

@@ -39,7 +39,6 @@ class MagicController extends Controller
             ['name' => request()->query('name') ?? generate_random_name()],
             ['team_id' => session('currentTeam')->id]
         );
-        ray($project);
         return response()->json([
             'project_uuid' => $project->uuid
         ]);
