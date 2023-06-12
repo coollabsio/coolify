@@ -7,7 +7,7 @@ return [
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => trim(exec('jq -r .coolify.v4.version ../versions.json')),
+    'release' => config('app.env') === 'local' ? trim(exec('jq -r .coolify.v4.version ../versions.json')) : trim(exec('jq -r .coolify.v4.version versions.json')),
 
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),
