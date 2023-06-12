@@ -11,11 +11,42 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Models\GithubApp;
 use App\Models\Server;
+use App\Models\User;
+use App\Notifications\TransactionalEmails\ResetPasswordEmail;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
+Route::post('/forgot-password', function (Request $request) {
+    $request->validate([
+        'email' => 'required|email',
+    ]);
+    $user = User::whereEmail($request->email)->first();
+    if (!$user->exists()) {
+        return back()->withErrors([
+            'email' => 'No user found with that email address.',
+        ]);
+    }
+    if (is_transactional_emails_active()) {
+        $token = Str::random(64);
+        $token_exists = DB::table('password_reset_tokens')->whereEmail($user->email)->first();
+        if ($token_exists) {
+            return back()->withErrors([
+                'email' => 'Token already exists.',
+            ]);
+        }
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => $token,
+            'created_at' => now(),
+        ]);
 
+        $user->notify(new ResetPasswordEmail($token));
+    } else {
+        // $user->sendPasswordResetNotification($user->createToken('password-reset')->plainTextToken);
+    }
+})->name('password.forgot');
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);

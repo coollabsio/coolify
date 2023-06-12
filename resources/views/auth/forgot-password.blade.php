@@ -10,19 +10,23 @@
                 <h1>{{ __('auth.forgot_password') }}</h1>
             </div>
             <div class="w-96">
-                <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
-                    @csrf
-                    <x-forms.input required value="test@example.com" type="email" name="email"
-                        label="{{ __('input.email') }}" autofocus />
-                    <x-forms.button type="submit">{{ __('auth.forgot_password_send_email') }}</x-forms.button>
-                </form>
+                @if (is_transactional_emails_active())
+                    <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
+                        @csrf
+                        <x-forms.input required value="test@example.com" type="email" name="email"
+                            label="{{ __('input.email') }}" autofocus />
+                        <x-forms.button type="submit">{{ __('auth.forgot_password_send_email') }}</x-forms.button>
+                    </form>
+                @else
+                    'asd'
+                @endif
                 @if ($errors->any())
-                    <div class="text-center text-error">
+                    <div class="text-xs text-center text-error">
                         <span>{{ __('auth.failed') }}</span>
                     </div>
                 @endif
                 @if (session('status'))
-                    <div class="mb-4 text-sm font-medium text-green-600">
+                    <div class="mb-4 text-xs font-medium text-green-600">
                         {{ session('status') }}
                     </div>
                 @endif
