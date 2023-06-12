@@ -12,11 +12,10 @@ class EmailChannel
     {
         $this->bootConfigs($notifiable);
 
-        if ($notification instanceof \App\Notifications\TestNotification) {
+        $is_test_notification = $notification instanceof \App\Notifications\TestNotification;
+
+        if ($is_test_notification) {
             $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');
-            if (count($bcc) === 0) {
-                $bcc = $notifiable->routeNotificationForEmail();
-            }
         } else {
             $bcc = $notifiable->routeNotificationForEmail();
         }

@@ -57,6 +57,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
+    Route::get('/invitations/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');
+    Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');
 });
 
 Route::middleware(['auth'])->group(function () {

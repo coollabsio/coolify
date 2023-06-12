@@ -8,8 +8,6 @@
         </div>
         <div class="pt-2 pb-4 text-sm">SMTP settings for password reset, invitation, etc.</div>
         <div class="flex items-end gap-2">
-            <x-forms.input required id="settings.extra_attributes.smtp_recipients"
-                helper="Email list to send the all notifications to, separated by comma." label="Recipient(s)" />
             <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipient(s)"
                 helper="Email list to send a test email to, separated by comma." />
             <x-forms.button wire:click='test_email'>

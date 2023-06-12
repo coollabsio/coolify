@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\InstanceSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -58,4 +59,9 @@ function generate_application_name(string $git_repository, string $git_branch)
 {
     $cuid = new Cuid2(7);
     return Str::kebab("{$git_repository}:{$git_branch}-{$cuid}");
+}
+
+function is_transactional_emails_active()
+{
+    return data_get(InstanceSettings::get(), 'extra_attributes.smtp_host');
 }

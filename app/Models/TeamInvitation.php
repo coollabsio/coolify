@@ -8,9 +8,11 @@ class TeamInvitation extends Model
 {
     protected $fillable = [
         'team_id',
+        'uuid',
         'email',
         'role',
         'link',
+        'via',
     ];
     public function team()
     {

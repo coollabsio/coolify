@@ -38,10 +38,18 @@
     <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
+            function copyToClipboard(text) {
+                navigator.clipboard.writeText(text);
+                Livewire.emit('message', 'Copied to clipboard.');
+            }
             Livewire.on('reloadWindow', () => {
                 window.location.reload();
             })
             Livewire.on('error', (message) => {
+                console.log(message);
+                alert(message);
+            })
+            Livewire.on('message', (message) => {
                 console.log(message);
                 alert(message);
             })

@@ -18,7 +18,7 @@ class InstanceSettings extends Model implements SendsEmail
     {
         return $this->extra_attributes->modelScope();
     }
-    public function routeNotificationForEmail(string $attribute = 'smtp_recipients')
+    public function routeNotificationForEmail(string $attribute = 'smtp_test_recipients')
     {
         $recipients = $this->extra_attributes->get($attribute, '');
         if (is_null($recipients) || $recipients === '') {

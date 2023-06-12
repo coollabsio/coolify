@@ -4,7 +4,7 @@
     <div class="overflow-x-auto">
         <table class="table">
             <thead>
-                <tr class="text-warning border-coolgray-200">
+                <tr class="font-bold text-white uppercase border-coolgray-200">
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
@@ -29,22 +29,17 @@
             </div>
         @else
             <div class="py-4">
-                <h3 class="pb-4">Invite a new member</h3>
-                <livewire:team.invite-link />
-                <div class="text-sm text-warning">You need to configure SMTP settings before you can invite a new member
+                <h3>Invite a new member</h3>
+                <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a new
+                    member
                     via
                     email.
                 </div>
+                <livewire:team.invite-link />
             </div>
-            @if ($invitations->count() > 0)
-                <h2 class="pb-2">Pending Invitations</h2>
-            @endif
-            @foreach ($invitations as $invite)
-                <div class="flex gap-2 text-sm">
-                    <div>{{ $invite->email }}</div>
-                    <div>Sent: {{ $invite->created_at }}</div>
-                </div>
-            @endforeach
+
+
+            <livewire:team.invitations :invitations="$invitations" />
         @endif
     @endif
 </x-layout>

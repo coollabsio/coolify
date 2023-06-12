@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -10,7 +11,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Visus\Cuid2\Cuid2;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 
-class User extends Authenticatable
+class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
     protected $fillable = [
@@ -46,10 +47,13 @@ class User extends Authenticatable
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
+    public function routeNotificationForEmail()
+    {
+        return $this->email;
+    }
     public function isAdmin()
     {
         if (auth()->user()->id === 0) {
-            ray('is root user');
             return true;
         }
         $teams = $this->teams()->get();
@@ -59,7 +63,6 @@ class User extends Authenticatable
             ($is_part_of_root_team->pivot->role === 'admin' || $is_part_of_root_team->pivot->role === 'owner');
 
         if ($is_part_of_root_team && $is_admin_of_root_team) {
-            ray('is admin of root team');
             return true;
         }
         $role = $teams->where('id', session('currentTeam')->id)->first()->pivot->role;

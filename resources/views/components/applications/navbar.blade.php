@@ -1,4 +1,4 @@
-<nav class="flex items-center gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+<nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
     <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', [
             'project_uuid' => Route::current()->parameters()['project_uuid'],

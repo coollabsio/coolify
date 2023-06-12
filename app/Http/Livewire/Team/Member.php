@@ -15,7 +15,7 @@ class Member extends Component
     }
     public function makeReadonly()
     {
-        $this->member->teams()->updateExistingPivot(session('currentTeam')->id, ['role' => 'readonly']);
+        $this->member->teams()->updateExistingPivot(session('currentTeam')->id, ['role' => 'member']);
         $this->emit('reloadWindow');
     }
     public function remove()
