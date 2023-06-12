@@ -44,16 +44,16 @@ services:
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_USER: "${DB_USERNAME:-coolify}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME}",
+          "pg_isready -U ${DB_USERNAME:-coolify}",
           "-d",
-          "${DB_DATABASE}"
+          "${DB_DATABASE:-coolify}"
         ]
       interval: 2s
       retries: 5
