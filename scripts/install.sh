@@ -48,7 +48,7 @@ if [ ! -f /data/coolify/source/.env ]; then
 fi
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env.production /data/coolify/source/.env | sed '/^$/d' > /data/coolify/source/.env
+sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' > /data/coolify/source/.env
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
