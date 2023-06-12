@@ -19,7 +19,6 @@ class InviteLink extends Component
     public function viaEmail()
     {
         $this->generate_invite_link(isEmail: true);
-        $this->emit('message', 'Invitation sent via email successfully.');
     }
     private function generate_invite_link(bool $isEmail = false)
     {
@@ -60,6 +59,9 @@ class InviteLink extends Component
             ]);
             if ($isEmail) {
                 $user->first()->notify(new InvitationLinkEmail());
+                $this->emit('message', 'Invitation sent via email successfully.');
+            } else {
+                $this->emit('message', 'Invitation link generated.');
             }
             $this->emit('refreshInvitations');
         } catch (\Throwable $e) {
@@ -73,6 +75,5 @@ class InviteLink extends Component
     public function inviteByLink()
     {
         $this->generate_invite_link();
-        $this->emit('message', 'Invitation link generated.');
     }
 }
