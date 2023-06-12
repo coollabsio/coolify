@@ -16,7 +16,7 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_active' => 'nullable|boolean',
         'model.extra_attributes.smtp_from_address' => 'required|email',
         'model.extra_attributes.smtp_from_name' => 'required',
-        'model.extra_attributes.smtp_recipients' => 'required',
+        'model.extra_attributes.smtp_recipients' => 'nullable',
         'model.extra_attributes.smtp_host' => 'required',
         'model.extra_attributes.smtp_port' => 'required',
         'model.extra_attributes.smtp_encryption' => 'nullable',
