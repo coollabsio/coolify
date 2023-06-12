@@ -3,7 +3,7 @@
 return [
 
     // @see https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-    'dsn' => 'https://340d052d37ff4540bb322a5174d634e4@o1082494.ingest.sentry.io/4504672605372416',
+    'dsn' => 'https://2a1cf2f028104b2083c806ee2210b3c0@o1082494.ingest.sentry.io/4505347448045568',
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
