@@ -127,7 +127,7 @@ Route::post('/source/github/events', function () {
                 }
             }
             if ($x_github_event === 'pull_request') {
-                if ($action === 'opened') {
+                if ($action === 'opened' || $action === 'synchronize' || $action === 'reopened') {
                     if ($application->isPRDeployable()) {
                         $deployment_uuid = new Cuid2(7);
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -161,7 +161,7 @@ Route::post('/source/github/events', function () {
                         remote_process(["docker rm -f $container_name"], $application->destination->server);
                         return response('Preview Deployment closed.');
                     }
-                    return response('Nothing to do. No Preview Deplyoment found');
+                    return response('Nothing to do. No Preview Deployment found');
                 }
             }
         }
