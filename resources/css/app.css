@@ -45,7 +45,7 @@ select {
 }
 
 button[isWarning] {
-    @apply bg-error hover:bg-error;
+    @apply bg-red-600 hover:bg-red-500;
 }
 button[isHighlighted] {
     @apply btn-primary text-white;
@@ -65,10 +65,6 @@ h4 {
 a {
     @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
 }
-
-.main-navbar {
-    @apply fixed h-full overflow-hidden pt-16;
-}
 .kbd-custom {
     @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;
 }
@@ -80,29 +76,6 @@ a {
 }
 .box {
     @apply flex items-center justify-center text-sm rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
-}
-
-/* .main-menu {
-    @apply relative float-left;
-}
-.main-menu:after {
-    content: "/";
-    @apply absolute border border-dotted rounded border-neutral-600 right-1 top-0 text-warning mx-1 px-2 mt-[0.3rem] text-sm;
-} */
-.magic-badge {
-    @apply min-w-fit px-2 rounded text-center border border-dotted border-primary text-white text-xs;
-}
-.magic-input {
-    @apply input input-sm w-80 xl:w-96 placeholder:text-neutral-700 text-sm rounded;
-}
-.magic-items {
-    @apply absolute top-12 mt-2 w-[24rem] bg-coolgray-200 rounded  z-50;
-}
-.magic-item {
-    @apply text-sm flex items-center gap-4 m-2 py-2 pl-4 cursor-pointer hover:bg-coolgray-500 text-neutral-400 hover:text-white transition-colors hover:shadow;
-}
-.magic-item-focused {
-    @apply bg-coolgray-400 text-white;
 }
 
 .lds-heart {

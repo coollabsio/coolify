@@ -1,5 +1,5 @@
 @auth
-    <nav class="main-navbar">
+    <nav class="fixed h-full pt-16 overflow-hidden">
         <ul class="gap-4 menu">
             <li>
                 <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>

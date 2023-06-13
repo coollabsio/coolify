@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;

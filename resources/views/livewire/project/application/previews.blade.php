@@ -3,7 +3,7 @@
     <div>
         <div class="flex items-center gap-2">
             <h3>Pull Requests on Git</h3>
-            <x-forms.button wire:click="load_prs">Load (Open) Pull Requests
+            <x-forms.button wire:click="load_prs">Load Pull Requests (Open)
             </x-forms.button>
         </div>
         @isset($rate_limit_remaining)

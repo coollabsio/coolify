@@ -1,4 +1,4 @@
-<div class="flex items-center gap-2" wire:poll="pollStatus">
+<div class="flex items-center gap-2" wire:poll.10000ms="pollStatus">
     <div class="group">
         <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Actions
             <x-chevron-down />
