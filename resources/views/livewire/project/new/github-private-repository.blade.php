@@ -73,6 +73,11 @@
             </div>
         </form>
     @else
-        Add new github app
+        <div>
+            <div>No Git App found.</div>
+            <a href="/source/new">
+                <x-forms.button>Add</x-forms.button>
+            </a>
+        </div>
     @endif
 </div>
