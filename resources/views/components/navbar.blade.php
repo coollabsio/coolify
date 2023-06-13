@@ -70,7 +70,7 @@
             @endif
         </ul>
     </nav>
-    <div class="fixed top-0 right-0 p-2">
+    <div class="fixed right-0 p-2 top-1">
         <div class="group">
             <label tabindex="0"
                 class="absolute top-0 right-0 p-2 m-2 cursor-pointer hover:bg-transparent hover:text-warning">

@@ -15,8 +15,8 @@
             <x-forms.input id="custom_port" label="Custom Git Port" required />
         </div>
         <x-forms.checkbox class="pt-2" id="is_system_wide" label="System Wide" />
-        <x-forms.button isHighlighted type="submit">
-            Create New Source
+        <x-forms.button type="submit">
+            Save New Source
         </x-forms.button>
     </form>
 </div>

@@ -56,12 +56,13 @@
                 </div>
             </div>
         @else
-            <x-forms.button wire:click='deploy'> <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="44"
-                    height="44" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                    stroke-linecap="round" stroke-linejoin="round">
+            <button wire:click='deploy' class="flex items-center gap-2 text-sm cursor-pointer hover:text-white"> <svg
+                    xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" stroke-width="1.5"
+                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M7 4v16l13 -8z" />
-                </svg>Start Proxy</x-forms.button>
+                </svg>Start Proxy
+            </button>
         @endif
     @endif
 </div>

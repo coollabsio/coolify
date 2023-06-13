@@ -7,6 +7,7 @@
                 <div wire:loading wire:target="checkProxySettingsInSync">
                     <x-loading />
                 </div>
+
                 @isset($proxy_settings)
                     @if ($selectedProxy->value === 'TRAEFIK_V2')
                         <form wire:submit.prevent='saveConfiguration({{ $server }})'>
@@ -25,6 +26,9 @@
                                 <div class="text-sm text-red-500">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif
+                            <div class="container w-full py-4 mx-auto">
+                                <livewire:activity-monitor :header="true" />
+                            </div>
                             <div class="flex flex-col gap-2">
                                 <x-forms.textarea label="Configuration file: traefik.conf" class="text-xs" noDirty
                                     name="proxy_settings" wire:model.defer="proxy_settings" rows="30" />
@@ -54,9 +58,6 @@
                 </div>
             </div>
         @endif
-        <div class="container w-full pt-4 mx-auto">
-            <livewire:activity-monitor :header="true" />
-        </div>
     @else
         <div class="text-sm">Server is not validated. Validate first.</div>
     @endif

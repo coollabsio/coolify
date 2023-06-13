@@ -33,7 +33,12 @@ class Server extends BaseModel
     {
         return $this->extra_attributes->modelScope();
     }
-
+    public function destinations()
+    {
+        $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
+        $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
+        return $standalone_docker->concat($swarm_docker);
+    }
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);

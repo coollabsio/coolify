@@ -2,7 +2,7 @@
     @if ($this->activity)
         @if ($header)
             <div class="flex gap-2 pb-2">
-                <h2>Logs</h2>
+                <h3>Logs</h3>
                 @if ($isPollingActive)
                     <x-loading />
                 @endif

@@ -38,7 +38,7 @@ textarea {
     @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar;
 }
 select {
-    @apply select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
+    @apply h-7 select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
 }
 .loading {
     @apply w-4 text-warning;
@@ -67,7 +67,7 @@ a {
 }
 
 .main-navbar {
-    @apply fixed h-full overflow-hidden pt-14;
+    @apply fixed h-full overflow-hidden pt-16;
 }
 .kbd-custom {
     @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;

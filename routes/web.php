@@ -126,6 +126,16 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
+    Route::get('/destinations', function () {
+        $servers = Server::all();
+        $destinations = collect([]);
+        foreach ($servers as $server) {
+            $destinations = $destinations->merge($server->destinations());
+        }
+        return view('destination.all', [
+            'destinations' => $destinations,
+        ]);
+    })->name('destination.all');
     Route::get('/destination/new', function () {
         $servers = Server::validated()->get();
         $pre_selected_server_uuid = data_get(request()->query(), 'server');

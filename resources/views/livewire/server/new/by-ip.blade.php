@@ -25,7 +25,7 @@
         <x-forms.checkbox class="pb-8" disabled instantSave noDirty id="is_part_of_swarm"
             label="Is it part of a Swarm cluster?" />
         <x-forms.button type="submit">
-            Save Server
+            Save New Server
         </x-forms.button>
     </form>
 </div>

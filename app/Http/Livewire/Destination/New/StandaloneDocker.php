@@ -38,24 +38,29 @@ class StandaloneDocker extends Component
 
     public function submit()
     {
+
         $this->validate();
-        $found = ModelsStandaloneDocker::where('server_id', $this->server_id)->where('network', $this->network)->first();
-        if ($found) {
-            $this->addError('network', 'Network already added to this server.');
-            return;
+        try {
+            $found = ModelsStandaloneDocker::where('server_id', $this->server_id)->where('network', $this->network)->first();
+            if ($found) {
+                $this->addError('network', 'Network already added to this server.');
+                return;
+            }
+            $server = Server::find($this->server_id);
+
+            instant_remote_process(['docker network create --attachable ' . $this->network], $server);
+
+            instant_remote_process(["docker network connect $this->network coolify-proxy"], $server);
+
+            $docker = ModelsStandaloneDocker::create([
+                'name' => $this->name,
+                'network' => $this->network,
+                'server_id' => $this->server_id,
+                'team_id' => session('currentTeam')->id
+            ]);
+            return redirect()->route('destination.show', $docker->uuid);
+        } catch (\Exception $e) {
+            return general_error_handler(err: $e);
         }
-        $server = Server::find($this->server_id);
-        instant_remote_process(['docker network create --attachable ' . $this->network], $server, throwError: false);
-        instant_remote_process(["docker network connect $this->network coolify-proxy"], $server, throwError: false);
-
-        $docker = ModelsStandaloneDocker::create([
-            'name' => $this->name,
-            'network' => $this->network,
-            'server_id' => $this->server_id,
-            'team_id' => session('currentTeam')->id
-        ]);
-
-
-        return redirect()->route('destination.show', $docker->uuid);
     }
 }

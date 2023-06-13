@@ -1,7 +1,7 @@
 <template>
     <Transition name="fade">
         <div>
-            <div class="flex items-center p-1 px-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
+            <div class="flex items-center p-1 px-2 mt-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
                 @click="showCommandPalette = true">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24" stroke-width="2"
                     stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -319,36 +319,42 @@ const magicActions = [{
 },
 {
     id: 12,
-    name: 'Goto: Settings',
+    name: 'Goto: Destinations',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 13,
-    name: 'Goto: Command Center',
+    name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 14,
-    name: 'Goto: Notifications',
+    name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 15,
-    name: 'Goto: Profile',
+    name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 16,
-    name: 'Goto: Teams',
+    name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 17,
+    name: 'Goto: Teams',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 18,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -545,21 +551,24 @@ async function redirect() {
             targetUrl.pathname = `/sources`
             break;
         case 12:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/destinations`
             break;
         case 13:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/settings`
             break;
         case 14:
-            targetUrl.pathname = `/profile/team/notifications`
+            targetUrl.pathname = `/command-center`
             break;
         case 15:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/profile/team/notifications`
             break;
         case 16:
-            targetUrl.pathname = `/profile/team`
+            targetUrl.pathname = `/profile`
             break;
         case 17:
+            targetUrl.pathname = `/profile/team`
+            break;
+        case 18:
             targetUrl.pathname = `/profile/team`
             break;
     }

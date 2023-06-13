@@ -32,7 +32,7 @@
             </span>
         </label>
     @endif
-    <select class="select-xs h-7" {{ $attributes }}
+    <select {{ $attributes }}
         @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endif>
         {{ $slot }}
     </select>

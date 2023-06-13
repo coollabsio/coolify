@@ -1,3 +1,3 @@
 <x-layout>
-    GitLab WIP
+    WIP
 </x-layout>
