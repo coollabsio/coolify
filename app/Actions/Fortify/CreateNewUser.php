@@ -50,6 +50,11 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();
+
+            // Disable registration after first user is created
+            $settings = InstanceSettings::get();
+            $settings->is_registration_enabled = false;
+            $settings->save();
         } else {
             $user = User::create([
                 'name' => $input['name'],
