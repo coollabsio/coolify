@@ -7,7 +7,7 @@
                 class="box">{{ $project->name }}</a>
         @empty
             <div>
-                No project found.
+                <div>No project found.</div>
                 <x-use-magic-bar />
             </div>
         @endforelse

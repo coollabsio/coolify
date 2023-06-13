@@ -4,7 +4,8 @@
     @if ($servers->count() > 0)
         <livewire:run-command :servers="$servers" />
     @else
-        <div>No validated servers found.
+        <div>
+            <div>No validated servers found.</div>
             <x-use-magic-bar />
         </div>
     @endif

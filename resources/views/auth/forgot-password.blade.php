@@ -2,7 +2,9 @@
     <div class="flex items-center justify-center h-screen">
         <div>
             <div class="flex flex-col items-center pb-8">
-                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                <a href="{{ route('dashboard') }}">
+                    <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                </a>
                 <x-version />
             </div>
 
