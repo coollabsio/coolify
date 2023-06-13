@@ -18,7 +18,6 @@ class Controller extends BaseController
 
     public function dashboard()
     {
-        ray(request());
         $projects = Project::ownedByCurrentTeam()->get();
         $servers = Server::ownedByCurrentTeam()->get();
 
