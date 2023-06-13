@@ -9,7 +9,11 @@
                     <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
                     <div class="group-hover:text-white">
                         <div>{{ $source->name }}</div>
+                        @if (is_null($source->app_id))
+                            <span class="text-error">Not registered</span>
+                        @endif
                     </div>
+
                 </a>
             @endif
             @if ($source->getMorphClass() === 'App\Models\GitlabApp')
@@ -18,6 +22,9 @@
                     <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
                     <div class="group-hover:text-white">
                         <div>{{ $source->name }}</div>
+                        @if (is_null($source->app_id))
+                            <span class="text-error">Not registered</span>
+                        @endif
                     </div>
                 </a>
             @endif

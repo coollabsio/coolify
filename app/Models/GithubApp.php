@@ -41,10 +41,10 @@ class GithubApp extends BaseModel
     }
     static public function public()
     {
-        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', true)->get();
+        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(true)->whereNotNull('app_id')->get();
     }
     static public function private()
     {
-        return GithubApp::where('team_id', session('currentTeam')->id)->where('is_public', false)->get();
+        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(false)->whereNotNull('app_id')->get();
     }
 }

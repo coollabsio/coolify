@@ -42,6 +42,13 @@ class GithubPrivateRepository extends Component
     public bool $is_static = false;
     public string|null $publish_directory = null;
 
+    public function mount()
+    {
+        $this->parameters = get_parameters();
+        $this->query = request()->query();
+        $this->repositories = $this->branches = collect();
+        $this->github_apps = GithubApp::private();
+    }
     protected function loadRepositoryByPage()
     {
         $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
@@ -151,12 +158,5 @@ class GithubPrivateRepository extends Component
             $this->publish_directory = null;
         }
         $this->emit('saved', 'Application settings updated!');
-    }
-    public function mount()
-    {
-        $this->parameters = get_parameters();
-        $this->query = request()->query();
-        $this->repositories = $this->branches = collect();
-        $this->github_apps = GithubApp::private();
     }
 }
