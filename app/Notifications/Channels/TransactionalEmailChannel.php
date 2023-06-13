@@ -12,11 +12,14 @@ class TransactionalEmailChannel
 {
     public function send(User $notifiable, Notification $notification): void
     {
+        $settings = InstanceSettings::get();
+        if ($settings->extra_attributes?->get('smtp_active') !== true) {
+            return;
+        }
         $email = $notifiable->email;
         if (!$email) {
             return;
         }
-        $settings = InstanceSettings::get();
         $this->bootConfigs($settings);
         $mailMessage = $notification->toMail($notifiable);
 

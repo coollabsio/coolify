@@ -24,12 +24,17 @@
                 <h3 class="pb-4">Invite a new member</h3>
             @else
                 <h3>Invite a new member</h3>
-                <div class="pb-4 text-xs text-warning">You need to configure SMTP settings before you can invite a
-                    new
-                    member
-                    via
-                    email.
-                </div>
+                @if (auth()->user()->isInstanceAdmin())
+                    <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
+                            class="underline text-warning">Transactional Emails</a>
+                        before
+                        you can invite a
+                        new
+                        member
+                        via
+                        email.
+                    </div>
+                @endif
             @endif
             <livewire:team.invite-link />
         </div>
