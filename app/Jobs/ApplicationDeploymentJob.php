@@ -92,13 +92,29 @@ class ApplicationDeploymentJob implements ShouldQueue
     public function handle(): void
     {
         try {
+            ray()->clearScreen();
             if ($this->application->deploymentType() === 'source') {
                 $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
             }
 
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
+
             if ($this->pull_request_id !== 0) {
                 ray('Deploying pull/' . $this->pull_request_id . '/head for application: ' . $this->application->name);
+                if ($this->application->fqdn) {
+                    $preview_fqdn = data_get($this->preview, 'fqdn');
+                    $template = $this->application->preview_url_template;
+                    $url = Url::fromString($this->application->fqdn);
+                    $host = $url->getHost();
+                    $schema = $url->getScheme();
+                    $random = new Cuid2(7);
+                    $preview_fqdn = str_replace('{{random}}', $random, $template);
+                    $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                    $preview_fqdn = str_replace('{{pr_id}}', $this->pull_request_id, $preview_fqdn);
+                    $preview_fqdn = "$schema://$preview_fqdn";
+                    $this->preview->fqdn = $preview_fqdn;
+                    $this->preview->save();
+                }
                 $this->deploy_pull_request();
             } else {
                 $this->deploy();
@@ -203,6 +219,12 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     }
     private function deploy_pull_request()
     {
+        dispatch(new ApplicationPullRequestUpdateJob(
+            application_id: $this->application->id,
+            pull_request_id: $this->pull_request_id,
+            deployment_uuid: $this->deployment_uuid,
+            status: 'in_progress'
+        ));
         $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
         $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
         $this->container_name = generate_container_name($this->application->uuid, $this->pull_request_id);
@@ -282,12 +304,12 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             ]);
             $this->activity->save();
         }
-        dispatch(new ApplicationContainerStatusJob(
-            application: $this->application,
-            container_name: $this->container_name,
-            pull_request_id: $this->pull_request_id
+        dispatch(new ApplicationPullRequestUpdateJob(
+            application_id: $this->application->id,
+            pull_request_id: $this->pull_request_id,
+            deployment_uuid: $this->deployment_uuid,
+            status: $status
         ));
-
         queue_next_deployment($this->application);
     }
     private function execute_in_builder(string $command)

@@ -115,7 +115,7 @@
                     default_permissions: {
                         contents: 'read',
                         metadata: 'read',
-                        pull_requests: 'read',
+                        pull_requests: 'write',
                         emails: 'read'
                     },
                     default_events: ['pull_request', 'push']

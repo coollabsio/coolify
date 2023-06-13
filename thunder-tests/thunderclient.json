@@ -3,7 +3,7 @@
     "_id": "b3d379ab-e5e4-4ba4-991d-b6c8c6bbcb98",
     "colId": "e6458286-eef1-401c-be84-860b111d66f0",
     "containerId": "b8cfd093-5467-44a2-9221-ad0207717310",
-    "name": "Push",
+    "name": "Public Push",
     "url": "http://localhost:8000/webhooks/source/github/events",
     "method": "POST",
     "sortNum": 10000,
@@ -51,12 +51,12 @@
     "_id": "b5386afc-ad91-428f-88ac-0f449c5c26fd",
     "colId": "e6458286-eef1-401c-be84-860b111d66f0",
     "containerId": "b8cfd093-5467-44a2-9221-ad0207717310",
-    "name": "PR - Opened",
+    "name": "Public PR - Opened",
     "url": "http://localhost:8000/webhooks/source/github/events",
     "method": "POST",
     "sortNum": 20000,
     "created": "2023-05-31T08:23:28.904Z",
-    "modified": "2023-05-31T09:07:17.450Z",
+    "modified": "2023-06-13T10:01:31.875Z",
     "headers": [
       {
         "name": "X-GitHub-Delivery",
@@ -99,12 +99,12 @@
     "_id": "7e7a3abd-dc01-454f-aa80-eaeb2c18aa56",
     "colId": "e6458286-eef1-401c-be84-860b111d66f0",
     "containerId": "b8cfd093-5467-44a2-9221-ad0207717310",
-    "name": "PR - Closed",
+    "name": "Public PR - Closed",
     "url": "http://localhost:8000/webhooks/source/github/events",
     "method": "POST",
     "sortNum": 30000,
     "created": "2023-05-31T09:15:15.833Z",
-    "modified": "2023-05-31T09:15:29.822Z",
+    "modified": "2023-06-13T08:34:27.203Z",
     "headers": [
       {
         "name": "X-GitHub-Delivery",

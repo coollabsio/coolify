@@ -81,3 +81,16 @@ function set_transanctional_email_settings()
         "local_domain" => null,
     ]);
 }
+
+function base_url()
+{
+    $settings = InstanceSettings::get();
+    if ($settings->fqdn) {
+        return $settings->fqdn;
+    } else {
+        if (config('app.env') === 'local') {
+            return url('/') . ':8080';
+        }
+        return url('/');
+    }
+}

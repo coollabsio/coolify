@@ -8,6 +8,7 @@ class ApplicationPreview extends BaseModel
         'uuid',
         'pull_request_id',
         'pull_request_html_url',
+        'pull_request_issue_comment_id',
         'fqdn',
         'status',
         'application_id',

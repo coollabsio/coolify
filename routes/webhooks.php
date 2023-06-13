@@ -100,14 +100,13 @@ Route::post('/source/github/events', function () {
         if (!$id || !$branch) {
             return response('Nothing to do. No id or branch found.');
         }
-        $applications = Application::where('repository_project_id', $id);
+        $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
         if ($x_github_event === 'push') {
             $applications = $applications->where('git_branch', $branch)->get();
         }
         if ($x_github_event === 'pull_request') {
             $applications = $applications->where('git_branch', $base_branch)->get();
         }
-
         if ($applications->isEmpty()) {
             return response('Nothing to do. No applications found.');
         }

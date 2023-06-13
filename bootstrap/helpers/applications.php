@@ -46,6 +46,7 @@ function queue_next_deployment(Application $application)
             application_id: $next_found->application_id,
             deployment_uuid: $next_found->deployment_uuid,
             force_rebuild: $next_found->force_rebuild,
+            pull_request_id: $next_found->pull_request_id
         ));
     }
 }

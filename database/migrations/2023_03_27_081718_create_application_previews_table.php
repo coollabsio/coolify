@@ -16,6 +16,7 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->integer('pull_request_id');
             $table->string('pull_request_html_url');
+            $table->integer('pull_request_issue_comment_id')->nullable();
 
             $table->string('fqdn')->unique()->nullable();
             $table->string('status')->default('exited');

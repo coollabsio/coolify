@@ -2,6 +2,7 @@
 
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
@@ -47,15 +48,22 @@ function generate_github_jwt_token(GithubApp $source)
     return $issuedToken;
 }
 
-function get_from_git_api(GithubApp|GitlabApp $source, $endpoint)
+function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method = 'get', array|null $data = null, bool $throwError = true)
 {
     if ($source->getMorphClass() == 'App\Models\GithubApp') {
         if ($source->is_public) {
-            $response = Http::github($source->api_url)->get($endpoint);
+            $response = Http::github($source->api_url)->$method($endpoint);
+        } else {
+            $github_access_token = generate_github_installation_token($source);
+            if ($data && ($method === 'post' || $method === 'patch' || $method === 'put')) {
+                $response = Http::github($source->api_url, $github_access_token)->$method($endpoint, $data);
+            } else {
+                $response = Http::github($source->api_url, $github_access_token)->$method($endpoint);
+            }
         }
     }
     $json = $response->json();
-    if ($response->status() !== 200) {
+    if ($response->failed() && $throwError) {
         throw new \Exception("Failed to get data from {$source->name} with error: " . $json['message']);
     }
     return [

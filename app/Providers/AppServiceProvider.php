@@ -19,10 +19,18 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Http::macro('github', function (string $api_url) {
-            return Http::withHeaders([
-                'Accept' => 'application/vnd.github.v3+json'
-            ])->baseUrl($api_url);
+        Http::macro('github', function (string $api_url, string|null $github_access_token = null) {
+            if ($github_access_token) {
+                return Http::withHeaders([
+                    'X-GitHub-Api-Version' => '2022-11-28',
+                    'Accept' => 'application/vnd.github.v3+json',
+                    'Authorization' => "Bearer $github_access_token",
+                ])->baseUrl($api_url);
+            } else {
+                return Http::withHeaders([
+                    'Accept' => 'application/vnd.github.v3+json',
+                ])->baseUrl($api_url);
+            }
         });
     }
 }

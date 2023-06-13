@@ -34,7 +34,6 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             $status = get_container_status(server: $this->application->destination->server, container_id: $this->container_name, throwError: false);
-            ray('ApplicationContainerStatusJob', $status);
             if ($this->pull_request_id) {
                 $preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
                 $preview->status = $status;

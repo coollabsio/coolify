@@ -66,7 +66,7 @@ class PublicGitRepository extends Component
         $this->get_git_source();
 
         try {
-            ['data' => $data] = get_from_git_api($this->git_source, "/repos/{$this->git_repository}/branches");
+            ['data' => $data] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches");
             $this->branches = collect($data)->pluck('name')->toArray();
         } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
