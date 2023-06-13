@@ -38,7 +38,7 @@ textarea {
     @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar;
 }
 select {
-    @apply h-7 select select-sm text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
+    @apply h-7 select select-xs text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
 }
 .loading {
     @apply w-4 text-warning;

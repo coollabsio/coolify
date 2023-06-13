@@ -14,7 +14,7 @@
             <div class="relative" role="dialog" aria-modal="true" v-if="showCommandPalette" @keyup.esc="resetState">
                 <div class="fixed inset-0 transition-opacity bg-opacity-90 bg-coolgray-100" @click.self="resetState">
                 </div>
-                <div class="fixed inset-0 p-4 mx-auto overflow-y-auto md:w-[70rem] sm:p-10 md:px-20"
+                <div class="fixed inset-0 p-4 mx-auto overflow-y-auto lg:w-[70rem] sm:p-10 md:px-20"
                     @click.self="resetState">
                     <div class="overflow-hidden transition-all transform bg-coolgray-200 ring-1 ring-black ring-opacity-5">
                         <div class="relative">

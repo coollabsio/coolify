@@ -38,10 +38,8 @@
     <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
-            function changeType(id) {
-                console.log(id)
+            function changePasswordFieldType(id) {
                 const input = document.getElementById(id);
-                console.log(input)
                 if (input.type === 'password') {
                     input.type = 'text';
                 } else {
