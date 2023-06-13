@@ -61,7 +61,7 @@ Route::post('/source/github/events', function () {
         $x_github_delivery = request()->header('X-GitHub-Delivery');
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
         $x_github_hook_installation_target_id = request()->header('X-GitHub-Hook-Installation-Target-Id');
-        $x_hub_signature_256 = request()->header('X-Hub-Signature-256');
+        $x_hub_signature_256 = Str::after(request()->header('X-Hub-Signature-256'), 'sha256=');
         $payload = request()->collect();
         if ($x_github_event === 'ping') {
             // Just pong
@@ -72,13 +72,15 @@ Route::post('/source/github/events', function () {
             return response('cool');
         }
         $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->firstOrFail();
-        // TODO: Verify signature
-        // $webhook_secret = data_get($github_app, 'webhook_secret');
-        // $key = hash('sha256', $webhook_secret, true);
-        // $hmac = hash_hmac('sha256', request()->getContent(), $key);
-        // if (!hash_equals($hmac, $x_hub_signature_256)) {
-        //     return response('not cool');
-        // }
+
+        $webhook_secret = data_get($github_app, 'webhook_secret');
+        $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
+        ray($hmac, $x_hub_signature_256)->blue();
+        if (config('app.env') !== 'local') {
+            if (!hash_equals($x_hub_signature_256, $hmac)) {
+                return response('not cool');
+            }
+        }
 
         if ($x_github_event === 'push') {
             $id = data_get($payload, 'repository.id');

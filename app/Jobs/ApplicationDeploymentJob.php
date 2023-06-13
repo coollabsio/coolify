@@ -92,7 +92,6 @@ class ApplicationDeploymentJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            ray()->clearScreen();
             if ($this->application->deploymentType() === 'source') {
                 $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
             }
@@ -100,7 +99,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             $this->workdir = "/artifacts/{$this->deployment_uuid}";
 
             if ($this->pull_request_id !== 0) {
-                ray('Deploying pull/' . $this->pull_request_id . '/head for application: ' . $this->application->name);
+                ray('Deploying pull/' . $this->pull_request_id . '/head for application: ' . $this->application->name)->green();
                 if ($this->application->fqdn) {
                     $preview_fqdn = data_get($this->preview, 'fqdn');
                     $template = $this->application->preview_url_template;
@@ -253,13 +252,13 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}...'",
         ]);
         $this->start_builder_image();
-        ray('Rollback Commit: ' . $this->rollback_commit);
+        ray('Rollback Commit: ' . $this->rollback_commit)->green();
         if ($this->rollback_commit === 'HEAD') {
             $this->clone_repository();
         }
         $this->build_image_name = "{$this->application->uuid}:{$this->git_commit}-build";
         $this->production_image_name = "{$this->application->uuid}:{$this->git_commit}";
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name:' . $this->production_image_name);
+        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name:' . $this->production_image_name)->green();
         if (!$this->force_rebuild) {
             $this->execute_now([
                 "docker images -q {$this->application->uuid}:{$this->git_commit} 2>/dev/null",
@@ -295,7 +294,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function next(string $status)
     {
         if (!Str::of($this->application_deployment_queue->status)->startsWith('cancelled')) {
-            ray('Next Status: ' . $status);
+            ray('Next Status: ' . $status)->green();
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
@@ -319,14 +318,14 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     private function generate_environment_variables($ports)
     {
         $environment_variables = collect();
-        ray('Generate Environment Variables');
+        ray('Generate Environment Variables')->green();
         if ($this->pull_request_id === 0) {
-            ray($this->application->runtime_environment_variables);
+            ray($this->application->runtime_environment_variables)->green();
             foreach ($this->application->runtime_environment_variables as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
         } else {
-            ray($this->application->runtime_environment_variables_preview);
+            ray($this->application->runtime_environment_variables_preview)->green();
             foreach ($this->application->runtime_environment_variables_preview as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
@@ -451,7 +450,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             }
             $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
         }
-        ray('local_persistent_volumes', $local_persistent_volumes);
+        ray('local_persistent_volumes', $local_persistent_volumes)->green();
         return $local_persistent_volumes;
     }
 
@@ -581,13 +580,13 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         } else {
             $commandText = collect($command)->implode("\n");
         }
-        ray('Executing command: ' . $commandText);
+        ray('Executing command: ' . $commandText)->green();
         $this->activity->properties = $this->activity->properties->merge([
             'command' => $commandText,
         ]);
         $this->activity->save();
         if ($isDebuggable && !$this->application->settings->is_debug_enabled) {
-            ray('Debugging is disabled for this application. Skipping command.');
+            ray('Debugging is disabled for this application. Skipping command.')->green();
             $hideFromOutput = true;
         }
         $remote_process = resolve(RunRemoteProcess::class, [
