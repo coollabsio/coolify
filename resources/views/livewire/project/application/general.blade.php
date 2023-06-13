@@ -77,8 +77,8 @@
             <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                 id="is_auto_deploy_enabled" label="Auto Deploy" />
             <x-forms.checkbox
-                helper="Automatically deploy Preview Deployments for all opened PR's. Closed PRs deletes Preview Deployments."
-                instantSave id="is_preview_deployments_enabled" label="Auto Previews Deployments" />
+                helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
+                instantSave id="is_preview_deployments_enabled" label="Previews Deployments" />
             <x-forms.checkbox instantSave id="is_git_submodules_enabled" label="Git Submodules"
                 helper="Allow Git Submodules during build process." />
             <x-forms.checkbox instantSave id="is_git_lfs_enabled" label="Git LFS"
