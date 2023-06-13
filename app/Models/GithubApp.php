@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class GithubApp extends BaseModel
 {
-    protected $fillable = ['name', 'uuid', 'organization', 'api_url', 'html_url', 'custom_user', 'custom_port', 'team_id'];
+    protected $fillable = ['name', 'uuid', 'organization', 'api_url', 'html_url', 'custom_user', 'custom_port', 'team_id', 'client_secret', 'webhook_secret'];
     protected $appends = ['type'];
     protected $casts = [
         'is_public' => 'boolean',
