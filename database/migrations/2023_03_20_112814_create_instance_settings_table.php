@@ -13,6 +13,7 @@ return new class extends Migration
     {
         Schema::create('instance_settings', function (Blueprint $table) {
             $table->id();
+            $table->string('public_ip_address')->nullable();
             $table->string('fqdn')->nullable();
             $table->string('wildcard_domain')->nullable();
             $table->string('default_redirect_404')->nullable();

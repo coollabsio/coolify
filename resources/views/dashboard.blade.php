@@ -17,6 +17,5 @@
             <div class="stat-value">{{ $resources }}</div>
             <div class="stat-desc">Applications, databases, etc...</div>
         </div>
-
     </div>
 </x-layout>

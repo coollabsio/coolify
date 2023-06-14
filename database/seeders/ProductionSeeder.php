@@ -13,6 +13,7 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
 class ProductionSeeder extends Seeder
@@ -104,6 +105,17 @@ class ProductionSeeder extends Seeder
                 'network' => 'coolify',
                 'server_id' => 0,
             ]);
+        }
+        try {
+            $ip = Process::run('curl -4s https://ifconfig.io')->output;
+            $ip = trim($ip);
+            $ip = filter_var($ip, FILTER_VALIDATE_IP);
+            $settings = InstanceSettings::get();
+            if ($settings->public_ip_address !== $ip) {
+                $settings->update(['public_ip_address' => $ip]);
+            }
+        } catch (\Exception $e) {
+            echo "Error: {$e->getMessage()}\n";
         }
     }
 }
