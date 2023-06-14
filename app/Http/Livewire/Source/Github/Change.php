@@ -14,7 +14,6 @@ class Change extends Component
     public string|null $fqdn;
     public $parameters;
     public GithubApp $github_app;
-    public string $installation_url;
     public string $name;
     public bool $is_system_wide;
 

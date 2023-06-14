@@ -9,7 +9,7 @@
                     <x-forms.button x-on:click.prevent="deleteSource = true">
                         Delete
                     </x-forms.button>
-                    <a href="{{ $installation_url }}">
+                    <a href="{{ get_installation_path($github_app) }}">
                         <x-forms.button>
                             @if ($github_app->installation_id)
                                 Update Repositories

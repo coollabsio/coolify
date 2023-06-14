@@ -2,7 +2,7 @@
 
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
@@ -70,4 +70,11 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
         'data' => collect($json)
     ];
+}
+function get_installation_path(GithubApp $source)
+{
+    $github = GithubApp::where('uuid', $source->uuid)->first();
+    $name = Str::of(Str::kebab($github->name));
+    $installation_path = $github->html_url === 'https://github.com' ? 'apps' : 'github-apps';
+    return "$github->html_url/$installation_path/$name/installations/new";
 }
