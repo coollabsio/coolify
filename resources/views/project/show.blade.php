@@ -4,7 +4,7 @@
         <livewire:project.delete-project :project_id="$project->id" :resource_count="$project->applications->count()" />
     </div>
     <div class="pt-2 pb-10 text-sm">{{ $project->name }}.</div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid lg:grid-cols-2 gap-2">
         @forelse ($project->environments as $environment)
             <a class="box" href="{{ route('project.resources', [$project->uuid, $environment->name]) }}">
                 {{ $environment->name }}

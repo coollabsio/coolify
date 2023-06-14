@@ -14,7 +14,7 @@ body {
     @apply scrollbar min-h-screen bg-coolgray-100 text-neutral-400 antialiased;
 }
 main {
-    @apply px-32 xl:px-14 mx-auto max-w-screen-xl pt-4;
+    @apply pl-24 pr-10 lg:px-14 mx-auto max-w-screen-xl pt-4;
 }
 
 input[type="checkbox"] {

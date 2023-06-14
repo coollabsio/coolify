@@ -22,6 +22,7 @@ class ServerSeeder extends Seeder
         $private_key_1 = PrivateKey::find(1);
 
         Server::create([
+            'id' => 0,
             'name' => "testing-local-docker-container",
             'description' => "This is a test docker container",
             'ip' => "coolify-testing-host",

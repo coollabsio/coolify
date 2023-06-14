@@ -1,4 +1,4 @@
-<div class="grid grid-cols-2">
+<div class="grid lg:grid-cols-2 gap-2">
     @forelse ($private_keys as $private_key)
         <x-forms.button wire:click='setPrivateKey({{ $private_key->id }})'>{{ $private_key->name }}
         </x-forms.button>

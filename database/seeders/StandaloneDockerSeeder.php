@@ -15,7 +15,7 @@ class StandaloneDockerSeeder extends Seeder
      */
     public function run(): void
     {
-        $server_1 = Server::find(1);
+        $server_1 = Server::find(0);
         StandaloneDocker::create([
             'name' => 'Standalone Docker 1',
             'network' => 'coolify',

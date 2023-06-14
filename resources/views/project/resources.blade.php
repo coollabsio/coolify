@@ -28,7 +28,7 @@
     @if ($environment->applications->count() === 0)
         <p>No resources found.</p>
     @endif
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid lg:grid-cols-2 gap-2">
         @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">

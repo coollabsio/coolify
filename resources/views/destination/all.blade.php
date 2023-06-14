@@ -1,7 +1,7 @@
 <x-layout>
     <h1>Destinations</h1>
     <div class="pt-2 pb-10 text-sm">All Destinations</div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid lg:grid-cols-2 gap-2">
         @forelse ($destinations as $destination)
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
                 <a class="flex gap-4 text-center hover:no-underline box group"

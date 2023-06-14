@@ -13,7 +13,6 @@
                     </tr>
                 </thead>
                 <tbody x-data>
-
                     @foreach ($invitations as $invite)
                         <tr>
                             <td>{{ $invite->email }}</td>

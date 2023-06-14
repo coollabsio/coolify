@@ -303,12 +303,17 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             ]);
             $this->activity->save();
         }
-        dispatch(new ApplicationPullRequestUpdateJob(
-            application_id: $this->application->id,
-            pull_request_id: $this->pull_request_id,
-            deployment_uuid: $this->deployment_uuid,
-            status: $status
-        ));
+        if ($this->pull_request_id) {
+            dispatch(new ApplicationPullRequestUpdateJob(
+                application_id: $this->application->id,
+                pull_request_id: $this->pull_request_id,
+                deployment_uuid: $this->deployment_uuid,
+                status: $status
+            ));
+        }
+        if ($this->application->fqdn) {
+            dispatch(new InstanceProxyCheckJob());
+        }
         queue_next_deployment($this->application);
     }
     private function execute_in_builder(string $command)

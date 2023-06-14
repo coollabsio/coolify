@@ -7,7 +7,8 @@
                         <x-chevron-down />
                     </label>
                     <div class="absolute hidden group-hover:block ">
-                        <ul tabindex="0" class="text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
+                        <ul tabindex="0"
+                            class="relative text-xs text-white normal-case rounded -ml-28 min-w-max menu bg-coolgray-200">
                             <li>
                                 <a target="_blank"
                                     class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
@@ -25,7 +26,7 @@
                     </label>
                     <div class="absolute hidden group-hover:block ">
                         <ul tabindex="0"
-                            class="mt-1 text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
+                            class="relative text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200 -ml-14">
                             <li>
                                 <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
                                         xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"

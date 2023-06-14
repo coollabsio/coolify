@@ -1,7 +1,7 @@
 <x-layout>
     <h1>Sources</h1>
     <div class="pt-2 pb-10 text-sm">All Sources</div>
-    <div class="grid grid-cols-2 gap-2">
+    <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
                 <a class="flex gap-4 text-center hover:no-underline box group"

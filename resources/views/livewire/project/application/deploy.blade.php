@@ -5,7 +5,8 @@
         </label>
         <div class="absolute hidden group-hover:block ">
             @if ($application->status === 'running')
-                <ul tabindex="0" class="text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
+                <ul tabindex="0"
+                    class="relative text-xs text-white normal-case rounded -ml-44 min-w-max menu bg-coolgray-200">
                     <li>
                         <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"

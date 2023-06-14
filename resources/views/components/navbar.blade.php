@@ -1,5 +1,5 @@
 @auth
-    <nav class="fixed h-full pt-16 overflow-hidden">
+    <nav class="fixed h-full overflow-hidden pt-14">
         <ul class="gap-4 menu">
             <li>
                 <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>
@@ -73,7 +73,7 @@
     <div class="fixed right-0 p-2 top-1">
         <div class="group">
             <label tabindex="0"
-                class="absolute top-0 right-0 p-2 m-2 cursor-pointer hover:bg-transparent hover:text-warning">
+                class="absolute top-0 right-0 p-2 m-2 my-1 cursor-pointer hover:bg-transparent hover:text-warning">
                 <div class="flex items-center justify-center gap-2 placeholder">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">

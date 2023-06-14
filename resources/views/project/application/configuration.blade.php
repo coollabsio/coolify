@@ -1,9 +1,10 @@
 <x-layout>
     <h1>Configuration</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
-        <ol class="inline-flex items-center">
+    <nav class="flex pt-2 pb-10">
+        <ol class="flex items-center">
             <li class="inline-flex items-center">
-                <a href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                <a class="text-xs truncate lg:text-sm"
+                    href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
                     {{ $application->environment->project->name }}</a>
             </li>
             <li>
@@ -14,7 +15,7 @@
                             d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                             clip-rule="evenodd"></path>
                     </svg>
-                    <a
+                    <a class="text-xs truncate lg:text-sm"
                         href="{{ route('project.resources', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
                 </div>
             </li>
@@ -26,7 +27,7 @@
                             d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                             clip-rule="evenodd"></path>
                     </svg>
-                    <span>{{ data_get($application, 'name') }}</span>
+                    <span class="text-xs truncate lg:text-sm">{{ data_get($application, 'name') }}</span>
                 </div>
             </li>
             <li>

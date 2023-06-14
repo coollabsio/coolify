@@ -20,10 +20,11 @@
         <label tabindex="0" class="flex items-center gap-2 text-sm cursor-pointer hover:text-white"> Links
             <x-chevron-down />
         </label>
-        <div class="absolute hidden group-hover:block ">
-            <ul tabindex="0" class="text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
+        <div class="absolute hidden group-hover:block">
+            <ul tabindex="0"
+                class="relative -ml-24 text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
                 <li>
-                    <a target="_blank" class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                    <a target="_blank" class="text-xs text-white rounded-none hover:no-underline"
                         href="{{ $application->gitBranchLocation }}">
                         <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
                         Git Repository

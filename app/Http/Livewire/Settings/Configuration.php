@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Settings;
 
+use App\Jobs\InstanceProxyCheckJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
@@ -193,12 +194,11 @@ class Configuration extends Component
         $this->settings->save();
 
         $this->dynamic_config_path = '/data/coolify/proxy/dynamic';
-        if (config('app.env') == 'local') {
-            $this->server = Server::findOrFail(1);
-        } else {
-            $this->server = Server::findOrFail(0);
-        }
+        $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
         $this->setup_default_redirect_404();
+        if ($this->settings->fqdn || $this->settings->default_redirect_404) {
+            dispatch(new InstanceProxyCheckJob());
+        }
     }
 }
