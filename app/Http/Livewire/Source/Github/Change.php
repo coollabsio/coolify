@@ -8,7 +8,10 @@ use Livewire\Component;
 
 class Change extends Component
 {
-    public string $host;
+    public string $webhook_endpoint;
+    public string|null $ipv4;
+    public string|null $ipv6;
+    public string|null $fqdn;
     public $parameters;
     public GithubApp $github_app;
     public string $installation_url;
@@ -23,12 +26,18 @@ class Change extends Component
         'github_app.custom_user' => 'required|string',
         'github_app.custom_port' => 'required|int',
         'github_app.app_id' => 'required|int',
-        'github_app.installation_id' => 'required|int',
-        'github_app.client_id' => 'required|string',
-        'github_app.client_secret' => 'required|string',
-        'github_app.webhook_secret' => 'required|string',
+        'github_app.installation_id' => 'nullable',
+        'github_app.client_id' => 'nullable',
+        'github_app.client_secret' => 'nullable',
+        'github_app.webhook_secret' => 'nullable',
         'github_app.is_system_wide' => 'required|bool',
     ];
+    public function mount()
+    {
+        $this->webhook_endpoint = $this->ipv4;
+        $this->parameters = get_parameters();
+        $this->is_system_wide = $this->github_app->is_system_wide;
+    }
     public function submit()
     {
         try {
@@ -48,15 +57,7 @@ class Change extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
-    public function mount()
-    {
-        $settings = InstanceSettings::get();
-        if ($settings->fqdn) {
-            $this->host = $settings->fqdn;
-        }
-        $this->parameters = get_parameters();
-        $this->is_system_wide = $this->github_app->is_system_wide;
-    }
+
     public function delete()
     {
         try {

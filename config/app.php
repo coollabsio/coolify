@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Facade;
 
 return [
 
+    'port' => env('APP_PORT', 8000),
     /*
     |--------------------------------------------------------------------------
     | Application Name

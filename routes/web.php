@@ -101,18 +101,22 @@ Route::middleware(['auth'])->group(function () {
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
         $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
-        $name = Str::of(Str::kebab($github_app->name))->start('coolify-');
         $settings = InstanceSettings::get();
-        $host = $request->schemeAndHttpHost();
-        if ($settings->fqdn) {
-            $host = $settings->fqdn;
-        }
+        $name = Str::of(Str::kebab($github_app->name));
         $installation_path = $github_app->html_url === 'https://github.com' ? 'apps' : 'github-apps';
         $installation_url = "$github_app->html_url/$installation_path/$name/installations/new";
+        if ($settings->public_ipv4) {
+            $ipv4 = 'http://' . $settings->public_ipv4 . ':' . config('app.port');
+        }
+        if ($settings->public_ipv6) {
+            $ipv6 = 'http://' . $settings->public_ipv6 . ':' . config('app.port');
+        }
         return view('source.github.show', [
             'github_app' => $github_app,
-            'host' => $host,
             'name' => $name,
+            'ipv4' => $ipv4 ?? null,
+            'ipv6' => $ipv6 ?? null,
+            'fqdn' => $settings->fqdn,
             'installation_url' => $installation_url,
         ]);
     })->name('source.github.show');
