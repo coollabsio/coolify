@@ -4,9 +4,9 @@
             <x-chevron-down />
         </label>
         <div class="absolute hidden group-hover:block ">
-            @if ($application->status === 'running')
-                <ul tabindex="0"
-                    class="relative text-xs text-white normal-case rounded -ml-44 min-w-max menu bg-coolgray-200">
+            <ul tabindex="0"
+                class="relative text-xs text-white normal-case rounded -ml-44 min-w-max menu bg-coolgray-200">
+                @if ($application->status === 'running')
                     <li>
                         <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
@@ -67,9 +67,7 @@
                                     d="M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47" />
                             </svg>Stop</div>
                     </li>
-                </ul>
-            @else
-                <ul tabindex="0" class="text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
+                @else
                     <li>
                         <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
@@ -114,8 +112,8 @@
                             cache)
                         </div>
                     </li>
-                </ul>
-            @endif
+                @endif
+            </ul>
         </div>
     </div>
 </div>
