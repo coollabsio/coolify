@@ -11,7 +11,7 @@ class EmailChannel
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
-        $is_test_notification = $notification instanceof \App\Notifications\TestNotification;
+        $is_test_notification = $notification instanceof  \App\Notifications\Notifications\TestNotification;
 
         if ($is_test_notification) {
             $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');

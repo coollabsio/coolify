@@ -4,7 +4,7 @@ namespace App\Http\Livewire\Notifications;
 
 use App\Models\Server;
 use App\Models\Team;
-use App\Notifications\TestNotification;
+use App\Notifications\Notifications\TestNotification;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 

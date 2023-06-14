@@ -11,7 +11,6 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
-use App\Models\Team;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -45,15 +44,6 @@ class ProductionSeeder extends Seeder
                 'team_id' => 0,
             ]);
         }
-
-        // Add first Team if it doesn't exist
-        // if (Team::find(0) == null) {
-        //     Team::create([
-        //         'id' => 0,
-        //         'name' => "Root's Team",
-        //         'personal_team' => true,
-        //     ]);
-        // }
 
         // Save SSH Keys for the Coolify Host
         $coolify_key_name = "id.root@host.docker.internal";
@@ -107,19 +97,22 @@ class ProductionSeeder extends Seeder
             ]);
         }
         try {
-            $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
-            $ipv4 = trim($ipv4);
-            $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
             $settings = InstanceSettings::get();
-            if (is_null($settings->public_ipv4) && $ipv4) {
-                $settings->update(['public_ipv4' => $ipv4]);
+            if (is_null($settings->public_ipv4)) {
+                $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
+                if ($ipv4) {
+                    $ipv4 = trim($ipv4);
+                    $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
+                    $settings->update(['public_ipv4' => $ipv4]);
+                }
             }
-            $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
-            $ipv6 = trim($ipv6);
-            $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
-            $settings = InstanceSettings::get();
-            if (is_null($settings->public_ipv6) && $ipv6) {
-                $settings->update(['public_ipv6' => $ipv6]);
+            if (is_null($settings->public_ipv6)) {
+                $ipv6 = Process::run('curl -6s https://ifconfig.io')->output();
+                if ($ipv6) {
+                    $ipv6 = trim($ipv6);
+                    $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+                    $settings->update(['public_ipv6' => $ipv6]);
+                }
             }
         } catch (\Exception $e) {
             echo "Error: {$e->getMessage()}\n";

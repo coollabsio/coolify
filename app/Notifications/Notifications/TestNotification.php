@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications;
+namespace App\Notifications\Notifications;
 
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
@@ -29,6 +29,6 @@ class TestNotification extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return 'You have successfully received a test Discord notification from Coolify. 🥳 [Go to your dashboard](' . url('/') . ')';
+        return 'You have successfully received a test Discord notification from Coolify. 🥳 [Go to your dashboard](' . base_url() . ')';
     }
 }
