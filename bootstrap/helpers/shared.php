@@ -87,10 +87,13 @@ function base_url()
     $settings = InstanceSettings::get();
     if ($settings->fqdn) {
         return $settings->fqdn;
-    } else {
-        if (config('app.env') === 'local') {
-            return url('/') . ':8080';
-        }
-        return url('/');
     }
+    $port = config('app.port');
+    if ($settings->public_ipv4) {
+        return "http://{$settings->public_ipv4}:{$port}";
+    }
+    if ($settings->public_ipv6) {
+        return "http://{$settings->public_ipv6}:{$port}";
+    }
+    return url('/');
 }
