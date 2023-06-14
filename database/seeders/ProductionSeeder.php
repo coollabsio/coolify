@@ -107,12 +107,19 @@ class ProductionSeeder extends Seeder
             ]);
         }
         try {
-            $ip = Process::run('curl -4s https://ifconfig.io')->output;
-            $ip = trim($ip);
-            $ip = filter_var($ip, FILTER_VALIDATE_IP);
+            $ipv4 = Process::run('curl -4s https://ifconfig.io')->output;
+            $ipv4 = trim($ipv4);
+            $ipv4 = filter_var($ipv4, FILTER_VALIDATE_IP);
             $settings = InstanceSettings::get();
-            if ($settings->public_ip_address !== $ip) {
-                $settings->update(['public_ip_address' => $ip]);
+            if (is_null($settings->public_ipv4)) {
+                $settings->update(['public_ipv4' => $ipv4]);
+            }
+            $ipv6 = Process::run('curl -6s https://ifconfig.io')->output;
+            $ipv6 = trim($ipv6);
+            $ipv6 = filter_var($ipv6, FILTER_VALIDATE_IP);
+            $settings = InstanceSettings::get();
+            if (is_null($settings->public_ipv6)) {
+                $settings->update(['public_ipv6' => $ipv6]);
             }
         } catch (\Exception $e) {
             echo "Error: {$e->getMessage()}\n";
