@@ -62,26 +62,43 @@
                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                 instantSave id="is_system_wide" />
         @else
-            <div class="text-sm ">You need to register a GitHub App before using this source.</div>
-            <div class="flex items-end gap-4 pt-2 pb-10">
-                <form class="flex gap-2">
-                    <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
-                        helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
-                        @if ($ipv4)
-                            <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                        @endif
-                        @if ($ipv6)
-                            <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                        @endif
-                        @if ($fqdn)
-                            <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                        @endif
-                    </x-forms.select>
-                    <x-forms.button x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}')">Register a GitHub
+            <form class="flex gap-4">
+                <div class="flex items-end gap-2">
+                    <h3>Register a GitHub App</h3>
+                    <x-forms.button
+                        x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
+                        Register a
+                        GitHub
                         Application
                     </x-forms.button>
-                </form>
-            </div>
+                </div>
+                <div class="pt-1 pb-2 text-sm">You need to register a GitHub App before using this source.</div>
+                <div class="pt-2 pb-10">
+                    <div class="flex items-end gap-2">
+                        <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
+                            helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
+                            @if ($ipv4)
+                                <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                            @endif
+                            @if ($ipv6)
+                                <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                            @endif
+                            @if ($fqdn)
+                                <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                            @endif
+                        </x-forms.select>
+
+
+                    </div>
+                    <div class="flex flex-col gap-2 pt-4">
+                        <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"
+                            helper="Contents: read<br>Metadata: read<br>Email: read" />
+                        <x-forms.checkbox instantSave id="preview_deployment_permissions"
+                            label="Preview Deployments Permission"
+                            helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
+                    </div>
+                </div>
+            </form>
             <div class="flex gap-2">
                 <x-forms.input id="github_app.name" label="App Name" disabled />
                 <x-forms.input id="github_app.organization" label="Organization"
@@ -102,9 +119,9 @@
             </div>
             <x-forms.checkbox
                 helper="If checked, this GitHub App will be available for everyone in this Coolify instance." noDirty
-                label="System Wide?" instantSave disabled id="is_system_wide" />
+                label="System Wide?" disabled id="is_system_wide" />
             <script>
-                function createGithubApp(webhook_endpoint) {
+                function createGithubApp(webhook_endpoint, preview_deployment_permissions) {
                     const {
                         organization,
                         uuid,
@@ -119,6 +136,14 @@
                     }
                     const webhookBaseUrl = `${baseUrl}/webhooks`;
                     const path = organization ? `organizations/${organization}/settings/apps/new` : 'settings/apps/new';
+                    const default_permissions = {
+                        contents: 'read',
+                        metadata: 'read',
+                        emails: 'read'
+                    };
+                    if (preview_deployment_permissions) {
+                        default_permissions.pull_requests = 'write';
+                    }
                     const data = {
                         name,
                         url: baseUrl,
@@ -132,12 +157,7 @@
                         request_oauth_on_install: false,
                         setup_url: `${webhookBaseUrl}/source/github/install?source=${uuid}`,
                         setup_on_update: true,
-                        default_permissions: {
-                            contents: 'read',
-                            metadata: 'read',
-                            pull_requests: 'write',
-                            emails: 'read'
-                        },
+                        default_permissions,
                         default_events: ['pull_request', 'push']
                     };
                     const form = document.createElement('form');

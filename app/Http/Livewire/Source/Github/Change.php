@@ -12,6 +12,10 @@ class Change extends Component
     public string|null $ipv4;
     public string|null $ipv6;
     public string|null $fqdn;
+
+    public bool|null $default_permissions = true;
+    public bool|null $preview_deployment_permissions = true;
+
     public $parameters;
     public GithubApp $github_app;
     public string $name;
@@ -48,13 +52,6 @@ class Change extends Component
     }
     public function instantSave()
     {
-        try {
-            $this->github_app->is_system_wide = $this->is_system_wide;
-            $this->github_app->save();
-            $this->emit('saved', 'GitHub settings updated!');
-        } catch (\Exception $e) {
-            return general_error_handler(err: $e, that: $this);
-        }
     }
 
     public function delete()

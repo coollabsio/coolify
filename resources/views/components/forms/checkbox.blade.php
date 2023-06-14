@@ -8,7 +8,7 @@
     'noDirty' => $attributes->has('noDirty'),
     'disabled' => null,
 ])
-<label {{ $attributes->merge(['class' => 'flex cursor-pointer w-64 label']) }}>
+<div {{ $attributes->merge(['class' => 'flex cursor-pointer w-96 label']) }}>
     <div class="flex gap-1 label-text">
         @if ($label)
             {{ $label }}
@@ -16,7 +16,7 @@
             {{ $id }}
         @endif
         @if ($helper)
-            <div class="group">
+            <div class="group w-fit">
                 <div class="cursor-pointer text-warning">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                         class="w-4 h-4 stroke-current">
@@ -36,4 +36,4 @@
     <input type="checkbox" @if ($disabled !== null) disabled @endif name={{ $id }}
         @if (!$noDirty) wire:dirty.class="input-warning" @endif
         @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
-</label>
+</div>
