@@ -9,6 +9,18 @@ use Livewire\Component;
 class Upgrade extends Component
 {
     public bool $showProgress = false;
+    public bool $isUpgradeAvailable = false;
+
+    public function checkUpdate()
+    {
+        $latestVersion = get_latest_version_of_coolify();
+        $currentVersion = config('version');
+        version_compare($currentVersion, $latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
+        if (config('app.env') === 'local') {
+            $this->isUpgradeAvailable = true;
+        }
+        ray($this->isUpgradeAvailable);
+    }
     public function upgrade()
     {
         try {
