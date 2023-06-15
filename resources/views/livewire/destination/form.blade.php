@@ -6,9 +6,11 @@
             <x-forms.button wire:click.prevent='submit' type="submit">
                 Save
             </x-forms.button>
-            <x-forms.button x-on:click.prevent="deleteDestination = true">
-                Delete
-            </x-forms.button>
+            @if ($destination->network !== 'coolify')
+                <x-forms.button x-on:click.prevent="deleteDestination = true">
+                    Delete
+                </x-forms.button>
+            @endif
         </div>
 
         @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')

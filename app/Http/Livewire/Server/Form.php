@@ -8,7 +8,6 @@ use Livewire\Component;
 
 class Form extends Component
 {
-    public $server_id;
     public Server $server;
     public $uptime;
     public $dockerVersion;
@@ -22,10 +21,6 @@ class Form extends Component
         'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required'
     ];
-    public function mount()
-    {
-        $this->server = Server::find($this->server_id)->load(['settings']);
-    }
     public function installDocker()
     {
         $activity = resolve(InstallDocker::class)($this->server);

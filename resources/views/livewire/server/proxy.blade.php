@@ -19,7 +19,7 @@
                                 @endif
                                 <livewire:server.proxy.status :server="$server" />
                             </div>
-                            <div class="pb-4 text-sm">Traefik v2</div>
+                            <div class="pt-3 pb-4 text-sm">Traefik v2</div>
                             @if (
                                 $server->extra_attributes->proxy_last_applied_settings &&
                                     $server->extra_attributes->proxy_last_saved_settings !== $server->extra_attributes->proxy_last_applied_settings)

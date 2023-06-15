@@ -4,17 +4,10 @@
         <div class="flex gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">Save</x-forms.button>
-            @if ($server_id !== 0)
+            @if ($server->id !== 0)
                 <x-forms.button x-on:click.prevent="deleteServer = true">
                     Delete
                 </x-forms.button>
-            @endif
-            @if (!$server->settings->is_reachable)
-                <div class="w-full">
-                    <x-forms.button isHighlighted wire:click.prevent='validateServer'>
-                        Validate Server
-                    </x-forms.button>
-                </div>
             @endif
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
@@ -44,9 +37,8 @@
                 @endif
             </div>
         </div>
-
+        <h3 class="pb-4">Actions</h3>
         @if ($server->settings->is_reachable)
-            <h3 class="pt-8 pb-4">Quick Actions</h3>
             <div class="flex items-center gap-2">
                 <x-forms.button wire:click.prevent='validateServer'>
                     Check Server Details
@@ -58,14 +50,19 @@
                         Install Docker Engine
                     @endif
                 </x-forms.button>
-                {{-- <x-forms.button wire:click.prevent='installDocker'>Install Docker</x-forms.button> --}}
+            </div>
+        @else
+            <div class="w-full">
+                <x-forms.button isHighlighted wire:click.prevent='validateServer'>
+                    Validate Server
+                </x-forms.button>
             </div>
         @endif
         <div class="container w-full py-4 mx-auto">
             <livewire:activity-monitor :header="true" />
         </div>
         @isset($uptime)
-            <h3 class="pb-3">Server Info</h3>
+            <h4 class="pb-3">Server Info</h4>
             <div class="text-sm">
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
@@ -74,38 +71,4 @@
             </div>
         @endisset
     </form>
-    <div class="flex items-center gap-2 py-4">
-        <h3>Private Key</h3>
-        <a href="{{ route('server.private-key', ['server_uuid' => $server->uuid]) }}">
-            <x-forms.button>
-                @if (data_get($server, 'privateKey.uuid'))
-                    Change
-                @else
-                    Add
-                @endif
-            </x-forms.button>
-        </a>
-    </div>
-    @if (data_get($server, 'privateKey.uuid'))
-        <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
-            <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
-        </a>
-    @else
-        <div class="text-sm">No private key attached.</div>
-    @endif
-    <div class="flex items-center gap-2 py-4">
-        <h3>Destinations</h3>
-        <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">
-            <x-forms.button>Add</x-forms.button>
-        </a>
-    </div>
-    <div>
-        @forelse ($server->standaloneDockers as $docker)
-            <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
-                <button class="text-white btn-link">{{ data_get($docker, 'network') }}</button>
-            </a>
-        @empty
-            <div class="text-sm">No destinations added</div>
-        @endforelse
-    </div>
 </div>

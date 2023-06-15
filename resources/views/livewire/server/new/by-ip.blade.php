@@ -22,8 +22,8 @@
                 @endif
             @endforeach
         </x-forms.select>
-        <x-forms.checkbox class="pb-8" disabled instantSave noDirty id="is_part_of_swarm"
-            label="Is it part of a Swarm cluster?" />
+        {{-- <x-forms.checkbox class="pb-8" disabled instantSave noDirty id="is_part_of_swarm"
+            label="Is it part of a Swarm cluster?" /> --}}
         <x-forms.button type="submit">
             Save New Server
         </x-forms.button>
