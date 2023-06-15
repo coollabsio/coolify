@@ -43,7 +43,7 @@
                 <x-forms.button wire:click.prevent='validateServer'>
                     Check Server Details
                 </x-forms.button>
-                <x-forms.button wire:click.prevent='installDocker'>
+                <x-forms.button wire:click.prevent='installDocker' isHighlighted>
                     @if ($server->settings->is_usable)
                         Reconfigure Docker Engine
                     @else

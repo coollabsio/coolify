@@ -50,7 +50,7 @@ class StandaloneDocker extends Component
 
             instant_remote_process(['docker network create --attachable ' . $this->network], $server);
 
-            instant_remote_process(["docker network connect $this->network coolify-proxy"], $server);
+            instant_remote_process(["docker network connect $this->network coolify-proxy"], $server, throwError: false);
 
             $docker = ModelsStandaloneDocker::create([
                 'name' => $this->name,
