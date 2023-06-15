@@ -31,10 +31,10 @@
                     .then(response => {
                         if (response.ok) {
                             Toaster.success('Coolify is back online. Reloading...')
+                            if (checkHealthInterval) clearInterval(checkHealthInterval);
                             setTimeout(() => {
-                                if (checkHealthInterval) clearInterval(checkHealthInterval);
                                 window.location.reload();
-                            }, 2000)
+                            }, 5000)
                         } else {
                             console.log('Waiting for server to come back from dead...');
                         }
