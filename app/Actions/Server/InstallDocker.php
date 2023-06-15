@@ -2,21 +2,28 @@
 
 namespace App\Actions\Server;
 
-use App\Enums\ActivityTypes;
 use App\Models\Server;
 
 class InstallDocker
 {
     public function __invoke(Server $server)
     {
+        $dockerVersion = '23.0';
         $config = base64_encode('{ "live-restore": true }');
         $activity = remote_process([
-            "echo Installing Docker...",
-            "curl https://releases.rancher.com/install-docker/23.0.sh | sh",
-            "echo Configuring Docker...",
-            "echo '{$config}' | base64 -d > /etc/docker/daemon.json",
-            "echo Restarting Docker...",
-            "systemctl restart docker"
+            "echo ####### Installing Prerequisites...",
+            "command -v jq >/dev/null || apt-get update",
+            "command -v jq >/dev/null || apt install -y jq",
+            "echo ####### Installing/updating Docker Engine...",
+            "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh",
+            "echo ####### Configuring Docker Engine (merging existing configuration with the required)...",
+            "test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json \"/etc/docker/daemon.json.original-`date +\"%Y%m%d-%H%M%S\"`\" || echo '{$config}' | base64 -d > /etc/docker/daemon.json",
+            "echo '{$config}' | base64 -d > /etc/docker/daemon.json.coolify",
+            "cat <<< $(jq . /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json.coolify",
+            "cat <<< $(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json",
+            "echo ####### Restarting Docker Engine...",
+            "systemctl restart docker",
+            "echo ####### Done!"
         ], $server);
 
         return $activity;

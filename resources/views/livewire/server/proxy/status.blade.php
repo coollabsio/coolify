@@ -1,6 +1,6 @@
 <div>
     @if ($server->settings->is_validated)
-        <div wire:poll.10000ms="proxyStatus">
+        <div wire:poll.10000ms="proxyStatus" x-init="$wire.proxyStatus">
             @if ($server->extra_attributes->proxy_status === 'running')
                 <x-status.running />
             @elseif ($server->extra_attributes->proxy_status === 'restarting')

@@ -49,20 +49,30 @@
             <h3 class="pt-8 pb-4">Quick Actions</h3>
             <div class="flex items-center gap-2">
                 <x-forms.button wire:click.prevent='validateServer'>
-                    Check Connection
+                    Check Server Details
+                </x-forms.button>
+                <x-forms.button wire:click.prevent='installDocker'>
+                    @if ($server->settings->is_docker_installed)
+                        Reconfigure Docker Engine
+                    @else
+                        Install Docker Engine
+                    @endif
                 </x-forms.button>
                 {{-- <x-forms.button wire:click.prevent='installDocker'>Install Docker</x-forms.button> --}}
             </div>
         @endif
+        <div class="container w-full py-4 mx-auto">
+            <livewire:activity-monitor :header="true" />
+        </div>
         @isset($uptime)
-            <h3 class="py-3">Server Info</h3>
+            <h3 class="pb-3">Server Info</h3>
             <div class="text-sm">
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
                     <p>Docker Engine {{ $dockerVersion }}</p>
                 @endisset
                 @isset($dockerComposeVersion)
-                    <p>{{ $dockerComposeVersion }}</p>
+                    <p>Compose: {{ $dockerComposeVersion }}</p>
                 @endisset
             </div>
         @endisset

@@ -3,9 +3,10 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
 
-class LocalPersistentVolume extends BaseModel
+class LocalPersistentVolume extends Model
 {
     protected $fillable = [
         'name',

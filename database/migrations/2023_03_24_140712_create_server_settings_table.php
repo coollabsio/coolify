@@ -17,6 +17,7 @@ return new class extends Migration
             $table->boolean('is_jump_server')->default(false);
             $table->boolean('is_build_server')->default(false);
             $table->boolean('is_validated')->default(false);
+            $table->boolean('is_docker_installed')->default(false);
             $table->foreignId('server_id');
             $table->timestamps();
         });

@@ -35,6 +35,5 @@ class CoolifyTask implements ShouldQueue
         ]);
 
         $remote_process();
-        // @TODO: Remove file at $this->activity->getExtraProperty('private_key_location') after process is finished
     }
 }

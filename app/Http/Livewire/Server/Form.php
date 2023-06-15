@@ -39,16 +39,15 @@ class Form extends Component
             if (!$this->uptime) {
                 $this->uptime = 'Server not reachable.';
                 throw new \Exception('Server not reachable.');
-            } else {
-                if (!$this->server->settings->is_validated) {
-                    $this->server->settings->is_validated = true;
-                    $this->server->settings->save();
-                    $this->emit('serverValidated');
-                }
             }
             $this->dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $this->server, false);
             if (!$this->dockerVersion) {
                 $this->dockerVersion = 'Not installed.';
+            } else {
+                $this->server->settings->is_docker_installed = true;
+                $this->server->settings->is_validated = true;
+                $this->server->settings->save();
+                $this->emit('serverValidated');
             }
             $this->dockerComposeVersion = instant_remote_process(['docker compose version|head -2|grep -i version'], $this->server, false);
             if (!$this->dockerComposeVersion) {
