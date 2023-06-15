@@ -59,7 +59,6 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
         } catch (\Exception $e) {
             ray('InstanceAutoUpdateJob failed');
             ray($e->getMessage());
-            $this->fail($e->getMessage());
             return;
         }
     }
