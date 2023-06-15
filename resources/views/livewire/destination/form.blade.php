@@ -6,7 +6,7 @@
             <x-forms.button wire:click.prevent='submit' type="submit">
                 Save
             </x-forms.button>
-            @if ($destination->network !== 'coolify')
+            @if ($destination->server->id === 0 && $destination->network !== 'coolify')
                 <x-forms.button x-on:click.prevent="deleteDestination = true">
                     Delete
                 </x-forms.button>

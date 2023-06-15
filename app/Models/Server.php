@@ -14,6 +14,9 @@ class Server extends BaseModel
                 'server_id' => $server->id,
             ]);
         });
+        static::deleting(function ($server) {
+            $server->settings()->delete();
+        });
     }
     protected $fillable = [
         'name',
@@ -32,6 +35,19 @@ class Server extends BaseModel
     public function scopeWithExtraAttributes(): Builder
     {
         return $this->extra_attributes->modelScope();
+    }
+    public function isEmpty()
+    {
+        if ($this->applications()->count() === 0) {
+            return true;
+        }
+        return false;
+    }
+    public function applications()
+    {
+        return $this->destinations()->map(function ($standaloneDocker) {
+            return $standaloneDocker->applications;
+        })->flatten();
     }
     public function destinations()
     {

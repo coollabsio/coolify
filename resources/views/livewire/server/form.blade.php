@@ -4,7 +4,7 @@
         <div class="flex gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">Save</x-forms.button>
-            @if ($server->id !== 0)
+            @if ($server->id !== 0 || config('app.env') === 'local')
                 <x-forms.button x-on:click.prevent="deleteServer = true">
                     Delete
                 </x-forms.button>

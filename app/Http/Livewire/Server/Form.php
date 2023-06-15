@@ -51,6 +51,10 @@ class Form extends Component
     }
     public function delete()
     {
+        if (!$this->server->isEmpty()) {
+            $this->emit('error', 'Server has defined resources. Please delete them first.');
+            return;
+        }
         $this->server->delete();
         redirect()->route('dashboard');
     }
