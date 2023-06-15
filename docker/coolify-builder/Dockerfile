@@ -2,7 +2,7 @@ FROM alpine:3.17
 
 ARG TARGETPLATFORM
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.2
+ARG DOCKER_VERSION=23.0.6
 # https://github.com/docker/compose/releases
 ARG DOCKER_COMPOSE_VERSION=2.18.1
 # https://github.com/docker/buildx/releases
