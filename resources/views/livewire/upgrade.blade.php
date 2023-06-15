@@ -36,11 +36,10 @@
                                 if (checkHealthInterval) clearInterval(checkHealthInterval);
                                 window.location.reload();
                             }, 2000)
+                        } else {
+                            console.log('Waiting for server to come back from dead...');
                         }
                     })
-                    .catch(error => {
-                        console.log('Waiting for server to come back from dead...');
-                    });
                 return;
             }, 2000);
         }
@@ -52,14 +51,13 @@
                     .then(response => {
                         if (response.ok) {
                             console.log('It\'s alive. Waiting for server to be dead...');
+                        } else {
+                            Toaster.success('Update done, restarting Coolify!')
+                            console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
+                            if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                            revive();
                         }
                     })
-                    .catch(error => {
-                        Toaster.success('Update done, restarting Coolify!')
-                        console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
-                        if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
-                        revive();
-                    });
                 return;
             }, 2000);
         }
