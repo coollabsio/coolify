@@ -14,6 +14,7 @@ class StandaloneDocker extends Component
     public string $network;
 
     public Collection $servers;
+    public Server $server;
     public int|null $server_id = null;
 
     protected $rules = [
@@ -35,29 +36,31 @@ class StandaloneDocker extends Component
         $this->network = new Cuid2(7);
         $this->name = generate_random_name();
     }
-
+    private function createNetworkAndAttachToProxy()
+    {
+        instant_remote_process(['docker network create --attachable ' . $this->network], $this->server, throwError: false);
+        instant_remote_process(["docker network connect $this->network coolify-proxy"], $this->server, throwError: false);
+    }
     public function submit()
     {
 
         $this->validate();
         try {
-            $found = ModelsStandaloneDocker::where('server_id', $this->server_id)->where('network', $this->network)->first();
+            $this->server = Server::find($this->server_id);
+            $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
             if ($found) {
+                $this->createNetworkAndAttachToProxy();
                 $this->addError('network', 'Network already added to this server.');
                 return;
+            } else {
+                $docker = ModelsStandaloneDocker::create([
+                    'name' => $this->name,
+                    'network' => $this->network,
+                    'server_id' => $this->server_id,
+                    'team_id' => session('currentTeam')->id
+                ]);
             }
-            $server = Server::find($this->server_id);
-
-            instant_remote_process(['docker network create --attachable ' . $this->network], $server);
-
-            instant_remote_process(["docker network connect $this->network coolify-proxy"], $server, throwError: false);
-
-            $docker = ModelsStandaloneDocker::create([
-                'name' => $this->name,
-                'network' => $this->network,
-                'server_id' => $this->server_id,
-                'team_id' => session('currentTeam')->id
-            ]);
+            $this->createNetworkAndAttachToProxy();
             return redirect()->route('destination.show', $docker->uuid);
         } catch (\Exception $e) {
             return general_error_handler(err: $e);
