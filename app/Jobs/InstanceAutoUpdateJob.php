@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -79,5 +80,9 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
             $this->fail($e->getMessage());
             return;
         }
+    }
+    public function failed(Exception $exception)
+    {
+        return;
     }
 }
