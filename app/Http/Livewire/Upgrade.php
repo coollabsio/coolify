@@ -19,7 +19,6 @@ class Upgrade extends Component
         if (config('app.env') === 'local') {
             $this->isUpgradeAvailable = true;
         }
-        ray($this->isUpgradeAvailable);
     }
     public function upgrade()
     {
