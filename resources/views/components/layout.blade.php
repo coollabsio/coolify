@@ -39,6 +39,46 @@
     <x-version class="fixed left-2 bottom-1" />
     @auth
         <script>
+            let checkHealthInterval = null;
+            let checkIfIamDeadInterval = null;
+
+            function revive() {
+                console.log('Checking server\'s health...')
+                checkHealthInterval = setInterval(() => {
+                    fetch('/api/health')
+                        .then(response => {
+                            if (response.ok) {
+                                Toaster.success('Coolify is back online. Reloading...')
+                                if (checkHealthInterval) clearInterval(checkHealthInterval);
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 5000)
+                            } else {
+                                console.log('Waiting for server to come back from dead...');
+                            }
+                        })
+                    return;
+                }, 2000);
+            }
+
+            function upgrade() {
+                console.log('Update initiated.')
+                checkIfIamDeadInterval = setInterval(() => {
+                    fetch('/api/health')
+                        .then(response => {
+                            if (response.ok) {
+                                console.log('It\'s alive. Waiting for server to be dead...');
+                            } else {
+                                Toaster.success('Update done, restarting Coolify!')
+                                console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
+                                if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                                revive();
+                            }
+                        })
+                    return;
+                }, 2000);
+            }
+
             function changePasswordFieldType(id) {
                 const input = document.getElementById(id);
                 if (input.type === 'password') {
