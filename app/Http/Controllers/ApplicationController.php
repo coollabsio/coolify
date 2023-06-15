@@ -46,7 +46,7 @@ class ApplicationController extends Controller
 
     public function deployment()
     {
-        $deployment_uuid = request()->route('deployment_uuid');
+        $deploymentUuid = request()->route('deployment_uuid');
 
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -60,7 +60,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        $activity = Activity::where('properties->type_uuid', '=', $deployment_uuid)->first();
+        $activity = Activity::where('properties->type_uuid', '=', $deploymentUuid)->first();
         if (!$activity) {
             return redirect()->route('project.application.deployments', [
                 'project_uuid' => $project->uuid,
@@ -68,7 +68,7 @@ class ApplicationController extends Controller
                 'application_uuid' => $application->uuid,
             ]);
         }
-        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deployment_uuid)->first();
+        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
         if (!$deployment) {
             return redirect()->route('project.application.deployments', [
                 'project_uuid' => $project->uuid,
@@ -80,7 +80,7 @@ class ApplicationController extends Controller
             'application' => $application,
             'activity' => $activity,
             'deployment' => $deployment,
-            'deployment_uuid' => $deployment_uuid,
+            'deployment_uuid' => $deploymentUuid,
         ]);
     }
 }

@@ -53,7 +53,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         if (config('app.env') === 'local') {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
         $this->query = request()->query();
         $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
     }

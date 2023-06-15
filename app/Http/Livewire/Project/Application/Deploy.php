@@ -3,7 +3,6 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Jobs\ApplicationContainerStatusJob;
-use App\Jobs\ContainerStopJob;
 use App\Models\Application;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -17,7 +16,7 @@ class Deploy extends Component
     public $destination;
     public array $parameters;
 
-    protected string $deployment_uuid;
+    protected string $deploymentUuid;
     protected array $command = [];
     protected $source;
 
@@ -27,7 +26,7 @@ class Deploy extends Component
 
     public function mount()
     {
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
         $this->application = Application::where('id', $this->applicationId)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
     }
@@ -35,10 +34,9 @@ class Deploy extends Component
     {
         $this->application->refresh();
     }
-    protected function set_deployment_uuid()
+    protected function setDeploymentUuid()
     {
-        // Create Deployment ID
-        $this->deployment_uuid = new Cuid2(7);
+        $this->deploymentUuid = new Cuid2(7);
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
     }
     public function deploy(bool $force = false, bool|null $debug = null)
@@ -47,7 +45,7 @@ class Deploy extends Component
             $this->application->settings->is_debug_enabled = true;
             $this->application->settings->save();
         }
-        $this->set_deployment_uuid();
+        $this->setDeploymentUuid();
 
         queue_application_deployment(
             application_id: $this->application->id,
@@ -65,7 +63,7 @@ class Deploy extends Component
     public function stop()
     {
         instant_remote_process(["docker rm -f {$this->application->uuid}"], $this->application->destination->server);
-        $this->application->status = get_container_status(server: $this->application->destination->server, container_id: $this->application->uuid);
+        $this->application->status = 'stopped';
         $this->application->save();
         $this->emit('applicationStatusChanged');
     }

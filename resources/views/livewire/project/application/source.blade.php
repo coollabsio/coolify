@@ -21,7 +21,7 @@
         <div class="text-sm">Code source of your application.</div>
         <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository" label="Repository" />
         <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
-        <div class="flex items-end gap-2">
+        <div class="flex items-end gap-2 w-96">
             <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
             <a target="_blank" class="flex hover:no-underline" href="{{ $application?->gitCommits }}">
                 <x-forms.button><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"

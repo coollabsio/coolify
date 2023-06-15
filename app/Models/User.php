@@ -31,9 +31,6 @@ class User extends Authenticatable implements SendsEmail
     {
         parent::boot();
 
-        static::creating(function (Model $model) {
-            $model->uuid = (string) new Cuid2(7);
-        });
         static::created(function (User $user) {
             $team = [
                 'name' => $user->name . "'s Team",

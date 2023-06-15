@@ -12,7 +12,7 @@ class Danger extends Component
 
     public function mount()
     {
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
     }
     public function delete()
     {

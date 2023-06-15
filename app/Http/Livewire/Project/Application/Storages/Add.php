@@ -2,10 +2,6 @@
 
 namespace App\Http\Livewire\Project\Application\Storages;
 
-use App\Models\Application;
-use App\Models\LocalPersistentVolume;
-use Illuminate\Database\QueryException;
-use Illuminate\Support\Facades\Route;
 use Livewire\Component;
 
 class Add extends Component
@@ -23,7 +19,7 @@ class Add extends Component
     ];
     public function mount()
     {
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
     }
     public function submit()
     {

@@ -13,11 +13,8 @@ return new class extends Migration
     {
         Schema::create('project_settings', function (Blueprint $table) {
             $table->id();
-            $table->string('uuid')->unique();
             $table->string('wildcard_domain')->nullable();
-
             $table->foreignId('project_id');
-
             $table->timestamps();
         });
     }

@@ -33,7 +33,7 @@ class MagicController extends Controller
             'environments' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->first()->environments
         ]);
     }
-    public function new_project()
+    public function newProject()
     {
         $project = Project::firstOrCreate(
             ['name' => request()->query('name') ?? generate_random_name()],
@@ -43,7 +43,7 @@ class MagicController extends Controller
             'project_uuid' => $project->uuid
         ]);
     }
-    public function new_environment()
+    public function newEnvironment()
     {
         $environment = Environment::firstOrCreate(
             ['name' => request()->query('name') ?? generate_random_name()],

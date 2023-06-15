@@ -64,7 +64,7 @@ class Controller extends BaseController
             'invitations' => $invitations,
         ]);
     }
-    public function accept_invitation()
+    public function acceptInvitation()
     {
         try {
             $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
@@ -76,8 +76,8 @@ class Controller extends BaseController
                 abort(401);
             }
 
-            $created_at = $invitation->created_at;
-            $diff = $created_at->diffInMinutes(now());
+            $createdAt = $invitation->created_at;
+            $diff = $createdAt->diffInMinutes(now());
             if ($diff <= config('constants.invitation.link.expiration')) {
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
                 $invitation->delete();
@@ -90,7 +90,7 @@ class Controller extends BaseController
             throw $th;
         }
     }
-    public function revoke_invitation()
+    public function revokeInvitation()
     {
         try {
             $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();

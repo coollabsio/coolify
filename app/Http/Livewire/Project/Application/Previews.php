@@ -20,7 +20,7 @@ class Previews extends Component
     public function mount()
     {
         $this->pull_requests = collect();
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
     }
     public function loadStatus($pull_request_id)
     {
@@ -30,7 +30,7 @@ class Previews extends Component
             pull_request_id: $pull_request_id
         ));
     }
-    protected function set_deployment_uuid()
+    protected function setDeploymentUuid()
     {
         $this->deployment_uuid = new Cuid2(7);
         $this->parameters['deployment_uuid'] = $this->deployment_uuid;
@@ -49,7 +49,7 @@ class Previews extends Component
     public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
     {
         try {
-            $this->set_deployment_uuid();
+            $this->setDeploymentUuid();
             $found = ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first();
             if (!$found && !is_null($pull_request_html_url)) {
                 ApplicationPreview::create([

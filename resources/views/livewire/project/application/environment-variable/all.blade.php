@@ -8,7 +8,7 @@
             :env="$env" />
     @endforeach
     <div class="pt-2 pb-8">
-        <livewire:project.application.environment-variable.add />
+        <livewire:project.application.environment-varia /ble.add />
     </div>
     <div>
         <h3>Preview Deployments</h3>

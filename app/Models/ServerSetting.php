@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
-class ServerSetting extends BaseModel
+use Illuminate\Database\Eloquent\Model;
+
+class ServerSetting extends Model
 {
     protected $fillable = [
         'server_id'

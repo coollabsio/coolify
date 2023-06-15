@@ -37,7 +37,7 @@ function general_error_handler(\Throwable|null $err = null, $that = null, $isJso
     }
 }
 
-function get_parameters()
+function getRouteParameters()
 {
     return Route::current()->parameters();
 }

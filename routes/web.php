@@ -43,8 +43,8 @@ Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/destinations', [MagicController::class, 'destinations']);
     Route::get('/projects', [MagicController::class, 'projects']);
     Route::get('/environments', [MagicController::class, 'environments']);
-    Route::get('/project/new', [MagicController::class, 'new_project']);
-    Route::get('/environment/new', [MagicController::class, 'new_environment']);
+    Route::get('/project/new', [MagicController::class, 'newProject']);
+    Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -63,10 +63,18 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/servers', [ServerController::class, 'all'])->name('server.all');
-    Route::get('/server/new', [ServerController::class, 'create'])->name('server.create');
-    Route::get('/server/{server_uuid}', [ServerController::class, 'show'])->name('server.show');
-    Route::get('/server/{server_uuid}/proxy', [ServerController::class, 'proxy'])->name('server.proxy');
+    Route::get('/servers', fn () => view('server.all', [
+        'servers' => Server::ownedByCurrentTeam()->get()
+    ]))->name('server.all');
+    Route::get('/servers/new', fn () => view('server.create', [
+        'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
+    ]))->name('server.create');
+    Route::get('/servers/{server_uuid}', fn () => view('server.show', [
+        'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
+    ]))->name('server.show');
+    Route::get('/servers/{server_uuid}/proxy', fn () => view('server.proxy', [
+        'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
+    ]))->name('server.proxy');
     Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key'))->name('server.private-key');
 });
 
@@ -79,8 +87,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/profile/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
-    Route::get('/invitations/{uuid}', [Controller::class, 'accept_invitation'])->name('team.invitation.accept');
-    Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revoke_invitation'])->name('team.invitation.revoke');
+    Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
+    Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
 });
 
 Route::middleware(['auth'])->group(function () {

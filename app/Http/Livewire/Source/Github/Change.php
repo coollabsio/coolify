@@ -38,7 +38,7 @@ class Change extends Component
     public function mount()
     {
         $this->webhook_endpoint = $this->ipv4;
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
         $this->is_system_wide = $this->github_app->is_system_wide;
     }
     public function submit()

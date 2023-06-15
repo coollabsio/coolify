@@ -5,10 +5,11 @@ namespace App\Models;
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsDiscord;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 
-class Team extends BaseModel implements SendsDiscord, SendsEmail
+class Team extends Model implements SendsDiscord, SendsEmail
 {
     use Notifiable;
 

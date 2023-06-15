@@ -8,18 +8,18 @@ class ProjectController extends Controller
 {
     public function all()
     {
-        $team_id = session('currentTeam')->id;
+        $teamId = session('currentTeam')->id;
 
-        $projects = Project::where('team_id', $team_id)->get();
+        $projects = Project::where('team_id', $teamId)->get();
         return view('projects', ['projects' => $projects]);
     }
 
     public function show()
     {
-        $project_uuid = request()->route('project_uuid');
-        $team_id = session('currentTeam')->id;
+        $projectUuid = request()->route('project_uuid');
+        $teamId = session('currentTeam')->id;
 
-        $project = Project::where('team_id', $team_id)->where('uuid', $project_uuid)->first();
+        $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

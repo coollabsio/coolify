@@ -43,7 +43,7 @@ class PublicGitRepository extends Component
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
             $this->port = 3000;
         }
-        $this->parameters = get_parameters();
+        $this->parameters = getRouteParameters();
         $this->query = request()->query();
     }
 

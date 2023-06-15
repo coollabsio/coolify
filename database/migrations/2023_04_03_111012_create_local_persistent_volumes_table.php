@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('local_persistent_volumes', function (Blueprint $table) {
             $table->id();
-            $table->string('uuid')->unique();
             $table->string('name');
             $table->string('mount_path');
             $table->string('host_path')->nullable();
