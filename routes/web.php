@@ -66,13 +66,13 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/servers', fn () => view('server.all', [
         'servers' => Server::ownedByCurrentTeam()->get()
     ]))->name('server.all');
-    Route::get('/servers/new', fn () => view('server.create', [
+    Route::get('/server/new', fn () => view('server.create', [
         'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.create');
-    Route::get('/servers/{server_uuid}', fn () => view('server.show', [
+    Route::get('/server/{server_uuid}', fn () => view('server.show', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.show');
-    Route::get('/servers/{server_uuid}/proxy', fn () => view('server.proxy', [
+    Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.proxy');
     Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key'))->name('server.private-key');
