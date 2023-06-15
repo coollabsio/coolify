@@ -67,6 +67,9 @@
                         </svg>
                     </a>
                 </li>
+                <li title="New version available">
+                    <livewire:upgrade />
+                </li>
             @endif
         </ul>
     </nav>

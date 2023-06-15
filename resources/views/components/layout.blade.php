@@ -26,6 +26,7 @@
 
 <body>
     @livewireScripts
+    <x-toaster-hub />
     @auth
         <x-navbar />
     @endauth
@@ -54,17 +55,17 @@
             Livewire.on('reloadWindow', () => {
                 window.location.reload();
             })
+            Livewire.on('info', (message) => {
+                if (message) Toaster.info(message)
+            })
             Livewire.on('error', (message) => {
-                console.log(message);
-                alert(message);
+                if (message) Toaster.error(message)
             })
-            Livewire.on('message', (message) => {
-                console.log(message);
-                alert(message);
+            Livewire.on('warning', (message) => {
+                if (message) Toaster.warning(message)
             })
-            Livewire.on('saved', (message) => {
-                if (message) console.log(message);
-                else console.log('saved');
+            Livewire.on('success', (message) => {
+                if (message) Toaster.success(message)
             })
         </script>
     @else

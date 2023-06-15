@@ -59,7 +59,7 @@ class General extends Component
         $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
         $this->application->settings->save();
         $this->application->refresh();
-        $this->emit('saved', 'Application settings updated!');
+        $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
     }
     protected function checkWildCardDomain()

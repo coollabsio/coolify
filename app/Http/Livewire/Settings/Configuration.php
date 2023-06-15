@@ -37,7 +37,7 @@ class Configuration extends Component
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
         $this->settings->save();
-        $this->emit('saved', 'Settings updated!');
+        $this->emit('success', 'Settings updated!');
     }
     private function setup_instance_fqdn()
     {

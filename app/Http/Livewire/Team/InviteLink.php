@@ -59,9 +59,9 @@ class InviteLink extends Component
             ]);
             if ($isEmail) {
                 $user->first()->notify(new InvitationLinkEmail());
-                $this->emit('message', 'Invitation sent via email successfully.');
+                $this->emit('success', 'Invitation sent via email successfully.');
             } else {
-                $this->emit('message', 'Invitation link generated.');
+                $this->emit('success', 'Invitation link generated.');
             }
             $this->emit('refreshInvitations');
         } catch (\Throwable $e) {

@@ -27,24 +27,6 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
     public function __construct(private bool $force = false)
     {
     }
-    private function update()
-    {
-        if (config('app.env') === 'local') {
-            ray('Running update on local docker container');
-            instant_remote_process([
-                "sleep 10"
-            ], $this->server);
-            ray('Update done');
-            return;
-        } else {
-            ray('Running update on production server');
-            instant_remote_process([
-                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
-                "bash /data/coolify/source/upgrade.sh $this->latest_version"
-            ], $this->server);
-            return;
-        }
-    }
     public function handle(): void
     {
         try {
@@ -81,6 +63,25 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
             return;
         }
     }
+    private function update()
+    {
+        if (config('app.env') === 'local') {
+            ray('Running update on local docker container');
+            instant_remote_process([
+                "sleep 10"
+            ], $this->server);
+            ray('Update done');
+            return;
+        } else {
+            ray('Running update on production server');
+            instant_remote_process([
+                "curl -fsSL https://cdn.coollabs.io/coolify/upgrade.sh -o /data/coolify/source/upgrade.sh",
+                "bash /data/coolify/source/upgrade.sh $this->latest_version"
+            ], $this->server);
+            return;
+        }
+    }
+
     public function failed(Exception $exception)
     {
         return;

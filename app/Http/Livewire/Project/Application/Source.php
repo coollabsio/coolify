@@ -40,6 +40,6 @@ class Source extends Component
             $this->application->git_commit_sha = 'HEAD';
         }
         $this->application->save();
-        $this->emit('saved', 'Application source updated!');
+        $this->emit('success', 'Application source updated!');
     }
 }

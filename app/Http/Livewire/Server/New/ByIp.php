@@ -39,7 +39,7 @@ class ByIp extends Component
     }
     public function instantSave()
     {
-        $this->emit('saved', 'Application settings updated!');
+        $this->emit('success', 'Application settings updated!');
     }
     public function submit()
     {

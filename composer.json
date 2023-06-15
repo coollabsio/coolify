@@ -19,6 +19,7 @@
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "livewire/livewire": "^v2.12.3",
+        "masmerise/livewire-toaster": "^1.2",
         "nubs/random-name-generator": "^2.2",
         "sentry/sentry-laravel": "^3.4",
         "spatie/laravel-activitylog": "^4.7.3",
