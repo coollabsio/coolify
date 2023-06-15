@@ -37,7 +37,7 @@ class Deploy extends Component
     protected function setDeploymentUuid()
     {
         $this->deploymentUuid = new Cuid2(7);
-        $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+        $this->parameters['deployment_uuid'] = $this->deploymentUuid;
     }
     public function deploy(bool $force = false, bool|null $debug = null)
     {
@@ -49,13 +49,13 @@ class Deploy extends Component
 
         queue_application_deployment(
             application_id: $this->application->id,
-            deployment_uuid: $this->deployment_uuid,
+            deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force,
         );
         return redirect()->route('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
-            'deployment_uuid' => $this->deployment_uuid,
+            'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }
