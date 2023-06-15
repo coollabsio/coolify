@@ -307,54 +307,60 @@ const magicActions = [{
 },
 {
     id: 10,
-    name: 'Goto: Projects',
+    name: 'Goto: Private Keys',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 11,
-    name: 'Goto: Sources',
+    name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 12,
-    name: 'Goto: Destinations',
+    name: 'Goto: Sources',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 13,
-    name: 'Goto: Settings',
+    name: 'Goto: Destinations',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 14,
-    name: 'Goto: Command Center',
+    name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 15,
-    name: 'Goto: Notifications',
+    name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 16,
-    name: 'Goto: Profile',
+    name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 17,
-    name: 'Goto: Teams',
+    name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 18,
+    name: 'Goto: Teams',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 19,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -545,30 +551,33 @@ async function redirect() {
             targetUrl.pathname = `/servers`
             break;
         case 10:
-            targetUrl.pathname = `/projects`
+            targetUrl.pathname = `/private-keys`
             break;
         case 11:
-            targetUrl.pathname = `/sources`
+            targetUrl.pathname = `/projects`
             break;
         case 12:
-            targetUrl.pathname = `/destinations`
+            targetUrl.pathname = `/sources`
             break;
         case 13:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/destinations`
             break;
         case 14:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/settings`
             break;
         case 15:
-            targetUrl.pathname = `/profile/team/notifications`
+            targetUrl.pathname = `/command-center`
             break;
         case 16:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/profile/team/notifications`
             break;
         case 17:
-            targetUrl.pathname = `/profile/team`
+            targetUrl.pathname = `/profile`
             break;
         case 18:
+            targetUrl.pathname = `/profile/team`
+            break;
+        case 19:
             targetUrl.pathname = `/profile/team`
             break;
     }
