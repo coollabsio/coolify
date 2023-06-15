@@ -79,15 +79,6 @@
                 }, 2000);
             }
 
-            function changePasswordFieldType(id) {
-                const input = document.getElementById(id);
-                if (input.type === 'password') {
-                    input.type = 'text';
-                } else {
-                    input.type = 'password';
-                }
-            }
-
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text);
                 Livewire.emit('message', 'Copied to clipboard.');
@@ -108,18 +99,17 @@
                 if (message) Toaster.success(message)
             })
         </script>
-    @else
-        <script>
-            function changePasswordFieldType(id) {
-                const input = document.getElementById(id);
-                if (input.type === 'password') {
-                    input.type = 'text';
-                } else {
-                    input.type = 'password';
-                }
-            }
-        </script>
     @endauth
+    <script>
+        function changePasswordFieldType(id) {
+            const input = document.getElementById(id);
+            if (input.type === 'password') {
+                input.type = 'text';
+            } else {
+                input.type = 'password';
+            }
+        }
+    </script>
 </body>
 
 </html>

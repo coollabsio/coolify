@@ -9,7 +9,7 @@
                     Delete
                 </x-forms.button>
             @endif
-            @if (!$server->settings->is_validated)
+            @if (!$server->settings->is_reachable)
                 <div class="w-full">
                     <x-forms.button isHighlighted wire:click.prevent='validateServer'>
                         Validate Server
@@ -45,14 +45,14 @@
             </div>
         </div>
 
-        @if ($server->settings->is_validated)
+        @if ($server->settings->is_reachable)
             <h3 class="pt-8 pb-4">Quick Actions</h3>
             <div class="flex items-center gap-2">
                 <x-forms.button wire:click.prevent='validateServer'>
                     Check Server Details
                 </x-forms.button>
                 <x-forms.button wire:click.prevent='installDocker'>
-                    @if ($server->settings->is_docker_installed)
+                    @if ($server->settings->is_usable)
                         Reconfigure Docker Engine
                     @else
                         Install Docker Engine
@@ -70,9 +70,6 @@
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
                     <p>Docker Engine {{ $dockerVersion }}</p>
-                @endisset
-                @isset($dockerComposeVersion)
-                    <p>Compose: {{ $dockerComposeVersion }}</p>
                 @endisset
             </div>
         @endisset

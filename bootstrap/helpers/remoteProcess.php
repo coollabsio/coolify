@@ -50,7 +50,7 @@ function remote_process(
 function save_private_key_for_server(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
-        $server->settings->is_validated = false;
+        $server->settings->is_reachable = false;
         $server->settings->save();
         throw new \Exception("Server {$server->name} does not have a private key");
     }

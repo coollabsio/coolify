@@ -85,7 +85,7 @@ class ProductionSeeder extends Seeder
                 'proxy_status' => ProxyStatus::EXITED->value
             ]);
             $server = Server::create($server_details);
-            $server->settings->is_validated = true;
+            $server->settings->is_reachable = true;
             $server->settings->save();
         }
         if (StandaloneDocker::find(0) == null) {

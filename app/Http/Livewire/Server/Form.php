@@ -12,7 +12,6 @@ class Form extends Component
     public Server $server;
     public $uptime;
     public $dockerVersion;
-    public $dockerComposeVersion;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -20,7 +19,7 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
-        'server.settings.is_validated' => 'required',
+        'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required'
     ];
     public function mount()
@@ -36,7 +35,10 @@ class Form extends Component
     {
         try {
             $this->uptime = instant_remote_process(['uptime'], $this->server, false);
-            if (!$this->uptime) {
+            if ($this->uptime) {
+                $this->server->settings->is_reachable = true;
+                $this->server->settings->save();
+            } else {
                 $this->uptime = 'Server not reachable.';
                 throw new \Exception('Server not reachable.');
             }
@@ -44,14 +46,9 @@ class Form extends Component
             if (!$this->dockerVersion) {
                 $this->dockerVersion = 'Not installed.';
             } else {
-                $this->server->settings->is_docker_installed = true;
-                $this->server->settings->is_validated = true;
+                $this->server->settings->is_usable = true;
                 $this->server->settings->save();
                 $this->emit('serverValidated');
-            }
-            $this->dockerComposeVersion = instant_remote_process(['docker compose version|head -2|grep -i version'], $this->server, false);
-            if (!$this->dockerComposeVersion) {
-                $this->dockerComposeVersion = 'Not installed.';
             }
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);

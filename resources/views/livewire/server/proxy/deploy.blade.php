@@ -1,5 +1,5 @@
 <div>
-    @if ($server->settings->is_validated)
+    @if ($server->settings->is_reachable)
         @if ($server->extra_attributes->proxy_status === 'running')
             <div class="flex gap-4">
                 <div class="group">

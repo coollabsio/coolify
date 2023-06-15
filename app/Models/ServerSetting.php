@@ -8,7 +8,7 @@ class ServerSetting extends Model
 {
     protected $fillable = [
         'server_id',
-        'is_docker_installed',
+        'is_usable',
     ];
     public function server()
     {

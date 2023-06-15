@@ -65,7 +65,7 @@ class Server extends BaseModel
 
     static public function validated()
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_validated', true);
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
     }
 
     static public function destinationsByServer(string $server_id)

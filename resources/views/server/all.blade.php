@@ -7,7 +7,7 @@
                 href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
                 <div class="group-hover:text-white">
                     <div>{{ $server->name }}</div>
-                    @if (!$server->settings->is_validated)
+                    @if (!$server->settings->is_reachable)
                         <div class="text-xs text-error">not validated</div>
                     @endif
                 </div>
