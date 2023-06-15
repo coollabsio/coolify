@@ -38,7 +38,6 @@ class SyncBunny extends Command
         $compose_file_prod = "docker-compose.prod.yml";
         $install_script = "install.sh";
         $upgrade_script = "upgrade.sh";
-        $docker_install_script = "install-docker.sh";
         $production_env = ".env.production";
 
         $versions = "versions.json";
@@ -71,7 +70,6 @@ class SyncBunny extends Command
                 $pool->storage(file: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
                 $pool->storage(file: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
                 $pool->storage(file: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
-                $pool->storage(file: "$parent_dir/scripts/$docker_install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$docker_install_script"),
                 $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
             ]);
             ray("{$bunny_cdn}/{$bunny_cdn_path}");
@@ -81,7 +79,6 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$production_env"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
-                $pool->purge("$bunny_cdn/$bunny_cdn_path/$docker_install_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
             echo "All files uploaded & purged...\n";
