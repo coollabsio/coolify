@@ -4,8 +4,6 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-
-
 FROM node:19 as static-assets
 WORKDIR /app
 COPY . .
@@ -16,7 +14,19 @@ RUN npm run build
 FROM serversideup/php:8.2-fpm-nginx
 WORKDIR /var/www/html
 ARG POSTGRES_VERSION=15
-RUN apt-get update && apt-get install -y php-pgsql postgresql-client openssh-client git git-lfs jq 
+
+RUN apt-get update 
+# Postgres version requirements
+RUN apt install dirmngr ca-certificates software-properties-common gnupg gnupg2 apt-transport-https curl -y
+RUN curl -fSsL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /usr/share/keyrings/postgresql.gpg > /dev/null
+
+RUN echo deb [arch=amd64,arm64,ppc64el signed-by=/usr/share/keyrings/postgresql.gpg] http://apt.postgresql.org/pub/repos/apt/ jammy-pgdg main | sudo tee -a /etc/apt/sources.list.d/postgresql.list
+
+RUN apt-get update 
+RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
+
+# Coolify requirements
+RUN apt-get install -y php-pgsql openssh-client git git-lfs jq
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 COPY docker/prod-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
