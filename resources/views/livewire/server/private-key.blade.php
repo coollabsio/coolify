@@ -5,7 +5,7 @@
             <x-forms.button>Add a new Private Key</x-forms.button>
         </a>
     </div>
-    <div class="pt-2 pb-8 text-sm">Selected Private Key for SSH connection</div>
+    <div class="pt-2 pb-6 text-sm">Selected Private Key for SSH connection</div>
     <div class="pb-10 text-sm">
         @if (data_get($server, 'privateKey.uuid'))
             Currently attached Private Key:

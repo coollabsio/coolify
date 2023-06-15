@@ -24,16 +24,18 @@ class StandaloneDocker extends Component
     ];
     public function mount()
     {
-        if (!$this->server_id) {
-            if (request()->query('server_id')) {
-                $this->server_id = request()->query('server_id');
-            } else {
-                if ($this->servers->count() > 0) {
-                    $this->server_id = $this->servers->first()->id;
-                }
+        if (request()->query('server_id')) {
+            $this->server_id = request()->query('server_id');
+        } else {
+            if ($this->servers->count() > 0) {
+                $this->server_id = $this->servers->first()->id;
             }
         }
-        $this->network = new Cuid2(7);
+        if (request()->query('network_name')) {
+            $this->network = request()->query('network_name');
+        } else {
+            $this->network = new Cuid2(7);
+        }
         $this->name = generate_random_name();
     }
     private function createNetworkAndAttachToProxy()
