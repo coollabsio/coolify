@@ -30,9 +30,8 @@
                 fetch('/api/health')
                     .then(response => {
                         if (response.ok) {
-                            console.log('Server is back online. Reloading...')
+                            Toaster.success('Coolify is back online. Reloading...')
                             setTimeout(() => {
-                                Toaster.success('Coolify started. Reloading!')
                                 if (checkHealthInterval) clearInterval(checkHealthInterval);
                                 window.location.reload();
                             }, 2000)

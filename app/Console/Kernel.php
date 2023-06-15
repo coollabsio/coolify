@@ -14,12 +14,12 @@ class Kernel extends ConsoleKernel
     {
         if (config('app.env') === 'local') {
             $schedule->command('horizon:snapshot')->everyMinute();
-            $schedule->job(new InstanceDockerCleanupJob)->everyMinute();
-            $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
+            // $schedule->job(new InstanceDockerCleanupJob)->everyMinute();
+            // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new InstanceDockerCleanupJob)->everyFiveMinutes();
-            $schedule->job(new InstanceAutoUpdateJob)->everyFifteenMinutes();
+            $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }
     }
     protected function commands(): void

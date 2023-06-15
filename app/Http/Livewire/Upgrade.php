@@ -2,8 +2,8 @@
 
 namespace App\Http\Livewire;
 
+use App\Actions\Server\UpdateCoolify;
 use Masmerise\Toaster\Toaster;
-use App\Jobs\InstanceAutoUpdateJob;
 use Livewire\Component;
 
 class Upgrade extends Component
@@ -13,7 +13,7 @@ class Upgrade extends Component
     {
         try {
             $this->showProgress = true;
-            dispatch(new InstanceAutoUpdateJob(force: true));
+            resolve(UpdateCoolify::class)(true);
             Toaster::success('Update started.');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
