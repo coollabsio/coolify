@@ -42,7 +42,7 @@
                         console.log('Waiting for server to come back from dead...');
                     });
                 return;
-            }, 5000);
+            }, 2000);
         }
 
         function upgrade() {
@@ -55,13 +55,13 @@
                         }
                     })
                     .catch(error => {
-                        Toaster.success('Update done, restart Coolify!')
+                        Toaster.success('Update done, restarting Coolify!')
                         console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
-                        revive();
                         if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                        revive();
                     });
                 return;
-            }, 5000);
+            }, 2000);
         }
     </script>
 </div>
