@@ -308,6 +308,7 @@ const magicActions = [{
 {
     id: 10,
     name: 'Goto: Private Keys',
+    tags: 'destination,docker,network,new,create',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
