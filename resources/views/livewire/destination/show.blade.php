@@ -8,7 +8,7 @@
     </div>
     <div class="pt-2 pb-6 text-sm">Destinations are used to segregate resources by network.</div>
     <div class="flex gap-2 text-sm">
-        Docker Networks added to the server:
+        Available for using:
         @forelse ($server->standaloneDockers as $docker)
             <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
                 <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
@@ -19,7 +19,7 @@
     </div>
     <div class="grid gap-2 pt-2">
         @if (count($networks) > 0)
-            <h3>Scanned available destinations</h3>
+            <h3>Scanned available Destinations</h3>
         @endif
         @foreach ($networks as $network)
             <div class="flex gap-2 text-sm w-96">
