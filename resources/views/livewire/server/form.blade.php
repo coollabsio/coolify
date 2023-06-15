@@ -10,8 +10,8 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <div class="flex flex-col w-full">
+        <div class="flex flex-col gap-2 ">
+            <div class="flex flex-col w-full gap-2 lg:flex-row">
                 @if ($server->id === 0)
                     <x-forms.input id="server.name" label="Name" readonly required />
                     <x-forms.input id="server.description" label="Description" readonly />
@@ -23,7 +23,7 @@
                 {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
-            <div class="flex flex-col w-full">
+            <div class="flex flex-col w-full gap-2 lg:flex-row">
                 @if ($server->id === 0)
                     <x-forms.input id="server.ip" label="IP Address" readonly required />
                     <x-forms.input id="server.user" label="User" readonly required />
@@ -37,7 +37,7 @@
                 @endif
             </div>
         </div>
-        <h3 class="pb-4">Actions</h3>
+        <h3 class="py-4">Actions</h3>
         @if ($server->settings->is_reachable)
             <div class="flex items-center gap-2">
                 <x-forms.button wire:click.prevent='validateServer'>
