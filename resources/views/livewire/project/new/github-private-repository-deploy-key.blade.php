@@ -16,15 +16,19 @@
         <x-forms.button isHighlighted>+</x-forms.button>
     </a>
     @isset($private_key_id)
-        <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
-            <x-forms.input id="repository_url" label="Repository URL" helper="{!! __('repository.url') !!}" />
-            <x-forms.input id="branch" label="Branch" />
-            <x-forms.checkbox instantSave id="is_static" label="Static Site?" />
-            @if ($is_static)
-                <x-forms.input id="publish_directory" label="Publish Directory" />
-            @else
-                <x-forms.input type="number" id="port" label="Port" :readonly="$is_static" />
-            @endif
+        <form class="flex flex-col gap-2 pb-6" wire:submit.prevent='submit'>
+            <div class="flex gap-2">
+                <x-forms.input id="repository_url" label="Repository URL" helper="{!! __('repository.url') !!}" />
+                <x-forms.input id="branch" label="Branch" />
+                @if ($is_static)
+                    <x-forms.input id="publish_directory" label="Publish Directory" />
+                @else
+                    <x-forms.input type="number" id="port" label="Port" :readonly="$is_static" />
+                @endif
+            </div>
+            <h4 class="pt-4">Settings</h4>
+            <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
             <x-forms.button type="submit">
                 Save New Application
             </x-forms.button>
