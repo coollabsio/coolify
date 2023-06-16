@@ -7,7 +7,6 @@
                 <div wire:loading wire:target="checkProxySettingsInSync">
                     <x-loading />
                 </div>
-
                 @isset($proxy_settings)
                     @if ($selectedProxy->value === 'TRAEFIK_V2')
                         <form wire:submit.prevent='saveConfiguration({{ $server }})'>

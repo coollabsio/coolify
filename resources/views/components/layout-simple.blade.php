@@ -27,13 +27,28 @@
     </main>
     <x-version class="fixed left-2 bottom-1" />
     <script>
-        function changePasswordFieldType(id) {
-            console.log(id)
-            const input = document.getElementById(id);
-            if (input.type === 'password') {
-                input.type = 'text';
-            } else {
-                input.type = 'password';
+        function changePasswordFieldType(event) {
+            const element = event.target.parentElement.parentElement.children[0];
+            if (element.nodeName === 'INPUT') {
+                if (element.type === 'password') {
+                    element.type = 'text';
+                } else {
+                    element.type = 'password';
+                }
+            }
+            if (element.nodeName === 'DIV') {
+                if (element.children[0].type === 'password') {
+                    element.children[0].type = 'text';
+                } else {
+                    element.children[0].type = 'password';
+                }
+            }
+            if (element.nodeName === 'svg') {
+                if (element.parentElement.parentElement.children[0].type === 'password') {
+                    element.parentElement.parentElement.children[0].type = 'text';
+                } else {
+                    element.parentElement.parentElement.children[0].type = 'password';
+                }
             }
         }
     </script>

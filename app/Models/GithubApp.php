@@ -12,6 +12,10 @@ class GithubApp extends BaseModel
         'is_public' => 'boolean',
         'type' => 'string'
     ];
+    protected $hidden = [
+        'client_secret',
+        'webhook_secret',
+    ];
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {

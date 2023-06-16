@@ -40,6 +40,24 @@
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
 
+            function changePasswordFieldType(event) {
+                const element = event.target.parentElement.parentElement.children[0];
+                if (element.nodeName === 'INPUT') {
+                    if (element.type === 'password') {
+                        element.type = 'text';
+                    } else {
+                        element.type = 'password';
+                    }
+                }
+                if (element.nodeName === 'DIV') {
+                    if (element.children[0].type === 'password') {
+                        element.children[0].type = 'text';
+                    } else {
+                        element.children[0].type = 'password';
+                    }
+                }
+            }
+
             function revive() {
                 console.log('Checking server\'s health...')
                 checkHealthInterval = setInterval(() => {

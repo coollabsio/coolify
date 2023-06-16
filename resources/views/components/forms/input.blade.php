@@ -15,20 +15,21 @@
 
     <div class="w-full">
         @if ($type === 'password')
-            <div class="w-full join" x-data>
-                <input class="join-item" @readonly($readonly) @disabled($disabled || $errors->isNotEmpty()) type={{ $type }}
-                    id={{ $id }} name={{ $name }} value={{ $value }}
-                    placeholder={{ $placeholder }}>
-                @if ($cannotPeakPassword)
-                    <span x-on:click="changePasswordFieldType('{{ $id }}')" x-cloak
-                        @class([
-                            'border-l-0 border-none rounded-r no-animation h-7 btn join-item btn-xs',
-                            'bg-coolgray-200/50 hover:bg-coolgray-200/50 text-opacity-25' =>
-                                $disabled || $readonly,
-                            'bg-coolgray-200 hover:bg-coolgray-200' => !$disabled || !$readonly,
-                        ])><svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon"
-                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-                            stroke-linecap="round" stroke-linejoin="round">
+            <div class="w-full rounded join" x-data>
+                <input class="join-item" wire:model.defer={{ $id }} wire:dirty.class="input-warning"
+                    @readonly($readonly) @disabled($disabled || $errors->isNotEmpty()) type={{ $type }} id={{ $id }}
+                    name={{ $name }} @isset($value) value={{ $value }} @endisset
+                    @isset($placeholder) placeholder={{ $placeholder }} @endisset>
+                @if (!$cannotPeakPassword)
+                    <span x-on:click="changePasswordFieldType" x-cloak @class([
+                        'border-l-0 border-none rounded-r no-animation h-7 btn join-item btn-xs',
+                        'bg-coolgray-200/50 hover:bg-coolgray-200/50 text-opacity-25' =>
+                            $disabled || $readonly,
+                        'bg-coolgray-200 hover:bg-coolgray-200' => !$disabled || !$readonly,
+                    ])><svg
+                            xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
+                            stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                            stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                             <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
                             <path

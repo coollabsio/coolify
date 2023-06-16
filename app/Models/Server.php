@@ -74,9 +74,10 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
-    static public function ownedByCurrentTeam()
+    static public function ownedByCurrentTeam(array $select = ['*'])
     {
-        return Server::whereTeamId(session('currentTeam')->id);
+        $selectArray = collect($select)->concat(['id']);
+        return Server::whereTeamId(session('currentTeam')->id)->with('settings')->select($selectArray->all());
     }
 
     static public function validated()
