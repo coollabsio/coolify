@@ -5,41 +5,39 @@
 .scrollbar {
     @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
 }
-
 html {
-    @apply min-h-screen h-full bg-coolgray-100;
+    @apply text-neutral-400;
 }
-
 body {
-    @apply scrollbar min-h-screen bg-coolgray-100 text-neutral-400 antialiased;
+    @apply scrollbar antialiased;
 }
-main {
+.main {
     @apply pl-24 pr-10 mx-auto max-w-screen-xl pt-4;
 }
-
+input {
+    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded bg-coolgray-200 w-full;
+}
 input[type="checkbox"] {
     @apply toggle toggle-warning toggle-xs rounded;
 }
-input {
-    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded;
-}
+
 input[type="text"],
 [type="number"],
 [type="email"],
 [type="password"] {
-    @apply read-only:bg-coolgray-200/50 read-only:text-opacity-25;
+    @apply read-only:bg-coolgray-200/50 read-only:text-opacity-25 border-none;
+}
+textarea {
+    @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar bg-coolgray-200;
+}
+select {
+    @apply h-7 select select-xs text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded bg-coolgray-200;
 }
 .label-text,
 label {
     @apply text-neutral-400 text-sm;
 }
 
-textarea {
-    @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar;
-}
-select {
-    @apply h-7 select select-xs text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded;
-}
 .loading {
     @apply w-4 text-warning;
 }

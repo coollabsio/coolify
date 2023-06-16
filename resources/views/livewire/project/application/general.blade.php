@@ -9,8 +9,8 @@
         <div class="text-sm">General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
-                <x-forms.input class="w-full" id="application.name" label="Name" required />
-                <x-forms.input placeholder="https://coolify.io" class="w-full" id="application.fqdn" label="Domains"
+                <x-forms.input id="application.name" label="Name" required />
+                <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
                     helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
 
             </div>

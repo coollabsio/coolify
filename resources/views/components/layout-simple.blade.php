@@ -26,6 +26,17 @@
         {{ $slot }}
     </main>
     <x-version class="fixed left-2 bottom-1" />
+    <script>
+        function changePasswordFieldType(id) {
+            console.log(id)
+            const input = document.getElementById(id);
+            if (input.type === 'password') {
+                input.type = 'text';
+            } else {
+                input.type = 'password';
+            }
+        }
+    </script>
 </body>
 
 </html>

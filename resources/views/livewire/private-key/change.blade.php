@@ -10,7 +10,7 @@
                 Delete
             </x-forms.button>
         </div>
-        <div class="pt-2 pb-8 text-sm">Private Key used for SSH connection</div>
+        <div class="pb-8 text-sm">Private Key used for SSH connection</div>
         <x-forms.input id="private_key.name" label="Name" required />
         <x-forms.input id="private_key.description" label="Description" />
         <div>

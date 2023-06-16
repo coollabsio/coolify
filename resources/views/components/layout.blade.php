@@ -26,18 +26,16 @@
 
 <body>
     @livewireScripts
-    <x-toaster-hub />
     @auth
+        <x-toaster-hub />
         <x-navbar />
-    @endauth
-    <div class="fixed top-3 left-4" id="vue">
-        <magic-bar></magic-bar>
-    </div>
-    <main>
-        {{ $slot }}
-    </main>
-    <x-version class="fixed left-2 bottom-1" />
-    @auth
+        <div class="fixed top-3 left-4" id="vue">
+            <magic-bar></magic-bar>
+        </div>
+        <main class="main">
+            {{ $slot }}
+        </main>
+        <x-version class="fixed left-2 bottom-1" />
         <script>
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
@@ -100,16 +98,9 @@
             })
         </script>
     @endauth
-    <script>
-        function changePasswordFieldType(id) {
-            const input = document.getElementById(id);
-            if (input.type === 'password') {
-                input.type = 'text';
-            } else {
-                input.type = 'password';
-            }
-        }
-    </script>
+    @guest
+        {{ $slot }}
+    @endguest
 </body>
 
 </html>
