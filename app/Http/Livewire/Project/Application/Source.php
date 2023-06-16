@@ -16,6 +16,11 @@ class Source extends Component
         'application.git_branch' => 'required',
         'application.git_commit_sha' => 'nullable',
     ];
+    protected $validationAttributes = [
+        'application.git_repository' => 'repository',
+        'application.git_branch' => 'branch',
+        'application.git_commit_sha' => 'commit sha',
+    ];
     private function get_private_keys()
     {
         $this->private_keys = PrivateKey::whereTeamId(session('currentTeam')->id)->get()->reject(function ($key) {

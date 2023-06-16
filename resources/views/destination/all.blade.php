@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Destinations</h1>
-    <div class="pt-2 pb-10 text-sm">All Destinations</div>
+    <div class="pt-2 pb-10 ">All Destinations</div>
     <div class="grid lg:grid-cols-2 gap-2">
         @forelse ($destinations as $destination)
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')

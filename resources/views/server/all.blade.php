@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Servers</h1>
-    <div class="pt-2 pb-10 text-sm">All Servers</div>
+    <div class="pt-2 pb-10 ">All Servers</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
             <a class="text-center hover:no-underline box group"

@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Destination</h1>
-    <div class="pt-2 pb-10 text-sm">Destinations are used to segregate resources by network.</div>
+    <div class="pt-2 pb-10 ">Destinations are used to segregate resources by network.</div>
     <form class="flex flex-col gap-4" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />

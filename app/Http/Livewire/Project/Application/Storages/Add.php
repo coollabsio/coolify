@@ -17,6 +17,11 @@ class Add extends Component
         'mount_path' => 'required|string',
         'host_path' => 'string|nullable',
     ];
+    protected $validationAttributes = [
+        'name' => 'name',
+        'mount_path' => 'mount',
+        'host_path' => 'host',
+    ];
     public function mount()
     {
         $this->parameters = getRouteParameters();

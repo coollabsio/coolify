@@ -22,7 +22,7 @@
             class="relative flex duration-300 transform transition ease-in-out max-w-md w-full pointer-events-auto {{ $position->is('center') ? 'text-center' : 'text-left' }}"
             :class="toast.select({ error: 'text-white', info: 'text-white', success: 'text-white', warning: 'text-white' })"
             >
-            <i class=" flex items-center gap-2 select-none not-italic pr-6 pl-4 py-3 rounded shadow-lg text-sm w-full {{ $alignment->is('bottom') ? 'mt-3' : 'mb-3' }}"
+            <i class=" flex items-center gap-2 select-none not-italic pr-6 pl-4 py-3 rounded shadow-lg  w-full {{ $alignment->is('bottom') ? 'mt-3' : 'mb-3' }}"
                 :class="toast.select({
                     error: 'bg-coolgray-300',
                     info: 'bg-coolgray-300',

@@ -7,7 +7,7 @@
             </x-forms.button>
         </div>
         @isset($rate_limit_remaining)
-            <div class="pt-1 text-sm">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>
+            <div class="pt-1 ">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
         @if (count($pull_requests) > 0)
             <div wire:loading.remove wire:target='load_prs'>
@@ -49,7 +49,7 @@
     </div>
     @if ($application->previews->count() > 0)
         <h4 class="pt-4">Preview Deployments</h4>
-        <div class="flex gap-6 text-sm">
+        <div class="flex gap-6 ">
             @foreach ($application->previews as $preview)
                 <div class="flex flex-col p-4 bg-coolgray-200 " x-init="$wire.loadStatus('{{ data_get($preview, 'pull_request_id') }}')">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |

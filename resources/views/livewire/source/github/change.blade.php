@@ -29,7 +29,7 @@
                 @endif
             </div>
         </div>
-        <div class="pt-2 pb-10 text-sm">Your Private GitHub App for private repositories.</div>
+        <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>
         @if ($github_app->app_id)
             <div class="flex gap-2">
                 <x-forms.input id="github_app.name" label="App Name" disabled />
@@ -72,7 +72,7 @@
                         Application
                     </x-forms.button>
                 </div>
-                <div class="pt-1 pb-2 text-sm">You need to register a GitHub App before using this source.</div>
+                <div class="pt-1 pb-2 ">You need to register a GitHub App before using this source.</div>
                 <div class="pt-2 pb-10">
                     <div class="flex items-end gap-2">
                         <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"

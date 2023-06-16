@@ -4,7 +4,7 @@
             <h2>Resource Limits</h2>
             <x-forms.button type='submit'>Save</x-forms.button>
         </div>
-        <div class="text-sm">Limit your container resources by CPU & memory.</div>
+        <div class="">Limit your container resources by CPU & memory.</div>
         <h3 class="pt-4">Limit CPUs</h3>
         <div class="flex gap-2">
             <x-forms.input placeholder="1.5" label="Number of CPUs" id="application.limits_cpus" />

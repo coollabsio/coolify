@@ -14,6 +14,9 @@ class Form extends Component
     protected $rules = [
         'application.preview_url_template' => 'required',
     ];
+    protected $validationAttributes = [
+        'application.preview_url_template' => 'preview url template',
+    ];
     public function resetToDefault()
     {
         $this->application->preview_url_template = '{{pr_id}}.{{domain}}';

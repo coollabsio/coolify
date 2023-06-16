@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Application</h1>
-    <div class="pb-4 text-sm">Deploy any public or private git repositories through a GitHub App.</div>
+    <div class="pb-4 ">Deploy any public or private git repositories through a GitHub App.</div>
     @if ($github_apps->count() > 0)
         <form class="flex flex-col" wire:submit.prevent='submit'>
             <div class="flex flex-col gap-2">

@@ -38,7 +38,7 @@
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
                                         possibleSequences[sequenceState.sequence[sequenceState.currentActionIndex]].newTitle }}
                                 </h2>
-                                <ul class="mt-2 -mx-4 text-sm text-white ">
+                                <ul class="mt-2 -mx-4 text-white">
                                     <li class="flex items-center px-4 py-2 cursor-pointer select-none group hover:bg-coolgray-400"
                                         id="option-1" role="option" tabindex="-1"
                                         @click="addNew(sequenceState.sequence[sequenceState.currentActionIndex])">
@@ -65,7 +65,7 @@
                                 </ul>
                             </li>
                             <li>
-                                <ul v-if="magic.length == 0" class="mt-2 -mx-4 text-sm text-white">
+                                <ul v-if="magic.length == 0" class="mt-2 -mx-4 text-white">
                                     <li class="flex items-center px-4 py-2 select-none group">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24"
                                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -83,7 +83,7 @@
                                     class="mt-4 mb-2 text-xs font-semibold text-neutral-500">{{
                                         possibleSequences[sequenceState.sequence[sequenceState.currentActionIndex]].title }}
                                 </h2>
-                                <ul v-if="magic.length != 0" class="mt-2 -mx-4 text-sm text-white">
+                                <ul v-if="magic.length != 0" class="mt-2 -mx-4 text-white">
                                     <li class="flex items-center px-4 py-2 transition-all cursor-pointer select-none group hover:bg-coolgray-400"
                                         :class="{ 'bg-coollabs': currentFocus === index }" id="option-1" role="option"
                                         tabindex="-1" v-for="action, index in magic" @click="goThroughSequence(index)"

@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Application</h1>
-    <div class="pt-2 pb-10 text-sm">Deploy any public or private GIT repositories through a Deploy Key.</div>
+    <div class="pt-2 pb-10 ">Deploy any public or private GIT repositories through a Deploy Key.</div>
     <h3 class="py-2">Select a Private Key</h3>
     @foreach ($private_keys as $key)
         @if ($private_key_id == $key->id)

@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Application</h1>
-    <div class="pb-4 text-sm">Deploy any public git repositories.</div>
+    <div class="pb-4 ">Deploy any public git repositories.</div>
     <form class="flex flex-col gap-2" wire:submit.prevent>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col">

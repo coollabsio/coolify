@@ -63,7 +63,7 @@
         </div>
         @isset($uptime)
             <h4 class="pb-3">Server Info</h4>
-            <div class="text-sm">
+            <div class="">
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
                     <p>Docker Engine {{ $dockerVersion }}</p>

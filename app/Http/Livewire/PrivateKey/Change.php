@@ -15,6 +15,11 @@ class Change extends Component
         'private_key.description' => 'nullable|string',
         'private_key.private_key' => 'required|string'
     ];
+    protected $validationAttributes = [
+        'private_key.name' => 'name',
+        'private_key.description' => 'description',
+        'private_key.private_key' => 'private key'
+    ];
     public function mount()
     {
         $this->private_key = PrivateKey::where('uuid', $this->private_key_uuid)->first();

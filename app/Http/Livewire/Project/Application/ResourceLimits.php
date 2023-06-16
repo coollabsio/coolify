@@ -17,6 +17,15 @@ class ResourceLimits extends Component
         'application.limits_cpuset' => 'nullable',
         'application.limits_cpu_shares' => 'nullable',
     ];
+    protected $validationAttributes = [
+        'application.limits_memory' => 'memory',
+        'application.limits_memory_swap' => 'swap',
+        'application.limits_memory_swappiness' => 'swappiness',
+        'application.limits_memory_reservation' => 'reservation',
+        'application.limits_cpus' => 'cpus',
+        'application.limits_cpuset' => 'cpuset',
+        'application.limits_cpu_shares' => 'cpu shares',
+    ];
     public function submit()
     {
         try {

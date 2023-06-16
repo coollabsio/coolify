@@ -21,6 +21,15 @@ class Form extends Component
         'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required'
     ];
+    protected $validationAttributes = [
+        'server.name' => 'name',
+        'server.description' => 'description',
+        'server.ip' => 'ip',
+        'server.user' => 'user',
+        'server.port' => 'port',
+        'server.settings.is_reachable' => 'is reachable',
+        'server.settings.is_part_of_swarm' => 'is part of swarm'
+    ];
     public function installDocker()
     {
         $activity = resolve(InstallDocker::class)($this->server);

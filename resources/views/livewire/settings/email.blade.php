@@ -6,7 +6,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="pt-2 pb-4 text-sm">SMTP settings for password resets, invitations, etc.</div>
+        <div class="pt-2 pb-4 ">SMTP settings for password resets, invitations, etc.</div>
         <div class="flex flex-col">
             <x-forms.checkbox instantSave id="settings.extra_attributes.smtp_active" label="Enabled" />
         </div>

@@ -18,7 +18,7 @@
                 </a>
             @endif
         </div>
-        <div class="text-sm">Code source of your application.</div>
+        <div class="">Code source of your application.</div>
         <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository" label="Repository" />
         <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
         <div class="flex items-end gap-2 w-96">
@@ -40,7 +40,7 @@
             <h4 class="py-2 pt-4">Current Deploy Key: <span
                     class="text-warning">{{ $application->private_key->name }}</span></h4>
 
-            <div class="py-2 text-sm">Select another Deploy Key</div>
+            <div class="py-2 ">Select another Deploy Key</div>
             <div class="flex gap-2">
                 @foreach ($private_keys as $key)
                     <x-forms.button wire:click.defer="setPrivateKey('{{ $key->id }}')">{{ $key->name }}

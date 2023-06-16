@@ -9,7 +9,7 @@ html {
     @apply text-neutral-400;
 }
 body {
-    @apply scrollbar antialiased;
+    @apply scrollbar antialiased text-sm;
 }
 .main {
     @apply pl-24 pr-10 mx-auto max-w-screen-xl pt-4;
@@ -28,11 +28,11 @@ textarea {
     @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar bg-coolgray-200;
 }
 select {
-    @apply h-7 select select-xs text-sm disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded bg-coolgray-200;
+    @apply h-7 select select-xs disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded bg-coolgray-200;
 }
 .label-text,
 label {
-    @apply text-neutral-400 text-sm;
+    @apply text-neutral-400;
 }
 
 .loading {
@@ -58,7 +58,7 @@ h4 {
     @apply text-base font-bold text-white;
 }
 a {
-    @apply text-neutral-400 hover:text-white text-sm link link-hover hover:bg-transparent;
+    @apply text-neutral-400 hover:text-white link link-hover hover:bg-transparent;
 }
 .kbd-custom {
     @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;
@@ -70,7 +70,7 @@ a {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center text-sm rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+    @apply flex items-center justify-center rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
 }
 
 .lds-heart {
@@ -106,13 +106,13 @@ table {
     @apply min-w-full divide-y divide-coolgray-200;
 }
 thead {
-    @apply uppercase text-sm;
+    @apply uppercase;
 }
 tbody {
     @apply divide-y divide-coolgray-200;
 }
 tr {
-    @apply text-sm text-neutral-400;
+    @apply text-neutral-400;
 }
 tr th {
     @apply px-3 py-3.5 text-left text-white;

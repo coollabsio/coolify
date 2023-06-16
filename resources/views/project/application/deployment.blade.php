@@ -1,6 +1,6 @@
 <x-layout>
     <h1 class="py-0">Deployment</h1>
-    <nav class="flex pt-2 pb-10 text-sm">
+    <nav class="flex pt-2 pb-10 ">
         <ol class="inline-flex items-center">
             <li class="inline-flex items-center">
                 <a

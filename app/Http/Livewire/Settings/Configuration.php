@@ -25,6 +25,13 @@ class Configuration extends Component
         'settings.public_port_max' => 'required',
         'settings.default_redirect_404' => 'nullable',
     ];
+    protected $validationAttributes = [
+        'settings.fqdn' => 'FQDN',
+        'settings.wildcard_domain' => 'Wildcard domain',
+        'settings.public_port_min' => 'Public port min',
+        'settings.public_port_max' => 'Public port max',
+        'settings.default_redirect_404' => 'Default redirect 404',
+    ];
     public function mount()
     {
         $this->do_not_track = $this->settings->do_not_track;

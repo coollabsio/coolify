@@ -44,7 +44,7 @@
                         <h3 class="text-base font-semibold leading-6 text-white" id="modal-title">Delete Resource
                         </h3>
                         <div class="mt-2">
-                            <p class="text-sm text-neutral-200">{{ $message }}</p>
+                            <p class=" text-neutral-200">{{ $message }}</p>
                         </div>
                     </div>
                 </div>

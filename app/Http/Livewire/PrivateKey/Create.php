@@ -16,8 +16,8 @@ class Create extends Component
         'value' => 'required|string',
     ];
     protected $validationAttributes = [
-        'name' => 'Name',
-        'value' => 'Private Key',
+        'name' => 'name',
+        'value' => 'private Key',
     ];
     public function createPrivateKey()
     {

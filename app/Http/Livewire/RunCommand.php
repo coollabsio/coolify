@@ -16,6 +16,10 @@ class RunCommand extends Component
         'server' => 'required',
         'command' => 'required',
     ];
+    protected $validationAttributes = [
+        'server' => 'server',
+        'command' => 'command',
+    ];
     public function mount($servers)
     {
         $this->servers = $servers;

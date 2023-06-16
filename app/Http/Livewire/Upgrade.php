@@ -10,12 +10,13 @@ class Upgrade extends Component
 {
     public bool $showProgress = false;
     public bool $isUpgradeAvailable = false;
+    public string $latestVersion = '';
 
     public function checkUpdate()
     {
-        $latestVersion = get_latest_version_of_coolify();
+        $this->latestVersion = get_latest_version_of_coolify();
         $currentVersion = config('version');
-        version_compare($currentVersion, $latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
+        version_compare($currentVersion, $this->latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
         if (isDev()) {
             $this->isUpgradeAvailable = true;
         }
@@ -25,7 +26,7 @@ class Upgrade extends Component
         try {
             $this->showProgress = true;
             resolve(UpdateCoolify::class)(true);
-            Toaster::success('Upgrading Coolify to latest version...');
+            Toaster::success("Upgrading Coolify to {$this->latestVersion} version...");
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

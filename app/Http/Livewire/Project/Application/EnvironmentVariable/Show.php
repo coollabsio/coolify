@@ -15,6 +15,11 @@ class Show extends Component
         'env.value' => 'required|string',
         'env.is_build_time' => 'required|boolean',
     ];
+    protected $validationAttributes = [
+        'key' => 'key',
+        'value' => 'value',
+        'is_build_time' => 'build',
+    ];
     public function mount()
     {
         $this->parameters = getRouteParameters();

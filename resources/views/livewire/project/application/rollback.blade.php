@@ -3,14 +3,14 @@
         <h2>Rollback</h2>
         <x-forms.button wire:click='loadImages'>Reload Available Images</x-forms.button>
     </div>
-    <div class="pb-4 text-sm">You can easily rollback to a previously built image quickly.</div>
+    <div class="pb-4 ">You can easily rollback to a previously built image quickly.</div>
     <div wire:target='loadImages'>
         <div class="flex flex-wrap">
             @foreach ($images as $image)
                 <div class="w-2/4 p-2">
                     <div class="rounded shadow-lg bg-coolgray-200">
                         <div class="p-2">
-                            <div class="text-sm">
+                            <div class="">
                                 @if (data_get($image, 'is_current'))
                                     <span class="font-bold text-warning">LIVE</span>
                                     |

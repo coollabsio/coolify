@@ -6,7 +6,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="text-sm">General configuration for your application.</div>
+        <div class="">General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-forms.input id="application.name" label="Name" required />
@@ -16,7 +16,7 @@
             </div>
             @if ($wildcard_domain)
                 <div class="pb-6">
-                    <div class="text-sm">Set Random Domain</div>
+                    <div class="">Set Random Domain</div>
                     @if ($global_wildcard_domain)
                         <x-forms.button wire:click="generateGlobalRandomDomain">Global Wildcard
                         </x-forms.button>

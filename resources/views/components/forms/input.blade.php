@@ -17,7 +17,7 @@
         @if ($type === 'password')
             <div class="w-full rounded join" x-data>
                 <input class="join-item" wire:model.defer={{ $id }} wire:dirty.class="input-warning"
-                    @readonly($readonly) @disabled($disabled || $errors->isNotEmpty()) type={{ $type }} id={{ $id }}
+                    @readonly($readonly) @disabled($disabled) type={{ $type }} id={{ $id }}
                     name={{ $name }} @isset($value) value={{ $value }} @endisset
                     @isset($placeholder) placeholder={{ $placeholder }} @endisset>
                 @if (!$cannotPeakPassword)
@@ -40,12 +40,17 @@
             </div>
         @else
             <input id={{ $id }} name={{ $name }} wire:model.defer={{ $id }}
-                wire:dirty.class="input-warning" @readonly($readonly) @disabled($disabled || $errors->isNotEmpty())
+                wire:dirty.class="input-warning" @readonly($readonly) @disabled($disabled)
                 @isset($value) value={{ $value }} @endisset
                 @isset($placeholder) placeholder={{ $placeholder }} @endisset>
         @endif
         @if (!$label && $helper)
             <x-helper :helper="$helper" />
         @endif
+        @error($id)
+            <label class="label">
+                <span class="text-red-500 label-text-alt">{{ $message }}</span>
+            </label>
+        @enderror
     </div>
 </div>

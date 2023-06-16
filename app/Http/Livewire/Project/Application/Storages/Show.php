@@ -12,6 +12,11 @@ class Show extends Component
         'storage.mount_path' => 'required|string',
         'storage.host_path' => 'string|nullable',
     ];
+    protected $validationAttributes = [
+        'name' => 'name',
+        'mount_path' => 'mount',
+        'host_path' => 'host',
+    ];
     public function submit()
     {
         $this->validate();

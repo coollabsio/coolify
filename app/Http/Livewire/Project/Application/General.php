@@ -47,6 +47,22 @@ class General extends Component
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
     ];
+    protected $validationAttributes = [
+        'application.name' => 'name',
+        'application.fqdn' => 'FQDN',
+        'application.git_repository' => 'Git repository',
+        'application.git_branch' => 'Git branch',
+        'application.git_commit_sha' => 'Git commit SHA',
+        'application.install_command' => 'Install command',
+        'application.build_command' => 'Build command',
+        'application.start_command' => 'Start command',
+        'application.build_pack' => 'Build pack',
+        'application.static_image' => 'Static image',
+        'application.base_directory' => 'Base directory',
+        'application.publish_directory' => 'Publish directory',
+        'application.ports_exposes' => 'Ports exposes',
+        'application.ports_mappings' => 'Ports mappings',
+    ];
     public function instantSave()
     {
         // @TODO: find another way - if possible

@@ -13,6 +13,11 @@ class Form extends Component
         'destination.network' => 'required',
         'destination.server.ip' => 'required',
     ];
+    protected $validationAttributes = [
+        'destination.name' => 'name',
+        'destination.network' => 'network',
+        'destination.server.ip' => 'IP Address',
+    ];
     public function submit()
     {
         $this->validate();

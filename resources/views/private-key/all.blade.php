@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Private Keys</h1>
-    <div class="pt-2 pb-10 text-sm">All Private Keys</div>
+    <div class="pt-2 pb-10 ">All Private Keys</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($privateKeys as $key)
             <a class="text-center hover:no-underline box group"

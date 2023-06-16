@@ -14,6 +14,9 @@ class Form extends Component
     protected $rules = [
         'name' => 'required',
     ];
+    protected $validationAttributes = [
+        'name' => 'name',
+    ];
     public function mount()
     {
         $this->userId = auth()->user()->id;

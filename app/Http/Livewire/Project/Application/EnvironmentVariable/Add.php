@@ -18,6 +18,11 @@ class Add extends Component
         'value' => 'required|string',
         'is_build_time' => 'required|boolean',
     ];
+    protected $validationAttributes = [
+        'key' => 'key',
+        'value' => 'value',
+        'is_build_time' => 'build',
+    ];
     public function mount()
     {
         $this->parameters = getRouteParameters();

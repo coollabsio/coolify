@@ -22,6 +22,11 @@ class StandaloneDocker extends Component
         'network' => 'required|string',
         'server_id' => 'required|integer'
     ];
+    protected $validationAttributes = [
+        'name' => 'name',
+        'network' => 'network',
+        'server_id' => 'server'
+    ];
     public function mount()
     {
         if (request()->query('server_id')) {

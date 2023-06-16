@@ -33,7 +33,7 @@
 
                     <x-forms.button type="submit">{{ __('auth.login') }}</x-forms.button>
                     @if (!$is_registration_enabled)
-                        <div class="text-sm text-center">{{ __('auth.registration_disabled') }}</div>
+                        <div class="text-center ">{{ __('auth.registration_disabled') }}</div>
                     @endif
                     @if ($errors->any())
                         <div class="text-xs text-center text-error">
@@ -41,7 +41,7 @@
                         </div>
                     @endif
                     @if (session('status'))
-                        <div class="mb-4 text-sm font-medium text-green-600">
+                        <div class="mb-4  font-medium text-green-600">
                             {{ session('status') }}
                         </div>
                     @endif

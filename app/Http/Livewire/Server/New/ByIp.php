@@ -22,11 +22,18 @@ class ByIp extends Component
     public bool $is_part_of_swarm = false;
 
     protected $rules = [
-        'name' => 'required',
-        'ip' => 'required',
-        'user' => 'required',
+        'name' => 'required|string',
+        'description' => 'nullable|string',
+        'ip' => 'required|ip',
+        'user' => 'required|string',
         'port' => 'required|integer',
-        'is_part_of_swarm' => 'required|boolean',
+    ];
+    protected $validationAttributes = [
+        'name' => 'name',
+        'description' => 'description',
+        'ip' => 'ip',
+        'user' => 'user',
+        'port' => 'port',
     ];
     public function mount()
     {
@@ -43,11 +50,11 @@ class ByIp extends Component
     }
     public function submit()
     {
+        $this->validate();
         try {
             if (!$this->private_key_id) {
                 return $this->emit('error', 'You must select a private key');
             }
-            $this->validate();
             $server = Server::create([
                 'name' => $this->name,
                 'description' => $this->description,

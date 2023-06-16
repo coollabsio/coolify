@@ -9,7 +9,6 @@ class DeleteProject extends Component
 {
     public array $parameters;
     public int $project_id;
-    public int $resource_count = 0;
 
     public function mount()
     {

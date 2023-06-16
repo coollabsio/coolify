@@ -3,14 +3,12 @@
 namespace App\Http\Livewire\Project;
 
 use App\Models\Environment;
-use App\Models\Project;
 use Livewire\Component;
 
 class DeleteEnvironment extends Component
 {
     public array $parameters;
     public int $environment_id;
-    public int $resource_count = 0;
 
     public function mount()
     {

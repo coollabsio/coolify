@@ -37,6 +37,12 @@ class PublicGitRepository extends Component
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
     ];
+    protected $validationAttributes = [
+        'repository_url' => 'repository',
+        'port' => 'port',
+        'is_static' => 'static',
+        'publish_directory' => 'publish directory',
+    ];
     public function mount()
     {
         if (isDev()) {

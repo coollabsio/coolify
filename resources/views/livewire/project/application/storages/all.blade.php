@@ -7,7 +7,7 @@
             volume
             name, example: <span class='text-helper'>-pr-1</span>" />
         </div>
-        <div class="text-sm">Persistent storage to preserve data between deployments.</div>
+        <div class="">Persistent storage to preserve data between deployments.</div>
     </div>
     <div class="flex flex-col gap-2 py-4">
         @foreach ($application->persistentStorages as $storage)

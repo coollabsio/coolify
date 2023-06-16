@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Server</h1>
-    <div class="pt-2 pb-10 text-sm">Servers are the main blocks of your infrastructure.</div>
+    <div class="pt-2 pb-10 ">Servers are the main blocks of your infrastructure.</div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
@@ -22,8 +22,6 @@
                 @endif
             @endforeach
         </x-forms.select>
-        {{-- <x-forms.checkbox class="pb-8" disabled instantSave noDirty id="is_part_of_swarm"
-            label="Is it part of a Swarm cluster?" /> --}}
         <x-forms.button type="submit">
             Save New Server
         </x-forms.button>

@@ -5,15 +5,15 @@
             <x-forms.button>Add a new Private Key</x-forms.button>
         </a>
     </div>
-    <div class="pt-2 pb-6 text-sm">Selected Private Key for SSH connection</div>
-    <div class="pb-10 text-sm">
+    <div class="pt-2 pb-6 ">Selected Private Key for SSH connection</div>
+    <div class="pb-10 ">
         @if (data_get($server, 'privateKey.uuid'))
             Currently attached Private Key:
             <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
                 <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
             </a>
         @else
-            <div class="text-sm">No private key attached.</div>
+            <div class="">No private key attached.</div>
         @endif
     </div>
     <h3 class="pb-4">Select a different Private Key</h3>

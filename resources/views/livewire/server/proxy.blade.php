@@ -18,11 +18,11 @@
                                 @endif
                                 <livewire:server.proxy.status :server="$server" />
                             </div>
-                            <div class="pt-3 pb-4 text-sm">Traefik v2</div>
+                            <div class="pt-3 pb-4 ">Traefik v2</div>
                             @if (
                                 $server->extra_attributes->proxy_last_applied_settings &&
                                     $server->extra_attributes->proxy_last_saved_settings !== $server->extra_attributes->proxy_last_applied_settings)
-                                <div class="text-sm text-red-500">Configuration out of sync. Restart to get the new configs.
+                                <div class="text-red-500 ">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif
                             <div class="container w-full mx-auto">
@@ -42,7 +42,7 @@
         @else
             <div>
                 <h2>Proxy</h2>
-                <div class="pt-2 pb-10 text-sm">Select a proxy you would like to use on this server.</div>
+                <div class="pt-2 pb-10 ">Select a proxy you would like to use on this server.</div>
                 <div class="flex gap-2">
                     <x-forms.button class="w-32 box" wire:click="setProxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">
                         Traefik
@@ -58,6 +58,6 @@
             </div>
         @endif
     @else
-        <div class="text-sm">Server is not validated. Validate first.</div>
+        <div class="">Server is not validated. Validate first.</div>
     @endif
 </div>

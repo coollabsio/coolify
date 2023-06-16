@@ -1,10 +1,10 @@
 <x-layout>
     <h1>Profile</h1>
-    <div class="pt-2 pb-10 text-sm">Your user profile settings.</div>
+    <div class="pt-2 pb-10 ">Your user profile settings.</div>
     <livewire:profile.form :request="$request" />
     <h3 class="py-4">Two-factor Authentication</h3>
     @if (session('status') == 'two-factor-authentication-enabled')
-        <div class="mb-4 text-sm font-medium">
+        <div class="mb-4 font-medium">
             Please finish configuring two factor authentication below. Read the QR code or enter the secret key
             manually.
         </div>
@@ -19,17 +19,17 @@
                 <div x-data="{ showCode: false }" class="py-2">
                     <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually enter</x-forms.button>
                     <template x-if="showCode">
-                        <div class="py-2 text-sm">{!! decrypt($request->user()->two_factor_secret) !!}</div>
+                        <div class="py-2 ">{!! decrypt($request->user()->two_factor_secret) !!}</div>
                     </template>
                 </div>
             </div>
         </div>
     @elseif(session('status') == 'two-factor-authentication-confirmed')
-        <div class="mb-4 text-sm">
+        <div class="mb-4 ">
             Two factor authentication confirmed and enabled successfully.
         </div>
         <div>
-            <div class="pb-6 text-sm">Here are the recovery codes for your account. Please store them in a secure
+            <div class="pb-6 ">Here are the recovery codes for your account. Please store them in a secure
                 location.</div>
             <div class="text-white">
                 @foreach ($request->user()->recoveryCodes() as $code)
@@ -39,7 +39,7 @@
         </div>
     @else
         @if ($request->user()->two_factor_confirmed_at)
-            <div class="text-sm"> Two factor authentication is <span class="text-helper">enabled</span>.</div>
+            <div class=""> Two factor authentication is <span class="text-helper">enabled</span>.</div>
             <div class="flex gap-2">
                 <form action="/user/two-factor-authentication" method="POST">
                     @csrf
@@ -53,7 +53,7 @@
             </div>
             @if (session('status') == 'recovery-codes-generated')
                 <div>
-                    <div class="py-6 text-sm">Here are the recovery codes for your account. Please store them in a
+                    <div class="py-6 ">Here are the recovery codes for your account. Please store them in a
                         secure
                         location.</div>
                     <div class="text-white">
@@ -64,7 +64,7 @@
                 </div>
             @endif
         @else
-            <div class="pb-2 text-sm">Two factor authentication is <span class="text-helper">disabled</span>.</div>
+            <div class="pb-2 ">Two factor authentication is <span class="text-helper">disabled</span>.</div>
             <form action="/user/two-factor-authentication" method="POST">
                 @csrf
                 <x-forms.button type="submit">Configure 2FA</x-forms.button>

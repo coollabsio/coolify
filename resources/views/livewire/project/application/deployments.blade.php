@@ -23,8 +23,8 @@
      class="hover:no-underline">
      <div class="flex flex-col justify-start">
          <div>
-             {{ $deployment->id }} <span class="text-sm text-warning">></span> {{ $deployment->deployment_uuid }}
-             <span class="text-sm text-warning">></span>
+             {{ $deployment->id }} <span class=" text-warning">></span> {{ $deployment->deployment_uuid }}
+             <span class=" text-warning">></span>
              {{ $deployment->status }}
          </div>
          @if (data_get($deployment, 'pull_request_id'))
