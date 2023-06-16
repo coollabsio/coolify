@@ -1,4 +1,3 @@
 <x-layout>
-
-    <livewire:private-key.change :private_key_uuid="$private_key->uuid" />
+    <livewire:private-key.change :private_key="$private_key" />
 </x-layout>

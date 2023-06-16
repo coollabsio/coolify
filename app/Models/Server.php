@@ -74,6 +74,10 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
+    public function muxFilename()
+    {
+        return "{$this->ip}_{$this->port}_{$this->user}";
+    }
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);

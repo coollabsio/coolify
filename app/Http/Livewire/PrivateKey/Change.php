@@ -7,7 +7,6 @@ use Livewire\Component;
 
 class Change extends Component
 {
-    public string $private_key_uuid;
     public PrivateKey $private_key;
 
     protected $rules = [
@@ -20,15 +19,15 @@ class Change extends Component
         'private_key.description' => 'description',
         'private_key.private_key' => 'private key'
     ];
-    public function mount()
-    {
-        $this->private_key = PrivateKey::where('uuid', $this->private_key_uuid)->first();
-    }
     public function delete()
     {
-        PrivateKey::where('uuid', $this->private_key_uuid)->delete();
-        session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
-        redirect()->route('dashboard');
+        try {
+            PrivateKey::where('uuid', $this->private_key_uuid)->delete();
+            session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+            redirect()->route('dashboard');
+        } catch (\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
+        }
     }
     public function changePrivateKey()
     {

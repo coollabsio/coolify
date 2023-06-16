@@ -11,9 +11,6 @@ class PrivateKey extends BaseModel
         'private_key',
         'team_id',
     ];
-    protected $hidden = [
-        'private_key',
-    ];
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
