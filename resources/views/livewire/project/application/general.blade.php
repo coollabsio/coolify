@@ -32,7 +32,6 @@
                 <option disabled value="docker">Docker</option>
                 <option disabled value="compose">Compose</option>
             </x-forms.select>
-            <x-forms.checkbox instantSave id="is_static" label="Static website?" />
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>
@@ -69,6 +68,9 @@
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
+            <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+
             <x-forms.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug_enabled"
                 label="Debug" />
             <x-forms.checkbox
