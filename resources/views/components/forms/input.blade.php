@@ -16,9 +16,10 @@
     <div class="w-full">
         @if ($type === 'password')
             <div class="w-full rounded join" x-data>
-                <input class="join-item" wire:model.defer={{ $id }} wire:dirty.class="input-warning"
-                    @readonly($readonly) @disabled($disabled) type={{ $type }} id={{ $id }}
-                    name={{ $name }} @isset($value) value={{ $value }} @endisset
+                <input {{ $attributes }} class="join-item" wire:model.defer={{ $id }}
+                    wire:dirty.class="input-warning" @readonly($readonly) @disabled($disabled)
+                    type={{ $type }} id={{ $id }} name={{ $name }}
+                    @isset($value) value={{ $value }} @endisset
                     @isset($placeholder) placeholder={{ $placeholder }} @endisset>
                 @if (!$cannotPeakPassword)
                     <span x-on:click="changePasswordFieldType" x-cloak @class([
@@ -39,9 +40,9 @@
                 @endif
             </div>
         @else
-            <input id={{ $id }} name={{ $name }} wire:model.defer={{ $id }}
-                wire:dirty.class="input-warning" @readonly($readonly) @disabled($disabled)
-                @isset($value) value={{ $value }} @endisset
+            <input {{ $attributes }} id={{ $id }} name={{ $name }}
+                wire:model.defer={{ $id }} wire:dirty.class="input-warning" @readonly($readonly)
+                @disabled($disabled) @isset($value) value={{ $value }} @endisset
                 @isset($placeholder) placeholder={{ $placeholder }} @endisset>
         @endif
         @if (!$label && $helper)
