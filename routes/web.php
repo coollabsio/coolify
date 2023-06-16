@@ -4,7 +4,6 @@ use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ServerController;
 use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\StandaloneDocker;
@@ -12,10 +11,7 @@ use App\Models\SwarmDocker;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\Server;
-use App\Models\User;
-use App\Notifications\TransactionalEmails\ResetPasswordEmail;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -26,15 +22,19 @@ use Laravel\Fortify\Fortify;
 
 
 Route::post('/forgot-password', function (Request $request) {
-    if (!is_transactional_emails_active()) {
+    if (is_transactional_emails_active()) {
         set_transanctional_email_settings();
         $request->validate([Fortify::email() => 'required|email']);
         $status = Password::broker(config('fortify.passwords'))->sendResetLink(
             $request->only(Fortify::email())
         );
-        return $status == Password::RESET_LINK_SENT
-            ? app(SuccessfulPasswordResetLinkRequestResponse::class, ['status' => $status])
-            : app(FailedPasswordResetLinkRequestResponse::class, ['status' => $status]);
+        if ($status == Password::RESET_LINK_SENT) {
+            return app(SuccessfulPasswordResetLinkRequestResponse::class, ['status' => $status]);
+        }
+        if ($status == Password::RESET_THROTTLED) {
+            return response('Already requested a password reset in the past minutes.', 400);
+        }
+        return app(FailedPasswordResetLinkRequestResponse::class, ['status' => $status]);
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');

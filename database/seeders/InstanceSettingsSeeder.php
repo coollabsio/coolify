@@ -17,6 +17,7 @@ class InstanceSettingsSeeder extends Seeder
             'id' => 0,
             'is_registration_enabled' => true,
             'extra_attributes' => [
+                'smtp_active' => true,
                 'smtp_test_recipients' => 'test@example.com,test2@example.com',
                 'smtp_host' => 'coolify-mail',
                 'smtp_port' => 1025,
