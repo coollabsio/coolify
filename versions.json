@@ -1,10 +1,10 @@
 {
     "coolify": {
         "main": {
-            "version": "3.12.31"
+            "version": "3.12.32"
         },
         "v4": {
-            "version": "4.0.0-nightly.17"
+            "version": "4.0.0-nightly.18"
         }
     }
 }

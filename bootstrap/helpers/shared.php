@@ -81,7 +81,10 @@ function set_transanctional_email_settings()
         "local_domain" => null,
     ]);
 }
-
+function base_ip() {
+    $settings = InstanceSettings::get();
+    return "http://{$settings->public_ipv4}"
+}
 function base_url(bool $withPort = true)
 {
     $settings = InstanceSettings::get();

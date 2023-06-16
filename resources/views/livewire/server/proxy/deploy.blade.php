@@ -3,7 +3,7 @@
         @if ($server->extra_attributes->proxy_status === 'running')
             <div class="flex gap-4">
                 <div class="group">
-                    <label tabindex="0" class="flex items-center gap-2  cursor-pointer hover:text-white"> Links
+                    <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
                         <x-chevron-down />
                     </label>
                     <div class="absolute hidden group-hover:block ">
@@ -12,7 +12,7 @@
                             <li>
                                 <a target="_blank"
                                     class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
-                                    href="{{ base_url(withPort: false) }}:8080">
+                                    href="{{ base_ip() }}:8080">
                                     Traefik Dashboard
                                     <x-external-link />
                                 </a>
@@ -57,7 +57,7 @@
                 </div>
             </div>
         @else
-            <button wire:click='deploy' class="flex items-center gap-2  cursor-pointer hover:text-white"> <svg
+            <button wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white"> <svg
                     xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" stroke-width="1.5"
                     stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
