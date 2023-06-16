@@ -19,8 +19,6 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
-
-
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         set_transanctional_email_settings();

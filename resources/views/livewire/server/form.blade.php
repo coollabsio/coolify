@@ -1,5 +1,6 @@
 <div x-data="{ deleteServer: false }">
-    <x-naked-modal show="deleteServer" message='Are you sure you would like to delete this server?' />
+    <x-naked-modal show="deleteServer" title="Delete Server"
+        message='This server will be deleted. It is not reversible. <br>Please think again.' />
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>

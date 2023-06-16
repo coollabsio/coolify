@@ -1,4 +1,6 @@
 <div x-data="{ deleteEnvironment: false }">
+    <x-naked-modal show="deleteEnvironment" title="Delete Environment"
+        message='This environment will be deleted. It is not reversible. <br>Please think again.' />
     <form wire:submit.prevent='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
         <x-forms.input id="env.key" label="Name" />
         <x-forms.input type="password" id="env.value" label="Value" />
@@ -12,5 +14,4 @@
             </x-forms.button>
         </div>
     </form>
-    <x-naked-modal show="deleteEnvironment" message="Are you sure you want to delete {{ $env->key }}?" />
 </div>

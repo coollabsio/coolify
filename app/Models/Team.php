@@ -79,4 +79,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
         return $sources;
     }
+    public function isEmpty()
+    {
+        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
+            return true;
+        }
+        return false;
+    }
 }

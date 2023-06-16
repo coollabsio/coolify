@@ -1,5 +1,6 @@
 <div x-data="{ deleteSource: false }">
-    <x-naked-modal show="deleteSource" message='Are you sure you would like to delete this source?' />
+    <x-naked-modal show="deleteSource" title="Delete Source"
+        message='This source will be deleted. It is not reversible. <br>Please think again.' />
     <form wire:submit.prevent='submit'>
         <div class="flex items-center gap-2">
             <h1>GitHub App</h1>

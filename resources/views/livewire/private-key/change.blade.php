@@ -1,5 +1,6 @@
 <div x-data="{ deletePrivateKey: false, showPrivateKey: false }">
-    <x-naked-modal show="deletePrivateKey" message='Are you sure you would like to delete this private key?' />
+    <x-naked-modal show="deletePrivateKey" title="Delete Private Key"
+        message='This private key will be deleted. It is not reversible. <br>Please think again.' />
     <form class="flex flex-col gap-2" wire:submit.prevent='changePrivateKey'>
         <div class="flex items-end gap-2">
             <h1>Private Key</h1>

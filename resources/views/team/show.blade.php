@@ -41,4 +41,6 @@
         </div>
         <livewire:team.invitations :invitations="$invitations" />
     @endif
+
+    <livewire:team.delete />
 </x-layout>

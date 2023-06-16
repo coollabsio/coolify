@@ -163,6 +163,16 @@
                                                         d="M3 8a9 9 0 0 1 9 9v1l1.428 -4.285a12 12 0 0 1 6.018 -6.938l.554 -.277" />
                                                     <path d="M15 6h5v5" />
                                                 </template>
+                                                <template
+                                                    v-if="action.icon === 'team' || sequenceState.sequence[sequenceState.currentActionIndex] === 'team'">
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                                    <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                                    <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+                                                    <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                                    <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+                                                    <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                                    <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+                                                </template>
                                             </svg>
                                             <div v-if="action.new"
                                                 class="absolute top-0 right-0 -mt-2 -mr-2 font-bold text-warning">+
@@ -297,7 +307,8 @@ const magicActions = [{
 {
     id: 8,
     name: 'Create: Team',
-    icon: '/',
+    icon: 'team',
+    new: true,
     sequence: ['main', 'redirect']
 },
 {

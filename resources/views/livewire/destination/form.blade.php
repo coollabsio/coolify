@@ -1,5 +1,6 @@
 <div x-data="{ deleteDestination: false }">
-    <x-naked-modal show="deleteDestination" message='Are you sure you would like to delete this destination?' />
+    <x-naked-modal show="deleteDestination" title="Delete Destination"
+        message='This destination will be deleted. It is not reversible. <br>Please think again.' />
     <form class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Destination</h1>

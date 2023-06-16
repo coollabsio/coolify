@@ -30,7 +30,6 @@ class User extends Authenticatable implements SendsEmail
     protected static function boot()
     {
         parent::boot();
-
         static::created(function (User $user) {
             $team = [
                 'name' => $user->name . "'s Team",
@@ -48,6 +47,7 @@ class User extends Authenticatable implements SendsEmail
     {
         return $this->email;
     }
+
     public function isAdmin()
     {
         if (auth()->user()->id === 0) {

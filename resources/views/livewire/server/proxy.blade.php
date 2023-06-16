@@ -1,6 +1,6 @@
 <div x-data="{ stopProxy: false }">
-    <x-naked-modal show="stopProxy" action="stopProxy"
-        message='Are you sure you would like to stop the proxy? All resources will be unavailable.' />
+    <x-naked-modal show="stopProxy" action="stopProxy" title="Stop Proxy"
+        message='This proxy will be stopped. It is not reversible. <br>All resources will be unavailable. <br>Please think again.' />
     @if ($server->settings->is_reachable)
         @if ($server->extra_attributes->proxy_type)
             <div x-init="$wire.checkProxySettingsInSync">

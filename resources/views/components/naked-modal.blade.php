@@ -1,5 +1,6 @@
 @props([
     'show' => null,
+    'title' => 'Delete',
     'message' => 'Are you sure you want to delete this?',
     'action' => 'delete',
 ])
@@ -20,19 +21,20 @@
                         </svg>
                     </div>
                     <div class="mt-4 text-center sm:ml-4 sm:mt-1 sm:text-left">
-                        <h3 class="text-base font-semibold leading-6 text-white" id="modal-title">Delete Resource
+                        <h3 class="text-base font-semibold leading-6 text-white" id="modal-title">{{ $title }}
                         </h3>
                         <div class="mt-2">
-                            <p class=" text-neutral-200">{{ $message }}</p>
+                            <p class=" text-neutral-200">{!! $message !!}</p>
                         </div>
                     </div>
                 </div>
-                <div class="gap-4 mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                    <x-forms.button class="w-24" wire:click='{{ $action }}'
-                        x-on:click="{{ $show }} = false" isWarning type="button">Delete</x-forms.button>
-                    <x-forms.button class="w-24 bg-coolgray-200 hover:bg-coolgray-300"
+                <div class="gap-4 pt-10 sm:mt-4 sm:flex">
+                    <x-forms.button class="w-24 bg-coolgray-100 hover:bg-coolgray-100"
                         x-on:click="{{ $show }} = false" type="button">Cancel
                     </x-forms.button>
+                    <div class="flex-1"></div>
+                    <x-forms.button class="w-24" wire:click='{{ $action }}'
+                        x-on:click="{{ $show }} = false" isWarning type="button">Continue</x-forms.button>
                 </div>
             </div>
         </div>
