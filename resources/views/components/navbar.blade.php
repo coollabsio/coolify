@@ -100,7 +100,8 @@
                         </a>
                     </li>
                     <li>
-                        <a class="text-white rounded-none hover:no-underline hover:bg-coollabs" href="/profile/team">
+                        <a class="text-white rounded-none hover:no-underline hover:bg-coollabs"
+                            href="{{ route('team.show') }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -117,7 +118,7 @@
                     <form action="/logout" method="POST">
                         <li>
                             @csrf
-                            <button class=" text-white rounded-none hover:bg-coollabs"> <svg
+                            <button class="text-white rounded-none  hover:bg-coollabs"> <svg
                                     xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                     stroke-linejoin="round">

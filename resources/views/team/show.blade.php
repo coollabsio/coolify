@@ -1,7 +1,8 @@
 <x-layout>
     <x-team.navbar :team="session('currentTeam')" />
-    <h2>Members</h2>
-    <div class="overflow-hidden">
+    <livewire:team.form />
+    <h3>Members</h3>
+    <div class="pt-4 overflow-hidden">
         <table>
             <thead>
                 <tr>

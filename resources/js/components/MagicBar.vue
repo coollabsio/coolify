@@ -293,75 +293,82 @@ const magicActions = [{
     new: true,
     sequence: ['main', 'server', 'redirect']
 },
+
 {
     id: 8,
+    name: 'Create: Team',
+    icon: '/',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 9,
     name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 9,
+    id: 10,
     name: 'Goto: Servers',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 10,
+    id: 11,
     name: 'Goto: Private Keys',
     tags: 'destination,docker,network,new,create',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 11,
+    id: 12,
     name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 12,
+    id: 13,
     name: 'Goto: Sources',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 13,
+    id: 14,
     name: 'Goto: Destinations',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 14,
+    id: 15,
     name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 15,
+    id: 16,
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 16,
+    id: 17,
     name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 17,
+    id: 18,
     name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 18,
+    id: 19,
     name: 'Goto: Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 19,
+    id: 20,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -546,40 +553,43 @@ async function redirect() {
             targetUrl.searchParams.append('server', server)
             break;
         case 8:
-            targetUrl.pathname = `/`
+            targetUrl.pathname = `/team/new`
             break;
         case 9:
-            targetUrl.pathname = `/servers`
+            targetUrl.pathname = `/`
             break;
         case 10:
-            targetUrl.pathname = `/private-keys`
+            targetUrl.pathname = `/servers`
             break;
         case 11:
-            targetUrl.pathname = `/projects`
+            targetUrl.pathname = `/private-keys`
             break;
         case 12:
-            targetUrl.pathname = `/sources`
+            targetUrl.pathname = `/projects`
             break;
         case 13:
-            targetUrl.pathname = `/destinations`
+            targetUrl.pathname = `/sources`
             break;
         case 14:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/destinations`
             break;
         case 15:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/settings`
             break;
         case 16:
-            targetUrl.pathname = `/profile/team/notifications`
+            targetUrl.pathname = `/command-center`
             break;
         case 17:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/team/notifications`
             break;
         case 18:
-            targetUrl.pathname = `/profile/team`
+            targetUrl.pathname = `/profile`
             break;
         case 19:
-            targetUrl.pathname = `/profile/team`
+            targetUrl.pathname = `/team`
+            break;
+        case 20:
+            targetUrl.pathname = `/team`
             break;
     }
     window.location.href = targetUrl;

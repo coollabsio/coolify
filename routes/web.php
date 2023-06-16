@@ -90,8 +90,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
-    Route::get('/profile/team', [Controller::class, 'team'])->name('team.show');
-    Route::get('/profile/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
+    Route::get('/team', [Controller::class, 'team'])->name('team.show');
+    Route::get('/team/new', fn () => view('team.create'))->name('team.create');
+    Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
     Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');

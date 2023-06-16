@@ -6,6 +6,7 @@ use App\Http\Livewire\Server\PrivateKey;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Team;
 
 class MagicController extends Controller
 {
@@ -52,5 +53,17 @@ class MagicController extends Controller
         return response()->json([
             'environment_name' => $environment->name,
         ]);
+    }
+    public function newTeam()
+    {
+        $team = Team::create(
+            [
+                'name' => request()->query('name') ?? generate_random_name(),
+                'personal_team' => false,
+            ],
+        );
+        auth()->user()->teams()->attach($team, ['role' => 'admin']);
+        session(['currentTeam' => $team]);
+        return redirect(request()->header('Referer'));
     }
 }

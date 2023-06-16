@@ -20,6 +20,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     protected $fillable = [
         'id',
         'name',
+        'description',
         'personal_team',
         'extra_attributes',
     ];

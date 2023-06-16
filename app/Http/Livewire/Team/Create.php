@@ -1,0 +1,37 @@
+<?php
+
+namespace App\Http\Livewire\Team;
+
+use App\Models\Team;
+use Livewire\Component;
+
+class Create extends Component
+{
+    public string $name = '';
+    public string|null $description = null;
+
+    protected $rules = [
+        'name' => 'required|min:3|max:255',
+        'description' => 'nullable|min:3|max:255',
+    ];
+    protected $validationAttributes = [
+        'name' => 'name',
+        'description' => 'description',
+    ];
+    public function submit()
+    {
+        $this->validate();
+        try {
+            $team = Team::create([
+                'name' => $this->name,
+                'description' => $this->description,
+                'personal_team' => false,
+            ]);
+            auth()->user()->teams()->attach($team, ['role' => 'admin']);
+            session(['currentTeam' => $team]);
+            return redirect()->route('team.show');
+        } catch (\Throwable $th) {
+            return general_error_handler($th, $this);
+        }
+    }
+}
