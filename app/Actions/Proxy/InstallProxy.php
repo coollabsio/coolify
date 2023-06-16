@@ -2,6 +2,8 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
@@ -10,6 +12,11 @@ class InstallProxy
 {
     public function __invoke(Server $server): Activity
     {
+        if (is_null(data_get($server, 'extra_attributes.proxy_type'))) {
+            $server->extra_attributes->proxy_type = ProxyTypes::TRAEFIK_V2->value;
+            $server->extra_attributes->proxy_status = ProxyStatus::EXITED->value;
+            $server->save();
+        }
         $proxy_path = config('coolify.proxy_config_path');
 
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
