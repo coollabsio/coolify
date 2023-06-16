@@ -7,7 +7,7 @@ if (!function_exists('getProxyConfiguration')) {
     function getProxyConfiguration(Server $server)
     {
         $proxy_path = config('coolify.proxy_config_path');
-        if (config('app.env') === 'local') {
+        if (isDev()) {
             $proxy_path = $proxy_path . '/testing-host-1/';
         }
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
@@ -77,7 +77,7 @@ if (!function_exists('getProxyConfiguration')) {
                 ],
             ],
         ];
-        if (config('app.env') === 'local') {
+        if (isDev()) {
             $config['services']['traefik']['command'][] = "--log.level=debug";
         }
         return Yaml::dump($config, 4, 2);

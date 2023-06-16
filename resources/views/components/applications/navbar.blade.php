@@ -48,7 +48,7 @@
                 @endif
                 @if (data_get($application, 'ports_mappings_array'))
                     @foreach ($application->ports_mappings_array as $port)
-                        @if (config('app.env') === 'local')
+                        @if (isDev())
                             <li>
                                 <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
                                     target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">

@@ -12,7 +12,7 @@
                             <li>
                                 <a target="_blank"
                                     class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
-                                    href="http://{{ request()->getHost() }}:8080">
+                                    href="{{ base_url(withPort: false) }}:8080">
                                     Traefik Dashboard
                                     <x-external-link />
                                 </a>

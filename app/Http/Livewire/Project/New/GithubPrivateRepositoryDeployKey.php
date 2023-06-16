@@ -50,7 +50,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     ];
     public function mount()
     {
-        if (config('app.env') === 'local') {
+        if (isDev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
         $this->parameters = getRouteParameters();

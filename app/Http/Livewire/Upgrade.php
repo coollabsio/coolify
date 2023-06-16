@@ -16,7 +16,7 @@ class Upgrade extends Component
         $latestVersion = get_latest_version_of_coolify();
         $currentVersion = config('version');
         version_compare($currentVersion, $latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
-        if (config('app.env') === 'local') {
+        if (isDev()) {
             $this->isUpgradeAvailable = true;
         }
     }

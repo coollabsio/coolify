@@ -14,7 +14,7 @@ class InviteLink extends Component
     public string $role = 'member';
     public function mount()
     {
-        $this->email = config('app.env') === 'local' ? 'test3@example.com' : '';
+        $this->email = isDev() ? 'test3@example.com' : '';
     }
     public function viaEmail()
     {

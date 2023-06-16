@@ -82,7 +82,7 @@ function set_transanctional_email_settings()
     ]);
 }
 
-function base_url()
+function base_url(bool $withPort = true)
 {
     $settings = InstanceSettings::get();
     if ($settings->fqdn) {
@@ -90,10 +90,27 @@ function base_url()
     }
     $port = config('app.port');
     if ($settings->public_ipv4) {
-        return "http://{$settings->public_ipv4}:{$port}";
+        if ($withPort) {
+            if (isDev()) {
+                return "http://localhost:{$port}";
+            }
+            return "http://{$settings->public_ipv4}:{$port}";
+        }
+        if (isDev()) {
+            return "http://localhost";
+        }
+        return "http://{$settings->public_ipv4}";
     }
     if ($settings->public_ipv6) {
-        return "http://{$settings->public_ipv6}:{$port}";
+        if ($withPort) {
+            return "http://{$settings->public_ipv6}:{$port}";
+        }
+        return "http://{$settings->public_ipv6}";
     }
     return url('/');
+}
+
+function isDev()
+{
+    return config('app.env') === 'local';
 }

@@ -14,7 +14,7 @@
                 <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
             </a>
         @empty
-            <div class="text-sm">No destinations added</div>
+            <div class="text-sm">N\A</div>
         @endforelse
     </div>
     <div class="grid gap-2 pt-2">

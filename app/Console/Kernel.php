@@ -12,7 +12,7 @@ class Kernel extends ConsoleKernel
 {
     protected function schedule(Schedule $schedule): void
     {
-        if (config('app.env') === 'local') {
+        if (isDev()) {
             $schedule->command('horizon:snapshot')->everyMinute();
             // $schedule->job(new InstanceDockerCleanupJob)->everyMinute();
             // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
