@@ -17,12 +17,59 @@ if [ $EUID != 0 ]; then
     echo "Please run as root"
     exit
 fi
+if [ $OS_TYPE != "ubuntu" ] && [ $OS_TYPE != "debian" ]; then
+    echo "This script only supports Ubuntu and Debian for now."
+    exit
+fi
+
+echo -e "-------------"
+echo -e "Welcome to Coolify v4 beta installer!"
+echo -e "This script will install everything for you."
+echo -e "(Source code: https://github.com/coollabsio/coolify/blob/main/scripts/install.sh)\n"
+echo -e "-------------"
+
+echo "OS: $OS_TYPE $OS_VERSION"
+echo "Coolify version: $LATEST_VERSION"
+
+echo -e "-------------"
+echo "Installing required packages..."
+
+apt update -y >/dev/null 2>&1
+apt install -y curl wget git jq >/dev/null 2>&1
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
     curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
     echo "Docker installed successfully"
 fi
+echo -e "-------------"
+echo -e "Configuring Docker..."
+mkdir -p /etc/docker
+
+test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-$(date +"%Y%m%d-%H%M%S") || cat >/etc/docker/daemon.json <<EOL
+{
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOL
+cat >/etc/docker/daemon.json.coolify <<EOL
+{
+  "live-restore": true,
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "10m",
+    "max-file": "3"
+  }
+}
+EOL
+cat <<<$(jq . /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json.coolify
+cat <<<$(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json
+systemctl restart docker
+echo -e "-------------"
 
 mkdir -p /data/coolify/deployments
 mkdir -p /data/coolify/ssh/keys
@@ -42,13 +89,14 @@ curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.production /data/coolify/source/.env
+    sed -i "s|APP_ID=.*|APP_ID=$(openssl rand -hex 16)|g" /data/coolify/source/.env
     sed -i "s|APP_KEY=.*|APP_KEY=base64:$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|DB_PASSWORD=.*|DB_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
     sed -i "s|REDIS_PASSWORD=.*|REDIS_PASSWORD=$(openssl rand -base64 32)|g" /data/coolify/source/.env
 fi
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' > /data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
@@ -57,7 +105,7 @@ if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
 fi
 
 addSshKey() {
-    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >> ~/.ssh/authorized_keys
+    cat /data/coolify/ssh/keys/id.root@host.docker.internal.pub >>~/.ssh/authorized_keys
     chmod 600 ~/.ssh/authorized_keys
 }
 
@@ -73,3 +121,7 @@ if [ -z "$(grep -w "root@coolify" ~/.ssh/authorized_keys)" ]; then
 fi
 
 bash /data/coolify/source/upgrade.sh ${LATEST_VERSION:-latest}
+
+echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
+echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
+echo "It will take a few minutes to start up, don't worry."
