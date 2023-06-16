@@ -56,6 +56,13 @@
                         element.children[0].type = 'password';
                     }
                 }
+                if (element.nodeName === 'svg') {
+                    if (element.parentElement.parentElement.children[0].type === 'password') {
+                        element.parentElement.parentElement.children[0].type = 'text';
+                    } else {
+                        element.parentElement.parentElement.children[0].type = 'password';
+                    }
+                }
             }
 
             function revive() {
