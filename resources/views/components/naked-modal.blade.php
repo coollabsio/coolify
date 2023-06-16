@@ -29,7 +29,7 @@
                     </div>
                 </div>
                 <div class="gap-4 pt-10 sm:mt-4 sm:flex">
-                    <x-forms.button class="w-24 bg-coolgray-100 hover:bg-coolgray-100"
+                    <x-forms.button class="w-24 bg-coolgray-200 hover:bg-coolgray-100"
                         x-on:click="{{ $show }} = false" type="button">Cancel
                     </x-forms.button>
                     <div class="flex-1"></div>

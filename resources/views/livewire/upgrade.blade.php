@@ -1,6 +1,6 @@
 <li title="New version available" x-init="$wire.checkUpdate" x-data>
     @if ($isUpgradeAvailable)
-        <div wire:click='upgrade' class="hover:bg-transparent focus:bg-transparent" x-on:click="upgrade" <button>
+        <button wire:click='upgrade' class="hover:bg-transparent focus:bg-transparent" x-on:click="upgrade">
             @if ($showProgress)
                 <svg xmlns="http://www.w3.org/2000/svg"
                     class="w-6 h-6 text-pink-500 transition-colors hover:text-pink-300 lds-heart" viewBox="0 0 24 24"
@@ -21,7 +21,7 @@
                     <path d="M9 18h6" />
                 </svg>
             @endif
-            </button>
+        </button>
         </div>
     @endif
 </li>

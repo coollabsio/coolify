@@ -87,4 +87,10 @@ class Previews extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+    public function previewRefresh()
+    {
+        $this->application->previews->each(function ($preview) {
+            $preview->refresh();
+        });
+    }
 }

@@ -66,6 +66,7 @@
             }
 
             function revive() {
+                if (checkHealthInterval) return true;
                 console.log('Checking server\'s health...')
                 checkHealthInterval = setInterval(() => {
                     fetch('/api/health')
@@ -85,6 +86,7 @@
             }
 
             function upgrade() {
+                if (checkIfIamDeadInterval) return true;
                 console.log('Update initiated.')
                 checkIfIamDeadInterval = setInterval(() => {
                     fetch('/api/health')

@@ -24,6 +24,9 @@ class Upgrade extends Component
     public function upgrade()
     {
         try {
+            if ($this->showProgress) {
+                return;
+            }
             $this->showProgress = true;
             resolve(UpdateCoolify::class)(true);
             Toaster::success("Upgrading to {$this->latestVersion} version...");
