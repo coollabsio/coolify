@@ -26,7 +26,7 @@
                 </div>
             </div>
             <div x-cloak x-show="!showPrivateKey">
-                <x-forms.input cannotPeak type="password" rows="10" id="private_key.private_key" required
+                <x-forms.input cannotPeakPassword type="password" rows="10" id="private_key.private_key" required
                     disabled />
             </div>
             <div x-cloak x-show="showPrivateKey">

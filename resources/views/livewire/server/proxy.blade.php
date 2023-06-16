@@ -26,7 +26,7 @@
                                 <div class="text-sm text-red-500">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif
-                            <div class="container w-full py-4 mx-auto">
+                            <div class="container w-full mx-auto">
                                 <livewire:activity-monitor :header="true" />
                             </div>
                             <div class="flex flex-col gap-2">
