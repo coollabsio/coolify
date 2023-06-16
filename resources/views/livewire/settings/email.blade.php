@@ -11,7 +11,7 @@
             <x-forms.checkbox instantSave id="settings.extra_attributes.smtp_active" label="Enabled" />
         </div>
         <div class="flex items-end gap-2">
-            <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipient(s)"
+            <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipients"
                 helper="Email list to send a test email to, separated by comma." />
             @if ($settings->extra_attributes->smtp_active)
                 <x-forms.button wire:click='test_email'>

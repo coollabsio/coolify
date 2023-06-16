@@ -24,8 +24,8 @@
         <div class="flex flex-col gap-2 xl:flex-row">
             <x-forms.input id="model.extra_attributes.smtp_recipients"
                 placeholder="If empty, all users will be notified in the team."
-                helper="Email list to send the all notifications to, separated by comma." label="Recipient(s)" />
-            <x-forms.input id="model.extra_attributes.smtp_test_recipients" label="Test Notification Recipient(s)"
+                helper="Email list to send the all notifications to, separated by comma." label="Recipients" />
+            <x-forms.input id="model.extra_attributes.smtp_test_recipients" label="Test Notification Recipients"
                 placeholder="If empty, all users will be notified in the team."
                 helper="Email list to send the test notification to, separated by comma." />
         </div>
