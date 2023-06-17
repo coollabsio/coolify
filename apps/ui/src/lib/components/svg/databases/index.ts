@@ -7,5 +7,6 @@ export { default as MySQL } from './MySQL.svelte';
 export { default as PostgreSQL } from './PostgreSQL.svelte';
 export { default as Redis } from './Redis.svelte';
 export { default as EdgeDB } from './EdgeDB.svelte';
+export { default as InfluxDB } from './InfluxDB.svelte';
 
 

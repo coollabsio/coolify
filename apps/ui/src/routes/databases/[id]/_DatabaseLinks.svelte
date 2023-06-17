@@ -9,6 +9,7 @@
 	import MySql from '$lib/components/svg/databases/MySQL.svelte';
 	import PostgreSql from '$lib/components/svg/databases/PostgreSQL.svelte';
 	import Redis from '$lib/components/svg/databases/Redis.svelte';
+	import InfluxDB from '$lib/components/svg/databases/InfluxDB.svelte';
 </script>
 
 <span class="relative">
@@ -28,5 +29,7 @@
 		<Redis />
 	{:else if database.type === 'edgedb'}
 		<EdgeDb />
+	{:else if database.type === 'influxdb'}
+		<InfluxDB />
 	{/if}
 </span>

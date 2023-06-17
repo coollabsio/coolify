@@ -18,4 +18,6 @@
 	<Icons.CouchDB {isAbsolute} />
 {:else if type === 'edgedb'}
 	<Icons.EdgeDB {isAbsolute} />
+{:else if type === 'influxdb'}
+	<Icons.InfluxDB {isAbsolute} />
 {/if}

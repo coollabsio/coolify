@@ -450,6 +450,12 @@ export const supportedDatabaseTypesAndVersions = [
 		fancyName: 'EdgeDB',
 		baseImage: 'edgedb/edgedb',
 		versions: ['latest', '2.9', '2.8', '2.7']
+	},
+	{
+		name: "influxdb",
+		fancyName: "InfluxDB",
+		baseImage: "influxdb",
+		versions: ["latest", "2.7.1-alpine", "2.7-alpine"]
 	}
 ];
 
@@ -954,7 +960,15 @@ type DatabaseConfiguration =
 			EDGEDB_SERVER_DATABASE: string;
 			EDGEDB_SERVER_TLS_CERT_MODE: string;
 		};
-	};
+	}
+    | {
+    volume: string;
+    image: string;
+    command?: string;
+    ulimits: Record<string, unknown>;
+    privatePort: number;
+};
+
 export function generateDatabaseConfiguration(database: any): DatabaseConfiguration {
 	const { id, dbUser, dbUserPassword, rootUser, rootUserPassword, defaultDatabase, version, type } =
 		database;
@@ -1086,6 +1100,13 @@ export function generateDatabaseConfiguration(database: any): DatabaseConfigurat
 			ulimits: {}
 		};
 		return configuration;
+	} else if (type === 'influxdb') {
+        return {
+            privatePort: 8086,
+            image: `${baseImage}:${version}`,
+            volume: `${id}-${type}-data:/var/lib/influxdb2`,
+            ulimits: {}
+        };
 	}
 }
 export function isARM() {
