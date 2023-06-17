@@ -3,7 +3,6 @@
 namespace App\Http\Livewire\Source\Github;
 
 use App\Models\GithubApp;
-use App\Models\InstanceSettings;
 use Livewire\Component;
 
 class Change extends Component

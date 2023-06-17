@@ -51,6 +51,13 @@ Route::get('/source/github/install', function () {
             $github_app->installation_id = $installation_id;
             $github_app->save();
         }
+        // Must check the slug in case the user changes it in the GitHub App settings
+        $token = generate_github_jwt_token($github_app);
+        $response = Http::github($github_app->api_url, $token)->get('/app');
+        $slug = data_get($response->json(), 'slug');
+        $github_app->name = $slug;
+        $github_app->save();
+
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
     } catch (\Exception $e) {
         return general_error_handler(err: $e);
