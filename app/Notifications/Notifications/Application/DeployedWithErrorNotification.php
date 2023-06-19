@@ -3,6 +3,7 @@
 namespace App\Notifications\Notifications\Application;
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Team;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
@@ -17,7 +18,7 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
     use Queueable;
     public Application $application;
     public string $deployment_uuid;
-    public int $pull_request_id;
+    public ApplicationPreview|null $preview;
 
     public string $application_name;
     public string|null $deployment_url = null;
@@ -25,11 +26,11 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
     public string $environment_name;
     public string $fqdn;
 
-    public function __construct(Application $application, string $deployment_uuid, int $pull_request_id = 0)
+    public function __construct(Application $application, string $deployment_uuid, ApplicationPreview|null $preview)
     {
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
-        $this->pull_request_id = $pull_request_id;
+        $this->preview = $preview;
 
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
@@ -59,7 +60,7 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
             'name' => $this->application_name,
             'fqdn' => $this->fqdn,
             'url' => $this->deployment_url,
-            'pull_request_id' => $this->pull_request_id,
+            'pull_request_id' => $this->preview->pull_request_id,
         ]);
         return $mail;
     }
@@ -67,8 +68,8 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         $message = '❌ Deployment failed of **' . $this->application_name;
-        if ($this->pull_request_id !== 0) {
-            $message .= ": PR# {$this->pull_request_id}";
+        if ($this->preview) {
+            $message .= ": PR# {$this->preview->pull_request_id}";
         }
         $message .= '**.';
         $message .= "\n\n";

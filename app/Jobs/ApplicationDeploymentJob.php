@@ -318,16 +318,16 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             dispatch(new InstanceProxyCheckJob());
         }
         queue_next_deployment($this->application);
-        if ($status === ProcessStatus::ERROR->value) {
-            Notification::send(
-                $this->application->environment->project->team,
-                new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->pull_request_id)
-            );
-        }
         if ($status === ProcessStatus::FINISHED->value) {
             Notification::send(
                 $this->application->environment->project->team,
-                new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid, $this->pull_request_id)
+                new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid)
+            );
+        }
+        if ($status === ProcessStatus::ERROR->value) {
+            Notification::send(
+                $this->application->environment->project->team,
+                new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->preview)
             );
         }
     }

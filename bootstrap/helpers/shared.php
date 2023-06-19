@@ -44,9 +44,15 @@ function getRouteParameters()
 
 function get_latest_version_of_coolify()
 {
-    $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
-    $versions = $response->json();
-    return data_get($versions, 'coolify.v4.version');
+    try {
+        $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
+        $versions = $response->json();
+        return data_get($versions, 'coolify.v4.version');
+    } catch (\Throwable $th) {
+        //throw $th;
+        ray($th->getMessage());
+        return '0.0.0';
+    }
 }
 
 function generate_random_name()

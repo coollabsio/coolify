@@ -3,6 +3,7 @@
 namespace App\Notifications\Notifications\Application;
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Team;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
@@ -17,7 +18,7 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     use Queueable;
     public Application $application;
     public string $deployment_uuid;
-    public int $pull_request_id;
+    public ApplicationPreview|null $preview = null;
 
     public string $application_name;
     public string|null $deployment_url = null;
@@ -25,11 +26,11 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public string $environment_name;
     public string $fqdn;
 
-    public function __construct(Application $application, string $deployment_uuid, int $pull_request_id = 0)
+    public function __construct(Application $application, string $deployment_uuid, ApplicationPreview|null $preview = null)
     {
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
-        $this->pull_request_id = $pull_request_id;
+        $this->preview = $preview;
 
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
@@ -59,20 +60,20 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
             'name' => $this->application_name,
             'fqdn' => $this->fqdn,
             'url' => $this->deployment_url,
-            'pull_request_id' => $this->pull_request_id,
+            'pull_request_id' => $this->preview->pull_request_id,
         ]);
         return $mail;
     }
 
     public function toDiscord(): string
     {
-        if ($this->pull_request_id !== 0) {
-            $message = '✅ Pull request #' . $this->pull_request_id . ' of **' . $this->application_name . '**.';
+        if ($this->preview) {
+            $message = '✅ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '**. \n\n';
+            $message .= '[Application Link](' . $this->preview->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
         } else {
-            $message = '✅ A new version has been deployed of **' . $this->application_name . '**.';
+            $message = '✅ A new version has been deployed of **' . $this->application_name . '**. \n\n ';
+            $message .= '[Application Link](' . $this->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
         }
-        $message .= "\n\n";
-        $message .= '[Application Link](' . $this->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
         return $message;
     }
 }
