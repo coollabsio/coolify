@@ -43,8 +43,8 @@
             <input {{ $attributes }} id={{ $id }} name={{ $name }}
                 wire:model.defer={{ $id }} wire:dirty.class="input-warning" wire:loading.attr='disabled'
                 @readonly($readonly) @disabled($disabled)
-                @isset($value) value={{ $value }} @endisset
-                @isset($placeholder) placeholder={{ $placeholder }} @endisset>
+                @isset($value) value="{{ $value }}" @endisset
+                @isset($placeholder) placeholder="{{ $placeholder }}" @endisset>
         @endif
         @if (!$label && $helper)
             <x-helper :helper="$helper" />

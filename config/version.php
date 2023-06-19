@@ -1,3 +1,3 @@
 <?php
 
-return '4.0.0-nightly.23';
+return '4.0.0-nightly.24';

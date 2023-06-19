@@ -88,8 +88,6 @@
                                 <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
                             @endif
                         </x-forms.select>
-
-
                     </div>
                     <div class="flex flex-col gap-2 pt-4">
                         <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"
