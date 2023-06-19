@@ -53,9 +53,6 @@ export default async function (data) {
 
 		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
 		console.log({ key, environment });
-		if (Object.keys(environment).length > 0) {
-			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
-		}
 		value['environment'] = [...environment, ...envs];
 
 		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
@@ -72,7 +69,7 @@ export default async function (data) {
 				}
 			}
 		}
-		if (build.length > 0 || buildArgs.length > 0) {
+		if (build || buildArgs.length > 0) {
 			value['build'] = {
 				...build,
 				args: finalArgs
