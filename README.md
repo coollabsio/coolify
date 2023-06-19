@@ -1,12 +1,20 @@
-# Coolify
+# Coolify v4 Beta
 
 An open-source & self-hostable Heroku / Netlify alternative.
 
-# v4
+# Beta
 
-You are checking the next-gen of Coolify here, aka v4. Hi 👋
+You are checking the next-gen of Coolify, aka v4. Hi 👋
 
-Thinks will be added here incrementally through PR's.
+It is still in beta, lots of improvements will come every day. Things could break, but we are working hard to make it stable as soon as possible. If you find any bugs, please report them.
+
+Automatic updates are available, so you will receive the latest version as soon as it is released.
+
+If you are looking for v3, check out the [v3 branch](https://github.com/coollabsio/coolify/tree/v3).
+
+## What's new?
+
+Well, the whole tech stack changed, core is different, so yeah, a lot.
 
 # Installation
 
@@ -14,10 +22,12 @@ Thinks will be added here incrementally through PR's.
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
 
+You can find the installation script [here](./scripts/install.sh).
+
 ## Support
 
--   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
 -   Twitter: [@heyandras](https://twitter.com/heyandras)
+-   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
 -   Email: [andras@coollabs.io](mailto:andras@coollabs.io)
 -   Discord: [Invitation](https://coollabs.io/discord)
 -   Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
