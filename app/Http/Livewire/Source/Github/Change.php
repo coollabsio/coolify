@@ -57,7 +57,7 @@ class Change extends Component
     {
         try {
             $this->github_app->delete();
-            redirect()->route('dashboard');
+            redirect()->route('source.all');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

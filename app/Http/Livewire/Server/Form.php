@@ -65,7 +65,7 @@ class Form extends Component
             return;
         }
         $this->server->delete();
-        redirect()->route('dashboard');
+        redirect()->route('server.all');
     }
     public function submit()
     {

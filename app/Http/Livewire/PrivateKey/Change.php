@@ -22,9 +22,12 @@ class Change extends Component
     public function delete()
     {
         try {
-            PrivateKey::where('uuid', $this->private_key_uuid)->delete();
-            session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
-            redirect()->route('dashboard');
+            if ($this->private_key->isEmpty()) {
+                $this->private_key->delete();
+                session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+                return redirect()->route('private-key.all');
+            }
+            $this->emit('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

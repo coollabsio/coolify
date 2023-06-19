@@ -5,11 +5,7 @@
         <div class="flex gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">Save</x-forms.button>
-            @if ($server->id !== 0 || isDev())
-                <x-forms.button x-on:click.prevent="deleteServer = true">
-                    Delete
-                </x-forms.button>
-            @endif
+
         </div>
         <div class="flex flex-col gap-2 ">
             <div class="flex flex-col w-full gap-2 lg:flex-row">
@@ -72,4 +68,15 @@
             </div>
         @endisset
     </form>
+    <h3>Danger Zone</h3>
+    <div class="">Woah. I hope you know what are you doing.</div>
+    <h4 class="pt-4">Delete Server</h4>
+    <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
+        back!
+    </div>
+    @if ($server->id !== 0 || isDev())
+        <x-forms.button x-on:click.prevent="deleteServer = true">
+            Delete
+        </x-forms.button>
+    @endif
 </div>
