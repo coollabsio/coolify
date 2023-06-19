@@ -1,5 +1,5 @@
 <div>
-    <form class="flex items-end justify-center gap-2" wire:submit.prevent='runCommand'>
+    <form class="flex flex-col justify-center gap-2 xl:items-end xl:flex-row" wire:submit.prevent='runCommand'>
         <x-forms.input placeholder="ls -l" autofocus noDirty id="command" label="Command" required />
         <x-forms.select label="Server" id="server" required>
             @foreach ($servers as $server)

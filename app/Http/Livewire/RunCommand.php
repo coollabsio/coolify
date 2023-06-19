@@ -28,8 +28,8 @@ class RunCommand extends Component
 
     public function runCommand()
     {
+        $this->validate();
         try {
-            $this->validate();
             $activity = remote_process([$this->command], Server::where('uuid', $this->server)->first(), ignore_errors: true);
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Exception $e) {
