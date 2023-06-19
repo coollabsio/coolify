@@ -9,7 +9,8 @@ use App\Enums\ProcessStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
-use App\Notifications\Notifications\ApplicationDeployedNotification;
+use App\Notifications\Notifications\Application\DeployedSuccessfullyNotification;
+use App\Notifications\Notifications\Application\DeployedWithErrorNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -317,7 +318,12 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             dispatch(new InstanceProxyCheckJob());
         }
         queue_next_deployment($this->application);
-        Notification::send($this->application->environment->project->team, new ApplicationDeployedNotification($this->application, $this->deployment_uuid));
+        if ($status === ProcessStatus::ERROR->value) {
+            Notification::send($this->application->environment->project->team, new DeployedWithErrorNotification($this->application, $this->deployment_uuid));
+        }
+        if ($status === ProcessStatus::FINISHED->value) {
+            Notification::send($this->application->environment->project->team, new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid));
+        }
     }
     private function execute_in_builder(string $command)
     {

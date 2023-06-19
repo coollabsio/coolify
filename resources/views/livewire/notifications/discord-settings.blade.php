@@ -19,5 +19,13 @@
             helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
             id="model.extra_attributes.discord_webhook" label="Webhook" />
     </form>
-    <x-notification-subscription />
+    <h4 class="mt-4">Subscribe to events</h4>
+    <div class="w-64 ">
+        @if (isDev())
+            <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_discord_test"
+                label="Test Notifications" />
+        @endif
+        <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_discord_deployments"
+            label="New Deployments" />
+    </div>
 </div>
