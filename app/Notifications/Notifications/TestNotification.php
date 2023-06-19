@@ -15,20 +15,26 @@ class TestNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $notifiable->extra_attributes?->get('smtp_active') && $channels[] = EmailChannel::class;
-        $notifiable->extra_attributes?->get('discord_active') && $channels[] = DiscordChannel::class;
+        if ($notifiable->extra_attributes?->get('email_active') && $notifiable->extra_attributes?->get('notifications_test')) {
+            $channels[] = EmailChannel::class;
+        }
+        if ($notifiable->extra_attributes?->get('discord_active') && $notifiable->extra_attributes?->get('notifications_test')) {
+            $channels[] = DiscordChannel::class;
+        }
         return $channels;
     }
     public function toMail(): MailMessage
     {
-        return (new MailMessage)
-            ->subject('Coolify Test Notification')
-            ->line('Congratulations!')
-            ->line('You have successfully received a test Email notification from Coolify. 🥳');
+        $mail = new MailMessage();
+        $mail->subject("Coolify Test Notification");
+        $mail->view('emails.test');
+        return $mail;
     }
 
     public function toDiscord(): string
     {
-        return 'You have successfully received a test Discord notification from Coolify. 🥳 [Go to your dashboard](' . base_url() . ')';
+        return 'This is a test Discord notification from Coolify.
+        
+[Go to your dashboard](' . base_url() . ')';
     }
 }

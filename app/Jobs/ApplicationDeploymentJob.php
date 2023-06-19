@@ -9,12 +9,14 @@ use App\Enums\ProcessStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
+use App\Notifications\Notifications\ApplicationDeployedNotification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
@@ -315,6 +317,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
             dispatch(new InstanceProxyCheckJob());
         }
         queue_next_deployment($this->application);
+        Notification::send($this->application->environment->project->team, new ApplicationDeployedNotification($this->application, $this->deployment_uuid));
     }
     private function execute_in_builder(string $command)
     {

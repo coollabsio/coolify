@@ -12,11 +12,12 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="flex flex-col gap-2 xl:flex-row w-96">
+        <div class="w-48">
             <x-forms.checkbox instantSave id="model.extra_attributes.discord_active" label="Notification Enabled" />
         </div>
         <x-forms.input type="string"
             helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
             id="model.extra_attributes.discord_webhook" label="Webhook" />
     </form>
+    <x-notification-subscription />
 </div>

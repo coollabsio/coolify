@@ -35,5 +35,5 @@
     <div class="flex-1"></div>
     <input type="checkbox" @if ($disabled !== null) disabled @endif name={{ $id }}
         @if (!$noDirty) wire:dirty.class="input-warning" @endif
-        @if ($instantSave) wire:click='instantSave' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
+        @if ($instantSave) wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}' wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
 </div>

@@ -26,7 +26,10 @@ class Project extends BaseModel
     {
         return Project::whereTeamId(session('currentTeam')->id);
     }
-
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
     public function environments()
     {
         return $this->hasMany(Environment::class);

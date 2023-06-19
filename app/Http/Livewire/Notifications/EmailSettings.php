@@ -24,6 +24,8 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_password' => 'nullable',
         'model.extra_attributes.smtp_timeout' => 'nullable',
         'model.extra_attributes.smtp_test_recipients' => 'nullable',
+        'model.extra_attributes.notifications_deployments' => 'nullable|boolean',
+        'model.extra_attributes.notifications_test' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'model.extra_attributes.smtp_from_address' => 'From Address',
@@ -66,10 +68,15 @@ class EmailSettings extends Component
         if (is_a($this->model, Team::class)) {
             session(['currentTeam' => $this->model]);
         }
+        $this->emit('success', 'Settings saved.');
     }
     public function sendTestNotification()
     {
         Notification::send($this->model, new TestNotification);
+    }
+    public function instantSaveEvents()
+    {
+        $this->saveModel();
     }
     public function instantSave()
     {

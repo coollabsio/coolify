@@ -17,7 +17,7 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="flex flex-col">
+        <div class="w-48">
             <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />
         </div>
 
@@ -53,4 +53,5 @@
             </div>
         </div>
     </form>
+    <x-notification-subscription />
 </div>

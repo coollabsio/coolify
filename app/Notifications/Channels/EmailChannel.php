@@ -11,20 +11,14 @@ class EmailChannel
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
-        $is_test_notification = $notification instanceof  \App\Notifications\Notifications\TestNotification;
 
-        if ($is_test_notification) {
-            $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');
-            if (count($bcc) === 0) {
-                if ($notifiable instanceof \App\Models\Team) {
-                    $bcc = $notifiable->members()->pluck('email')->toArray();
-                }
+        $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');
+        if (count($bcc) === 0) {
+            if ($notifiable instanceof \App\Models\Team) {
+                $bcc = $notifiable->members()->pluck('email')->toArray();
             }
-        } else {
-            $bcc = $notifiable->routeNotificationForEmail();
         }
         $mailMessage = $notification->toMail($notifiable);
-
         Mail::send(
             [],
             [],

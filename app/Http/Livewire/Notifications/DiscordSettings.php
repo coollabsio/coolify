@@ -15,11 +15,16 @@ class DiscordSettings extends Component
     protected $rules = [
         'model.extra_attributes.discord_active' => 'nullable|boolean',
         'model.extra_attributes.discord_webhook' => 'required|url',
+        'model.extra_attributes.notifications_test' => 'nullable|boolean',
+        'model.extra_attributes.notifications_deployments' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'model.extra_attributes.discord_webhook' => 'Discord Webhook',
     ];
-
+    public function instantSaveEvents()
+    {
+        $this->saveModel();
+    }
     public function instantSave()
     {
         try {
@@ -35,6 +40,7 @@ class DiscordSettings extends Component
         if (is_a($this->model, Team::class)) {
             session(['currentTeam' => $this->model]);
         }
+        $this->emit('success', 'Settings saved.');
     }
     public function submit()
     {
