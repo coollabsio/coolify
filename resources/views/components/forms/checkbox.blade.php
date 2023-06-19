@@ -8,7 +8,7 @@
     'noDirty' => $attributes->has('noDirty'),
     'disabled' => null,
 ])
-<div {{ $attributes->merge(['class' => 'flex cursor-pointer w-96 label']) }}>
+<div {{ $attributes->merge(['class' => 'flex cursor-pointer  label']) }}>
     <div class="flex gap-1 label-text">
         @if ($label)
             {{ $label }}

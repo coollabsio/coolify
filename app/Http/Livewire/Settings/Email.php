@@ -46,6 +46,7 @@ class Email extends Component
     public function test_email()
     {
         Notification::send($this->settings, new TestEmail);
+        $this->emit('success', 'Test email sent.');
     }
     public function submit()
     {

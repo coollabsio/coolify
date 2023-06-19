@@ -60,7 +60,8 @@ KDOflMRFj39/bOLmv9Wmct+3ArKiLtftlqkmAJTF+w7fJCiqH0s31A+OChi9PMcy
 oV2PBC0CgYAXOm08kFOQA+bPBdLAte8Ga89frh6asH/Z8ucfsz9/zMMG/hhq5nF3
 7TItY9Pblc2Fp805J13G96zWLX4YGyLwXXkYs+Ae7QoqjonTw7/mUDARY1Zxs9m/
 a1C8EDKapCw5hAhizEFOUQKOygL8Ipn+tmEUkORYdZ8Q8cWFCv9nIw==
------END RSA PRIVATE KEY-----"
+-----END RSA PRIVATE KEY-----",
+            "is_git_related" => true
         ]);
         PrivateKey::create([
             "team_id" => $team_1->id,

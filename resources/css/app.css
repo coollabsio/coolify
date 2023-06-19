@@ -15,13 +15,13 @@ body {
     @apply pl-24 pr-10 mx-auto max-w-screen-xl pt-4;
 }
 input {
-    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded bg-coolgray-200 w-full read-only:bg-coolgray-200/50 read-only:text-opacity-25 disabled:border-none;
+    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded bg-coolgray-200 w-full read-only:bg-coolgray-200/50 read-only:text-opacity-25;
 }
-input && :not(input[type="checkbox"]) {
-    @apply border-none;
+:not(input[type="checkbox"]) {
+    @apply border-none disabled:border-none;
 }
 input[type="checkbox"] {
-    @apply toggle toggle-warning toggle-xs rounded;
+    @apply toggle toggle-warning toggle-xs rounded disabled:toggle-warning;
 }
 
 textarea {

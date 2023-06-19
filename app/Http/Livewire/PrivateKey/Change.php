@@ -12,7 +12,8 @@ class Change extends Component
     protected $rules = [
         'private_key.name' => 'required|string',
         'private_key.description' => 'nullable|string',
-        'private_key.private_key' => 'required|string'
+        'private_key.private_key' => 'required|string',
+        'private_key.is_git_related' => 'nullable|boolean'
     ];
     protected $validationAttributes = [
         'private_key.name' => 'name',

@@ -27,7 +27,8 @@ Route::get('/source/github/redirect', function () {
         $private_key = PrivateKey::create([
             'name' => $slug,
             'private_key' => $private_key,
-            'team_id' => $github_app->team_id
+            'team_id' => $github_app->team_id,
+            'is_git_related' => true,
         ]);
         $github_app->name = $slug;
         $github_app->app_id = $id;

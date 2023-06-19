@@ -11,7 +11,7 @@
                 Delete
             </x-forms.button>
         </div>
-        <div class="pb-8 ">Private Key used for SSH connection</div>
+        <div class="pb-8">Private Key used for SSH connection</div>
         <x-forms.input id="private_key.name" label="Name" required />
         <x-forms.input id="private_key.description" label="Description" />
         <div>
@@ -26,6 +26,11 @@
                     Hide
                 </div>
             </div>
+            @if ($private_key->is_git_related)
+                <div class="w-48">
+                    <x-forms.checkbox id="private_key.is_git_related" disabled label="Is used by a Git App?" />
+                </div>
+            @endif
             <div x-cloak x-show="!showPrivateKey">
                 <x-forms.input cannotPeakPassword type="password" rows="10" id="private_key.private_key" required
                     disabled />
@@ -34,6 +39,5 @@
                 <x-forms.textarea rows="10" id="private_key.private_key" required />
             </div>
         </div>
-
     </form>
 </div>

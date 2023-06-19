@@ -98,11 +98,11 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/private-keys', fn () => view('private-key.all', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid'])->get()
+        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', false)->get()
     ]))->name('private-key.all');
     Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
     Route::get('/private-key/{private_key_uuid}', fn () => view('private-key.show', [
-        'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key'])->whereUuid(request()->private_key_uuid)->firstOrFail()
+        'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail()
     ]))->name('private-key.show');
 });
 

@@ -9,6 +9,7 @@ class PrivateKey extends BaseModel
         'name',
         'description',
         'private_key',
+        'is_git_related',
         'team_id',
     ];
     static public function ownedByCurrentTeam(array $select = ['*'])

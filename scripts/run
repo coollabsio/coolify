@@ -44,13 +44,21 @@ function db:reset {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
 
-function mfs {
-    db:reset
+function db {
+    bash vendor/bin/spin exec -u webuser coolify php artisan db
+}
+
+function db:migrate {
+    bash vendor/bin/spin exec -u webuser coolify php artisan migrate
 }
 
 function db:reset-prod {
     bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
+}
+
+function mfs {
+    db:reset
 }
 
 function coolify {
@@ -76,9 +84,6 @@ function tinker {
     bash vendor/bin/spin exec -u webuser coolify php artisan tinker
 }
 
-function db {
-    bash vendor/bin/spin exec -u webuser coolify php artisan db
-}
 
 function build:builder {
     act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
