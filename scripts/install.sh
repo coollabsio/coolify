@@ -12,6 +12,7 @@ CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
 OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
+DATE=$(date +"%Y%m%d-%H%M%S") 
 
 if [ $EUID != 0 ]; then
     echo "Please run as root"
@@ -43,10 +44,10 @@ if ! [ -x "$(command -v docker)" ]; then
     echo "Docker installed successfully"
 fi
 echo -e "-------------"
-echo -e "Configuring Docker..."
+echo -e "Check Docker Configuration..."
 mkdir -p /etc/docker
 
-test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-$(date +"%Y%m%d-%H%M%S") || cat >/etc/docker/daemon.json <<EOL
+test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-$DATE || cat >/etc/docker/daemon.json <<EOL
 {
   "live-restore": true,
   "log-driver": "json-file",
@@ -68,7 +69,14 @@ cat >/etc/docker/daemon.json.coolify <<EOL
 EOL
 cat <<<$(jq . /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json.coolify
 cat <<<$(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json
-systemctl restart docker
+DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-$DATE))
+if [ "$DIFF" != "" ]; then
+    echo "Docker configuration updated, restart docker daemon..."
+    systemctl restart docker
+else
+    echo "Docker configuration is up to date."
+fi
+
 echo -e "-------------"
 
 mkdir -p /data/coolify/deployments
