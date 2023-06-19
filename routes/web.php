@@ -98,7 +98,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/private-keys', fn () => view('private-key.all', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', true)->get()
+        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', false)->get()
     ]))->name('private-key.all');
     Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
     Route::get('/private-key/{private_key_uuid}', fn () => view('private-key.show', [
