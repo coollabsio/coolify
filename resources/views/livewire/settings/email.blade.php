@@ -7,7 +7,7 @@
             </x-forms.button>
         </div>
         <div class="pt-2 pb-4 ">SMTP settings for password resets, invitations, etc.</div>
-        <div class="flex flex-col">
+        <div class="w-32">
             <x-forms.checkbox instantSave id="settings.smtp.enabled" label="Enabled" />
         </div>
         <div class="flex items-end gap-2">
