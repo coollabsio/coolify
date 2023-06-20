@@ -69,7 +69,7 @@ function generate_application_name(string $git_repository, string $git_branch)
 
 function is_transactional_emails_active()
 {
-    return data_get(InstanceSettings::get(), 'extra_attributes.smtp_enabled');
+    return data_get(InstanceSettings::get(), 'smtp.enabled');
 }
 
 function set_transanctional_email_settings()
@@ -78,12 +78,12 @@ function set_transanctional_email_settings()
     config()->set('mail.default', 'smtp');
     config()->set('mail.mailers.smtp', [
         "transport" => "smtp",
-        "host" => $settings->extra_attributes?->get('smtp_host'),
-        "port" => $settings->extra_attributes?->get('smtp_port'),
-        "encryption" => $settings->extra_attributes?->get('smtp_encryption'),
-        "username" => $settings->extra_attributes?->get('smtp_username'),
-        "password" => $settings->extra_attributes?->get('smtp_password'),
-        "timeout" => $settings->extra_attributes?->get('smtp_timeout'),
+        "host" => data_get($settings, 'smtp.host'),
+        "port" => data_get($settings, 'smtp.port'),
+        "encryption" => data_get($settings, 'smtp.encryption'),
+        "username" => data_get($settings, 'smtp.username'),
+        "password" => data_get($settings, 'smtp.password'),
+        "timeout" => data_get($settings, 'smtp.timeout'),
         "local_domain" => null,
     ]);
 }

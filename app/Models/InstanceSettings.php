@@ -7,20 +7,24 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
+use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class InstanceSettings extends Model implements SendsEmail
 {
-    use Notifiable;
-    protected $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
+    use Notifiable, SchemalessAttributesTrait;
+    protected $schemalessAttributes = [
+        'smtp',
     ];
-    public function scopeWithExtraAttributes(): Builder
+    protected $casts = [
+        'smtp' => SchemalessAttributes::class,
+    ];
+    public function scopeWithSmtp(): Builder
     {
-        return $this->extra_attributes->modelScope();
+        return $this->smtp->modelScope();
     }
-    public function routeNotificationForEmail(string $attribute = 'smtp_test_recipients')
+    public function routeNotificationForEmail(string $attribute = 'test_recipients')
     {
-        $recipients = $this->extra_attributes->get($attribute, '');
+        $recipients = $this->smtp->get($attribute, '');
         if (is_null($recipients) || $recipients === '') {
             return [];
         }

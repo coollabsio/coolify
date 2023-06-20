@@ -8,40 +8,64 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
+use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class Team extends Model implements SendsDiscord, SendsEmail
 {
-    use Notifiable;
+    use Notifiable, SchemalessAttributesTrait;
 
+    protected $schemalessAttributes = [
+        'smtp',
+        'discord',
+        'smtp_notifications',
+        'discord_notifications',
+    ];
     protected $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
+        'smtp' => SchemalessAttributes::class,
+        'discord' => SchemalessAttributes::class,
+        'smtp_notifications' => SchemalessAttributes::class,
+        'discord_notifications' => SchemalessAttributes::class,
         'personal_team' => 'boolean',
     ];
+    public function scopeWithSmtp(): Builder
+    {
+        return $this->smtp->modelScope();
+    }
+    public function scopeWithDiscord(): Builder
+    {
+        return $this->discord->modelScope();
+    }
+    public function scopeWithSmtpNotifications(): Builder
+    {
+        return $this->smtp_notifications->modelScope();
+    }
+    public function scopeWithDiscordNotifications(): Builder
+    {
+        return $this->discord_notifications->modelScope();
+    }
     protected $fillable = [
         'id',
         'name',
         'description',
         'personal_team',
-        'extra_attributes',
+        'smtp',
+        'discord'
     ];
 
     public function routeNotificationForDiscord()
     {
-        return $this->extra_attributes->get('discord_webhook_url');
+        return $this->discord->get('webhook_url');
     }
-    public function routeNotificationForEmail(string $attribute = 'smtp_recipients')
+    public function routeNotificationForEmail(string $attribute = 'recipients')
     {
-        $recipients = $this->extra_attributes->get($attribute, '');
+        $recipients = $this->smtp->get($attribute, '');
         if (is_null($recipients) || $recipients === '') {
             return [];
         }
         return explode(',', $recipients);
     }
 
-    public function scopeWithExtraAttributes(): Builder
-    {
-        return $this->extra_attributes->modelScope();
-    }
+
 
     public function projects()
     {

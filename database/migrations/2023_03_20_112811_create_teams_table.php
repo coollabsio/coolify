@@ -16,7 +16,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('description')->nullable();
             $table->boolean('personal_team')->default(false);
-            $table->schemalessAttributes('extra_attributes');
+            $table->schemalessAttributes('smtp');
+            $table->schemalessAttributes('smtp_notifications');
+            $table->schemalessAttributes('discord');
+            $table->schemalessAttributes('discord_notifications');
             $table->timestamps();
         });
     }

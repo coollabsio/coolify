@@ -12,7 +12,7 @@ class EmailChannel
     {
         $this->bootConfigs($notifiable);
 
-        $bcc = $notifiable->routeNotificationForEmail('smtp_test_recipients');
+        $bcc = $notifiable->routeNotificationForEmail('test_recipients');
         if (count($bcc) === 0) {
             if ($notifiable instanceof \App\Models\Team) {
                 $bcc = $notifiable->members()->pluck('email')->toArray();
@@ -24,8 +24,8 @@ class EmailChannel
             [],
             fn (Message $message) => $message
                 ->from(
-                    $notifiable->extra_attributes?->get('smtp_from_address'),
-                    $notifiable->extra_attributes?->get('smtp_from_name')
+                    data_get($notifiable, 'smtp.from_address'),
+                    data_get($notifiable, 'smtp.from_name'),
                 )
                 ->bcc($bcc)
                 ->subject($mailMessage->subject)
@@ -38,12 +38,12 @@ class EmailChannel
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
             "transport" => "smtp",
-            "host" => $notifiable->extra_attributes?->get('smtp_host'),
-            "port" => $notifiable->extra_attributes?->get('smtp_port'),
-            "encryption" => $notifiable->extra_attributes?->get('smtp_encryption'),
-            "username" => $notifiable->extra_attributes?->get('smtp_username'),
-            "password" => $notifiable->extra_attributes?->get('smtp_password'),
-            "timeout" => $notifiable->extra_attributes?->get('smtp_timeout'),
+            "host" => data_get($notifiable, 'smtp.host'),
+            "port" => data_get($notifiable, 'smtp.port'),
+            "encryption" => data_get($notifiable, 'smtp.encryption'),
+            "username" => data_get($notifiable, 'smtp.username'),
+            "password" => data_get($notifiable, 'smtp.password'),
+            "timeout" => data_get($notifiable, 'smtp.timeout'),
             "local_domain" => null,
         ]);
     }

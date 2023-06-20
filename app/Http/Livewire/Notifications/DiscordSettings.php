@@ -10,20 +10,21 @@ class DiscordSettings extends Component
 {
     public Team $model;
     protected $rules = [
-        'model.extra_attributes.discord_enabled' => 'nullable|boolean',
-        'model.extra_attributes.discord_webhook_url' => 'required|url',
-        'model.extra_attributes.notifications_discord_test' => 'nullable|boolean',
-        'model.extra_attributes.notifications_discord_deployments' => 'nullable|boolean',
+        'model.discord.enabled' => 'nullable|boolean',
+        'model.discord.webhook_url' => 'required|url',
+        'model.discord_notifications.test' => 'nullable|boolean',
+        'model.discord_notifications.deployments' => 'nullable|boolean',
+
     ];
     protected $validationAttributes = [
-        'model.extra_attributes.discord_webhook_url' => 'Discord Webhook',
+        'model.discord.webhook_url' => 'Discord Webhook',
     ];
     public function instantSave()
     {
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->model->extra_attributes->discord_enabled = false;
+            $this->model->discord->enabled = false;
             $this->validate();
         }
     }

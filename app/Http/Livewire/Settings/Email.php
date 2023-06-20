@@ -12,34 +12,34 @@ class Email extends Component
     public InstanceSettings $settings;
 
     protected $rules = [
-        'settings.extra_attributes.smtp_enabled' => 'nullable|boolean',
-        'settings.extra_attributes.smtp_host' => 'required',
-        'settings.extra_attributes.smtp_port' => 'required|numeric',
-        'settings.extra_attributes.smtp_encryption' => 'nullable',
-        'settings.extra_attributes.smtp_username' => 'nullable',
-        'settings.extra_attributes.smtp_password' => 'nullable',
-        'settings.extra_attributes.smtp_timeout' => 'nullable',
-        'settings.extra_attributes.smtp_test_recipients' => 'nullable',
-        'settings.extra_attributes.smtp_from_address' => 'required|email',
-        'settings.extra_attributes.smtp_from_name' => 'required',
+        'settings.smtp.enabled' => 'nullable|boolean',
+        'settings.smtp.host' => 'required',
+        'settings.smtp.port' => 'required|numeric',
+        'settings.smtp.encryption' => 'nullable',
+        'settings.smtp.username' => 'nullable',
+        'settings.smtp.password' => 'nullable',
+        'settings.smtp.timeout' => 'nullable',
+        'settings.smtp.test_recipients' => 'nullable',
+        'settings.smtp.from_address' => 'required|email',
+        'settings.smtp.from_name' => 'required',
     ];
     protected $validationAttributes = [
-        'settings.extra_attributes.smtp_from_address' => 'From Address',
-        'settings.extra_attributes.smtp_from_name' => 'From Name',
-        'settings.extra_attributes.smtp_recipients' => 'Recipients',
-        'settings.extra_attributes.smtp_host' => 'Host',
-        'settings.extra_attributes.smtp_port' => 'Port',
-        'settings.extra_attributes.smtp_encryption' => 'Encryption',
-        'settings.extra_attributes.smtp_username' => 'Username',
-        'settings.extra_attributes.smtp_password' => 'Password',
-        'settings.extra_attributes.smtp_test_recipients' => 'Test Recipients',
+        'settings.smtp.from_address' => 'From Address',
+        'settings.smtp.from_name' => 'From Name',
+        'settings.smtp.recipients' => 'Recipients',
+        'settings.smtp.host' => 'Host',
+        'settings.smtp.port' => 'Port',
+        'settings.smtp.encryption' => 'Encryption',
+        'settings.smtp.username' => 'Username',
+        'settings.smtp.password' => 'Password',
+        'settings.smtp.test_recipients' => 'Test Recipients',
     ];
     public function instantSave()
     {
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->settings->extra_attributes->smtp_enabled = false;
+            $this->settings->smtp->enabled = false;
             $this->validate();
         }
     }
@@ -51,7 +51,7 @@ class Email extends Component
     public function submit()
     {
         $this->validate();
-        $this->settings->extra_attributes->smtp_test_recipients = str_replace(' ', '', $this->settings->extra_attributes->smtp_test_recipients);
+        $this->settings->smtp->test_recipients = str_replace(' ', '', $this->settings->smtp->test_recipients);
         $this->settings->save();
     }
 }

@@ -13,23 +13,22 @@ class TransactionalEmailChannel
     public function send(User $notifiable, Notification $notification): void
     {
         $settings = InstanceSettings::get();
-        if ($settings->extra_attributes?->get('smtp_enabled') !== true) {
+        if (data_get($settings, 'smtp.enabled') !== true) {
             return;
         }
         $email = $notifiable->email;
         if (!$email) {
             return;
         }
-        $this->bootConfigs($settings);
+        $this->bootConfigs();
         $mailMessage = $notification->toMail($notifiable);
-
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
                 ->from(
-                    $settings->extra_attributes?->get('smtp_from_address'),
-                    $settings->extra_attributes?->get('smtp_from_name')
+                    data_get($settings, 'smtp.from_address'),
+                    data_get($settings, 'smtp.from_name')
                 )
                 ->to($email)
                 ->subject($mailMessage->subject)
@@ -37,7 +36,7 @@ class TransactionalEmailChannel
         );
     }
 
-    private function bootConfigs(InstanceSettings $settings): void
+    private function bootConfigs(): void
     {
         set_transanctional_email_settings();
     }

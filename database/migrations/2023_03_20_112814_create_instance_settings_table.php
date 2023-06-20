@@ -23,7 +23,7 @@ return new class extends Migration
             $table->boolean('do_not_track')->default(false);
             $table->boolean('is_auto_update_enabled')->default(true);
             $table->boolean('is_registration_enabled')->default(true);
-            $table->schemalessAttributes('extra_attributes');
+            $table->schemalessAttributes('smtp');
             // $table->string('custom_dns_servers')->default('1.1.1.1,8.8.8.8');
             // $table->boolean('is_dns_check_enabled')->default(true);
             $table->timestamps();

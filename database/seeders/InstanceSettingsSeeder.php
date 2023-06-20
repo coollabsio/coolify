@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Data\SmtpConfiguration;
 use App\Models\InstanceSettings;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Process;
@@ -17,14 +16,14 @@ class InstanceSettingsSeeder extends Seeder
         InstanceSettings::create([
             'id' => 0,
             'is_registration_enabled' => true,
-            'extra_attributes' => SmtpConfiguration::from([
-                'smtp_enabled' => true,
-                'smtp_test_recipients' => 'test@example.com,test2@example.com',
-                'smtp_host' => 'coolify-mail',
-                'smtp_port' => 1025,
-                'smtp_from_address' => 'hi@localhost.com',
-                'smtp_from_name' => 'Coolify',
-            ])
+            'smtp' => [
+                'enabled' => true,
+                'test_recipients' => 'test@example.com,test2@example.com',
+                'host' => 'coolify-mail',
+                'port' => 1025,
+                'from_address' => 'hi@localhost.com',
+                'from_name' => 'Coolify',
+            ]
         ]);
         try {
             $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();

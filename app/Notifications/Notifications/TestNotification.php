@@ -20,12 +20,21 @@ class TestNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        if (($this->type === 'smtp' || is_null($this->type)) && $notifiable->extra_attributes?->get('smtp_enabled') && $notifiable->extra_attributes?->get('notifications_smtp_test')) {
+
+        $isSmtp = $this->type === 'smtp' || is_null($this->type);
+        $isDiscord = $this->type === 'discord' || is_null($this->type);
+        $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
+        $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
+        $isSubscribedToEmailTests = data_get($notifiable, 'smtp_notifications.test');
+        $isSubscribedToDiscordTests = data_get($notifiable, 'discord_notifications.test');
+
+        if ($isEmailEnabled && $isSubscribedToEmailTests && $isSmtp) {
             $channels[] = EmailChannel::class;
         }
-        if (($this->type === 'discord' || is_null($this->type)) && $notifiable->extra_attributes?->get('discord_enabled') && $notifiable->extra_attributes?->get('notifications_discord_test')) {
+        if ($isDiscordEnabled && $isSubscribedToDiscordTests && $isDiscord) {
             $channels[] = DiscordChannel::class;
         }
+
         return $channels;
     }
     public function toMail(): MailMessage
@@ -39,7 +48,7 @@ class TestNotification extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         return 'This is a test Discord notification from Coolify.
-        
+
 [Go to your dashboard](' . base_url() . ')';
     }
 }
