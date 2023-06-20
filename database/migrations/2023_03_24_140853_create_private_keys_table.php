@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('description')->nullable();
             $table->longText('private_key');
+            $table->boolean('is_git_related')->default(false);
             $table->foreignId('team_id');
             $table->timestamps();
         });
