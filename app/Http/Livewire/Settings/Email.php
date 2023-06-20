@@ -12,7 +12,7 @@ class Email extends Component
     public InstanceSettings $settings;
 
     protected $rules = [
-        'settings.extra_attributes.smtp_active' => 'nullable|boolean',
+        'settings.extra_attributes.smtp_enabled' => 'nullable|boolean',
         'settings.extra_attributes.smtp_host' => 'required',
         'settings.extra_attributes.smtp_port' => 'required|numeric',
         'settings.extra_attributes.smtp_encryption' => 'nullable',
@@ -39,7 +39,7 @@ class Email extends Component
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->settings->extra_attributes->smtp_active = false;
+            $this->settings->extra_attributes->smtp_enabled = false;
             $this->validate();
         }
     }

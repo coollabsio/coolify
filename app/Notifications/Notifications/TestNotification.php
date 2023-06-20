@@ -12,13 +12,18 @@ use Illuminate\Notifications\Notification;
 class TestNotification extends Notification implements ShouldQueue
 {
     use Queueable;
+    public string|null $type = null;
+    public function __construct(string|null $type = null)
+    {
+        $this->type = $type;
+    }
     public function via(object $notifiable): array
     {
         $channels = [];
-        if ($notifiable->extra_attributes?->get('smtp_active') && $notifiable->extra_attributes?->get('notifications_email_test')) {
+        if (($this->type === 'smtp' || is_null($this->type)) && $notifiable->extra_attributes?->get('smtp_enabled') && $notifiable->extra_attributes?->get('notifications_smtp_test')) {
             $channels[] = EmailChannel::class;
         }
-        if ($notifiable->extra_attributes?->get('discord_active') && $notifiable->extra_attributes?->get('notifications_discord_test')) {
+        if (($this->type === 'discord' || is_null($this->type)) && $notifiable->extra_attributes?->get('discord_enabled') && $notifiable->extra_attributes?->get('notifications_discord_test')) {
             $channels[] = DiscordChannel::class;
         }
         return $channels;

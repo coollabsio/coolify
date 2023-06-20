@@ -8,12 +8,12 @@
         </div>
         <div class="pt-2 pb-4 ">SMTP settings for password resets, invitations, etc.</div>
         <div class="flex flex-col">
-            <x-forms.checkbox instantSave id="settings.extra_attributes.smtp_active" label="Enabled" />
+            <x-forms.checkbox instantSave id="settings.extra_attributes.smtp_enabled" label="Enabled" />
         </div>
         <div class="flex items-end gap-2">
             <x-forms.input id="settings.extra_attributes.smtp_test_recipients" label="Test Recipients"
                 helper="Email list to send a test email to, separated by comma." />
-            @if ($settings->extra_attributes->smtp_active)
+            @if ($settings->extra_attributes->smtp_enabled)
                 <x-forms.button wire:click='test_email'>
                     Send Test Email
                 </x-forms.button>

@@ -27,7 +27,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
 
     public function routeNotificationForDiscord()
     {
-        return $this->extra_attributes->get('discord_webhook');
+        return $this->extra_attributes->get('discord_webhook_url');
     }
     public function routeNotificationForEmail(string $attribute = 'smtp_recipients')
     {

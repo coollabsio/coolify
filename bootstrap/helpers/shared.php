@@ -69,7 +69,7 @@ function generate_application_name(string $git_repository, string $git_branch)
 
 function is_transactional_emails_active()
 {
-    return data_get(InstanceSettings::get(), 'extra_attributes.smtp_active');
+    return data_get(InstanceSettings::get(), 'extra_attributes.smtp_enabled');
 }
 
 function set_transanctional_email_settings()

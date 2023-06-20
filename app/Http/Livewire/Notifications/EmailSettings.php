@@ -5,7 +5,6 @@ namespace App\Http\Livewire\Notifications;
 use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Notifications\TestNotification;
-use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class EmailSettings extends Component
@@ -13,7 +12,7 @@ class EmailSettings extends Component
     public Team $model;
 
     protected $rules = [
-        'model.extra_attributes.smtp_active' => 'nullable|boolean',
+        'model.extra_attributes.smtp_enabled' => 'nullable|boolean',
         'model.extra_attributes.smtp_from_address' => 'required|email',
         'model.extra_attributes.smtp_from_name' => 'required',
         'model.extra_attributes.smtp_recipients' => 'nullable',
@@ -24,7 +23,7 @@ class EmailSettings extends Component
         'model.extra_attributes.smtp_password' => 'nullable',
         'model.extra_attributes.smtp_timeout' => 'nullable',
         'model.extra_attributes.smtp_test_recipients' => 'nullable',
-        'model.extra_attributes.notifications_email_test' => 'nullable|boolean',
+        'model.extra_attributes.notifications_smtp_test' => 'nullable|boolean',
         'model.extra_attributes.notifications_email_deployments' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
@@ -41,7 +40,7 @@ class EmailSettings extends Component
     public function copySMTP()
     {
         $settings = InstanceSettings::get();
-        $this->model->extra_attributes->smtp_active = true;
+        $this->model->extra_attributes->smtp_enabled = true;
         $this->model->extra_attributes->smtp_from_address = $settings->extra_attributes->smtp_from_address;
         $this->model->extra_attributes->smtp_from_name = $settings->extra_attributes->smtp_from_name;
         $this->model->extra_attributes->smtp_recipients = $settings->extra_attributes->smtp_recipients;
@@ -72,7 +71,7 @@ class EmailSettings extends Component
     }
     public function sendTestNotification()
     {
-        Notification::send($this->model, new TestNotification);
+        $this->model->notify(new TestNotification('smtp'));
         $this->emit('success', 'Test notification sent.');
     }
     public function instantSave()
@@ -80,7 +79,7 @@ class EmailSettings extends Component
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->model->extra_attributes->smtp_active = false;
+            $this->model->extra_attributes->smtp_enabled = false;
             $this->validate();
         }
     }

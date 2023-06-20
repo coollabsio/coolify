@@ -7,7 +7,7 @@ use Spatie\LaravelData\Data;
 class SmtpConfiguration extends Data
 {
     public function __construct(
-        public bool $smtp_active = false,
+        public bool $smtp_enabled = false,
         public string $smtp_host,
         public int $smtp_port,
         public ?string $smtp_encryption,

@@ -10,7 +10,7 @@
                     Copy from Instance Settings
                 </x-forms.button>
             @endif
-            @if ($model->extra_attributes->smtp_active)
+            @if ($model->extra_attributes->smtp_enabled)
                 <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
@@ -18,7 +18,7 @@
             @endif
         </div>
         <div class="w-48">
-            <x-forms.checkbox instantSave id="model.extra_attributes.smtp_active" label="Notification Enabled" />
+            <x-forms.checkbox instantSave id="model.extra_attributes.smtp_enabled" label="Notification Enabled" />
         </div>
 
         <div class="flex flex-col gap-2 xl:flex-row">
@@ -53,13 +53,15 @@
             </div>
         </div>
     </form>
-    <h4 class="mt-4">Subscribe to events</h4>
-    <div class="w-64 ">
-        @if (isDev())
-            <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_email_test"
-                label="Test Notifications" />
-        @endif
-        <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_email_deployments"
-            label="New Deployments" />
-    </div>
+    @if (data_get($model, 'extra_attributes.smtp_enabled'))
+        <h4 class="mt-4">Subscribe to events</h4>
+        <div class="w-64 ">
+            @if (isDev())
+                <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_smtp_test"
+                    label="Test Notifications" />
+            @endif
+            <x-forms.checkbox instantSave="saveModel" id="model.extra_attributes.notifications_email_deployments"
+                label="New Deployments" />
+        </div>
+    @endif
 </div>
