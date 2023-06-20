@@ -14,7 +14,7 @@
 					engine: '/var/run/docker.sock',
 					remoteEngine: false,
 					network: cuid(),
-					isCoolifyProxyUsed: true
+					isCoolifyProxyUsed: false
 				};
 				break;
 			case 'remoteDocker':
