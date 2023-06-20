@@ -4,9 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
+use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class Server extends BaseModel
 {
+    use SchemalessAttributesTrait;
+    protected $schemalessAttributes = [
+        'proxy',
+    ];
+    public $casts = [
+        'proxy' => SchemalessAttributes::class,
+    ];
     protected static function booted()
     {
         static::created(function ($server) {
@@ -25,16 +33,14 @@ class Server extends BaseModel
         'port',
         'team_id',
         'private_key_id',
-        'extra_attributes',
+        'proxy',
     ];
 
-    public $casts = [
-        'extra_attributes' => SchemalessAttributes::class,
-    ];
 
-    public function scopeWithExtraAttributes(): Builder
+
+    public function scopeWithProxy(): Builder
     {
-        return $this->extra_attributes->modelScope();
+        return $this->proxy->modelScope();
     }
     public function isEmpty()
     {

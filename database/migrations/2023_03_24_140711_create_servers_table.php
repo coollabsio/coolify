@@ -21,7 +21,7 @@ return new class extends Migration
             $table->string('user')->default('root');
             $table->foreignId('team_id');
             $table->foreignId('private_key_id');
-            $table->schemalessAttributes('extra_attributes');
+            $table->schemalessAttributes('proxy');
             $table->timestamps();
         });
     }

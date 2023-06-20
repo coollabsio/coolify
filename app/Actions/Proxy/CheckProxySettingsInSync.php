@@ -20,7 +20,7 @@ class CheckProxySettingsInSync
             $final_output = Str::of($output)->trim()->value;
         }
         $docker_compose_yml_base64 = base64_encode($final_output);
-        $server->extra_attributes->proxy_last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
         if (is_null($output) || $reset) {
             instant_remote_process([

@@ -2,7 +2,7 @@
     <x-naked-modal show="stopProxy" action="stopProxy" title="Stop Proxy"
         message='This proxy will be stopped. It is not reversible. <br>All resources will be unavailable. <br>Please think again.' />
     @if ($server->settings->is_reachable)
-        @if ($server->extra_attributes->proxy_type)
+        @if ($server->proxy->type)
             <div x-init="$wire.checkProxySettingsInSync">
                 <div wire:loading wire:target="checkProxySettingsInSync">
                     <x-loading />
@@ -13,15 +13,15 @@
                             <div class="flex items-center gap-2">
                                 <h2>Proxy</h2>
                                 <x-forms.button type="submit">Save</x-forms.button>
-                                @if ($server->extra_attributes->proxy_status === 'exited')
+                                @if ($server->proxy->status === 'exited')
                                     <x-forms.button wire:click.prevent="switchProxy">Switch Proxy</x-forms.button>
                                 @endif
                                 <livewire:server.proxy.status :server="$server" />
                             </div>
                             <div class="pt-3 pb-4 ">Traefik v2</div>
                             @if (
-                                $server->extra_attributes->proxy_last_applied_settings &&
-                                    $server->extra_attributes->proxy_last_saved_settings !== $server->extra_attributes->proxy_last_applied_settings)
+                                $server->proxy->last_applied_settings &&
+                                    $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
                                 <div class="text-red-500 ">Configuration out of sync. Restart to get the new configs.
                                 </div>
                             @endif

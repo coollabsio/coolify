@@ -28,9 +28,9 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
-            'extra_attributes' => ServerMetadata::from([
-                'proxy_type' => ProxyTypes::TRAEFIK_V2->value,
-                'proxy_status' => ProxyStatus::EXITED->value
+            'proxy' => ServerMetadata::from([
+                'type' => ProxyTypes::TRAEFIK_V2->value,
+                'status' => ProxyStatus::EXITED->value
             ]),
         ]);
         Server::create([

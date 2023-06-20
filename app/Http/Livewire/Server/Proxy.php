@@ -23,14 +23,14 @@ class Proxy extends Component
     }
     public function switchProxy()
     {
-        $this->server->extra_attributes->proxy_type = null;
+        $this->server->proxy->type = null;
         $this->server->save();
     }
     public function installProxy()
     {
         if (
-            $this->server->extra_attributes->proxy_last_applied_settings &&
-            $this->server->extra_attributes->proxy_last_saved_settings !== $this->server->extra_attributes->proxy_last_applied_settings
+            $this->server->proxy->last_applied_settings &&
+            $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
         ) {
             $this->saveConfiguration($this->server);
         }
@@ -40,8 +40,8 @@ class Proxy extends Component
 
     public function setProxy(string $proxy_type)
     {
-        $this->server->extra_attributes->proxy_type = $proxy_type;
-        $this->server->extra_attributes->proxy_status = 'exited';
+        $this->server->proxy->type = $proxy_type;
+        $this->server->proxy->status = 'exited';
         $this->server->save();
     }
     public function stopProxy()
@@ -49,7 +49,7 @@ class Proxy extends Component
         instant_remote_process([
             "docker rm -f coolify-proxy",
         ], $this->server);
-        $this->server->extra_attributes->proxy_status = 'exited';
+        $this->server->proxy->status = 'exited';
         $this->server->save();
     }
     public function saveConfiguration(Server $server)
@@ -58,7 +58,7 @@ class Proxy extends Component
             $proxy_path = config('coolify.proxy_config_path');
             $this->proxy_settings = Str::of($this->proxy_settings)->trim()->value;
             $docker_compose_yml_base64 = base64_encode($this->proxy_settings);
-            $server->extra_attributes->proxy_last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+            $server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
             $server->save();
             instant_remote_process([
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",

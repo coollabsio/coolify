@@ -19,8 +19,8 @@ class Deploy extends Component
     public function deploy()
     {
         if (
-            $this->server->extra_attributes->proxy_last_applied_settings &&
-            $this->server->extra_attributes->proxy_last_saved_settings !== $this->server->extra_attributes->proxy_last_applied_settings
+            $this->server->proxy->last_applied_settings &&
+            $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
         ) {
             $this->saveConfiguration($this->server);
         }
@@ -32,7 +32,7 @@ class Deploy extends Component
         instant_remote_process([
             "docker rm -f coolify-proxy",
         ], $this->server);
-        $this->server->extra_attributes->proxy_status = 'exited';
+        $this->server->proxy->status = 'exited';
         $this->server->save();
         $this->emit('proxyStatusUpdated');
     }

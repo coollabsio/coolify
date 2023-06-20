@@ -12,9 +12,9 @@ class InstallProxy
 {
     public function __invoke(Server $server): Activity
     {
-        if (is_null(data_get($server, 'extra_attributes.proxy_type'))) {
-            $server->extra_attributes->proxy_type = ProxyTypes::TRAEFIK_V2->value;
-            $server->extra_attributes->proxy_status = ProxyStatus::EXITED->value;
+        if (is_null(data_get($server, 'proxy.type'))) {
+            $server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+            $server->proxy->status = ProxyStatus::EXITED->value;
             $server->save();
         }
         $proxy_path = config('coolify.proxy_config_path');
@@ -38,7 +38,7 @@ class InstallProxy
             $configuration = Str::of($configuration)->trim()->value;
         }
         $docker_compose_yml_base64 = base64_encode($configuration);
-        $server->extra_attributes->proxy_last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+        $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
         $activity = remote_process([
             "echo 'Creating required Docker networks...'",
