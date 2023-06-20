@@ -90,6 +90,7 @@ class EmailSettings extends Component
     public function saveModel()
     {
         $this->model->save();
+        $this->decrypt();
         if (is_a($this->model, Team::class)) {
             session(['currentTeam' => $this->model]);
         }
