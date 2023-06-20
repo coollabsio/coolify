@@ -35,6 +35,9 @@ class EmailChannel
 
     private function bootConfigs($notifiable): void
     {
+        $password = data_get($notifiable, 'smtp.password');
+        if ($password) $password = decrypt($password);
+
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
             "transport" => "smtp",
@@ -42,7 +45,7 @@ class EmailChannel
             "port" => data_get($notifiable, 'smtp.port'),
             "encryption" => data_get($notifiable, 'smtp.encryption'),
             "username" => data_get($notifiable, 'smtp.username'),
-            "password" => data_get($notifiable, 'smtp.password'),
+            "password" => $password,
             "timeout" => data_get($notifiable, 'smtp.timeout'),
             "local_domain" => null,
         ]);

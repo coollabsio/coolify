@@ -39,6 +39,19 @@ class EmailSettings extends Component
         'model.smtp.password' => 'Password',
         'model.smtp.test_recipients' => 'Test Recipients',
     ];
+    private function decrypt()
+    {
+        if (data_get($this->model, 'smtp.password')) {
+            try {
+                $this->model->smtp->password = decrypt($this->model->smtp->password);
+            } catch (\Exception $e) {
+            }
+        }
+    }
+    public function mount()
+    {
+        $this->decrypt();
+    }
     public function copyFromInstanceSettings()
     {
         $settings = InstanceSettings::get();
@@ -63,6 +76,13 @@ class EmailSettings extends Component
     {
         $this->resetErrorBag();
         $this->validate();
+
+        if ($this->model->smtp->password) {
+            $this->model->smtp->password = encrypt($this->model->smtp->password);
+        } else {
+            $this->model->smtp->password = null;
+        }
+
         $this->model->smtp->recipients = str_replace(' ', '', $this->model->smtp->recipients);
         $this->model->smtp->test_recipients = str_replace(' ', '', $this->model->smtp->test_recipients);
         $this->saveModel();

@@ -75,6 +75,9 @@ function is_transactional_emails_active()
 function set_transanctional_email_settings()
 {
     $settings = InstanceSettings::get();
+    $password = data_get($settings, 'smtp.password');
+    if ($password) $password = decrypt($password);
+
     config()->set('mail.default', 'smtp');
     config()->set('mail.mailers.smtp', [
         "transport" => "smtp",
@@ -82,7 +85,7 @@ function set_transanctional_email_settings()
         "port" => data_get($settings, 'smtp.port'),
         "encryption" => data_get($settings, 'smtp.encryption'),
         "username" => data_get($settings, 'smtp.username'),
-        "password" => data_get($settings, 'smtp.password'),
+        "password" => $password,
         "timeout" => data_get($settings, 'smtp.timeout'),
         "local_domain" => null,
     ]);

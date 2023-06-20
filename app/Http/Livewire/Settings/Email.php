@@ -34,6 +34,10 @@ class Email extends Component
         'settings.smtp.password' => 'Password',
         'settings.smtp.test_recipients' => 'Test Recipients',
     ];
+    public function mount()
+    {
+        $this->decrypt();
+    }
     public function instantSave()
     {
         try {
@@ -48,10 +52,27 @@ class Email extends Component
         Notification::send($this->settings, new TestEmail);
         $this->emit('success', 'Test email sent.');
     }
+    private function decrypt()
+    {
+        if (data_get($this->settings, 'smtp.password')) {
+            try {
+                $this->settings->smtp->password = decrypt($this->settings->smtp->password);
+            } catch (\Exception $e) {
+            }
+        }
+    }
     public function submit()
     {
+        $this->resetErrorBag();
         $this->validate();
+        if ($this->settings->smtp->password) {
+            $this->settings->smtp->password = encrypt($this->settings->smtp->password);
+        } else {
+            $this->settings->smtp->password = null;
+        }
+
         $this->settings->smtp->test_recipients = str_replace(' ', '', $this->settings->smtp->test_recipients);
         $this->settings->save();
+        $this->decrypt();
     }
 }
