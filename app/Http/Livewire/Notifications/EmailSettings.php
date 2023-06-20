@@ -42,18 +42,22 @@ class EmailSettings extends Component
     public function copyFromInstanceSettings()
     {
         $settings = InstanceSettings::get();
-        $this->model->smtp->enabled = true;
-        $this->model->smtp->from_address = $settings->smtp->from_address;
-        $this->model->smtp->from_name = $settings->smtp->from_name;
-        $this->model->smtp->recipients = $settings->smtp->recipients;
-        $this->model->smtp->host = $settings->smtp->host;
-        $this->model->smtp->port = $settings->smtp->port;
-        $this->model->smtp->encryption = $settings->smtp->encryption;
-        $this->model->smtp->username = $settings->smtp->username;
-        $this->model->smtp->password = $settings->smtp->password;
-        $this->model->smtp->timeout = $settings->smtp->timeout;
-        $this->model->smtp->test_recipients = $settings->smtp->test_recipients;
-        $this->saveModel();
+        if ($settings->smtp->enabled) {
+            $this->model->smtp->enabled = true;
+            $this->model->smtp->from_address = $settings->smtp->from_address;
+            $this->model->smtp->from_name = $settings->smtp->from_name;
+            $this->model->smtp->recipients = $settings->smtp->recipients;
+            $this->model->smtp->host = $settings->smtp->host;
+            $this->model->smtp->port = $settings->smtp->port;
+            $this->model->smtp->encryption = $settings->smtp->encryption;
+            $this->model->smtp->username = $settings->smtp->username;
+            $this->model->smtp->password = $settings->smtp->password;
+            $this->model->smtp->timeout = $settings->smtp->timeout;
+            $this->model->smtp->test_recipients = $settings->smtp->test_recipients;
+            $this->saveModel();
+        } else {
+            $this->emit('error', 'Instance SMTP settings are not enabled.');
+        }
     }
     public function submit()
     {
