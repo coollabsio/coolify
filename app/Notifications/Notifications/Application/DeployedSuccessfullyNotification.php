@@ -31,7 +31,6 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
         $this->preview = $preview;
-
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
         $this->environment_name = data_get($application, 'environment.name');
@@ -55,12 +54,17 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public function toMail(Team $team): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("✅ New version is deployed of {$this->application_name}");
+        $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
+        if ($pull_request_id === 0) {
+            $mail->subject("✅ New version is deployed of {$this->application_name}");
+        } else {
+            $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
+        }
         $mail->view('emails.application-deployed-successfully', [
             'name' => $this->application_name,
             'fqdn' => $this->fqdn,
             'url' => $this->deployment_url,
-            'pull_request_id' => $this->preview->pull_request_id,
+            'pull_request_id' => $pull_request_id,
         ]);
         return $mail;
     }

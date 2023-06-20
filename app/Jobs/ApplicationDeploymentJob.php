@@ -43,7 +43,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private string $build_image_name;
     private string $production_image_name;
     private string $container_name;
-    private ApplicationPreview|null $preview;
+    private ApplicationPreview|null $preview = null;
 
     public static int $batch_counter = 0;
     public $timeout = 10200;
@@ -66,8 +66,10 @@ class ApplicationDeploymentJob implements ShouldQueue
 
         $this->application = Application::find($this->application_id);
 
+        ray('pullrequestId: ' . $this->pull_request_id);
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
+            ray($this->preview);
         }
 
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
@@ -319,16 +321,10 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         }
         queue_next_deployment($this->application);
         if ($status === ProcessStatus::FINISHED->value) {
-            Notification::send(
-                $this->application->environment->project->team,
-                new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid)
-            );
+            $this->application->environment->project->team->notify(new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid, $this->preview));
         }
         if ($status === ProcessStatus::ERROR->value) {
-            Notification::send(
-                $this->application->environment->project->team,
-                new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->preview)
-            );
+            $this->application->environment->project->team->notify(new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->preview));
         }
     }
     private function execute_in_builder(string $command)

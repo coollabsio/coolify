@@ -1,9 +1,8 @@
-Hello,<br><br>
-
-A new version of your application "{{ $name }}"@if ($pull_request_id !== 0)
-    :PR#{{ $pull_request_id }}
-@endif has been deployed to <a target="_blank"
-    href="{{ $fqdn }}">{{ $fqdn }}</a><br><br>
-
-Click the following link to view the deployment logs: <a target="_blank" href="{{ $url }}">View
-    Deployment</a><br><br>
+@if ($pull_request_id === 0)
+    A new version of <a target="_blank" href="{{ $fqdn }}">{{ $fqdn }}</a> is available.<br><br>
+@else
+    Pull request #{{ $pull_request_id }} is available for review at <a target="_blank"
+        href="{{ $fqdn }}">{{ $fqdn }}</a><br><br>
+@endif
+<a target="_blank" href="{{ $url }}">View
+    Deployment Logs</a><br><br>

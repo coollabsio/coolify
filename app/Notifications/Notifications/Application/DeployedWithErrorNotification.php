@@ -60,7 +60,7 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
             'name' => $this->application_name,
             'fqdn' => $this->fqdn,
             'url' => $this->deployment_url,
-            'pull_request_id' => $this->preview->pull_request_id,
+            'pull_request_id' => data_get($this->preview, 'pull_request_id', 0),
         ]);
         return $mail;
     }
