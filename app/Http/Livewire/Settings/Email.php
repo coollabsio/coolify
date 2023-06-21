@@ -47,9 +47,9 @@ class Email extends Component
             $this->validate();
         }
     }
-    public function test_email()
+    public function testNotification()
     {
-        Notification::send($this->settings, new TestEmail);
+        $this->settings->notify(new TestEmail);
         $this->emit('success', 'Test email sent.');
     }
     private function decrypt()

@@ -35,17 +35,15 @@
             <x-forms.input helper="If SMTP through SSL, set it to 'tls'." placeholder="tls" id="model.smtp.encryption"
                 label="Encryption" />
         </div>
-        <div class="flex flex-col">
-            <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input id="model.smtp.username" helper="SMTP Username" label="Username" />
-                <x-forms.input type="password" helper="SMTP Password" id="model.smtp.password" label="Password" />
-            </div>
+        <div class="flex flex-col gap-2 xl:flex-row">
+            <x-forms.input id="model.smtp.username" helper="SMTP Username" label="SMTP Username" />
+            <x-forms.input type="password" helper="SMTP Password" id="model.smtp.password" label="SMTP Password" />
             <x-forms.input id="model.smtp.timeout" helper="Timeout value for sending emails." label="Timeout" />
-            <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input required id="model.smtp.from_name" helper="Name used in emails." label="From Name" />
-                <x-forms.input required id="model.smtp.from_address" helper="Email address used in emails."
-                    label="From Address" />
-            </div>
+        </div>
+        <div class="flex flex-col gap-2 xl:flex-row">
+            <x-forms.input required id="model.smtp.from_name" helper="Name used in emails." label="From Name" />
+            <x-forms.input required id="model.smtp.from_address" helper="Email address used in emails."
+                label="From Address" />
         </div>
     </form>
     @if (data_get($model, 'smtp.enabled'))

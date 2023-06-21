@@ -3,7 +3,6 @@
 namespace App\Notifications\TransactionalEmails;
 
 use App\Notifications\Channels\EmailChannel;
-use App\Notifications\Channels\TransactionalEmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -19,7 +18,7 @@ class TestEmail extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject('Coolify Test Notification');
+        $mail->subject('Test Notification');
         $mail->view('emails.test');
         return $mail;
     }
