@@ -132,4 +132,3 @@ bash /data/coolify/source/upgrade.sh ${LATEST_VERSION:-latest}
 
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."
-echo "It will take a few minutes to start up, don't worry."
