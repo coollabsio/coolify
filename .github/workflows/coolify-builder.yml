@@ -12,6 +12,7 @@ jobs:
   amd64:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v3
@@ -33,6 +34,7 @@ jobs:
   aarch64:
     runs-on: [self-hosted, arm64]
     permissions:
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v3
@@ -53,6 +55,9 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aarch64
   merge-manifest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     needs: [amd64, aarch64]
     steps:
       - name: Checkout
