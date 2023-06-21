@@ -20,7 +20,7 @@
                                 @else
                                     <a target="_blank"
                                         class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
-                                        href="{{ $server->ip }}:8080">
+                                        href="http://{{ $server->ip }}:8080">
                                         Traefik Dashboard
                                         <x-external-link />
                                     </a>
