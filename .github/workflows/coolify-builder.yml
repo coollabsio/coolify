@@ -11,6 +11,8 @@ env:
 jobs:
   amd64:
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
     steps:
       - uses: actions/checkout@v3
       - name: Login to ghcr.io
@@ -30,6 +32,8 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
   aarch64:
     runs-on: [self-hosted, arm64]
+    permissions:
+      packages: write
     steps:
       - uses: actions/checkout@v3
       - name: Login to ghcr.io
