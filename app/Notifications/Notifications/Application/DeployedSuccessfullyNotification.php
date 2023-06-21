@@ -80,11 +80,16 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     {
         if ($this->preview) {
             $message = '✅ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** deployed successfully: ';
-            $message .= '[Application Link](' . $this->preview->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
+            if ($this->preview->fqdn) {
+                $message .= '[Application Link](' . $this->preview->fqdn . ') |';
+            }
+            $message .= '[Deployment logs](' . $this->deployment_url . ')';
         } else {
-            $message = '✅ A new version has been deployed of **' . $this->application_name . '**.';
-            $message .= "\n\n";
-            $message .= '[Application Link](' . $this->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
+            $message = '✅ A new version has been deployed of **' . $this->application_name . '**: ';
+            if ($this->fqdn) {
+                $message .= '[Application Link](' . $this->fqdn . ') |';
+            }
+            $message .= '[Deployment logs](' . $this->deployment_url . ')';
         }
         return $message;
     }
