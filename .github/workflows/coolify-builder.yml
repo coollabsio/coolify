@@ -2,7 +2,7 @@ name: Coolify Builder (v4)
 
 on:
   push:
-    branches: ["v4"]
+    branches: ["main", "v4"]
 
 env:
   REGISTRY: ghcr.io

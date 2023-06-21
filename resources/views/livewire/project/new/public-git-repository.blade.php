@@ -29,8 +29,10 @@
                             @endif
                         </div>
                         <h4 class="pt-4">Settings</h4>
-                        <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                            helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                        <div class="w-52">
+                            <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                                helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                        </div>
                     </div>
                     <x-forms.button wire:click.prevent='submit'>
                         Save New Application
