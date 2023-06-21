@@ -10,12 +10,21 @@
                         <ul tabindex="0"
                             class="relative text-xs text-white normal-case rounded -ml-28 min-w-max menu bg-coolgray-200">
                             <li>
-                                <a target="_blank"
-                                    class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
-                                    href="{{ base_ip() }}:8080">
-                                    Traefik Dashboard
-                                    <x-external-link />
-                                </a>
+                                @if ($server->name === 'localhost')
+                                    <a target="_blank"
+                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                                        href="{{ base_ip() }}:8080">
+                                        Traefik Dashboard
+                                        <x-external-link />
+                                    </a>
+                                @else
+                                    <a target="_blank"
+                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                                        href="{{ $server->ip }}:8080">
+                                        Traefik Dashboard
+                                        <x-external-link />
+                                    </a>
+                                @endif
                             </li>
                         </ul>
                     </div>
