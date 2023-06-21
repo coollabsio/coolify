@@ -45,8 +45,9 @@ class TestNotification extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return 'This is a test Discord notification from Coolify.
-
-[Go to your dashboard](' . base_url() . ')';
+        $message = 'This is a test Discord notification from Coolify.';
+        $message .= "\n\n";
+        $message .= '[Go to your dashboard](' . base_url() . ')';
+        return $message;
     }
 }

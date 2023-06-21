@@ -1,12 +1,8 @@
-Hello,<br><br>
-
-Deployment failed of "{{ $name }}"
-
 @if ($pull_request_id !== 0)
-    :PR #{{ $pull_request_id }}
+    Pull Request #{{ $pull_request_id }} of {{ $name }} (<a target="_blank"
+        href="{{ $fqdn }}">{{ $fqdn }}</a>) deployment failed:
+@else
+    Deployment failed of {{ $name }} (<a target="_blank" href="{{ $fqdn }}">{{ $fqdn }}</a>):
 @endif
 
-to <a target="_blank" href="{{ $fqdn }}">{{ $fqdn }}</a>.<br><br>
-
-Click the following link to view the deployment logs: <a target="_blank" href="{{ $url }}">View
-    Deployment Logs</a><br><br>
+<a target="_blank" href="{{ $deployment_url }}">View Deployment Logs</a><br><br>

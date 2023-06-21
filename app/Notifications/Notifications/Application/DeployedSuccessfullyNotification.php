@@ -56,19 +56,21 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
         }
         return $channels;
     }
-    public function toMail(Team $team): MailMessage
+    public function toMail(): MailMessage
     {
         $mail = new MailMessage();
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
+        $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
             $mail->subject("✅ New version is deployed of {$this->application_name}");
         } else {
+            $fqdn = $this->preview->fqdn;
             $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
         }
         $mail->view('emails.application-deployed-successfully', [
             'name' => $this->application_name,
-            'fqdn' => $this->fqdn,
-            'url' => $this->deployment_url,
+            'fqdn' => $fqdn,
+            'deployment_url' => $this->deployment_url,
             'pull_request_id' => $pull_request_id,
         ]);
         return $mail;
@@ -77,10 +79,11 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = '✅ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '**. \n\n';
+            $message = '✅ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** deployed successfully: ';
             $message .= '[Application Link](' . $this->preview->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
         } else {
-            $message = '✅ A new version has been deployed of **' . $this->application_name . '**. \n\n ';
+            $message = '✅ A new version has been deployed of **' . $this->application_name . '**.';
+            $message .= "\n\n";
             $message .= '[Application Link](' . $this->fqdn . ') | [Deployment logs](' . $this->deployment_url . ')';
         }
         return $message;

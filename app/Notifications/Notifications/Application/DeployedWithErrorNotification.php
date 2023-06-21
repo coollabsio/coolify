@@ -57,14 +57,22 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
         }
         return $channels;
     }
-    public function toMail(Team $team): MailMessage
+    public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("❌ Deployment failed of {$this->application_name}");
+        $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
+        $fqdn = $this->fqdn;
+        if ($pull_request_id === 0) {
+            $mail->subject('❌ Deployment failed of ' . $this->application_name . '.');
+        } else {
+            $fqdn = $this->preview->fqdn;
+            $mail->subject('❌ Pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . ' deployment failed.');
+        }
+
         $mail->view('emails.application-deployed-with-error', [
             'name' => $this->application_name,
-            'fqdn' => $this->fqdn,
-            'url' => $this->deployment_url,
+            'fqdn' => $fqdn,
+            'deployment_url' => $this->deployment_url,
             'pull_request_id' => data_get($this->preview, 'pull_request_id', 0),
         ]);
         return $mail;
@@ -72,13 +80,13 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = '❌ Deployment failed of **' . $this->application_name;
         if ($this->preview) {
-            $message .= ": PR# {$this->preview->pull_request_id}";
+            $message = '❌ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
+            $message .= '[View Deployment Logs](' . $this->deployment_url . ')';
+        } else {
+            $message = '❌ Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
+            $message .= '[View Deployment Logs](' . $this->deployment_url . ')';
         }
-        $message .= '**.';
-        $message .= "\n\n";
-        $message .= "[Deployment logs]({$this->deployment_url})";
         return $message;
     }
 }

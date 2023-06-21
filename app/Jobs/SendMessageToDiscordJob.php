@@ -29,7 +29,8 @@ class SendMessageToDiscordJob implements ShouldQueue
     public function __construct(
         public string $text,
         public string $webhookUrl
-    ) {}
+    ) {
+    }
 
     /**
      * Execute the job.
@@ -39,7 +40,7 @@ class SendMessageToDiscordJob implements ShouldQueue
         $payload = [
             'content' => $this->text,
         ];
-
+        ray($payload);
         Http::post($this->webhookUrl, $payload);
     }
 }
