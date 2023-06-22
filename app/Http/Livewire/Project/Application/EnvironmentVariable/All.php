@@ -25,6 +25,8 @@ class All extends Component
                 'application_id' => $this->application->id,
             ]);
             $this->application->refresh();
+
+            $this->emit('success', 'Environment variable added successfully.');
             $this->emit('clearAddEnv');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);

@@ -42,6 +42,7 @@ class Email extends Component
     {
         try {
             $this->submit();
+            $this->emit('success', 'Settings saved successfully.');
         } catch (\Exception $e) {
             $this->settings->smtp->enabled = false;
             $this->validate();
@@ -73,6 +74,7 @@ class Email extends Component
 
         $this->settings->smtp->test_recipients = str_replace(' ', '', $this->settings->smtp->test_recipients);
         $this->settings->save();
+        $this->emit('success', 'Transaction email settings updated successfully.');
         $this->decrypt();
     }
 }

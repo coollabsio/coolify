@@ -207,5 +207,6 @@ class Configuration extends Component
         if ($this->settings->fqdn || $this->settings->default_redirect_404) {
             dispatch(new InstanceProxyCheckJob());
         }
+        $this->emit('success', 'Instance settings updated successfully!');
     }
 }

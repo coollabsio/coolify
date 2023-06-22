@@ -127,6 +127,7 @@ class General extends Component
 
             $this->application->fqdn = $domains->implode(',');
             $this->application->save();
+            $this->emit('success', 'Application settings updated!');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

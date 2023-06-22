@@ -52,6 +52,7 @@ class ResourceLimits extends Component
             }
             $this->validate();
             $this->application->save();
+            $this->emit('success', 'Resource limits updated successfully.');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

@@ -3,12 +3,14 @@
     <div class="pt-2 pb-10 ">All Projects</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
-            <div class="gap-2 cursor-pointer box group" x-data x-on:click="goto('{{ $project->uuid }}')">
+            <div class="gap-2 border border-transparent cursor-pointer box group" x-data
+                x-on:click="goto('{{ $project->uuid }}')">
                 <div class="flex flex-col mx-6">
                     <a class=" group-hover:text-white hover:no-underline"
                         href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">{{ $project->name }}</a>
-                    <a class="text-xs group-hover:text-white hover:no-underline"
-                        href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">{{ $project->description }}</a>
+                    <div class="text-xs group-hover:text-white hover:no-underline"
+                        href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
+                        {{ $project->description }}</div>
                 </div>
                 <div class="flex-1"></div>
                 <a class="mx-4 rounded hover:text-white"

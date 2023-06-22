@@ -63,6 +63,7 @@ class Proxy extends Component
             instant_remote_process([
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             ], $server);
+            $this->emit('success', 'Proxy configuration saved.');
         } catch (\Exception $e) {
             return general_error_handler(err: $e);
         }

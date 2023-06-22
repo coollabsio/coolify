@@ -82,5 +82,6 @@ class Form extends Component
         //     return;
         // }
         $this->server->save();
+        $this->emit('success', 'Server updated successfully.');
     }
 }

@@ -41,6 +41,7 @@ class Form extends Component
         $this->validate();
         $this->application->preview_url_template = str_replace(' ', '', $this->application->preview_url_template);
         $this->application->save();
+        $this->emit('success', 'Preview url template updated successfully.');
         $this->generate_real_url();
     }
 }

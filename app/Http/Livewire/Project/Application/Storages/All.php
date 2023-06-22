@@ -25,6 +25,7 @@ class All extends Component
                 'resource_type' => Application::class,
             ]);
             $this->application->refresh();
+            $this->emit('success', 'Storage added successfully');
             $this->emit('clearAddStorage');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);

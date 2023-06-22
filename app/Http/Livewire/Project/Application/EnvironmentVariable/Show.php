@@ -28,6 +28,7 @@ class Show extends Component
     {
         $this->validate();
         $this->env->save();
+        $this->emit('success', 'Environment variable updated successfully.');
     }
     public function delete()
     {

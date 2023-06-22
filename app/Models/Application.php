@@ -6,6 +6,8 @@ use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Masmerise\Toaster\Toastable;
+use Masmerise\Toaster\Toaster;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 
 class Application extends BaseModel

@@ -5,7 +5,6 @@
         <div class="flex gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">Save</x-forms.button>
-
         </div>
         <div class="flex flex-col gap-2 ">
             <div class="flex flex-col w-full gap-2 lg:flex-row">

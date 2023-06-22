@@ -21,6 +21,7 @@ class Show extends Component
     {
         $this->validate();
         $this->storage->save();
+        $this->emit('success', 'Storage updated successfully');
     }
     public function delete()
     {

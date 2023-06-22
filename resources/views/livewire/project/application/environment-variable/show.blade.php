@@ -4,7 +4,7 @@
     <form wire:submit.prevent='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
         <x-forms.input id="env.key" label="Name" />
         <x-forms.input type="password" id="env.value" label="Value" />
-        <x-forms.checkbox disabled id="env.is_build_time" label="Build Variable?" />
+        <x-forms.checkbox class="w-96" disabled id="env.is_build_time" label="Build Variable?" />
         <div class="flex gap-2">
             <x-forms.button type="submit">
                 Update
