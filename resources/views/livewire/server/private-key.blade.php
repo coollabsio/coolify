@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-end gap-2 pb-6 ">
-        <h1>Private Key</h1>
+        <h2>Private Key</h2>
         <a href="{{ route('private-key.new') }}">
             <x-forms.button>Add a new Private Key</x-forms.button>
         </a>

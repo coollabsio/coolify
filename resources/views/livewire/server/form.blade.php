@@ -40,13 +40,15 @@
                 <x-forms.button wire:click.prevent='validateServer'>
                     Check Server Details
                 </x-forms.button>
-                <x-forms.button wire:click.prevent='installDocker' isHighlighted>
-                    @if ($server->settings->is_usable)
-                        Reconfigure Docker Engine
-                    @else
-                        Install Docker Engine
-                    @endif
-                </x-forms.button>
+                @if ($server->id !== 0)
+                    <x-forms.button wire:click.prevent='installDocker' isHighlighted>
+                        @if ($server->settings->is_usable)
+                            Reconfigure Docker Engine
+                        @else
+                            Install Docker Engine
+                        @endif
+                    </x-forms.button>
+                @endif
             </div>
         @else
             <div class="w-full">
@@ -59,8 +61,8 @@
             <livewire:activity-monitor :header="true" />
         </div>
         @isset($uptime)
-            <h4 class="pb-3">Server Info</h4>
-            <div class="">
+            <h3 class="pb-3">Server Info</h3>
+            <div class="py-2 pb-4">
                 <p>Uptime: {{ $uptime }}</p>
                 @isset($dockerVersion)
                     <p>Docker Engine {{ $dockerVersion }}</p>

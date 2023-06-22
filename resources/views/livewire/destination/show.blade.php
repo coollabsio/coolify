@@ -1,6 +1,6 @@
 <div>
     <div class="flex items-end gap-2">
-        <h1>Destinations</h1>
+        <h2>Destinations</h2>
         <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">
             <x-forms.button>Add a new destination</x-forms.button>
         </a>
@@ -19,14 +19,14 @@
     </div>
     <div class="grid gap-2 pt-2">
         @if (count($networks) > 0)
-            <h3>Scanned available Destinations</h3>
+            <h4>Found Destinations</h4>
         @endif
         @foreach ($networks as $network)
-            <div class="flex gap-2  w-96">
+            <div class="flex gap-2 w-96">
                 <div class="w-32">{{ data_get($network, 'Name') }}</div>
                 <a
                     href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
-                    <x-forms.button>Add to Coolify</x-forms.button>
+                    <x-forms.button>Configure</x-forms.button>
                 </a>
             </div>
         @endforeach
