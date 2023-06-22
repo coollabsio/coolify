@@ -307,6 +307,7 @@ const magicActions = [{
 {
     id: 8,
     name: 'Create: Team',
+    tags: 'team,member,new,create',
     icon: 'team',
     new: true,
     sequence: ['main', 'redirect']

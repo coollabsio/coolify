@@ -24,7 +24,7 @@ class Project extends BaseModel
     ];
     static public function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(session('currentTeam')->id);
+        return Project::whereTeamId(session('currentTeam')->id)->orderBy('name');
     }
     public function team()
     {
