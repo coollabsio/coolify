@@ -12,21 +12,19 @@
                 <x-forms.input id="application.name" label="Name" required />
                 <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
                     helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
-
+                @if ($wildcard_domain)
+                    <div class="flex flex-row gap-2">
+                        @if ($global_wildcard_domain)
+                            <x-forms.button wire:click="generateGlobalRandomDomain">Global Wildcard
+                            </x-forms.button>
+                        @endif
+                        @if ($project_wildcard_domain)
+                            <x-forms.button wire:click="generateProjectRandomDomain">Project Wildcard
+                            </x-forms.button>
+                        @endif
+                    </div>
+                @endif
             </div>
-            @if ($wildcard_domain)
-                <div class="pb-6">
-                    <div class="">Set Random Domain</div>
-                    @if ($global_wildcard_domain)
-                        <x-forms.button wire:click="generateGlobalRandomDomain">Global Wildcard
-                        </x-forms.button>
-                    @endif
-                    @if ($project_wildcard_domain)
-                        <x-forms.button wire:click="generateProjectRandomDomain">Project Wildcard
-                        </x-forms.button>
-                    @endif
-                </div>
-            @endif
             <x-forms.select id="application.build_pack" label="Build Pack" required>
                 <option value="nixpacks">Nixpacks</option>
                 <option disabled value="docker">Docker</option>

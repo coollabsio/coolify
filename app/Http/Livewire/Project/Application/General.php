@@ -105,6 +105,7 @@ class General extends Component
         $scheme = $url->getScheme();
         $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
         $this->application->save();
+        $this->emit('success', 'Application settings updated!');
     }
     public function generateProjectRandomDomain()
     {
@@ -115,6 +116,7 @@ class General extends Component
         $scheme = $url->getScheme();
         $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
         $this->application->save();
+        $this->emit('success', 'Application settings updated!');
     }
     public function submit()
     {
