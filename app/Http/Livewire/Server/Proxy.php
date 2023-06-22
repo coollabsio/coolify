@@ -15,8 +15,13 @@ class Proxy extends Component
 
     public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
     public $proxy_settings = null;
+    public string|null $redirect_url = null;
 
     protected $listeners = ['serverValidated', 'saveConfiguration'];
+    public function mount()
+    {
+        $this->redirect_url = $this->server->proxy->redirect_url;
+    }
     public function serverValidated()
     {
         $this->server->refresh();
@@ -52,17 +57,20 @@ class Proxy extends Component
         $this->server->proxy->status = 'exited';
         $this->server->save();
     }
-    public function saveConfiguration(Server $server)
+    public function saveConfiguration()
     {
         try {
             $proxy_path = config('coolify.proxy_config_path');
             $this->proxy_settings = Str::of($this->proxy_settings)->trim()->value;
             $docker_compose_yml_base64 = base64_encode($this->proxy_settings);
-            $server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
-            $server->save();
+            $this->server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
+            $this->server->proxy->redirect_url = $this->redirect_url;
+            $this->server->save();
             instant_remote_process([
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
-            ], $server);
+            ], $this->server);
+            $this->server->refresh();
+            setup_default_redirect_404(redirect_url: $this->server->proxy->redirect_url, server: $this->server);
             $this->emit('success', 'Proxy configuration saved.');
         } catch (\Exception $e) {
             return general_error_handler(err: $e);

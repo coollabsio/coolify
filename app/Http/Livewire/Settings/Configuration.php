@@ -15,7 +15,7 @@ class Configuration extends Component
     public $do_not_track;
     public $is_auto_update_enabled;
     public $is_registration_enabled;
-    protected string $dynamic_config_path;
+    protected string $dynamic_config_path = '/data/coolify/proxy/dynamic';
     protected Server $server;
 
     protected $rules = [
@@ -117,9 +117,6 @@ class Configuration extends Component
                 "rm -f $file",
             ], $this->server);
         } else {
-            $url = Url::fromString($this->settings->default_redirect_404);
-            $host = $url->getHost();
-            $schema = $url->getScheme();
             $traefik_dynamic_conf = [
                 'http' =>
                 [
@@ -200,10 +197,9 @@ class Configuration extends Component
         $this->validate();
         $this->settings->save();
 
-        $this->dynamic_config_path = '/data/coolify/proxy/dynamic';
         $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
-        $this->setup_default_redirect_404();
+        setup_default_redirect_404(redirect_url: $this->settings->default_redirect_404, server: $this->server);
         if ($this->settings->fqdn || $this->settings->default_redirect_404) {
             dispatch(new InstanceProxyCheckJob());
         }

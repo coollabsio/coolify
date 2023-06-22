@@ -9,7 +9,7 @@
                 </div>
                 @isset($proxy_settings)
                     @if ($selectedProxy->value === 'TRAEFIK_V2')
-                        <form wire:submit.prevent='saveConfiguration({{ $server }})'>
+                        <form wire:submit.prevent='saveConfiguration'>
                             <div class="flex items-center gap-2">
                                 <h2>Proxy</h2>
                                 <x-forms.button type="submit">Save</x-forms.button>
@@ -24,6 +24,10 @@
                                     $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
                                 <div class="text-red-500 ">Configuration out of sync. Restart to get the new configs.
                                 </div>
+                            @endif
+                            @if ($server->id !== 0)
+                                <x-forms.input id="redirect_url" label="Default redirect"
+                                    placeholder="https://coolify.io" />
                             @endif
                             <div class="container w-full mx-auto">
                                 <livewire:activity-monitor :header="true" />
