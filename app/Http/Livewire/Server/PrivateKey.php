@@ -21,6 +21,9 @@ class PrivateKey extends Component
                 Toaster::success('Server is reachable with this private key.');
             }
         } catch (\Exception $e) {
+            $this->server->settings->is_reachable = false;
+            $this->server->settings->is_usable = false;
+            $this->server->settings->save();
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }

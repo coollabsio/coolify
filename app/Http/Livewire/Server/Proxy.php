@@ -66,6 +66,7 @@ class Proxy extends Component
             $this->server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
+
             instant_remote_process([
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             ], $this->server);

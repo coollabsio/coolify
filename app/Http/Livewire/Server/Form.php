@@ -44,7 +44,7 @@ class Form extends Component
     public function validateServer()
     {
         try {
-            $this->uptime = instant_remote_process(['uptime'], $this->server, false);
+            $this->uptime = instant_remote_process(['uptime'], $this->server);
             if ($this->uptime) {
                 $this->server->settings->is_reachable = true;
                 $this->server->settings->save();
@@ -61,7 +61,10 @@ class Form extends Component
                 $this->emit('serverValidated');
             }
         } catch (\Exception $e) {
-            return general_error_handler(err: $e, that: $this);
+            $this->server->settings->is_reachable = false;
+            $this->server->settings->is_usable = false;
+            $this->server->settings->save();
+            return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }
     public function delete()
