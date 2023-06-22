@@ -16,14 +16,12 @@ class PrivateKey extends Component
     public function checkConnection()
     {
         try {
-            $uptime = instant_remote_process(['uptime'], $this->server, false);
+            $uptime = instant_remote_process(['uptime'], $this->server);
             if ($uptime) {
                 Toaster::success('Server is reachable with this private key.');
-            } else {
-                Toaster::error('Server is NOT reachable with this private key.');
             }
         } catch (\Exception $e) {
-            return general_error_handler(err: $e, that: $this);
+            return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }
     public function setPrivateKey($private_key_id)
