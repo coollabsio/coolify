@@ -11,6 +11,7 @@ class Form extends Component
     public Server $server;
     public $uptime;
     public $dockerVersion;
+    public string|null $wildcard_domain = null;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -19,7 +20,8 @@ class Form extends Component
         'server.user' => 'required',
         'server.port' => 'required',
         'server.settings.is_reachable' => 'required',
-        'server.settings.is_part_of_swarm' => 'required'
+        'server.settings.is_part_of_swarm' => 'required',
+        'wildcard_domain' => 'nullable|string'
     ];
     protected $validationAttributes = [
         'server.name' => 'name',
@@ -30,6 +32,10 @@ class Form extends Component
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'
     ];
+    public function mount()
+    {
+        $this->wildcard_domain = $this->server->settings->wildcard_domain;
+    }
     public function installDocker()
     {
         $activity = resolve(InstallDocker::class)($this->server);
@@ -81,6 +87,8 @@ class Form extends Component
         //     }
         //     return;
         // }
+        $this->server->settings->wildcard_domain = $this->wildcard_domain;
+        $this->server->settings->save();
         $this->server->save();
         $this->emit('success', 'Server updated successfully.');
     }

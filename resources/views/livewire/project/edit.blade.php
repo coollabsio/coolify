@@ -8,7 +8,6 @@
         <div class="flex gap-2">
             <x-forms.input label="Name" id="project.name" />
             <x-forms.input label="Description" id="project.description" />
-            <x-forms.input label="Wildcard Domain" id="wildcard_domain" />
         </div>
     </form>
 </div>

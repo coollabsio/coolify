@@ -20,7 +20,7 @@ class General extends Component
     public string|null $git_commit_sha;
     public string $build_pack;
     public string|null $wildcard_domain = null;
-    public string|null $project_wildcard_domain = null;
+    public string|null $server_wildcard_domain = null;
     public string|null $global_wildcard_domain = null;
 
     public bool $is_static;
@@ -81,9 +81,9 @@ class General extends Component
     protected function checkWildCardDomain()
     {
         $coolify_instance_settings = InstanceSettings::get();
-        $this->project_wildcard_domain = data_get($this->application, 'environment.project.settings.wildcard_domain');
+        $this->server_wildcard_domain = data_get($this->application, 'destination.server.settings.wildcard_domain');
         $this->global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
-        $this->wildcard_domain = $this->project_wildcard_domain ?? $this->global_wildcard_domain ?? null;
+        $this->wildcard_domain = $this->server_wildcard_domain ?? $this->global_wildcard_domain ?? null;
     }
     public function mount()
     {
@@ -107,10 +107,10 @@ class General extends Component
         $this->application->save();
         $this->emit('success', 'Application settings updated!');
     }
-    public function generateProjectRandomDomain()
+    public function generateServerRandomDomain()
     {
-        // Set wildcard domain based on Project wildcard domain
-        $url = Url::fromString($this->project_wildcard_domain);
+        // Set wildcard domain based on Server wildcard domain
+        $url = Url::fromString($this->server_wildcard_domain);
         $host = $url->getHost();
         $path = $url->getPath() === '/' ? '' : $url->getPath();
         $scheme = $url->getScheme();

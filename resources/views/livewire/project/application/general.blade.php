@@ -15,11 +15,11 @@
                 @if ($wildcard_domain)
                     <div class="flex flex-row gap-2">
                         @if ($global_wildcard_domain)
-                            <x-forms.button wire:click="generateGlobalRandomDomain">Global Wildcard
+                            <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
                             </x-forms.button>
                         @endif
-                        @if ($project_wildcard_domain)
-                            <x-forms.button wire:click="generateProjectRandomDomain">Project Wildcard
+                        @if ($server_wildcard_domain)
+                            <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
                             </x-forms.button>
                         @endif
                     </div>
