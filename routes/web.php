@@ -86,6 +86,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::get('/license', [Controller::class, 'license'])->name('license');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');

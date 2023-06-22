@@ -17,6 +17,10 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
+    public function license()
+    {
+        return view('license');
+    }
     public function dashboard()
     {
         $projects = Project::ownedByCurrentTeam()->get();

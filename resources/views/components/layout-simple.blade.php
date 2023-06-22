@@ -19,9 +19,11 @@
             display: none !important;
         }
     </style>
+    @livewireStyles
 </head>
 
 <body>
+    @livewireScripts
     <main>
         {{ $slot }}
     </main>
