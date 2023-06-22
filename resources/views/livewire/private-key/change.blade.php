@@ -38,7 +38,7 @@
                     disabled />
             </div>
             <div x-cloak x-show="showPrivateKey">
-                @if ($private_key->id > 0)
+                @if ($private_key->id === 0)
                     <x-forms.textarea rows="10" id="private_key.private_key" disabled />
                 @else
                     <x-forms.textarea rows="10" id="private_key.private_key" required />
