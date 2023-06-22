@@ -87,7 +87,6 @@ class Server extends BaseModel
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
-        ray(Server::whereTeamId(session('currentTeam')->id)->with('settings')->select($selectArray->all())->get());
         return Server::whereTeamId(session('currentTeam')->id)->with('settings')->select($selectArray->all());
     }
 
