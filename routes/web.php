@@ -47,6 +47,7 @@ Route::prefix('magic')->middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'all'])->name('projects');
+    Route::get('/project/{project_uuid}/edit', [ProjectController::class, 'edit'])->name('project.edit');
     Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
     Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');

@@ -14,6 +14,16 @@ class ProjectController extends Controller
         return view('projects', ['projects' => $projects]);
     }
 
+    public function edit()
+    {
+        $projectUuid = request()->route('project_uuid');
+        $teamId = session('currentTeam')->id;
+        $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+        if (!$project) {
+            return redirect()->route('dashboard');
+        }
+        return view('project.edit', ['project' => $project]);
+    }
     public function show()
     {
         $projectUuid = request()->route('project_uuid');
