@@ -25,7 +25,7 @@ input[type="checkbox"] {
 }
 
 textarea {
-    @apply textarea placeholder:text-neutral-700 text-white rounded scrollbar bg-coolgray-200 leading-5 text-xs;
+    @apply textarea read-only:bg-coolgray-200/50 disabled:border-none read-only:text-opacity-25 placeholder:text-neutral-700 text-white rounded scrollbar bg-coolgray-200 leading-5 text-xs;
 }
 select {
     @apply h-7 select select-xs disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded bg-coolgray-200;
