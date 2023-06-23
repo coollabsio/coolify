@@ -16,9 +16,8 @@
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input id="server.name" label="Name" required />
                 <x-forms.input id="server.description" label="Description" />
-                <x-forms.input id="wildcard_domain" label="Wildcard Domain"
+                <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                     helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>" />
-
                 {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>

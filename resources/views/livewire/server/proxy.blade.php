@@ -27,10 +27,9 @@
                                         configs.
                                     </div>
                                 @endif
-                                @if ($server->id !== 0)
-                                    <x-forms.input id="redirect_url" label="Default redirect"
-                                        placeholder="https://coolify.io" />
-                                @endif
+                                <x-forms.input placeholder="https://coolify.io" id="redirect_url"
+                                    label="Default Redirect 404"
+                                    helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
                                 <div class="container w-full mx-auto">
                                     <livewire:activity-monitor :header="true" />
                                 </div>
