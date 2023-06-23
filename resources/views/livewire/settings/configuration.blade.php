@@ -18,10 +18,12 @@
             </div> --}}
         </div>
     </form>
-
-    <div class="flex flex-col py-6 text-right w-52">
+    <h2 class="pt-6">Advanced</h2>
+    <div class="flex flex-col py-6 text-right w-80">
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        <x-forms.checkbox instantSave helper="Do not recommended, only if you like to live on the edge."
+            id="next_channel" label="Enable pre-release (early) updates" />
     </div>
 </div>
