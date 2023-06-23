@@ -14,6 +14,7 @@ class UpdateCoolify
     public function __invoke(bool $force)
     {
         try {
+            $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $localhost_name = 'localhost';
             if (isDev()) {
@@ -23,12 +24,15 @@ class UpdateCoolify
             $this->latest_version = get_latest_version_of_coolify();
             $this->current_version = config('version');
             ray('latest version:' . $this->latest_version . " current version: " .  $this->current_version . ' force: ' . $force);
+            if ($settings->next_channel) {
+                ray('next channel enabled');
+                $force = true;
+                $this->latest_version = 'next';
+            }
             if ($force) {
                 $this->update();
             } else {
-                $instance_settings = InstanceSettings::get();
-                ray($instance_settings);
-                if (!$instance_settings->is_auto_update_enabled) {
+                if (!$settings->is_auto_update_enabled) {
                     throw new \Exception('Auto update is disabled');
                 }
                 if ($this->latest_version === $this->current_version) {
@@ -49,7 +53,7 @@ class UpdateCoolify
     private function update()
     {
         if (isDev()) {
-            ray('Running update on local docker container');
+            ray("Running update on local docker container. Updating to $this->latest_version");
             remote_process([
                 "sleep 10"
             ], $this->server);
