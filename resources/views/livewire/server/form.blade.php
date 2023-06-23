@@ -1,20 +1,21 @@
-<div x-data="{ deleteServer: false }">
+<div x-data="{ deleteServer: false, changeLocalhost: false }">
     <x-naked-modal show="deleteServer" title="Delete Server"
         message='This server will be deleted. It is not reversible. <br>Please think again.' />
+    <x-naked-modal show="changeLocalhost" action="submit" title="Change localhost"
+        message='You could lost a lot of functionalities if you change the server details of the server where Coolify is running on.<br>Please think again.' />
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
+            @if ($server->id === 0)
+                <x-forms.button x-on:click.prevent="changeLocalhost = true">Save</x-forms.button>
+            @else
+                <x-forms.button type="submit">Save</x-forms.button>
+            @endif
         </div>
         <div class="flex flex-col gap-2 ">
             <div class="flex flex-col w-full gap-2 lg:flex-row">
-                @if ($server->id === 0)
-                    <x-forms.input id="server.name" label="Name" readonly required />
-                    <x-forms.input id="server.description" label="Description" readonly />
-                @else
-                    <x-forms.input id="server.name" label="Name" required />
-                    <x-forms.input id="server.description" label="Description" />
-                @endif
+                <x-forms.input id="server.name" label="Name" required />
+                <x-forms.input id="server.description" label="Description" />
                 <x-forms.input id="wildcard_domain" label="Wildcard Domain"
                     helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>" />
 
@@ -23,16 +24,14 @@
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 @if ($server->id === 0)
-                    <x-forms.input id="server.ip" label="IP Address" readonly required />
-                    <x-forms.input id="server.user" label="User" readonly required />
-                    <x-forms.input type="number" id="server.port" label="Port" readonly required />
+                    <x-forms.input id="server.ip" label="IP Address" required />
                 @else
                     <x-forms.input id="server.ip" label="IP Address" readonly required />
-                    <div class="flex gap-2">
-                        <x-forms.input id="server.user" label="User" required />
-                        <x-forms.input type="number" id="server.port" label="Port" required />
-                    </div>
                 @endif
+                <div class="flex gap-2">
+                    <x-forms.input id="server.user" label="User" required />
+                    <x-forms.input type="number" id="server.port" label="Port" required />
+                </div>
             </div>
         </div>
         <h3 class="py-4">Actions</h3>

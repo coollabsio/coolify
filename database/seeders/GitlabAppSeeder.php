@@ -16,7 +16,7 @@ class GitlabAppSeeder extends Seeder
     public function run(): void
     {
         $root_team = Team::find(0);
-        $private_key_3 = PrivateKey::find(3);
+        $private_key_2 = PrivateKey::find(2);
         GitlabApp::create([
             'id' => 1,
             'name' => 'Public GitLab',
@@ -36,7 +36,7 @@ class GitlabAppSeeder extends Seeder
             'deploy_key_id' => '1234',
             'public_key' => 'dfjasiourj',
             'webhook_token' => '4u3928u4y392',
-            'private_key_id' => $private_key_3->id,
+            'private_key_id' => $private_key_2->id,
             'team_id' => $root_team->id,
         ]);
     }

@@ -16,7 +16,7 @@ class ServerSeeder extends Seeder
     public function run(): void
     {
         $root_team = Team::find(0);
-        $private_key_1 = PrivateKey::find(1);
+        $private_key_1 = PrivateKey::find(0);
 
         Server::create([
             'id' => 0,

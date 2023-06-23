@@ -17,6 +17,7 @@ class PrivateKeySeeder extends Seeder
     {
         $team_1 = Team::find(0);
         PrivateKey::create([
+            "id" => 0,
             "team_id" => $team_1->id,
             "name" => "Testing-host",
             "description" => "This is a test docker container",
