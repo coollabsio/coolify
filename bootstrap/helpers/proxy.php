@@ -82,7 +82,7 @@ function getProxyConfiguration(Server $server)
     }
     return Yaml::dump($config, 4, 2);
 }
-function setup_default_redirect_404(string $redirect_url, Server $server)
+function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
     $traefik_dynamic_conf_path = '/data/coolify/proxy/dynamic';
     $traefik_default_redirect_file = "$traefik_dynamic_conf_path/default_redirect_404.yaml";
