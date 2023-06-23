@@ -1,5 +1,5 @@
 #!/bin/bash
-## Do not modify this file. You will lost the ability to installation and autoupdate!
+## Do not modify this file. You will lose the ability to install and auto-update!
 
 ###########
 ## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
