@@ -74,7 +74,7 @@ Route::middleware(['auth'])->group(function () {
     ]))->name('server.proxy');
     Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
-        'privateKeys' => PrivateKey::ownedByCurrentTeam()->get(),
+        'privateKeys' => PrivateKey::ownedByCurrentTeam()->where('id', '!=', 0)->get(),
     ]))->name('server.private-key');
     Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
         'server' => Server::ownedByCurrentTeam(['name'])->whereUuid(request()->server_uuid)->firstOrFail()
