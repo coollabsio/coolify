@@ -3,10 +3,12 @@
 namespace App\Actions\Server;
 
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\Team;
 
 class InstallDocker
 {
-    public function __invoke(Server $server)
+    public function __invoke(Server $server, Team $team)
     {
         $dockerVersion = '23.0';
         $config = base64_encode('{ "live-restore": true }');
@@ -23,8 +25,16 @@ class InstallDocker
             "cat <<< $(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json",
             "echo ####### Restarting Docker Engine...",
             "systemctl restart docker",
+            "echo ####### Creating default network...",
+            "docker network create --attachable coolify",
             "echo ####### Done!"
         ], $server);
+        StandaloneDocker::create([
+            'name' => 'coolify',
+            'network' => 'coolify',
+            'server_id' => $server->id,
+            'team_id' => $team->id
+        ]);
 
         return $activity;
     }

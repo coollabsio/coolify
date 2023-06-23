@@ -14,7 +14,7 @@
                 <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
             </a>
         @empty
-            <div class="">N\A</div>
+            <div class="">N/A</div>
         @endforelse
     </div>
     <div class="grid gap-2 pt-2">
