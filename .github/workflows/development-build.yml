@@ -1,8 +1,8 @@
-name: Production Build (v4)
+name: Development Build (v4)
 
 on:
   push:
-    branches: ["main"]
+    branches: ["next"]
 
 env:
   REGISTRY: ghcr.io
@@ -30,8 +30,8 @@ jobs:
           file: docker/prod-ssu/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.version.outputs.VERSION }}
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}
