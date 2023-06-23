@@ -21,7 +21,7 @@ class Form extends Component
         'server.port' => 'required',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required',
-        'wildcard_domain' => 'nullable|string'
+        'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
         'server.name' => 'name',

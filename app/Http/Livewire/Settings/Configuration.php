@@ -23,13 +23,11 @@ class Configuration extends Component
         'settings.fqdn' => 'nullable',
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
-        'settings.default_redirect_404' => 'nullable',
     ];
     protected $validationAttributes = [
         'settings.fqdn' => 'FQDN',
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
-        'settings.default_redirect_404' => 'Default redirect 404',
     ];
     public function mount()
     {
@@ -139,8 +137,7 @@ class Configuration extends Component
 
         $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
-        setup_default_redirect_404(redirect_url: $this->settings->default_redirect_404, server: $this->server);
-        if ($this->settings->fqdn || $this->settings->default_redirect_404) {
+        if ($this->settings->fqdn) {
             dispatch(new InstanceProxyCheckJob());
         }
         $this->emit('success', 'Instance settings updated successfully!');
