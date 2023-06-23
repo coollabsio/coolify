@@ -20,20 +20,19 @@ class Configuration extends Component
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
-        'settings.wildcard_domain' => 'nullable',
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
         'settings.default_redirect_404' => 'nullable',
     ];
     protected $validationAttributes = [
         'settings.fqdn' => 'FQDN',
-        'settings.wildcard_domain' => 'Wildcard domain',
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
         'settings.default_redirect_404' => 'Default redirect 404',
     ];
     public function mount()
     {
+        ray($this->settings);
         $this->do_not_track = $this->settings->do_not_track;
         $this->is_auto_update_enabled = $this->settings->is_auto_update_enabled;
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
@@ -105,67 +104,6 @@ class Configuration extends Component
                     ],
                 ];
             }
-            $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
-        }
-    }
-    private function setup_default_redirect_404()
-    {
-        $file = "$this->dynamic_config_path/default_redirect_404.yaml";
-
-        if (empty($this->settings->default_redirect_404)) {
-            remote_process([
-                "rm -f $file",
-            ], $this->server);
-        } else {
-            $traefik_dynamic_conf = [
-                'http' =>
-                [
-                    'routers' =>
-                    [
-                        'catchall' =>
-                        [
-                            'entryPoints' => [
-                                0 => 'http',
-                                1 => 'https',
-                            ],
-                            'service' => 'noop',
-                            'rule' => "HostRegexp(`{catchall:.*}`)",
-                            'priority' => 1,
-                            'middlewares' => [
-                                0 => 'redirect-regexp@file',
-                            ],
-                        ],
-                    ],
-                    'services' =>
-                    [
-                        'noop' =>
-                        [
-                            'loadBalancer' =>
-                            [
-                                'servers' =>
-                                [
-                                    0 =>
-                                    [
-                                        'url' => '',
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                    'middlewares' =>
-                    [
-                        'redirect-regexp' =>
-                        [
-                            'redirectRegex' =>
-                            [
-                                'regex' => '(.*)',
-                                'replacement' => $this->settings->default_redirect_404,
-                                'permanent' => false,
-                            ],
-                        ],
-                    ],
-                ],
-            ];
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
         }
     }
