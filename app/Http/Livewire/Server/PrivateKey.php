@@ -19,6 +19,8 @@ class PrivateKey extends Component
             $uptime = instant_remote_process(['uptime'], $this->server);
             if ($uptime) {
                 Toaster::success('Server is reachable with this private key.');
+                $this->server->settings->is_reachable = true;
+                $this->server->settings->is_usable = true;
             }
         } catch (\Exception $e) {
             $this->server->settings->is_reachable = false;
