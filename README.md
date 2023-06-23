@@ -14,7 +14,7 @@ If you are looking for v3, check out the [v3 branch](https://github.com/coollabs
 
 ## What's new?
 
-Well, the whole tech stack changed, core is different, so yeah, a lot.
+Well, the whole tech stack changed, core is different, so yeah, a lot (documentation incoming).
 
 # Installation
 
