@@ -24,6 +24,7 @@ class Upgrade extends Component
         $settings = InstanceSettings::get();
         if ($settings->next_channel) {
             $this->isUpgradeAvailable = true;
+            $this->latestVersion = 'next';
         }
     }
     public function upgrade()
