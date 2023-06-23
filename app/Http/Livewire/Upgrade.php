@@ -3,6 +3,7 @@
 namespace App\Http\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
+use App\Models\InstanceSettings;
 use Masmerise\Toaster\Toaster;
 use Livewire\Component;
 
@@ -18,6 +19,10 @@ class Upgrade extends Component
         $currentVersion = config('version');
         version_compare($currentVersion, $this->latestVersion, '<') ? $this->isUpgradeAvailable = true : $this->isUpgradeAvailable = false;
         if (isDev()) {
+            $this->isUpgradeAvailable = true;
+        }
+        $settings = InstanceSettings::get();
+        if ($settings->next_channel) {
             $this->isUpgradeAvailable = true;
         }
     }

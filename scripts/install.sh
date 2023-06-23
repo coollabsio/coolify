@@ -23,6 +23,11 @@ if [ $OS_TYPE != "ubuntu" ] && [ $OS_TYPE != "debian" ]; then
     exit
 fi
 
+# Ovewrite LATEST_VERSION if user pass a version number
+if [ "$1" != "" ]; then
+    LATEST_VERSION=$1
+fi
+
 echo -e "-------------"
 echo -e "Welcome to Coolify v4 beta installer!"
 echo -e "This script will install everything for you."
