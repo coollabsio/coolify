@@ -17,12 +17,12 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Spatie\Activitylog\Models\Activity;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Throwable;
 use Visus\Cuid2\Cuid2;
 
 class ApplicationDeploymentJob implements ShouldQueue
@@ -46,7 +46,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private ApplicationPreview|null $preview = null;
 
     public static int $batch_counter = 0;
-    public $timeout = 10200;
+    public $failOnTimeout = true;
 
     public function __construct(
         public int $application_deployment_queue_id,
@@ -128,7 +128,8 @@ class ApplicationDeploymentJob implements ShouldQueue
                 "echo '\nOops something is not okay, are you okay? 😢'",
                 "echo '\n\n{$e->getMessage()}'",
             ]);
-            $this->fail();
+            ray($e);
+            $this->fail($e->getMessage());
         } finally {
             if (isset($this->docker_compose)) {
                 Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
@@ -142,9 +143,15 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->execute_now([
             "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
         ]);
-        $this->execute_now([
-            "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
-        ], isDebuggable: true);
+        if (isDev()) {
+            $this->execute_now([
+                "docker run -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock coolify-builder",
+            ], isDebuggable: true);
+        } else {
+            $this->execute_now([
+                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
+            ], isDebuggable: true);
+        }
         $this->execute_now([
             "echo 'Done.'"
         ]);
@@ -291,8 +298,9 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         $this->next(ProcessStatus::FINISHED->value);
     }
 
-    public function failed(): void
+    public function failed(Throwable $exception): void
     {
+        ray($exception);
         $this->next(ProcessStatus::ERROR->value);
     }
 
@@ -329,7 +337,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
     }
     private function execute_in_builder(string $command)
     {
-        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1'";
     }
     private function generate_environment_variables($ports)
     {

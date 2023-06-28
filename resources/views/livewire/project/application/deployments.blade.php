@@ -67,8 +67,8 @@
              dayjs.extend(window.dayjs_plugin_relativeTime);
 
              Alpine.data('elapsedTime', (uuid, status, created_at, updated_at) => ({
-                 finished_time: '0s',
-                 started_time: '0s',
+                 finished_time: 'calculating...',
+                 started_time: 'calculating...',
                  init() {
                      if (timers[uuid]) {
                          clearInterval(timers[uuid]);

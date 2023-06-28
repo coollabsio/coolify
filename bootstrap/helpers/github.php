@@ -64,7 +64,7 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
     }
     $json = $response->json();
     if ($response->failed() && $throwError) {
-        throw new \Exception("Failed to get data from {$source->name} with error: " . $json['message']);
+        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message']);
     }
     return [
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),

@@ -35,5 +35,5 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     ;fi
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "while true; do sleep 3600 && exit 0; done"]
+CMD ["sh", "-c", "while true; do sleep 1; done"]
 

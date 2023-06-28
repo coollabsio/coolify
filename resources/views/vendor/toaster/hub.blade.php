@@ -71,7 +71,7 @@
                         </svg>
                     </div>
                 </template>
-                <span x-text="toast.message" />
+                <span x-html="toast.message" />
             </i>
 
             @if ($closeable)

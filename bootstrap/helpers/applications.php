@@ -34,7 +34,7 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         force_rebuild: $force_rebuild,
         rollback_commit: $commit,
         pull_request_id: $pull_request_id,
-    ));
+    ))->onConnection('long-running')->onQueue('long-running');
 }
 
 function queue_next_deployment(Application $application)
@@ -47,6 +47,6 @@ function queue_next_deployment(Application $application)
             deployment_uuid: $next_found->deployment_uuid,
             force_rebuild: $next_found->force_rebuild,
             pull_request_id: $next_found->pull_request_id
-        ));
+        ))->onConnection('long-running')->onQueue('long-running');
     }
 }

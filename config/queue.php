@@ -33,7 +33,14 @@ return [
         'sync' => [
             'driver' => 'sync',
         ],
-
+        'long-running' => [
+            'driver' => 'redis',
+            'connection' => 'default',
+            'queue' => 'long-running',
+            'retry_after' => 3600,
+            'block_for' => null,
+            'after_commit' => false,
+        ],
         'database' => [
             'driver' => 'database',
             'table' => 'jobs',
@@ -66,7 +73,7 @@ return [
             'driver' => 'redis',
             'connection' => 'default',
             'queue' => env('REDIS_QUEUE', 'default'),
-            'retry_after' => 90,
+            'retry_after' => 300,
             'block_for' => null,
             'after_commit' => false,
         ],
