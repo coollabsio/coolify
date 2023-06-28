@@ -68,6 +68,7 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
     }
     return [
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
+        'rate_limit_reset' => $response->header('X-RateLimit-Reset'),
         'data' => collect($json)
     ];
 }

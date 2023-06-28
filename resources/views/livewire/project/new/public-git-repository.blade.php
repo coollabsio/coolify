@@ -5,21 +5,21 @@
         <div class="flex flex-col gap-2">
             <div class="flex flex-col">
                 <div class="flex items-end gap-2">
-                    <x-forms.input wire:keydown.enter='load_branches' id="repository_url" label="Repository URL"
+                    <x-forms.input wire:keydown.enter='load_branch' id="repository_url" label="Repository URL"
                         helper="{!! __('repository.url') !!}" />
-                    <x-forms.button wire:click.prevent="load_branches">
+                    <x-forms.button wire:click.prevent="load_branch">
                         Check repository
                     </x-forms.button>
                 </div>
-                @if (count($branches) > 0)
+                @if ($branch_found)
+                    <div class="py-2">
+                        <div>Rate limit remaining: {{ $rate_limit_remaining }}</div>
+                        <div>Rate limit reset at: {{ date('Y-m-d H:i:s', substr($rate_limit_reset, 0, 10)) }}</div>
+                    </div>
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">
-                            <x-forms.select id="selected_branch" label="Branch">
-                                <option value="default" disabled selected>Select a branch</option>
-                                @foreach ($branches as $branch)
-                                    <option value="{{ $branch }}">{{ $branch }}</option>
-                                @endforeach
-                            </x-forms.select>
+                            <x-forms.input disabled id="git_branch" label="Selected branch"
+                                helper="You can select other branches after configuration is done." />
                             @if ($is_static)
                                 <x-forms.input id="publish_directory" label="Publish Directory"
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
