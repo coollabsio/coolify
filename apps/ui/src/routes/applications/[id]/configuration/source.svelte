@@ -260,7 +260,7 @@
 	<PublicRepository />
 	<div class="flex flex-row items-center pt-10">
 		<div class="title py-4 pr-4">Simple Dockerfile <Beta /></div>
-		<DocLink url="https://docs.coollabs.io/coolify/applications/#dockerfile" />
+		<DocLink url="https://docs.coollabs.io/coolify/applications/#simple-dockerfile" />
 	</div>
 	<div class="mx-auto max-w-screen-2xl">
 		<form class="flex flex-col" on:submit|preventDefault={handleDockerImage}>
