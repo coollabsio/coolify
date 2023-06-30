@@ -68,9 +68,6 @@
         <div class="flex flex-col">
             <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
                 helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-
-            <x-forms.checkbox helper="More logs will be visible during a deployment." instantSave id="is_debug_enabled"
-                label="Debug" />
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />

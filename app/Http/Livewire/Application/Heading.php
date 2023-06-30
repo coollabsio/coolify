@@ -42,14 +42,6 @@ class Heading extends Component
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }
-    public function force_deploy_with_debug()
-    {
-        if ($this->application->settings->is_debug_enabled == false) {
-            $this->application->settings->is_debug_enabled = true;
-            $this->application->settings->save();
-        }
-        $this->deploy();
-    }
     public function force_deploy_without_cache()
     {
         $this->deploy(force_rebuild: true);
