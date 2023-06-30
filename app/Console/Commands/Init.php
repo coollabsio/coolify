@@ -2,33 +2,28 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Console\Command;
 
 class Init extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'app:init';
-
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Cleanup instance related stuffs';
-
-    /**
-     * Execute the console command.
-     */
     public function handle()
     {
+        $this->cleanup_in_progress_application_deployments();
+    }
+    private function cleanup_in_progress_application_deployments()
+    {
+        // Cleanup any failed deployments
+
         try {
             $halted_deployments = ApplicationDeploymentQueue::where('status', '==', 'in_progress')->get();
-            ray($halted_deployments);
+            foreach ($halted_deployments as $deployment) {
+                $deployment->status = ApplicationDeploymentStatus::FAILED->value;
+                $deployment->save();
+            }
         } catch (\Exception $e) {
             echo "Error: {$e->getMessage()}\n";
         }
