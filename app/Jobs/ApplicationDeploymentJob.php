@@ -309,6 +309,8 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         $this->application_deployment_queue->update([
             'status' => $status,
         ]);
+        ray($this->application_deployment_queue)->purple();
+        ray($this->activity)->purple();
         $this->activity->properties = $this->activity->properties->merge([
             'status' => $status,
         ]);

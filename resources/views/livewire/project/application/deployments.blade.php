@@ -1,5 +1,4 @@
- <div class="flex flex-col gap-2" wire:init='load_deployments'
-     @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
+ <div class="flex flex-col gap-2" @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
      <h2 class="pt-4">Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
      @if ($show_next)
          <x-forms.button wire:click="load_deployments({{ $default_take }})">Show More

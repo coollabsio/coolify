@@ -19,6 +19,7 @@ class Kernel extends ConsoleKernel
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new InstanceDockerCleanupJob)->everyFiveMinutes();
+            $schedule->job(new InstanceProxyCheckJob)->everyFiveMinutes();
             $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }
     }

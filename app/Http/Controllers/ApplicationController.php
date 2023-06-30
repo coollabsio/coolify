@@ -41,7 +41,8 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        return view('project.application.deployments', ['application' => $application]);
+        ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, 8);
+        return view('project.application.deployments', ['application' => $application, 'deployments' => $deployments, 'deployments_count' => $count]);
     }
 
     public function deployment()
