@@ -143,15 +143,15 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->execute_now([
             "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder)... '",
         ]);
-        if (isDev()) {
-            $this->execute_now([
-                "docker run -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock coolify-builder",
-            ], isDebuggable: true);
-        } else {
-            $this->execute_now([
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
-            ], isDebuggable: true);
-        }
+        // if (isDev()) {
+        //     $this->execute_now([
+        //         "docker run -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock coolify-builder",
+        //     ], isDebuggable: true);
+        // } else {
+        $this->execute_now([
+            "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
+        ], isDebuggable: true);
+        // }
         $this->execute_now([
             "echo 'Done.'"
         ]);
@@ -300,22 +300,19 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
 
     public function failed(Throwable $exception): void
     {
-        ray($exception);
         $this->next(ProcessStatus::ERROR->value);
     }
 
     private function next(string $status)
     {
-        if (!Str::of($this->application_deployment_queue->status)->startsWith('cancelled')) {
-            ray('Next Status: ' . $status)->green();
-            $this->application_deployment_queue->update([
-                'status' => $status,
-            ]);
-            $this->activity->properties = $this->activity->properties->merge([
-                'status' => $status,
-            ]);
-            $this->activity->save();
-        }
+        ray('Next Status: ' . $status)->green();
+        $this->application_deployment_queue->update([
+            'status' => $status,
+        ]);
+        $this->activity->properties = $this->activity->properties->merge([
+            'status' => $status,
+        ]);
+        $this->activity->save();
         if ($this->pull_request_id) {
             dispatch(new ApplicationPullRequestUpdateJob(
                 application_id: $this->application->id,
