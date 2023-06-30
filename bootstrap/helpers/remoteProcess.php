@@ -3,8 +3,15 @@
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
+use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\ApplicationDeploymentJobNew;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\InstanceSettings;
 use App\Models\Server;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
@@ -46,6 +53,11 @@ function remote_process(
             ignore_errors: $ignore_errors
         ),
     ])();
+}
+function get_private_key_for_server(Server $server)
+{
+    $temp_file = "id.root@{$server->ip}";
+    return '/var/www/html/storage/app/ssh/keys/' . $temp_file;
 }
 function save_private_key_for_server(Server $server)
 {
@@ -105,4 +117,82 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
         throw new \RuntimeException($process->errorOutput());
     }
     return $output;
+}
+
+function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
+{
+    $application = Application::find(data_get($application_deployment_queue, 'application_id'));
+    $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
+    if (is_null($application_deployment_queue)) {
+        return collect([]);
+    }
+    try {
+        $decoded = json_decode(
+            data_get($application_deployment_queue, 'log'),
+            associative: true,
+            flags: JSON_THROW_ON_ERROR
+        );
+    } catch (\JsonException $exception) {
+        return collect([]);
+    }
+    $formatted = collect($decoded);
+    if (!$is_debug_enabled) {
+
+        $formatted = $formatted->filter(fn ($i) => $i['show_in_output'] ?? true);
+    }
+    $formatted = $formatted->sortBy(fn ($i) => $i['order'])
+        ->map(function ($i) {
+            $i['timestamp'] = Carbon::parse($i['timestamp'])->format('Y-M-d H:i:s.u');
+            return $i;
+        });
+
+    return $formatted;
+}
+function execute_remote_command(array|Collection $commands, Server $server, ApplicationDeploymentQueue $queue, bool $show_in_output = true, bool $ignore_errors = false)
+{
+    if ($commands instanceof Collection) {
+        $commandsText = $commands;
+    } else {
+        $commandsText = collect($commands);
+    }
+    $ip = data_get($server, 'ip');
+    $user = data_get($server, 'user');
+    $port = data_get($server, 'port');
+    $private_key_location = get_private_key_for_server($server);
+    $commandsText->each(function ($command) use ($queue, $private_key_location, $ip, $user, $port, $show_in_output, $ignore_errors) {
+        $remote_command = generate_ssh_command($private_key_location, $ip, $user, $port, $command);
+        $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($queue, $command, $show_in_output) {
+            $new_log_entry = [
+                'command' => $command,
+                'output' => $output,
+                'type' => $type === 'err' ? 'stderr' : 'stdout',
+                'timestamp' => Carbon::now('UTC'),
+                'show_in_output' => $show_in_output,
+            ];
+
+            if (!$queue->log) {
+                $new_log_entry['order'] = 1;
+            } else {
+                $previous_logs = json_decode($queue->log, associative: true, flags: JSON_THROW_ON_ERROR);
+                $new_log_entry['order'] = count($previous_logs) + 1;
+            }
+
+            $previous_logs[] = $new_log_entry;
+            $queue->log = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);;
+            $queue->save();
+        });
+        $queue->update([
+            'current_process_id' => $process->id(),
+        ]);
+
+        $process_result = $process->wait();
+        if ($process_result->exitCode() !== 0) {
+            if (!$ignore_errors) {
+                $status = ApplicationDeploymentStatus::FAILED->value;
+                $queue->status = $status;
+                $queue->save();
+                throw new \RuntimeException($process_result->errorOutput());
+            }
+        }
+    });
 }

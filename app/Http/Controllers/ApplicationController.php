@@ -61,16 +61,16 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
-        $activity = Activity::where('properties->type_uuid', '=', $deploymentUuid)->first();
-        if (!$activity) {
-            return redirect()->route('project.application.deployments', [
-                'project_uuid' => $project->uuid,
-                'environment_name' => $environment->name,
-                'application_uuid' => $application->uuid,
-            ]);
-        }
-        $deployment = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
-        if (!$deployment) {
+        // $activity = Activity::where('properties->type_uuid', '=', $deploymentUuid)->first();
+        // if (!$activity) {
+        //     return redirect()->route('project.application.deployments', [
+        //         'project_uuid' => $project->uuid,
+        //         'environment_name' => $environment->name,
+        //         'application_uuid' => $application->uuid,
+        //     ]);
+        // }
+        $application_deployment_queue = ApplicationDeploymentQueue::where('deployment_uuid', $deploymentUuid)->first();
+        if (!$application_deployment_queue) {
             return redirect()->route('project.application.deployments', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,
@@ -79,8 +79,8 @@ class ApplicationController extends Controller
         }
         return view('project.application.deployment', [
             'application' => $application,
-            'activity' => $activity,
-            'deployment' => $deployment,
+            // 'activity' => $activity,
+            'application_deployment_queue' => $application_deployment_queue,
             'deployment_uuid' => $deploymentUuid,
         ]);
     }

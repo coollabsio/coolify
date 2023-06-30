@@ -1,6 +1,7 @@
 <?php
 
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\ApplicationDeploymentJobNew;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 
@@ -27,13 +28,16 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     if ($running_deployments->count() > 0) {
         return;
     }
-    dispatch(new ApplicationDeploymentJob(
+    // dispatch(new ApplicationDeploymentJob(
+    //     application_deployment_queue_id: $deployment->id,
+    //     application_id: $application_id,
+    //     deployment_uuid: $deployment_uuid,
+    //     force_rebuild: $force_rebuild,
+    //     rollback_commit: $commit,
+    //     pull_request_id: $pull_request_id,
+    // ))->onConnection('long-running')->onQueue('long-running');
+    dispatch(new ApplicationDeploymentJobNew(
         application_deployment_queue_id: $deployment->id,
-        application_id: $application_id,
-        deployment_uuid: $deployment_uuid,
-        force_rebuild: $force_rebuild,
-        rollback_commit: $commit,
-        pull_request_id: $pull_request_id,
     ))->onConnection('long-running')->onQueue('long-running');
 }
 
