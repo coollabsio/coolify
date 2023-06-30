@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->text('log')->default(null)->nullable();
+            $table->text('logs')->default(null)->nullable();
             $table->string('current_process_id')->default(null)->nullable();
         });
     }
@@ -23,7 +23,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('application_deployment_queues', function (Blueprint $table) {
-            $table->dropColumn('log');
+            $table->dropColumn('logs');
             $table->dropColumn('current_process_id');
         });
     }
