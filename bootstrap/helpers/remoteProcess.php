@@ -3,11 +3,8 @@
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
-use App\Enums\ApplicationDeploymentStatus;
-use App\Jobs\ApplicationDeploymentJobNew;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
-use App\Models\InstanceSettings;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -28,13 +25,16 @@ function remote_process(
     string $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
-    bool    $ignore_errors = false
+    bool    $ignore_errors = false,
 ): Activity {
 
     $command_string = implode("\n", $command);
-
-    // @TODO: Check if the user has access to this server
-    // checkTeam($server->team_id);
+    if (auth()->user()) {
+        $teams = auth()->user()->teams->pluck('id');
+        if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
+            throw new \Exception("User is not part of the team that owns this server");
+        }
+    }
 
     $private_key_location = save_private_key_for_server($server);
 
