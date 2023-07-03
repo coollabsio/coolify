@@ -25,35 +25,35 @@ function sync:bunny {
 }
 
 function queue {
-    bash vendor/bin/spin exec -u webuser coolify php artisan queue:listen
+    bash spin exec -u webuser coolify php artisan queue:listen
 }
 
 function horizon {
-    bash vendor/bin/spin exec -u webuser coolify php artisan horizon -vvv  
+    bash spin exec -u webuser coolify php artisan horizon -vvv  
 }
 
 function schedule {
-    bash vendor/bin/spin exec -u webuser coolify php artisan schedule:work
+    bash spin exec -u webuser coolify php artisan schedule:work
 }
 
 function schedule:run {
-    bash vendor/bin/spin exec -u webuser coolify php artisan schedule:run
+    bash spin exec -u webuser coolify php artisan schedule:run
 }
 
 function db:reset {
-    bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --seed
+    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
 }
 
 function db {
-    bash vendor/bin/spin exec -u webuser coolify php artisan db
+    bash spin exec -u webuser coolify php artisan db
 }
 
 function db:migrate {
-    bash vendor/bin/spin exec -u webuser coolify php artisan migrate
+    bash spin exec -u webuser coolify php artisan migrate
 }
 
 function db:reset-prod {
-    bash vendor/bin/spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
+    bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder
 }
 
@@ -62,11 +62,11 @@ function mfs {
 }
 
 function coolify {
-    bash vendor/bin/spin exec -u webuser coolify bash
+    bash spin exec -u webuser coolify bash
 }
 
 function coolify:root {
-    bash vendor/bin/spin exec coolify bash
+    bash spin exec coolify bash
 }
 function coolify:proxy {
    docker exec -ti coolify-proxy sh
@@ -77,11 +77,11 @@ function redis {
 }
 
 function vite {
-    bash vendor/bin/spin exec vite bash
+    bash spin exec vite bash
 }
 
 function tinker {
-    bash vendor/bin/spin exec -u webuser coolify php artisan tinker
+    bash spin exec -u webuser coolify php artisan tinker
 }
 
 
