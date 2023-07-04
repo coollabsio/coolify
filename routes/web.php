@@ -116,7 +116,7 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
-        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
+        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first()->makeVisible('client_secret')->makeVisible('webhook_secret');
         $settings = InstanceSettings::get();
         $name = Str::of(Str::kebab($github_app->name));
         if ($settings->public_ipv4) {
