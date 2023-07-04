@@ -15,6 +15,7 @@ class DeploymentNavbar extends Component
     protected $listeners = ['deploymentFinished'];
 
     public ApplicationDeploymentQueue $application_deployment_queue;
+    public bool $is_debug_enabled = false;
 
     public function deploymentFinished()
     {
@@ -25,6 +26,7 @@ class DeploymentNavbar extends Component
         $application = Application::find($this->application_deployment_queue->application_id);
         $application->settings->is_debug_enabled = !$application->settings->is_debug_enabled;
         $application->settings->save();
+        $this->is_debug_enabled = $application->settings->is_debug_enabled;
         $this->emit('refreshQueue');
     }
     public function cancel()
