@@ -26,7 +26,6 @@ class UpdateCoolify
             ray('latest version:' . $this->latest_version . " current version: " .  $this->current_version . ' force: ' . $force);
             if ($settings->next_channel) {
                 ray('next channel enabled');
-                $force = true;
                 $this->latest_version = 'next';
             }
             if ($force) {
