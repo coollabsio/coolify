@@ -8,8 +8,7 @@
             <div class="flex items-center gap-2">
                 <h1>{{ __('auth.login') }}</h1>
                 @if ($is_registration_enabled)
-                    <a href="/register"
-                        class="text-xs text-center text-white normal-case bg-transparent border-none rounded no-animation hover:no-underline btn btn-sm bg-coollabs-gradient">
+                    <a href="/register" class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
                         {{ __('auth.register_now') }}
                     </a>
                 @endif
@@ -41,7 +40,7 @@
                         </div>
                     @endif
                     @if (session('status'))
-                        <div class="mb-4  font-medium text-green-600">
+                        <div class="mb-4 font-medium text-green-600">
                             {{ session('status') }}
                         </div>
                     @endif

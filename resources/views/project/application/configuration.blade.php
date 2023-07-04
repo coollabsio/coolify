@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Configuration</h1>
-    <x-applications.navbar :application="$application" />
+    <livewire:application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"

@@ -1,5 +1,5 @@
 <x-layout>
     <h1 class="py-0">Deployment</h1>
-    <x-applications.navbar :application="$application" />
-    <livewire:project.application.deployment-logs :activity="$activity" :application="$application" :deployment_uuid="$deployment_uuid" />
+    <livewire:application.heading :application="$application" />
+    <livewire:project.application.deployment-logs :application_deployment_queue="$application_deployment_queue" />
 </x-layout>

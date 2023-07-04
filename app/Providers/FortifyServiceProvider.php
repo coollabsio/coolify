@@ -52,6 +52,11 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::loginView(function () {
             $settings = InstanceSettings::get();
+            $users = User::count();
+            if ($users == 0) {
+                // If there are no users, redirect to registration
+                return redirect()->route('register');
+            }
             return view('auth.login', [
                 'is_registration_enabled' => $settings->is_registration_enabled
             ]);

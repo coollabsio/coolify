@@ -42,9 +42,9 @@ function get_container_status(Server $server, string $container_id, bool $all_da
     return $container[0]['State']['Status'];
 }
 
-function generate_container_name(string $uuid, int|null $pull_request_id = null)
+function generate_container_name(string $uuid, int $pull_request_id = 0)
 {
-    if ($pull_request_id) {
+    if ($pull_request_id !== 0) {
         return $uuid . '-pr-' . $pull_request_id;
     } else {
         return $uuid;

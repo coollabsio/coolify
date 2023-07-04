@@ -2,31 +2,23 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Enums\ActivityTypes;
-use App\Models\Application;
-use Illuminate\Support\Facades\Redis;
+use App\Models\ApplicationDeploymentQueue;
 use Livewire\Component;
-use Spatie\Activitylog\Models\Activity;
 
 class DeploymentLogs extends Component
 {
-    public Application $application;
-    public $activity;
+    public ApplicationDeploymentQueue $application_deployment_queue;
     public $isKeepAliveOn = true;
-    public $deployment_uuid;
+    protected $listeners = ['refreshQueue'];
+    public function refreshQueue()
+    {
+        $this->application_deployment_queue->refresh();
+    }
     public function polling()
     {
         $this->emit('deploymentFinished');
-        if (is_null($this->activity) && isset($this->deployment_uuid)) {
-            $this->activity = Activity::query()
-                ->where('properties->type', '=', ActivityTypes::DEPLOYMENT->value)
-                ->where('properties->type_uuid', '=', $this->deployment_uuid)
-                ->first();
-        } else {
-            $this->activity?->refresh();
-        }
-
-        if (data_get($this->activity, 'properties.status') == 'finished' || data_get($this->activity, 'properties.status') == 'failed') {
+        $this->application_deployment_queue->refresh();
+        if (data_get($this->application_deployment_queue, 'status') == 'finished' || data_get($this->application_deployment_queue, 'status') == 'failed') {
             $this->isKeepAliveOn = false;
         }
     }

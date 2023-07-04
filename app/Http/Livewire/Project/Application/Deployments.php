@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class Deployments extends Component
 {
-    public int $application_id;
+    public Application $application;
     public $deployments = [];
     public int $deployments_count = 0;
     public string $current_url;
@@ -18,6 +18,17 @@ class Deployments extends Component
     public function mount()
     {
         $this->current_url = url()->current();
+        $this->show_more();
+    }
+    private function show_more()
+    {
+        if (count($this->deployments) !== 0) {
+            $this->show_next = true;
+            if (count($this->deployments) < $this->default_take) {
+                $this->show_next = false;
+            }
+            return;
+        }
     }
     public function reload_deployments()
     {
@@ -28,17 +39,11 @@ class Deployments extends Component
         if ($take) {
             $this->skip = $this->skip + $take;
         }
-
         $take = $this->default_take;
-        ['deployments' => $deployments, 'count' => $count] = Application::find($this->application_id)->deployments($this->skip, $take);
+
+        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $take);
         $this->deployments = $deployments;
         $this->deployments_count = $count;
-        if (count($this->deployments) !== 0) {
-            $this->show_next = true;
-            if (count($this->deployments) < $take) {
-                $this->show_next = false;
-            }
-            return;
-        }
+        $this->show_more();
     }
 }

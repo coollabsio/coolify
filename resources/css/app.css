@@ -97,7 +97,7 @@ a {
     }
 }
 .bg-coollabs-gradient {
-    @apply text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
+    @apply text-transparent text-white bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
 }
 .text-helper {
     @apply inline-block font-bold text-warning;

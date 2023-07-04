@@ -8,6 +8,7 @@ use App\Models\GitlabApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -21,15 +22,17 @@ class PublicGitRepository extends Component
     public $parameters;
     public $query;
 
-    public $branches = [];
+    public bool $branch_found = false;
     public string $selected_branch = 'main';
     public bool $is_static = false;
     public string|null $publish_directory = null;
+    public string $git_branch;
+    public int $rate_limit_remaining = 0;
+    public int $rate_limit_reset = 0;
 
     private GithubApp|GitlabApp $git_source;
     private string $git_host;
     private string $git_repository;
-    private string $git_branch;
 
     protected $rules = [
         'repository_url' => 'required|url',
@@ -64,16 +67,17 @@ class PublicGitRepository extends Component
         }
         $this->emit('success', 'Application settings updated!');
     }
-    public function load_branches()
+    public function load_branch()
     {
+        $this->branch_found = false;
         $this->validate([
             'repository_url' => 'required|url'
         ]);
         $this->get_git_source();
 
         try {
-            ['data' => $data] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches");
-            $this->branches = collect($data)->pluck('name')->toArray();
+            ['data' => $data, 'rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
+            $this->branch_found = true;
         } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }

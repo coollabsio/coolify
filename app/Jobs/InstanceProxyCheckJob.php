@@ -29,7 +29,7 @@ class InstanceProxyCheckJob implements ShouldQueue
     {
         try {
             $container_name = 'coolify-proxy';
-            $servers = Server::whereRelation('settings', 'is_reachable', true)->where('proxy->type', ProxyTypes::TRAEFIK_V2)->get();
+            $servers = Server::whereRelation('settings', 'is_usable', true)->where('proxy->type', ProxyTypes::TRAEFIK_V2)->get();
 
             foreach ($servers as $server) {
                 $status = get_container_status(server: $server, container_id: $container_name);

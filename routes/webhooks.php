@@ -1,11 +1,9 @@
 <?php
 
-use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\PrivateKey;
 use App\Models\GithubApp;
-use App\Models\GithubEventsApplications;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;

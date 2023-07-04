@@ -3,8 +3,12 @@
 use App\Actions\CoolifyTask\PrepareCoolifyTask;
 use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
@@ -21,13 +25,16 @@ function remote_process(
     string $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
-    bool    $ignore_errors = false
+    bool    $ignore_errors = false,
 ): Activity {
 
     $command_string = implode("\n", $command);
-
-    // @TODO: Check if the user has access to this server
-    // checkTeam($server->team_id);
+    if (auth()->user()) {
+        $teams = auth()->user()->teams->pluck('id');
+        if (!$teams->contains($server->team_id) && !$teams->contains(0)) {
+            throw new \Exception("User is not part of the team that owns this server");
+        }
+    }
 
     $private_key_location = save_private_key_for_server($server);
 
@@ -46,6 +53,11 @@ function remote_process(
             ignore_errors: $ignore_errors
         ),
     ])();
+}
+function get_private_key_for_server(Server $server)
+{
+    $temp_file = "id.root@{$server->ip}";
+    return '/var/www/html/storage/app/ssh/keys/' . $temp_file;
 }
 function save_private_key_for_server(Server $server)
 {
@@ -105,4 +117,34 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
         throw new \RuntimeException($process->errorOutput());
     }
     return $output;
+}
+
+function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
+{
+    $application = Application::find(data_get($application_deployment_queue, 'application_id'));
+    $is_debug_enabled = data_get($application, 'settings.is_debug_enabled');
+    if (is_null($application_deployment_queue)) {
+        return collect([]);
+    }
+    try {
+        $decoded = json_decode(
+            data_get($application_deployment_queue, 'logs'),
+            associative: true,
+            flags: JSON_THROW_ON_ERROR
+        );
+    } catch (\JsonException $exception) {
+        return collect([]);
+    }
+    $formatted = collect($decoded);
+    if (!$is_debug_enabled) {
+        $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
+    }
+    $formatted = $formatted
+        ->sortBy(fn ($i) => $i['order'])
+        ->map(function ($i) {
+            $i['timestamp'] = Carbon::parse($i['timestamp'])->format('Y-M-d H:i:s.u');
+            return $i;
+        });
+
+    return $formatted;
 }

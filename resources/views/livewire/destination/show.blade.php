@@ -22,13 +22,11 @@
             <h4>Found Destinations</h4>
         @endif
         @foreach ($networks as $network)
-            <div class="flex gap-2 w-96">
-                <div class="w-32">{{ data_get($network, 'Name') }}</div>
-                <a
-                    href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
-                    <x-forms.button>Configure</x-forms.button>
-                </a>
-            </div>
+            <a
+                href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
+                <x-forms.button>Add<span class="text-warning">{{ data_get($network, 'Name') }}</span>
+                </x-forms.button>
+            </a>
         @endforeach
     </div>
 </div>
