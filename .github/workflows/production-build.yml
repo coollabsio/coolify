@@ -9,7 +9,7 @@ env:
   IMAGE_NAME: "coollabsio/coolify"
 
 jobs:
-  arm64:
+  amd64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
