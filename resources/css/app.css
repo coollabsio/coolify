@@ -3,32 +3,32 @@
 @tailwind utilities;
 
 .scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-1;
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
 }
 html {
     @apply text-neutral-400;
 }
 body {
-    @apply scrollbar antialiased text-sm;
+    @apply text-sm antialiased scrollbar;
 }
 .main {
-    @apply pl-24 pr-10 mx-auto max-w-screen-xl pt-4;
+    @apply max-w-screen-xl pt-4 pl-24 pr-10 mx-auto;
 }
 input {
-    @apply input input-sm h-7 outline-none placeholder:text-neutral-700 text-white rounded bg-coolgray-200 w-full read-only:bg-coolgray-200/50 read-only:text-opacity-25;
+    @apply w-full text-white rounded outline-none input input-sm h-7 placeholder:text-neutral-700 bg-coolgray-200 read-only:bg-coolgray-200/50 read-only:text-opacity-25;
 }
 input:not(input[type="checkbox"]) {
     @apply border-none disabled:border-none;
 }
 input[type="checkbox"] {
-    @apply toggle toggle-warning toggle-xs rounded disabled:toggle-warning;
+    @apply rounded toggle toggle-warning toggle-xs disabled:toggle-warning;
 }
 
 textarea {
-    @apply textarea read-only:bg-coolgray-200/50 disabled:border-none read-only:text-opacity-25 placeholder:text-neutral-700 text-white rounded scrollbar bg-coolgray-200 leading-5 text-xs;
+    @apply text-xs leading-5 text-white rounded textarea read-only:bg-coolgray-200/50 disabled:border-none read-only:text-opacity-25 placeholder:text-neutral-700 scrollbar bg-coolgray-200;
 }
 select {
-    @apply h-7 select select-xs disabled:bg-coolgray-200 border-none disabled:opacity-50 font-normal placeholder:text-neutral-700 text-white rounded bg-coolgray-200;
+    @apply font-normal text-white border-none rounded h-7 select select-xs disabled:bg-coolgray-200 disabled:opacity-50 placeholder:text-neutral-700 bg-coolgray-200;
 }
 .label-text,
 label {
@@ -43,7 +43,7 @@ button[isWarning] {
     @apply bg-red-600 hover:bg-red-500;
 }
 button[isHighlighted] {
-    @apply btn-primary text-white;
+    @apply text-white btn-primary;
 }
 h1 {
     @apply text-3xl font-bold text-white;
@@ -61,7 +61,7 @@ a {
     @apply text-neutral-400 hover:text-white link link-hover hover:bg-transparent;
 }
 .kbd-custom {
-    @apply px-2  text-xs border border-dashed rounded border-neutral-700 text-warning;
+    @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
 }
 .icon {
     @apply w-6 h-6;
@@ -70,7 +70,7 @@ a {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white p-2 hover:no-underline transition-colors;
+    @apply flex items-center justify-center p-2 transition-colors rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white hover:no-underline;
 }
 
 .lds-heart {
@@ -124,5 +124,5 @@ tr td {
     @apply px-3 py-4 whitespace-nowrap;
 }
 tr td:first-child {
-    @apply pl-4 pr-3 sm:pl-6 font-bold;
+    @apply pl-4 pr-3 font-bold sm:pl-6;
 }
