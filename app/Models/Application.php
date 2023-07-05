@@ -195,6 +195,9 @@ class Application extends BaseModel
     }
     public function deploymentType()
     {
+        if (data_get($this, 'private_key_id')) {
+            return 'deploy_key';
+        }
         if (data_get($this, 'source')) {
             return 'source';
         }

@@ -566,7 +566,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         if ($this->pull_request_id !== 0) {
             $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
-
+        
         if ($this->application->deploymentType() === 'source') {
             $source_html_url = data_get($this->application, 'source.html_url');
             $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
