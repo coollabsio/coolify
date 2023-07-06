@@ -153,8 +153,13 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->prepare_builder_image();
         $this->clone_repository();
 
-        $this->build_image_name = "{$this->application->git_repository}:{$this->commit}-build";
-        $this->production_image_name = "{$this->application->uuid}:{$this->commit}";
+        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
+        if ($tag->count() > 128) {
+            $tag = $tag->substr(0, 128);
+        };
+
+        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
+        $this->production_image_name = "{$this->application->uuid}:{$tag}";
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
 
         if (!$this->force_rebuild) {
