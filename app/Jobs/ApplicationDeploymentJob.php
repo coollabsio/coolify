@@ -154,7 +154,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->clone_repository();
 
         $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
-        if ($tag->count() > 128) {
+        if (strlen($tag) > 128) {
             $tag = $tag->substr(0, 128);
         };
 
