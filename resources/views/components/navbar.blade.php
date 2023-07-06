@@ -1,6 +1,6 @@
 @auth
 <nav class="fixed h-full overflow-hidden overflow-y-auto pt-14 scrollbar">
-    <ul class="gap-4 menu flex flex-col flex-nowrap h-full">
+    <ul class="flex flex-col h-full gap-4 menu flex-nowrap">
         <li title="Dashboard">
             <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>
                 <svg xmlns="http://www.w3.org/2000/svg" class="{{ request()->is('/') ? 'text-warning icon' : 'icon' }}"
@@ -93,7 +93,7 @@
         <li class="pb-6" title="Logout">
             <form action="/logout" method="POST" class=" hover:bg-transparent">
                 @csrf
-                <button class="hover:text-white rounded-none hover:bg-transparent"> <svg
+                <button class="rounded-none hover:text-white hover:bg-transparent"> <svg
                         xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
