@@ -16,8 +16,8 @@ class DeploymentNavbar extends Component
     protected $listeners = ['deploymentFinished'];
 
     public ApplicationDeploymentQueue $application_deployment_queue;
-    private Application $application;
-    private Server $server;
+    public Application $application;
+    public Server $server;
     public bool $is_debug_enabled = false;
 
     public function mount()
