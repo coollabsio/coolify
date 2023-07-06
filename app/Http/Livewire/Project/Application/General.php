@@ -67,6 +67,11 @@ class General extends Component
     {
         // @TODO: find another way - if possible
         $this->application->settings->is_static = $this->is_static;
+        if ($this->is_static) {
+            $this->application->ports_exposes = 80;
+        } else {
+            $this->application->ports_exposes = 3000;
+        }
         $this->application->settings->is_git_submodules_enabled = $this->is_git_submodules_enabled;
         $this->application->settings->is_git_lfs_enabled = $this->is_git_lfs_enabled;
         $this->application->settings->is_debug_enabled = $this->is_debug_enabled;
@@ -74,6 +79,7 @@ class General extends Component
         $this->application->settings->is_auto_deploy_enabled = $this->is_auto_deploy_enabled;
         $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
         $this->application->settings->save();
+        $this->application->save();
         $this->application->refresh();
         $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
