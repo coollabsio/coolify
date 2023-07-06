@@ -164,7 +164,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
         if (!$this->force_rebuild) {
             $this->execute_remote_command([
-                "docker images -q {$this->application->uuid}:{$this->commit} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
+                "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
             ]);
             if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
                 $this->execute_remote_command([
