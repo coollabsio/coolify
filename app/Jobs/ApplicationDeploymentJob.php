@@ -237,15 +237,34 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
-            $dockerfile = "FROM {$this->application->static_image}
+            $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
-COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .";
-            $docker_file = base64_encode($dockerfile);
+COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
+            $nginx_config = base64_encode("server {
+                listen       80;
+                listen  [::]:80;
+                server_name  localhost;
+            
+                location / {
+                    root   /usr/share/nginx/html;
+                    index  index.html;
+                    try_files \$uri \$uri/index.html \$uri/ /index.html =404;
+                }
+            
+                error_page   500 502 503 504  /50x.html;
+                location = /50x.html {
+                    root   /usr/share/nginx/html;
+                }
+            }");
             $this->execute_remote_command(
                 [
-                    $this->execute_in_builder("echo '{$docker_file}' | base64 -d > {$this->workdir}/Dockerfile-prod")
+                    $this->execute_in_builder("echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
+                ],
+                [
+                    $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
                     $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
@@ -566,7 +585,7 @@ COPY --from=$this->build_image_name /app/{$this->application->publish_directory}
         if ($this->pull_request_id !== 0) {
             $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
-        
+
         if ($this->application->deploymentType() === 'source') {
             $source_html_url = data_get($this->application, 'source.html_url');
             $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
