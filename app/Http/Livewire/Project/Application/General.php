@@ -32,7 +32,7 @@ class General extends Component
     public bool $is_force_https_enabled;
 
     protected $rules = [
-        'application.name' => 'required|min:6',
+        'application.name' => 'required',
         'application.fqdn' => 'nullable',
         'application.git_repository' => 'required',
         'application.git_branch' => 'required',
