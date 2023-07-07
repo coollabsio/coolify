@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Settings;
 
-use App\Jobs\InstanceProxyCheckJob;
+use App\Jobs\ProxyCheckJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
@@ -138,7 +138,7 @@ class Configuration extends Component
         $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
         if ($this->settings->fqdn) {
-            dispatch(new InstanceProxyCheckJob());
+            dispatch(new ProxyCheckJob());
         }
         $this->emit('success', 'Instance settings updated successfully!');
     }

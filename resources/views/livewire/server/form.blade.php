@@ -33,6 +33,10 @@
                 </div>
             </div>
         </div>
+        <h3 class="py-4">Settings</h3>
+        <div class="flex items-center w-64 gap-2">
+            <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required helper="Disk cleanup job will be executed if disk usage is more than this number."/>
+        </div>
         <h3 class="py-4">Actions</h3>
         @if ($server->settings->is_reachable)
             <div class="flex items-center gap-2">

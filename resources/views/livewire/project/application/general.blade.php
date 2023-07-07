@@ -44,7 +44,7 @@
             </div>
             <div class="flex flex-col gap-2 xl:flex-row">
                 <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                    helper="Directory to use as root. Useful for monorepos." />
+                    helper="Directory to use as root. Useful for monorepos. WIP" disabled />
                 @if ($application->settings->is_static)
                     <x-forms.input placeholder="/dist" id="application.publish_directory" label="Publish Directory"
                         required />

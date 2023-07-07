@@ -32,7 +32,7 @@ class General extends Component
     public bool $is_force_https_enabled;
 
     protected $rules = [
-        'application.name' => 'required|min:6',
+        'application.name' => 'required',
         'application.fqdn' => 'nullable',
         'application.git_repository' => 'required',
         'application.git_branch' => 'required',
@@ -67,6 +67,11 @@ class General extends Component
     {
         // @TODO: find another way - if possible
         $this->application->settings->is_static = $this->is_static;
+        if ($this->is_static) {
+            $this->application->ports_exposes = 80;
+        } else {
+            $this->application->ports_exposes = 3000;
+        }
         $this->application->settings->is_git_submodules_enabled = $this->is_git_submodules_enabled;
         $this->application->settings->is_git_lfs_enabled = $this->is_git_lfs_enabled;
         $this->application->settings->is_debug_enabled = $this->is_debug_enabled;
@@ -74,6 +79,7 @@ class General extends Component
         $this->application->settings->is_auto_deploy_enabled = $this->is_auto_deploy_enabled;
         $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
         $this->application->settings->save();
+        $this->application->save();
         $this->application->refresh();
         $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
@@ -126,7 +132,12 @@ class General extends Component
             $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 return Str::of($domain)->trim()->lower();
             });
-
+            if ($this->application->base_directory && $this->application->base_directory !== '/') {
+                $this->application->base_directory = rtrim($this->application->base_directory, '/');
+            }
+            if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
+                $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
+            }
             $this->application->fqdn = $domains->implode(',');
             $this->application->save();
             $this->emit('success', 'Application settings updated!');

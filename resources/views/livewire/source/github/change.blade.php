@@ -32,6 +32,11 @@
         </div>
         <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>
         @if ($github_app->app_id)
+            <div class="w-48">
+                <x-forms.checkbox noDirty label="System Wide?"
+                    helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                    instantSave id="is_system_wide" />
+            </div>
             <div class="flex gap-2">
                 <x-forms.input id="github_app.name" label="App Name" disabled />
                 <x-forms.input id="github_app.organization" label="Organization" disabled
@@ -59,9 +64,6 @@
                 <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
                 <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
             </div>
-            <x-forms.checkbox noDirty label="System Wide?"
-                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                instantSave id="is_system_wide" />
         @else
             <form class="flex gap-4">
                 <div class="flex items-end gap-2">

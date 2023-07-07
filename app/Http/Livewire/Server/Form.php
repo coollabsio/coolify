@@ -12,6 +12,7 @@ class Form extends Component
     public $uptime;
     public $dockerVersion;
     public string|null $wildcard_domain = null;
+    public int $cleanup_after_percentage;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -35,6 +36,7 @@ class Form extends Component
     public function mount()
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
+        $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
     public function installDocker()
     {
@@ -91,6 +93,7 @@ class Form extends Component
         //     return;
         // }
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
+        $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
         $this->server->settings->save();
         $this->server->save();
         $this->emit('success', 'Server updated successfully.');
