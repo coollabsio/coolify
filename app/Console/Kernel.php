@@ -14,12 +14,11 @@ class Kernel extends ConsoleKernel
     {
         if (isDev()) {
             $schedule->command('horizon:snapshot')->everyMinute();
-            // $schedule->job(new DockerCleanupJob)->everyMinute();
+            // $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->job(new DockerCleanupJob)->everyFiveMinutes();
-
+            $schedule->job(new DockerCleanupJob)->everyTenMinutes();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
             $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }

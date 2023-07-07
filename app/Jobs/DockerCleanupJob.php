@@ -38,12 +38,11 @@ class DockerCleanupJob implements ShouldQueue
                 }
                 $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\"disks\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\"mount\":\""$6"\",\"size\":\""$2"\",\"used\":\""$3"\",\"avail\":\""$4"\",\"use%\":\""$5"\"}";a++;}END{print"]}";}\''], $server), true);
                 $mount_point = collect(data_get($disk_usage, 'disks'))->where('mount', $docker_root_filesystem)->first();
-                if (Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value() > 60) {
-                    continue;
+                if (Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value() >= $server->settings->cleanup_after_percentage) {
+                    instant_remote_process(['docker image prune -af'], $server);
+                    instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server);
+                    instant_remote_process(['docker builder prune -af'], $server);
                 }
-                instant_remote_process(['docker image prune -af'], $server);
-                instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server);
-                instant_remote_process(['docker builder prune -af'], $server);
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
