@@ -19,6 +19,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Spatie\Url\Url;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -48,6 +49,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private string $container_name;
     private string $workdir;
+    private string $build_workdir;
     private string $build_image_name;
     private string $production_image_name;
     private bool $is_debug_enabled;
@@ -76,6 +78,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->private_key_location = save_private_key_for_server($this->server);
 
         $this->workdir = "/artifacts/{$this->deployment_uuid}";
+        $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generate_container_name($this->application->uuid, $this->pull_request_id);
@@ -104,6 +107,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     public function handle(): void
     {
+        ray()->measure();
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -116,31 +120,32 @@ class ApplicationDeploymentJob implements ShouldQueue
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (\Exception $e) {
             ray($e);
-            $this->execute_remote_command([
-                ["echo '\nOops something is not okay, are you okay? 😢'"],
-                ["echo '\n\n{$e->getMessage()}'"]
-            ]);
-            $this->fail($e->getMessage());
+            $this->fail($e);
         } finally {
-            // if (isset($this->docker_compose)) {
-            //     Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
-            // }
+            if (isset($this->docker_compose)) {
+                Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
+            }
             $this->execute_remote_command(
                 [
                     "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
                     "hidden" => true,
                 ]
             );
+            ray()->measure();
         }
     }
     public function failed(Throwable $exception): void
     {
-        ray($exception);
+        $this->execute_remote_command(
+            ["echo 'Oops something is not okay, are you okay? 😢'"],
+            ["echo '{$exception->getMessage()}'"]
+        );
         $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
     private function execute_in_builder(string $command)
     {
-        return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1'";
+        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
     }
     private function deploy()
     {
@@ -384,7 +389,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
             $local_persistent_volumes[] = $volume_name . ':' . $persistentStorage->mount_path;
         }
-        ray('local_persistent_volumes', $local_persistent_volumes)->green();
         return $local_persistent_volumes;
     }
     private function generate_local_persistent_volumes_only_volume_names()

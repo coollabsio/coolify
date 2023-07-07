@@ -132,7 +132,12 @@ class General extends Component
             $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 return Str::of($domain)->trim()->lower();
             });
-
+            if ($this->application->base_directory && $this->application->base_directory !== '/') {
+                $this->application->base_directory = rtrim($this->application->base_directory, '/');
+            }
+            if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
+                $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
+            }
             $this->application->fqdn = $domains->implode(',');
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
