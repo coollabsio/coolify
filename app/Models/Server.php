@@ -84,6 +84,10 @@ class Server extends BaseModel
     {
         return "{$this->ip}_{$this->port}_{$this->user}";
     }
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
