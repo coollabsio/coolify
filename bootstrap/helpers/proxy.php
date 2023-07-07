@@ -56,6 +56,8 @@ function getProxyConfiguration(Server $server)
                     "--api.insecure=true",
                     "--entrypoints.http.address=:80",
                     "--entrypoints.https.address=:443",
+                    "--entrypoints.http.http.encodequerysemicolons=true",
+                    "--entrypoints.https.http.encodequerysemicolons=true",
                     "--providers.docker=true",
                     "--providers.docker.exposedbydefault=false",
                     "--providers.file.directory=/traefik/dynamic/",
