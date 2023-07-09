@@ -261,7 +261,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 location / {
                     root   /usr/share/nginx/html;
                     index  index.html;
-                    try_files \$uri \$uri/index.html \$uri/ /index.html =404;
+                    try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
                 }
             
                 error_page   500 502 503 504  /50x.html;
