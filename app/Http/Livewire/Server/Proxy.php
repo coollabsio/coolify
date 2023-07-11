@@ -31,18 +31,6 @@ class Proxy extends Component
         $this->server->proxy->type = null;
         $this->server->save();
     }
-    public function installProxy()
-    {
-        if (
-            $this->server->proxy->last_applied_settings &&
-            $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
-        ) {
-            $this->saveConfiguration($this->server);
-        }
-        $activity = resolve(InstallProxy::class)($this->server);
-        $this->emit('newMonitorActivity', $activity->id);
-    }
-
     public function setProxy(string $proxy_type)
     {
         $this->server->proxy->type = $proxy_type;
@@ -56,6 +44,7 @@ class Proxy extends Component
         ], $this->server);
         $this->server->proxy->status = 'exited';
         $this->server->save();
+        $this->server->refresh();
     }
     public function saveConfiguration()
     {
