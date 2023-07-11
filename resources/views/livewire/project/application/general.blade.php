@@ -19,7 +19,7 @@
                             </x-forms.button>
                         @endif
                         @if ($server_wildcard_domain)
-                            <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
+                            <x-forms.button class="w-32" wire:click="generateServerRandomDomain">Set Server Wildcard
                             </x-forms.button>
                         @endif
                     </div>

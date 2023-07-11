@@ -22,7 +22,8 @@ class Input extends Component
         public bool $readonly = false,
         public string|null $helper = null,
         public bool $noDirty = false,
-        public bool $cannotPeakPassword = false,
+        public bool $allowToPeak = true,
+        public string $defaultClass = "block w-full p-2 text-xs border-none rounded outline-none bg-coolgray-200 sm:text-sm focus:ring-warning"
     ) {
     }
 

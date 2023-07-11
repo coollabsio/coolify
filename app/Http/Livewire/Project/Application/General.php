@@ -126,6 +126,7 @@ class General extends Component
     }
     public function submit()
     {
+        sleep(4);
         try {
             $this->validate();
 

@@ -1,5 +1,5 @@
 import Alpine from "alpinejs";
-
+import "flowbite";
 import { createApp } from "vue";
 import MagicBar from "./components/MagicBar.vue";
 import Toaster from "../../vendor/masmerise/livewire-toaster/resources/js";

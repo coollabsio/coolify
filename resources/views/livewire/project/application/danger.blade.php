@@ -7,5 +7,6 @@
     <div class="pb-4">This will stop your containers, delete all related data, etc. Beware! There is no coming
         back!
     </div>
-    <x-forms.button isWarning x-on:click.prevent="deleteApplication = true">Delete</x-forms.button>
+    <x-forms.button x-on:click.prevent="deleteApplication = true">Delete
+    </x-forms.button>
 </div>
