@@ -70,7 +70,7 @@ class PublicGitRepository extends Component
     private function get_branch()
     {
         ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
-        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s.u');
+        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
         $this->branch_found = true;
     }
     public function load_branch()
