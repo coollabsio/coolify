@@ -2,6 +2,7 @@
 
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use Carbon\Carbon;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
@@ -64,7 +65,7 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
     }
     $json = $response->json();
     if ($response->failed() && $throwError) {
-        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message']);
+        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message'] . "<br><br>Rate Limit resets at: " .  Carbon::parse((int)$response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s') . 'UTC');
     }
     return [
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),

@@ -8,7 +8,7 @@ use App\Models\GitlabApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 use Livewire\Component;
 use Spatie\Url\Url;
 
@@ -26,9 +26,9 @@ class PublicGitRepository extends Component
     public string $selected_branch = 'main';
     public bool $is_static = false;
     public string|null $publish_directory = null;
-    public string $git_branch;
+    public string $git_branch = 'main';
     public int $rate_limit_remaining = 0;
-    public int $rate_limit_reset = 0;
+    public $rate_limit_reset = 0;
 
     private GithubApp|GitlabApp $git_source;
     private string $git_host;
@@ -67,6 +67,12 @@ class PublicGitRepository extends Component
         }
         $this->emit('success', 'Application settings updated!');
     }
+    private function get_branch()
+    {
+        ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
+        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s.u');
+        $this->branch_found = true;
+    }
     public function load_branch()
     {
         $this->branch_found = false;
@@ -74,12 +80,18 @@ class PublicGitRepository extends Component
             'repository_url' => 'required|url'
         ]);
         $this->get_git_source();
-
         try {
-            ['data' => $data, 'rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
-            $this->branch_found = true;
-        } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            $this->get_branch();
+        } catch (\Exception $e) {
+        }
+
+        if (!$this->branch_found && $this->git_branch == 'main') {
+            try {
+                $this->git_branch = 'master';
+                $this->get_branch();
+            } catch (\Exception $e) {
+                return general_error_handler(err: $e, that: $this);
+            }
         }
     }
     private function get_git_source()
