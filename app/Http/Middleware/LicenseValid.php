@@ -16,7 +16,10 @@ class LicenseValid
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (!config('coolify.self_hosted')) {
+        if (isCloud()) {
+            if (isDev()) {
+                return $next($request);
+            }
             $value = Cache::get('license_key');
             if (!$value) {
                 ray($request->path());

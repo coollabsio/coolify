@@ -4,6 +4,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\PrivateKey;
 use App\Models\GithubApp;
+use App\Models\Webhook;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -168,5 +169,44 @@ Route::post('/source/github/events', function () {
         }
     } catch (\Exception $e) {
         return general_error_handler(err: $e);
+    }
+});
+
+Route::post('/subscriptions/events', function () {
+    try {
+        $secret    = config('coolify.lemon_squeezy_webhook_secret');
+        $payload   = request()->collect();
+        $hash      = hash_hmac('sha256', $payload, $secret);
+        $signature = '';
+
+        if (!hash_equals($hash, $signature)) {
+            return response('Invalid signature.', 400);
+        }
+
+        $webhook = Webhook::create([
+            'type' => 'lemonsqueezy',
+            'payload' => $payload
+        ]);
+
+        $event = data_get($payload, 'meta.event_name');
+        $email = data_get($payload, 'data.attributes.user_email');
+        $update_payment_method = data_get($payload, 'data.attributes.urls.update_payment_method');
+        switch ($event) {
+            case 'subscription_created':
+
+                break;
+        }
+
+        ray($payload);
+        $webhook->update([
+            'status' => 'success',
+        ]);
+    } catch (\Exception $e) {
+        $webhook->update([
+            'status' => 'failed',
+            'failure_reason' => $e->getMessage()
+        ]);
+    } finally {
+        return response('OK');
     }
 });

@@ -4,6 +4,7 @@ use App\Models\InstanceSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
 
@@ -126,4 +127,27 @@ function base_url(bool $withPort = true)
 function isDev()
 {
     return config('app.env') === 'local';
+}
+function isCloud()
+{
+    return !config('coolify.self_hosted');
+}
+function getSubscriptionLink()
+{
+    $user_id = auth()->user()->id;
+    $email = auth()->user()->email ?? null;
+    $name = auth()->user()->name ?? null;
+    $url = "https://store.coollabs.io/checkout/buy/d0b28c6a-9b57-40bf-8b84-89fbafde6526?";
+    if ($user_id) {
+        $url .= "checkout[custom][user_id]={$user_id}";
+    }
+    if ($email) {
+        $url .= "?checkout[email]={$email}";
+    }
+    if ($name) {
+        $url .= "&checkout[name]={$name}";
+    }
+    $url = "?checkout[custom][user_id]={$user_id}&checkout[email]={$email}&checkout[name]={$name}";
+    ray($url);
+    return $url;
 }
