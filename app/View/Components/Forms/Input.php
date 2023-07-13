@@ -23,7 +23,7 @@ class Input extends Component
         public string|null $helper = null,
         public bool $noDirty = false,
         public bool $allowToPeak = true,
-        public string $defaultClass = "block w-full p-2 text-xs border-none rounded outline-none bg-coolgray-200 sm:text-sm focus:ring-warning"
+        public string $defaultClass = "input input-sm input-bordered rounded outline-none border-none  text-white w-full"
     ) {
     }
 

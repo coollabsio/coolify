@@ -6,7 +6,6 @@ module.exports = {
         "./app/**/*.php",
         "./resources/**/*.js",
         "./resources/**/*.vue",
-        "./node_modules/flowbite/**/*.js",
     ],
     theme: {
         extend: {
@@ -41,27 +40,26 @@ module.exports = {
         scrollbar: ["dark"],
         extend: {},
     },
-    // daisyui: {
-    //     themes: [
-    //         {
-    //             coollabs: {
-    //                 primary: "#6B16ED",
-    //                 secondary: "#4338ca",
-    //                 accent: "#4338ca",
-    //                 neutral: "#1B1D1D",
-    //                 "base-100": "#181818",
-    //                 info: "#2563EB",
-    //                 success: "#16A34A",
-    //                 warning: "#FCD34D",
-    //                 error: "#DC2626",
-    //             },
-    //         },
-    //     ],
-    // },
+    daisyui: {
+        themes: [
+            {
+                coollabs: {
+                    primary: "#6B16ED",
+                    secondary: "#4338ca",
+                    accent: "#4338ca",
+                    neutral: "#1B1D1D",
+                    "base-100": "#181818",
+                    info: "#2563EB",
+                    success: "#16A34A",
+                    warning: "#FCD34D",
+                    error: "#DC2626",
+                },
+            },
+        ],
+    },
     plugins: [
         require("tailwindcss-scrollbar"),
         require("@tailwindcss/typography"),
-        // require("daisyui"),
-        require("flowbite/plugin"),
+        require("daisyui"),
     ],
 };
