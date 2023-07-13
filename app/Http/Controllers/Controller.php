@@ -62,10 +62,20 @@ class Controller extends BaseController
     public function team()
     {
         $invitations = [];
-        if (auth()->user()->isAdmin()) {
+        if (auth()->user()->isAdminFromSession()) {
             $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
         }
         return view('team.show', [
+            'invitations' => $invitations,
+        ]);
+    }
+    public function members()
+    {
+        $invitations = [];
+        if (auth()->user()->isAdminFromSession()) {
+            $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
+        }
+        return view('team.members', [
             'invitations' => $invitations,
         ]);
     }

@@ -30,9 +30,11 @@
     @auth
         <x-toaster-hub />
         <x-navbar />
-        <div class="fixed top-3 left-4" id="vue">
-            <magic-bar></magic-bar>
-        </div>
+        @if (isSubscribed())
+            <div class="fixed top-3 left-4" id="vue">
+                <magic-bar></magic-bar>
+            </div>
+        @endif
         <main class="main">
             {{ $slot }}
         </main>

@@ -132,20 +132,3 @@ function isCloud()
 {
     return !config('coolify.self_hosted');
 }
-function getSubscriptionLink()
-{
-    $user_id = auth()->user()->id;
-    $email = auth()->user()->email ?? null;
-    $name = auth()->user()->name ?? null;
-    $url = "https://store.coollabs.io/checkout/buy/d0b28c6a-9b57-40bf-8b84-89fbafde6526?";
-    if ($user_id) {
-        $url .= "&checkout[custom][user_id]={$user_id}";
-    }
-    if ($email) {
-        $url .= "&checkout[email]={$email}";
-    }
-    if ($name) {
-        $url .= "&checkout[name]={$name}";
-    }
-    return $url;
-}

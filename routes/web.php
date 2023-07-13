@@ -91,6 +91,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/team/new', fn () => view('team.create'))->name('team.create');
     Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
+    Route::get('/team/members', [Controller::class, 'members'])->name('team.members');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
     Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');

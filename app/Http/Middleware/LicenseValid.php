@@ -16,10 +16,7 @@ class LicenseValid
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (isCloud()) {
-            if (isDev()) {
-                return $next($request);
-            }
+        if (isCloud() && !isDev()) {
             $value = Cache::get('license_key');
             if (!$value) {
                 ray($request->path());

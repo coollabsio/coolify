@@ -18,6 +18,4 @@
             <div class="stat-desc">Applications, databases, etc...</div>
         </div>
     </div>
-    {{-- <a href="{{ getSubscriptionLink() }}">Subscribe</a> --}}
-
 </x-layout>
