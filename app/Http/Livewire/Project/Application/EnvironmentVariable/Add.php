@@ -29,6 +29,7 @@ class Add extends Component
     }
     public function submit()
     {
+        ray('submitting');
         $this->validate();
         $this->emitUp('submit', [
             'key' => $this->key,
@@ -36,6 +37,7 @@ class Add extends Component
             'is_build_time' => $this->is_build_time,
             'is_preview' => $this->is_preview,
         ]);
+        $this->clear();
     }
     public function clear()
     {

@@ -34,7 +34,7 @@
                 </div>
             @endif
             <div x-cloak x-show="!showPrivateKey">
-                <x-forms.input cannotPeakPassword type="password" rows="10" id="private_key.private_key" required
+                <x-forms.input allowToPeak="false" type="password" rows="10" id="private_key.private_key" required
                     disabled />
             </div>
             <div x-cloak x-show="showPrivateKey">

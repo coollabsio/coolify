@@ -1,8 +1,14 @@
-<form wire:submit.prevent='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row"">
-    <x-forms.input placeholder="NODE_ENV" noDirty id="key" label="Name" required />
-    <x-forms.input placeholder="production" noDirty id="value" label="Value" required />
-    <x-forms.checkbox class="w-96" noDirty id="is_build_time" label="Build Variable?" />
-    <x-forms.button type="submit">
-        Add New Variable
-    </x-forms.button>
-</form>
+<dialog id="newVariable" class="modal">
+    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+        <h3 class="text-lg font-bold">Add Environment Variable</h3>
+        <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
+        <x-forms.input placeholder="production" id="value" label="Value" required />
+        <x-forms.checkbox id="is_build_time" label="Build Variable?" />
+        <x-forms.button onclick="newVariable.close()" type="submit">
+            Save
+        </x-forms.button>
+    </form>
+    <form method="dialog" class="modal-backdrop">
+        <button>close</button>
+    </form>
+</dialog>

@@ -2,19 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-.scrollbar {
-    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
-}
 html {
     @apply text-neutral-400;
 }
 body {
     @apply text-sm antialiased scrollbar;
 }
+button[isError] {
+    @apply bg-red-600 hover:bg-red-500;
+}
+.scrollbar {
+    @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
+}
 .main {
     @apply max-w-screen-xl pt-4 pl-24 pr-10 mx-auto;
 }
-input {
+/* input {
     @apply w-full text-white rounded outline-none input input-sm h-7 placeholder:text-neutral-700 bg-coolgray-200 read-only:bg-coolgray-200/50 read-only:text-opacity-25;
 }
 input:not(input[type="checkbox"]) {
@@ -22,14 +25,14 @@ input:not(input[type="checkbox"]) {
 }
 input[type="checkbox"] {
     @apply rounded toggle toggle-warning toggle-xs disabled:toggle-warning;
-}
+} */
 
-textarea {
+/* textarea {
     @apply text-xs leading-5 text-white rounded textarea read-only:bg-coolgray-200/50 disabled:border-none read-only:text-opacity-25 placeholder:text-neutral-700 scrollbar bg-coolgray-200;
 }
 select {
     @apply font-normal text-white border-none rounded h-7 select select-xs disabled:bg-coolgray-200 disabled:opacity-50 placeholder:text-neutral-700 bg-coolgray-200;
-}
+} */
 .label-text,
 label {
     @apply text-neutral-400;
@@ -39,12 +42,12 @@ label {
     @apply w-4 text-warning;
 }
 
-button[isWarning] {
+/* button[isWarning] {
     @apply bg-red-600 hover:bg-red-500;
 }
 button[isHighlighted] {
     @apply text-white btn-primary;
-}
+} */
 h1 {
     @apply text-3xl font-bold text-white;
 }

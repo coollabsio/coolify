@@ -11,7 +11,7 @@
     @else
         @if (session('currentTeam')->isEmpty())
             <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-            <x-forms.button isWarning x-on:click.prevent="deleteTeam = true">
+            <x-forms.button isError x-on:click.prevent="deleteTeam = true">
                 Delete
             </x-forms.button>
         @else

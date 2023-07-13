@@ -5,11 +5,17 @@ namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
 use App\Models\Application;
 use App\Models\EnvironmentVariable;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class All extends Component
 {
     public Application $application;
+    public string|null $modalId = null;
     protected $listeners = ['refreshEnvs', 'submit'];
+    public function mount()
+    {
+        $this->modalId = new Cuid2(7);
+    }
     public function refreshEnvs()
     {
         $this->application->refresh();
@@ -17,6 +23,11 @@ class All extends Component
     public function submit($data)
     {
         try {
+            $found = $this->application->environment_variables()->where('key', $data['key'])->first();
+            if ($found) {
+                $this->emit('error', 'Environment variable already exists.');
+                return;
+            }
             EnvironmentVariable::create([
                 'key' => $data['key'],
                 'value' => $data['value'],
@@ -27,7 +38,6 @@ class All extends Component
             $this->application->refresh();
 
             $this->emit('success', 'Environment variable added successfully.');
-            $this->emit('clearAddEnv');
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

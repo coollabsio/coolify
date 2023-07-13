@@ -34,8 +34,8 @@
                         <div wire:loading.remove wire:target="checkProxySettingsInSync">
                             @if ($proxy_settings)
                                 <div class="flex flex-col gap-2 pt-2">
-                                    <x-forms.textarea label="Configuration file: traefik.conf" class="text-xs" noDirty
-                                        name="proxy_settings" wire:model.defer="proxy_settings" rows="30" />
+                                    <x-forms.textarea label="Configuration file: traefik.conf" name="proxy_settings"
+                                        wire:model.defer="proxy_settings" rows="30" />
                                     <x-forms.button wire:click.prevent="resetProxy">
                                         Reset configuration to default
                                     </x-forms.button>

@@ -1,43 +1,18 @@
-@props([
-    'id' => null,
-    'label' => null,
-    'helper' => $attributes->has('helper'),
-    'required' => false,
-])
-
-<div {{ $attributes->merge(['class' => 'flex flex-col']) }}>
+<div class="w-full">
     @if ($label)
-        <label class="label" for={{ $id }}>
-            <span class="flex gap-1 label-text">
-                {{ $label }}
-                @if ($required)
-                    <span class="text-warning">*</span>
-                @endif
-                @if ($helper)
-                    <div class="group">
-                        <div class="cursor-pointer text-warning">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                class="w-4 h-4 stroke-current">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                        </div>
-                        <div class="absolute hidden text-xs group-hover:block border-coolgray-400 bg-coolgray-500">
-                            <div class="p-4 card-body">
-                                {!! $helper !!}
-                            </div>
-                        </div>
-                    </div>
-                @endif
-            </span>
+        <label for="small-input"
+            class="flex items-center gap-1 mb-2 text-sm font-medium text-neutral-400">{{ $label }}
+            @if ($required)
+                <span class="text-warning">*</span>
+            @endif
+            @if ($helper)
+                <x-helper :helper="$helper" />
+            @endif
         </label>
     @endif
-    <select {{ $attributes }}
-        @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endif>
+    <select {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+        wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" name={{ $id }}
+        wire:model.defer={{ $id }}>
         {{ $slot }}
     </select>
-
-    @error($id)
-        <div class="text-red-500">{{ $message }}</div>
-    @enderror
 </div>

@@ -8,7 +8,7 @@
                 class="relative text-xs text-white normal-case rounded -ml-44 min-w-max menu bg-coolgray-200">
                 @if ($application->status === 'running')
                     <li>
-                        <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
+                        <div class="rounded-none hover:bg-coollabs hover:text-white" wire:click='deploy'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5"
                                 stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -19,10 +19,10 @@
                             </svg>Restart</div>
                     </li>
                     <li>
-                        <div class="rounded-none hover:bg-coollabs" wire:click='force_deploy_without_cache'><svg
-                                xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
+                        <div class="rounded-none hover:bg-coollabs hover:text-white"
+                            wire:click='force_deploy_without_cache'><svg xmlns="http://www.w3.org/2000/svg"
+                                class="w-6 h-6" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                 <path
                                     d="M12.983 8.978c3.955 -.182 7.017 -1.446 7.017 -2.978c0 -1.657 -3.582 -3 -8 -3c-1.661 0 -3.204 .19 -4.483 .515m-2.783 1.228c-.471 .382 -.734 .808 -.734 1.257c0 1.22 1.944 2.271 4.734 2.74" />
@@ -35,7 +35,7 @@
                         </div>
                     </li>
                     <li>
-                        <div class="rounded-none hover:bg-red-500" wire:click='stop'><svg
+                        <div class="rounded-none hover:bg-red-500 hover:text-white" wire:click='stop'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -49,7 +49,7 @@
                     </li>
                 @else
                     <li>
-                        <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
+                        <div class="rounded-none hover:bg-coollabs hover:text-white" wire:click='deploy'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -60,7 +60,7 @@
                     <li>
                     </li>
                     <li>
-                        <div class="rounded-none hover:bg-coollabs" wire:click='deploy(true)'><svg
+                        <div class="rounded-none hover:bg-coollabs hover:text-white" wire:click='deploy(true)'><svg
                                 xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
