@@ -12,7 +12,7 @@ class Button extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public string $defaultClass = "text-white bg-coolgray-200 hover:bg-coollabs focus:outline-none font-medium rounded px-3 py-2 text-xs"
+        public string $defaultClass = "btn btn-primary btn-xs text-white normal-case no-animation rounded"
     ) {
         //
     }
