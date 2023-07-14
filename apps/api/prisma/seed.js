@@ -96,6 +96,10 @@ async function main() {
 async function reEncryptSecrets() {
 	const secretOld = process.env['COOLIFY_SECRET_KEY'];
 	const secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
+	if (!secretNew) {
+		console.log('no new secret found');
+		return;
+	}
 	if (secretOld !== secretNew) {
 		console.log('secrets are different, so re-encrypting');
 		const secrets = await prisma.secret.findMany();
