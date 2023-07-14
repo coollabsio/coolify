@@ -61,7 +61,8 @@ class User extends Authenticatable implements SendsEmail
     {
         return $this->email;
     }
-    public function isAdmin() {
+    public function isAdmin()
+    {
         return $this->pivot->role === 'admin' || $this->pivot->role === 'owner';
     }
     public function isAdminFromSession()
@@ -91,7 +92,8 @@ class User extends Authenticatable implements SendsEmail
         });
         return $found_root_team->count() > 0;
     }
-    public function personalTeam() {
+    public function personalTeam()
+    {
         return $this->teams()->where('personal_team', true)->first();
     }
     public function teams()

@@ -12,6 +12,7 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 class InstanceSettings extends Model implements SendsEmail
 {
     use Notifiable, SchemalessAttributesTrait;
+    protected $guarded = [];
     protected $schemalessAttributes = [
         'smtp',
     ];

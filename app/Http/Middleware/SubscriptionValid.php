@@ -4,33 +4,34 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class SubscriptionValid
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
-     */
+
     public function handle(Request $request, Closure $next): Response
     {
         $allowed_paths = [
-            'team',
-            'livewire/message/team',
+            'subscription',
             'login',
             'register',
-            'livewire/message/switch-team',
             'logout',
+            'livewire/message/check-license',
+            'livewire/message/switch-team',
         ];
-        if (isCloud()) {
-           if (!$request->user()?->currentTeam()?->subscription && $request->user()?->currentTeam()->subscription?->lemon_status !== 'active') {
+        if (isCloud() && !isSubscribed()) {
+            ray('SubscriptionValid Middleware');
             if (!in_array($request->path(), $allowed_paths)) {
-                return redirect('team');
+                return redirect('subscription');
+            } else {
+                return $next($request);
             }
+        } else {
+            if ($request->path() === 'subscription') {
+                return redirect('/');
+            } else {
+                return $next($request);
             }
         }
-        return $next($request);
     }
 }

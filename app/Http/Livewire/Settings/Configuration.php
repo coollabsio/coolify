@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Settings;
 use App\Jobs\ProxyCheckJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -21,11 +22,13 @@ class Configuration extends Component
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
+        'settings.resale_license' => 'nullable',
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
     ];
     protected $validationAttributes = [
         'settings.fqdn' => 'FQDN',
+        'settings.resale_license' => 'Resale License',
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
     ];

@@ -16,12 +16,18 @@ class LicenseValid
      */
     public function handle(Request $request, Closure $next): Response
     {
-        if (isCloud() && !isDev()) {
+        if (isCloud()) {
             $value = Cache::get('license_key');
+            if (isDev()) {
+                $value = true;
+            }
             if (!$value) {
-                ray($request->path());
                 if ($request->path() !== 'license' && $request->path() !== 'livewire/message/license') {
                     return redirect('license');
+                }
+            } else {
+                if ($request->path() === 'license' || $request->path() === 'livewire/message/license') {
+                    return redirect('home');
                 }
             }
         }

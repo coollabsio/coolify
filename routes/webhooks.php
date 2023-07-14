@@ -176,8 +176,9 @@ Route::post('/source/github/events', function () {
 });
 
 if (isCloud()) {
-    Route::post('/subscriptions/events', function () {
+    Route::post('/payments/events', function () {
         try {
+
             $secret    = config('coolify.lemon_squeezy_webhook_secret');
             $payload   = request()->collect();
             $hash      = hash_hmac('sha256', $payload, $secret);
@@ -192,8 +193,12 @@ if (isCloud()) {
                 'payload' => $payload
             ]);
             $event = data_get($payload, 'meta.event_name');
+            ray('Subscription event: ' . $event);
             $email = data_get($payload, 'data.attributes.user_email');
             $team_id = data_get($payload, 'meta.custom_data.team_id');
+            if (is_null($team_id) || empty($team_id)) {
+                throw new \Exception('No team_id found in webhook payload.');
+            }
             $subscription_id = data_get($payload, 'data.id');
             $order_id = data_get($payload, 'data.attributes.order_id');
             $product_id = data_get($payload, 'data.attributes.product_id');
@@ -218,7 +223,7 @@ if (isCloud()) {
                     $subscription = Subscription::updateOrCreate([
                         'team_id' => $team_id,
                     ], [
-                        'lemon_subscription_id'=> $subscription_id,
+                        'lemon_subscription_id' => $subscription_id,
                         'lemon_customer_id' => $customer_id,
                         'lemon_order_id' => $order_id,
                         'lemon_product_id' => $product_id,
@@ -246,7 +251,6 @@ if (isCloud()) {
                     }
                     break;
             }
-            ray('Subscription event: ' . $event);
             $webhook->update([
                 'status' => 'success',
             ]);

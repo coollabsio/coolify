@@ -20,22 +20,20 @@
             @endif
         </ol>
     </nav>
-    @if (isSubscribed())
-        <nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
-            <a class="{{ request()->routeIs('team.show') ? 'text-white' : '' }}" href="{{ route('team.show') }}">
-                <button>General</button>
-            </a>
-            <a class="{{ request()->routeIs('team.members') ? 'text-white' : '' }}" href="{{ route('team.members') }}">
-                <button>Members</button>
-            </a>
-            <a class="{{ request()->routeIs('team.notifications') ? 'text-white' : '' }}"
-                href="{{ route('team.notifications') }}">
-                <button>Notifications</button>
-            </a>
-            <div class="flex-1"></div>
+    <nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+        <a class="{{ request()->routeIs('team.show') ? 'text-white' : '' }}" href="{{ route('team.show') }}">
+            <button>General</button>
+        </a>
+        <a class="{{ request()->routeIs('team.members') ? 'text-white' : '' }}" href="{{ route('team.members') }}">
+            <button>Members</button>
+        </a>
+        <a class="{{ request()->routeIs('team.notifications') ? 'text-white' : '' }}"
+            href="{{ route('team.notifications') }}">
+            <button>Notifications</button>
+        </a>
+        <div class="flex-1"></div>
+        <div class="-mt-9">
             <livewire:switch-team />
-        @else
-            <livewire:switch-team />
-    @endif
+        </div>
     </nav>
 </div>

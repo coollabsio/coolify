@@ -16,7 +16,6 @@ class TeamSeeder extends Seeder
         $root_user_personal_team->save();
 
         $normal_user_in_root_team->teams()->attach($root_user_personal_team);
-
         $normal_user_not_in_root_team = User::find(2);
         $normal_user_in_root_team_personal_team = Team::find(1);
         $normal_user_not_in_root_team->teams()->attach($normal_user_in_root_team_personal_team, ['role' => 'admin']);

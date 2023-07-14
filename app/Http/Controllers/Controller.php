@@ -17,9 +17,11 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
-    public function license()
+    public function subscription()
     {
-        return view('license');
+        return view('subscription', [
+            'settings' => InstanceSettings::get()
+        ]);
     }
     public function dashboard()
     {

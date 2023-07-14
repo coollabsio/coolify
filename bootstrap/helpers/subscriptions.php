@@ -23,12 +23,21 @@ function getSubscriptionLink()
     }
     return $url;
 }
-function getPaymentLink() {
+function getPaymentLink()
+{
     return auth()->user()->currentTeam()->subscription->lemon_update_payment_menthod_url;
 }
-function getRenewDate() {
+function getRenewDate()
+{
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
-function isSubscribed() {
-    return isCloud() && auth()->user()->currentTeam()->subscription?->lemon_status === 'active';
+function getEndDate()
+{
+    return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at)->format('Y-M-d H:i:s');
+}
+function isSubscribed()
+{
+    return
+        auth()->user()?->currentTeam()?->subscription?->lemon_status === 'active' ||
+        (auth()->user()?->currentTeam()?->subscription?->lemon_ends_at && Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at) > Carbon::now());
 }
