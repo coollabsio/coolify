@@ -34,14 +34,20 @@
 		customClass="max-w-[32rem]"
 		text="Remote Docker Engines are using <span class='text-white font-bold'>SSH</span> to communicate with the remote docker engine. 
         You need to setup an <span class='text-white font-bold'>SSH key</span> in advance on the server and install Docker. 
-        <br>See <a class='text-white' href='https://docs.coollabs.io/coolify/destinations#remote-docker-engine' target='blank'>docs</a> for more details."
+        <br>See <a class='text-white' href='https://docs.coollabs.io-v3/coolify/destinations#remote-docker-engine' target='blank'>docs</a> for more details."
 	/>
 </div>
 <div class="flex justify-center px-6 pb-8">
 	<form on:submit|preventDefault={handleSubmit} class="grid grid-flow-row gap-2 py-4">
-		<div class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col lg:flex-row space-y-4 lg:space-y-0">
+		<div
+			class="flex items-start lg:items-center space-x-0 lg:space-x-4 pb-5 flex-col lg:flex-row space-y-4 lg:space-y-0"
+		>
 			<div class="title font-bold">{$t('forms.configuration')}</div>
-			<button type="submit" class="btn btn-sm bg-destinations w-full lg:w-fit" class:loading disabled={loading}
+			<button
+				type="submit"
+				class="btn btn-sm bg-destinations w-full lg:w-fit"
+				class:loading
+				disabled={loading}
 				>{loading
 					? payload.isCoolifyProxyUsed
 						? $t('destination.new.saving_and_configuring_proxy')

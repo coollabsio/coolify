@@ -293,7 +293,7 @@
 						</a>
 						<a
 							id="documentation"
-							href="https://docs.coollabs.io/coolify/"
+							href="https://docs.coollabs.io/coolify-v3/"
 							target="_blank"
 							rel="noreferrer external"
 							class="icons hover:text-info"
@@ -498,7 +498,7 @@
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-info"
-					href="https://docs.coollabs.io/coolify/"
+					href="https://docs.coollabs.io/coolify-v3/"
 					target="_blank"
 					rel="noreferrer external"
 				>
