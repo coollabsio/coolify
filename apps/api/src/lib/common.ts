@@ -8,7 +8,6 @@ import type { Config } from 'unique-names-generator';
 import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
-import * as Sentry from '@sentry/node';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import * as SSHConfig from 'ssh-config/src/ssh-config';
@@ -23,8 +22,7 @@ export const version = '3.12.33';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
-export const sentryDSN =
-	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
+
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -1684,9 +1682,6 @@ export function errorHandler({
 	if (message.message) message = message.message;
 	if (message.includes('Unique constraint failed')) {
 		message = 'This data is unique and already exists. Please try again with a different value.';
-	}
-	if (type === 'normal') {
-		Sentry.captureException(message);
 	}
 	throw { status, message };
 }

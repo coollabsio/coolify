@@ -12,7 +12,6 @@ import {
 	prisma,
 	uniqueName,
 	version,
-	sentryDSN,
 	executeCommand
 } from '../../../lib/common';
 import { scheduler } from '../../../lib/scheduler';
@@ -452,7 +451,6 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 	});
 	return {
 		settings: await prisma.setting.findUnique({ where: { id: '0' } }),
-		sentryDSN,
 		pendingInvitations,
 		token,
 		...request.user

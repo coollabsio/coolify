@@ -13,8 +13,12 @@ declare module '@fastify/jwt' {
 }
 
 export default fp<FastifyJWTOptions>(async (fastify, opts) => {
+	let secretKey = fastify.config.COOLIFY_SECRET_KEY_BETTER;
+	if (!secretKey) {
+		secretKey = fastify.config.COOLIFY_SECRET_KEY;
+	}
 	fastify.register(fastifyJwt, {
-		secret: fastify.config.COOLIFY_SECRET_KEY_BETTER ?? fastify.config.COOLIFY_SECRET_KEY
+		secret: secretKey
 	});
 
 	fastify.decorate('authenticate', async function (request, reply) {

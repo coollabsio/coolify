@@ -18,7 +18,6 @@ import {
 	isDev,
 	listSettings,
 	prisma,
-	sentryDSN,
 	startTraefikProxy,
 	startTraefikTCPProxy,
 	version
@@ -32,7 +31,6 @@ import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handler
 import { checkContainer } from './lib/docker';
 import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
-import * as Sentry from '@sentry/node';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
@@ -281,9 +279,6 @@ async function initServer() {
 		if (settings.doNotTrack === true) {
 			console.log('[000] Telemetry disabled...');
 		} else {
-			if (settings.sentryDSN !== sentryDSN) {
-				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } });
-			}
 			// Initialize Sentry
 			// Sentry.init({
 			// 	dsn: sentryDSN,

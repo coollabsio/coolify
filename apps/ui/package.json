@@ -42,8 +42,6 @@
 	},
 	"type": "module",
 	"dependencies": {
-		"@sentry/svelte": "7.21.1",
-		"@sentry/tracing": "7.21.1",
 		"@sveltejs/adapter-static": "1.0.0-next.48",
 		"@tailwindcss/typography": "0.5.8",
 		"cuid": "2.1.8",
