@@ -79,6 +79,7 @@
                     </a>
                 </li>
                 <livewire:upgrade />
+                <div class="flex-1"></div>
                 <li title="Settings" class="mt-auto">
                     <a class="hover:bg-transparent" @if (!request()->is('settings')) href="/settings" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg"
@@ -93,7 +94,7 @@
                     </a>
                 </li>
             @endif
-            <div class="flex-1"></div>
+
             <li class="pb-6" title="Logout">
                 <form action="/logout" method="POST" class=" hover:bg-transparent">
                     @csrf
