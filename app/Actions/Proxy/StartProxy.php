@@ -8,7 +8,7 @@ use App\Models\Server;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 
-class InstallProxy
+class StartProxy
 {
     public function __invoke(Server $server): Activity
     {

@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Actions\Proxy\StartProxy;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -11,25 +10,23 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ProxyCheckJob implements ShouldQueue
+class ProxyStartJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct()
+    public function __construct(protected Server $server)
     {
     }
     public function handle()
     {
         try {
             $container_name = 'coolify-proxy';
-            $servers = Server::isUsable()->whereNotNull('proxy')->get();
-            foreach ($servers as $server) {
-                $status = get_container_status(server: $server, container_id: $container_name);
-                if ($status === 'running') {
-                    continue;
-                }
-                resolve(StartProxy::class)($server);
+            ray('Starting proxy for server: ' . $this->server->name);
+            $status = get_container_status(server: $this->server, container_id: $container_name);
+            if ($status === 'running') {
+                return;
             }
+            resolve(StartProxy::class)($this->server);
         } catch (\Throwable $th) {
             ray($th->getMessage());
             //throw $th;

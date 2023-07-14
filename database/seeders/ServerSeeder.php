@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Actions\Proxy\InstallProxy;
 use App\Data\ServerMetadata;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;

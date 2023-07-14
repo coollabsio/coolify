@@ -1,7 +1,7 @@
 <div x-data="{ stopProxy: false }">
     <x-naked-modal show="stopProxy" action="stopProxy" title="Stop Proxy"
         message='This proxy will be stopped. It is not reversible. <br>All resources will be unavailable. <br>Please think again.' />
-    @if ($server->settings->is_reachable)
+    @if ($server->settings->is_usable)
         @if ($server->proxy->type)
             <div x-init="$wire.checkProxySettingsInSync">
                 @if ($selectedProxy->value === 'TRAEFIK_V2')
@@ -12,9 +12,7 @@
                             @if ($server->proxy->status === 'exited')
                                 <x-forms.button wire:click.prevent="switchProxy">Switch Proxy</x-forms.button>
                             @endif
-                            @if ($server->settings->is_reachable)
-                                <livewire:server.proxy.status :server="$server" />
-                            @endif
+                            <livewire:server.proxy.status :server="$server" />
                         </div>
 
                         <div class="pt-3 pb-4 ">Traefik v2</div>
@@ -66,6 +64,6 @@
                 </div>
         @endif
     @else
-        <div class="">Server is not validated. Validate first.</div>
+        <div>Server is not validated. Validate first.</div>
     @endif
 </div>

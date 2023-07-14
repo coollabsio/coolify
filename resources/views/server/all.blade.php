@@ -11,13 +11,22 @@
                 <div class="flex flex-col mx-6">
                     <div class=" group-hover:text-white">
                         {{ $server->name }}
-                        @if (!$server->settings->is_reachable)
-                            <span class="text-xs text-error">not validated yet</span>
-                        @endif
+
                     </div>
                     <div class="text-xs group-hover:text-white"
                         href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
                         {{ $server->description }}</div>
+                    <div class="flex gap-1 text-xs text-error">
+                        @if (!$server->settings->is_reachable)
+                            <span>Not reachable</span>
+                        @endif
+                        @if (!$server->settings->is_reachable && !$server->settings->is_usable)
+                            &
+                        @endif
+                        @if (!$server->settings->is_usable)
+                            <span>Not usable by Coolify</span>
+                        @endif
+                    </div>
                 </div>
                 <div class="flex-1"></div>
             </div>

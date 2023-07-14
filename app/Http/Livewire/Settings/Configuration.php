@@ -2,8 +2,7 @@
 
 namespace App\Http\Livewire\Settings;
 
-use App\Actions\Proxy\InstallProxy;
-use App\Jobs\ProxyCheckJob;
+use App\Jobs\ProxyStartJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
@@ -108,7 +107,7 @@ class Configuration extends Component
                 ];
             }
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
-            dispatch(new ProxyCheckJob($this->server));
+            dispatch(new ProxyStartJob($this->server));
         }
     }
     private function save_configuration_to_disk(array $traefik_dynamic_conf, string $file)

@@ -117,7 +117,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             } else {
                 $this->deploy();
             }
-            if ($this->application->fqdn) dispatch(new ProxyCheckJob($this->server));
+            if ($this->application->fqdn) dispatch(new ProxyStartJob($this->server));
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (\Exception $e) {
             ray($e);

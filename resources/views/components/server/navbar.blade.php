@@ -26,11 +26,9 @@
             ]) }}">
             <button>Destinations</button>
         </a>
-        @if ($server->settings->is_reachable)
-            @if (request()->routeIs('server.proxy'))
-                <div class="flex-1"></div>
-                <livewire:server.proxy.deploy :server="$server" />
-            @endif
+        @if (request()->routeIs('server.proxy'))
+            <div class="flex-1"></div>
+            <livewire:server.proxy.deploy :server="$server" />
         @endif
     </nav>
 </div>

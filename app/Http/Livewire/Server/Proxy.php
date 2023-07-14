@@ -27,14 +27,16 @@ class Proxy extends Component
     }
     public function switchProxy()
     {
-        $this->server->proxy->type = null;
+        $this->server->proxy = null;
         $this->server->save();
+        $this->emit('proxyStatusUpdated');
     }
     public function setProxy(string $proxy_type)
     {
         $this->server->proxy->type = $proxy_type;
         $this->server->proxy->status = 'exited';
         $this->server->save();
+        $this->emit('proxyStatusUpdated');
     }
     public function stopProxy()
     {
