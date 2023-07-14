@@ -63,7 +63,7 @@ class Form extends Component
             } else {
                 $this->server->settings->is_usable = true;
                 $this->server->settings->save();
-                $this->emit('serverValidated');
+                $this->emit('proxyStatusUpdated');
             }
         } catch (\Exception $e) {
             $this->server->settings->is_reachable = false;

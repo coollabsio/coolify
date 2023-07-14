@@ -84,14 +84,16 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
-    Route::get('/license', [Controller::class, 'license'])->name('license');
+    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
+    Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
     Route::get('/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/team/new', fn () => view('team.create'))->name('team.create');
     Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
-    Route::get('/command-center', fn () => view('command-center', ['servers' => Server::validated()->get()]))->name('command-center');
+    Route::get('/team/members', [Controller::class, 'members'])->name('team.members');
+    Route::get('/command-center', fn () => view('command-center', ['servers' => Server::isReachable()->get()]))->name('command-center');
     Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
 });
@@ -154,7 +156,7 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('destination.all');
     Route::get('/destination/new', function () {
-        $servers = Server::validated()->get();
+        $servers = Server::isUsable()->get();
         $pre_selected_server_uuid = data_get(request()->query(), 'server');
         if ($pre_selected_server_uuid) {
             $server = $servers->firstWhere('uuid', $pre_selected_server_uuid);

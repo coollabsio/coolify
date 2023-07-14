@@ -8,6 +8,8 @@
         <div>This is the default team. You can't delete it.</div>
     @elseif(auth()->user()->teams()->get()->count() === 1)
         <div>You can't delete your last team.</div>
+    @elseif(auth()->user()->currentTeam()->subscription?->lemon_status !== 'cancelled')
+        <div>Please cancel your subscription before delete this team (Manage My Subscription button).</div>
     @else
         @if (session('currentTeam')->isEmpty())
             <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>

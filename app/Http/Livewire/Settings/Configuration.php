@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Settings;
 
-use App\Jobs\ProxyCheckJob;
+use App\Jobs\ProxyStartJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
@@ -21,11 +21,13 @@ class Configuration extends Component
 
     protected $rules = [
         'settings.fqdn' => 'nullable',
+        'settings.resale_license' => 'nullable',
         'settings.public_port_min' => 'required',
         'settings.public_port_max' => 'required',
     ];
     protected $validationAttributes = [
         'settings.fqdn' => 'FQDN',
+        'settings.resale_license' => 'Resale License',
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
     ];
@@ -105,6 +107,7 @@ class Configuration extends Component
                 ];
             }
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
+            dispatch(new ProxyStartJob($this->server));
         }
     }
     private function save_configuration_to_disk(array $traefik_dynamic_conf, string $file)
@@ -134,12 +137,8 @@ class Configuration extends Component
         }
         $this->validate();
         $this->settings->save();
-
         $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
-        if ($this->settings->fqdn) {
-            dispatch(new ProxyCheckJob());
-        }
         $this->emit('success', 'Instance settings updated successfully!');
     }
 }

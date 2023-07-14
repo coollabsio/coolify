@@ -4,6 +4,10 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\PrivateKey;
 use App\Models\GithubApp;
+use App\Models\Webhook;
+use App\Models\User;
+use App\Models\Team;
+use App\Models\Subscription;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -170,3 +174,94 @@ Route::post('/source/github/events', function () {
         return general_error_handler(err: $e);
     }
 });
+
+if (isCloud()) {
+    Route::post('/payments/events', function () {
+        try {
+
+            $secret    = config('coolify.lemon_squeezy_webhook_secret');
+            $payload   = request()->collect();
+            $hash      = hash_hmac('sha256', $payload, $secret);
+            $signature = request()->header('X-Signature');
+
+            if (!hash_equals($hash, $signature)) {
+                return response('Invalid signature.', 400);
+            }
+
+            $webhook = Webhook::create([
+                'type' => 'lemonsqueezy',
+                'payload' => $payload
+            ]);
+            $event = data_get($payload, 'meta.event_name');
+            ray('Subscription event: ' . $event);
+            $email = data_get($payload, 'data.attributes.user_email');
+            $team_id = data_get($payload, 'meta.custom_data.team_id');
+            if (is_null($team_id) || empty($team_id)) {
+                throw new \Exception('No team_id found in webhook payload.');
+            }
+            $subscription_id = data_get($payload, 'data.id');
+            $order_id = data_get($payload, 'data.attributes.order_id');
+            $product_id = data_get($payload, 'data.attributes.product_id');
+            $variant_id = data_get($payload, 'data.attributes.variant_id');
+            $variant_name = data_get($payload, 'data.attributes.variant_name');
+            $customer_id = data_get($payload, 'data.attributes.customer_id');
+            $status = data_get($payload, 'data.attributes.status');
+            $trial_ends_at = data_get($payload, 'data.attributes.trial_ends_at');
+            $renews_at = data_get($payload, 'data.attributes.renews_at');
+            $ends_at = data_get($payload, 'data.attributes.ends_at');
+            $update_payment_method = data_get($payload, 'data.attributes.urls.update_payment_method');
+            $team = Team::find($team_id);
+            $found = $team->members->where('email', $email)->first();
+            if (!$found->isAdmin()) {
+                throw new \Exception("User {$email} is not an admin or owner of team {$team->id}.");
+            }
+            switch ($event) {
+                case 'subscription_created':
+                case 'subscription_updated':
+                case 'subscription_resumed':
+                case 'subscription_unpaused':
+                    $subscription = Subscription::updateOrCreate([
+                        'team_id' => $team_id,
+                    ], [
+                        'lemon_subscription_id' => $subscription_id,
+                        'lemon_customer_id' => $customer_id,
+                        'lemon_order_id' => $order_id,
+                        'lemon_product_id' => $product_id,
+                        'lemon_variant_id' => $variant_id,
+                        'lemon_status' => $status,
+                        'lemon_variant_name' => $variant_name,
+                        'lemon_trial_ends_at' => $trial_ends_at,
+                        'lemon_renews_at' => $renews_at,
+                        'lemon_ends_at' => $ends_at,
+                        'lemon_update_payment_menthod_url' => $update_payment_method,
+                    ]);
+                    break;
+                case 'subscription_cancelled':
+                case 'subscription_paused':
+                case 'subscription_expired':
+                    $subscription = Subscription::where('team_id', $team_id)->where('lemon_order_id', $order_id)->first();
+                    if ($subscription) {
+                        $subscription->update([
+                            'lemon_status' => $status,
+                            'lemon_trial_ends_at' => $trial_ends_at,
+                            'lemon_renews_at' => $renews_at,
+                            'lemon_ends_at' => $ends_at,
+                            'lemon_update_payment_menthod_url' => $update_payment_method,
+                        ]);
+                    }
+                    break;
+            }
+            $webhook->update([
+                'status' => 'success',
+            ]);
+        } catch (\Exception $e) {
+            ray($e->getMessage());
+            $webhook->update([
+                'status' => 'failed',
+                'failure_reason' => $e->getMessage()
+            ]);
+        } finally {
+            return response('OK');
+        }
+    });
+}

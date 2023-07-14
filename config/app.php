@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Facade;
 
 return [
 
+    'id' => env('APP_ID'),
     'port' => env('APP_PORT', 8000),
     /*
     |--------------------------------------------------------------------------

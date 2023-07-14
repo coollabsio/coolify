@@ -9,6 +9,12 @@
         <a class="{{ request()->routeIs('settings.emails') ? 'text-white' : '' }}" href="{{ route('settings.emails') }}">
             <button>SMTP</button>
         </a>
+        @if (isCloud())
+            <a class="{{ request()->routeIs('settings.license') ? 'text-white' : '' }}"
+                href="{{ route('settings.license') }}">
+                <button>Resale License</button>
+            </a>
+        @endif
         <div class="flex-1"></div>
     </nav>
 </div>

@@ -24,11 +24,16 @@
         <a class="{{ request()->routeIs('team.show') ? 'text-white' : '' }}" href="{{ route('team.show') }}">
             <button>General</button>
         </a>
+        <a class="{{ request()->routeIs('team.members') ? 'text-white' : '' }}" href="{{ route('team.members') }}">
+            <button>Members</button>
+        </a>
         <a class="{{ request()->routeIs('team.notifications') ? 'text-white' : '' }}"
             href="{{ route('team.notifications') }}">
             <button>Notifications</button>
         </a>
         <div class="flex-1"></div>
-        <livewire:switch-team />
+        <div class="-mt-9">
+            <livewire:switch-team />
+        </div>
     </nav>
 </div>

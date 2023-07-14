@@ -13,7 +13,7 @@ class MagicController extends Controller
     public function servers()
     {
         return response()->json([
-            'servers' => Server::validated()->get()
+            'servers' => Server::isUsable()->get()
         ]);
     }
     public function destinations()

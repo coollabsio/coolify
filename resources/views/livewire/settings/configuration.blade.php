@@ -10,6 +10,7 @@
             <div class="flex gap-2">
                 <x-forms.input id="settings.fqdn" label="Coolify's Domain" />
             </div>
+
             {{-- <div class="flex gap-2 ">
                 <x-forms.input type="number" id="settings.public_port_min" label="Public Port Min" />
                 <x-forms.input type="number" id="settings.public_port_max" label="Public Port Max" />

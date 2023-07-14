@@ -66,7 +66,10 @@ class Team extends Model implements SendsDiscord, SendsEmail
     }
 
 
-
+    public function subscription()
+    {
+        return $this->hasOne(Subscription::class);
+    }
     public function projects()
     {
         return $this->hasMany(Project::class);

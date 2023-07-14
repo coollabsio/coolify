@@ -4,6 +4,7 @@ use App\Models\InstanceSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
 
@@ -126,4 +127,8 @@ function base_url(bool $withPort = true)
 function isDev()
 {
     return config('app.env') === 'local';
+}
+function isCloud()
+{
+    return !config('coolify.self_hosted');
 }

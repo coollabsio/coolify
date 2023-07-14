@@ -1,6 +1,6 @@
 <div>
-    @if ($server->settings->is_reachable)
-        @if ($server->proxy->status === 'running')
+    @if (data_get($server, 'proxy.type'))
+        @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
                 <div class="group">
                     <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
