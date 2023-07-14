@@ -102,14 +102,14 @@ async function reEncryptSecrets() {
 	}
 	if (secretOld !== secretNew) {
 		console.log('secrets are different, so re-encrypting');
-		const secrets = await prisma.secret.findMany();
-		if (secrets.length > 0) {
-			for (const secret of secrets) {
-				const value = decrypt(secret.value, secretOld);
-				const newValue = encrypt(value, secretNew);
-				console.log({ value: secret.value, newValue });
-			}
-		}
+		// const secrets = await prisma.secret.findMany();
+		// if (secrets.length > 0) {
+		// 	for (const secret of secrets) {
+		// 		const value = decrypt(secret.value, secretOld);
+		// 		const newValue = encrypt(value, secretNew);
+		// 		console.log({ value: secret.value, newValue });
+		// 	}
+		// }
 	}
 }
 main()

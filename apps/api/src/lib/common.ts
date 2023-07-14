@@ -172,13 +172,19 @@ export const base64Encode = (text: string): string => {
 export const base64Decode = (text: string): string => {
 	return Buffer.from(text, 'base64').toString('ascii');
 };
+export const getSecretKey = () => {
+	if (process.env['COOLIFY_SECRET_KEY_BETTER']) {
+		return process.env['COOLIFY_SECRET_KEY_BETTER'];
+	}
+	return process.env['COOLIFY_SECRET_KEY'];
+};
 export const decrypt = (hashString: string) => {
 	if (hashString) {
 		try {
 			const hash = JSON.parse(hashString);
 			const decipher = crypto.createDecipheriv(
 				algorithm,
-				process.env['COOLIFY_SECRET_KEY'],
+				getSecretKey(),
 				Buffer.from(hash.iv, 'hex')
 			);
 			const decrpyted = Buffer.concat([
@@ -195,7 +201,7 @@ export const decrypt = (hashString: string) => {
 export const encrypt = (text: string) => {
 	if (text) {
 		const iv = crypto.randomBytes(16);
-		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
+		const cipher = crypto.createCipheriv(algorithm, getSecretKey(), iv);
 		const encrypted = Buffer.concat([cipher.update(text.trim()), cipher.final()]);
 		return JSON.stringify({
 			iv: iv.toString('hex'),
@@ -841,7 +847,7 @@ export function generateToken() {
 		{
 			nbf: Math.floor(Date.now() / 1000) - 30
 		},
-		process.env['COOLIFY_SECRET_KEY']
+		getSecretKey()
 	);
 }
 export function generatePassword({

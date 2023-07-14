@@ -38,6 +38,7 @@ declare module 'fastify' {
 		config: {
 			COOLIFY_APP_ID: string;
 			COOLIFY_SECRET_KEY: string;
+			COOLIFY_SECRET_KEY_BETTER: string | null;
 			COOLIFY_DATABASE_URL: string;
 			COOLIFY_IS_ON: string;
 			COOLIFY_WHITE_LABELED: string;
@@ -66,6 +67,10 @@ const host = '0.0.0.0';
 			},
 			COOLIFY_SECRET_KEY: {
 				type: 'string'
+			},
+			COOLIFY_SECRET_KEY_BETTER: {
+				type: 'string',
+				default: null
 			},
 			COOLIFY_DATABASE_URL: {
 				type: 'string',
@@ -402,7 +407,9 @@ async function autoUpdater() {
 				if (!isDev) {
 					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 					if (isAutoUpdateEnabled) {
-						await executeCommand({ command: `docker pull ghcr.io/coollabsio/coolify:${latestVersion}` });
+						await executeCommand({
+							command: `docker pull ghcr.io/coollabsio/coolify:${latestVersion}`
+						});
 						await executeCommand({ shell: true, command: `env | grep '^COOLIFY' > .env` });
 						await executeCommand({
 							command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
@@ -651,7 +658,7 @@ async function cleanupStorage() {
 		// 	}
 		// } catch (error) {}
 		// if (lowDiskSpace) {
-			// await cleanupDockerStorage(destination.id);
+		// await cleanupDockerStorage(destination.id);
 		// }
 	}
 }
