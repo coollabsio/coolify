@@ -15,7 +15,7 @@ class ProxyCheckJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(protected Server|null $server)
+    public function __construct(protected Server|null $server = null)
     {
     }
     public function handle()
