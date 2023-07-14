@@ -83,6 +83,12 @@ class ProductionSeeder extends Seeder
             ]);
             $server = Server::create($server_details);
             $server->settings->is_reachable = true;
+            $server->settings->is_usable = true;
+            $server->settings->save();
+        } else {
+            $server = Server::find(0);
+            $server->settings->is_reachable = true;
+            $server->settings->is_usable = true;
             $server->settings->save();
         }
         if (StandaloneDocker::find(0) == null) {
