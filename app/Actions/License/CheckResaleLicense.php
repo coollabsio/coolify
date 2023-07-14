@@ -24,12 +24,7 @@ class CheckResaleLicense
                 'instance_name' => $instance_id,
             ])->throw()->json();
             $product_id = data_get($data, 'meta.product_id');
-
-            if (isDev()) {
-                $valid_product_id = 93221;
-            } else {
-                $valid_product_id = 93222;
-            }
+            $valid_product_id = config('coolify.lemon_squeezy_product_id');
             if ($product_id !== $valid_product_id) {
                 throw new \Exception('Invalid product id');
             }

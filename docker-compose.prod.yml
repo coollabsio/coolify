@@ -10,8 +10,6 @@ services:
       - /data/coolify/ssh:/var/www/html/storage/app/ssh
       - /data/coolify/deployments:/var/www/html/storage/app/deployments
     environment:
-      - SELF_HOSTED
-      - LEMON_SQUEEZY_WEBHOOK_SECRET
       - APP_ENV=production
       - APP_DEBUG
       - APP_NAME
@@ -31,6 +29,10 @@ services:
       - PHP_PM_START_SERVERS=1
       - PHP_PM_MIN_SPARE_SERVERS=1
       - PHP_PM_MAX_SPARE_SERVERS=10
+      - SELF_HOSTED
+      - LEMON_SQUEEZY_WEBHOOK_SECRET
+      - LEMON_SQUEEZY_CHECKOUT_ID
+      - LEMON_SQUEEZY_PRODUCT_ID
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

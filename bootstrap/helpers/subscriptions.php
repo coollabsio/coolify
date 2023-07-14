@@ -8,7 +8,8 @@ function getSubscriptionLink()
     $team_id = auth()->user()->currentTeam()->id ?? null;
     $email = auth()->user()->email ?? null;
     $name = auth()->user()->name ?? null;
-    $url = "https://store.coollabs.io/checkout/buy/d0b28c6a-9b57-40bf-8b84-89fbafde6526?";
+    $checkout_id = config('coolify.lemon_squeezy_checkout_id');
+    $url = "https://store.coollabs.io/checkout/buy/$checkout_id?";
     if ($user_id) {
         $url .= "&checkout[custom][user_id]={$user_id}";
     }
