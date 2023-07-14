@@ -11,27 +11,31 @@ class SubscriptionValid
 
     public function handle(Request $request, Closure $next): Response
     {
-        $allowed_paths = [
-            'subscription',
-            'login',
-            'register',
-            'logout',
-            'livewire/message/check-license',
-            'livewire/message/switch-team',
-        ];
-        if (isCloud() && !isSubscribed()) {
-            ray('SubscriptionValid Middleware');
-            if (!in_array($request->path(), $allowed_paths)) {
-                return redirect('subscription');
+        if (auth()->user()) {
+            if (isCloud() && !isSubscribed()) {
+                ray('SubscriptionValid Middleware');
+
+                $allowed_paths = [
+                    'subscription',
+                    'login',
+                    'register',
+                    'logout',
+                    'livewire/message/check-license',
+                    'livewire/message/switch-team',
+                ];
+                if (!in_array($request->path(), $allowed_paths)) {
+                    return redirect('subscription');
+                } else {
+                    return $next($request);
+                }
             } else {
-                return $next($request);
-            }
-        } else {
-            if ($request->path() === 'subscription') {
-                return redirect('/');
-            } else {
-                return $next($request);
+                if ($request->path() === 'subscription' && !auth()->user()->isInstanceAdmin()) {
+                    return redirect('/');
+                } else {
+                    return $next($request);
+                }
             }
         }
+        return $next($request);
     }
 }

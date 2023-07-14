@@ -33,11 +33,13 @@ function getRenewDate()
 }
 function getEndDate()
 {
-    return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at)->format('Y-M-d H:i:s');
+    return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
 function isSubscribed()
 {
     return
         auth()->user()?->currentTeam()?->subscription?->lemon_status === 'active' ||
-        (auth()->user()?->currentTeam()?->subscription?->lemon_ends_at && Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at) > Carbon::now());
+        (auth()->user()?->currentTeam()?->subscription?->lemon_ends_at &&
+            Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at) > Carbon::now()
+        ) || auth()->user()->isInstanceAdmin();
 }

@@ -1,13 +1,4 @@
 <x-layout-subscription>
-    @if (auth()->user()->isInstanceAdmin())
-        <div class="pb-10">
-            <h3>Resale License</h3>
-            <livewire:check-license />
-        </div>
-    @endif
-    @if (!auth()->user()->isInstanceAdmin() && !$settings->is_resale_license_active)
-        <div>Resale license is not active. Please contact your instance admin.</div>
-    @endif
     @if ($settings->is_resale_license_active)
         <div class="flex gap-2">
             <h3>Subscription</h3>
@@ -37,5 +28,7 @@
         <x-forms.button><a class="text-white" href="https://app.lemonsqueezy.com/my-orders">Manage My
                 Subscription</a>
         </x-forms.button>
+    @else
+        <div>Resale license is not active. Please contact your instance admin.</div>
     @endif
 </x-layout-subscription>

@@ -18,6 +18,7 @@ class InstanceSettings extends Model implements SendsEmail
     ];
     protected $casts = [
         'smtp' => SchemalessAttributes::class,
+        'resale_license' => 'encrypted',
     ];
     public function scopeWithSmtp(): Builder
     {

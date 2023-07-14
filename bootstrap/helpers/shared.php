@@ -130,5 +130,5 @@ function isDev()
 }
 function isCloud()
 {
-    return (bool)config('coolify.self_hosted') === false;
+    return !config('coolify.self_hosted');
 }

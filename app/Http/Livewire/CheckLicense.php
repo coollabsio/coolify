@@ -35,7 +35,7 @@ class CheckLicense extends Component
             } catch (\Throwable $th) {
                 session()->flash('error', 'License is not valid. Please contact support.');
                 ray($th->getMessage());
-                return redirect()->to('/subscription');
+                return redirect()->to('/settings/license');
             }
         }
     }

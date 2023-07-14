@@ -19,7 +19,19 @@ class Controller extends BaseController
 
     public function subscription()
     {
+        if (!isCloud()) {
+            abort(404);
+        }
         return view('subscription', [
+            'settings' => InstanceSettings::get()
+        ]);
+    }
+    public function license()
+    {
+        if (!isCloud()) {
+            abort(404);
+        }
+        return view('settings.license', [
             'settings' => InstanceSettings::get()
         ]);
     }

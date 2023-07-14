@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('instance_settings', function (Blueprint $table) {
             $table->boolean('is_resale_license_active')->default(false);
-            $table->string('resale_license')->nullable();
+            $table->longText('resale_license')->nullable();
         });
     }
 

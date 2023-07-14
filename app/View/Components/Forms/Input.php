@@ -16,13 +16,12 @@ class Input extends Component
         public string|null $type = 'text',
         public string|null $value = null,
         public string|null $label = null,
-        public string|null $placeholder = null,
         public bool $required = false,
         public bool $disabled = false,
         public bool $readonly = false,
         public string|null $helper = null,
         public bool $allowToPeak = true,
-        public string $defaultClass = "input input-sm bg-coolgray-200 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none"
+        public string $defaultClass = "input input-sm bg-coolgray-200 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500"
     ) {
     }
 

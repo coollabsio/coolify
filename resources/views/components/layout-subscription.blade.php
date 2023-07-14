@@ -25,12 +25,37 @@
 <body>
     @livewireScripts
     <x-toaster-hub />
-    <x-navbar-subscription />
+    @if (auth()->user()->isInstanceAdmin())
+        <div class="fixed top-3 left-4" id="vue">
+            <magic-bar></magic-bar>
+        </div>
+        <x-navbar />
+    @else
+        <x-navbar-subscription />
+    @endif
+
     <main class="main">
         {{ $slot }}
     </main>
     <x-version class="fixed left-2 bottom-1" />
     <script>
+        function changePasswordFieldType(event) {
+            let element = event.target
+            for (let i = 0; i < 10; i++) {
+                if (element.className === "relative") {
+                    break;
+                }
+                element = element.parentElement;
+            }
+            element = element.children[1];
+            if (element.nodeName === 'INPUT') {
+                if (element.type === 'password') {
+                    element.type = 'text';
+                } else {
+                    element.type = 'password';
+                }
+            }
+        }
         Livewire.on('reloadWindow', () => {
             window.location.reload();
         })
