@@ -10,6 +10,8 @@ services:
       - /data/coolify/ssh:/var/www/html/storage/app/ssh
       - /data/coolify/deployments:/var/www/html/storage/app/deployments
     environment:
+      - SELF_HOSTED
+      - LEMON_SQUEEZY_WEBHOOK_SECRET
       - APP_ENV=production
       - APP_DEBUG
       - APP_NAME
