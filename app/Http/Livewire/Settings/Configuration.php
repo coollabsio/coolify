@@ -2,10 +2,10 @@
 
 namespace App\Http\Livewire\Settings;
 
+use App\Actions\Proxy\InstallProxy;
 use App\Jobs\ProxyCheckJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -108,6 +108,7 @@ class Configuration extends Component
                 ];
             }
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
+            dispatch(new ProxyCheckJob($this->server));
         }
     }
     private function save_configuration_to_disk(array $traefik_dynamic_conf, string $file)
@@ -137,12 +138,8 @@ class Configuration extends Component
         }
         $this->validate();
         $this->settings->save();
-
         $this->server = Server::findOrFail(0);
         $this->setup_instance_fqdn();
-        if ($this->settings->fqdn) {
-            dispatch(new ProxyCheckJob());
-        }
         $this->emit('success', 'Instance settings updated successfully!');
     }
 }

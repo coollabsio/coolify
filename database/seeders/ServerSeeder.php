@@ -25,10 +25,10 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host",
             'team_id' => $root_team->id,
             'private_key_id' => $private_key_1->id,
-            'proxy' => ServerMetadata::from([
-                'type' => ProxyTypes::TRAEFIK_V2->value,
-                'status' => ProxyStatus::EXITED->value
-            ]),
+            // 'proxy' => ServerMetadata::from([
+            //     'type' => ProxyTypes::TRAEFIK_V2->value,
+            //     'status' => ProxyStatus::EXITED->value
+            // ]),
         ]);
         Server::create([
             'name' => "testing-local-docker-container-2",

@@ -15,30 +15,33 @@ class ProxyCheckJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Create a new job instance.
-     */
-    public function __construct()
+    public function __construct(protected Server|null $server)
     {
     }
-
-    /**
-     * Execute the job.
-     */
     public function handle()
     {
         try {
             $container_name = 'coolify-proxy';
-            $servers = Server::whereRelation('settings', 'is_usable', true)->where('proxy->type', ProxyTypes::TRAEFIK_V2)->get();
-
-            foreach ($servers as $server) {
-                $status = get_container_status(server: $server, container_id: $container_name);
+            if ($this->server) {
+                ray('Checking proxy for server: ' . $this->server->name);
+                $status = get_container_status(server: $this->server, container_id: $container_name);
                 if ($status === 'running') {
-                    continue;
+                    return;
                 }
-                resolve(InstallProxy::class)($server);
+                resolve(InstallProxy::class)($this->server);
+            } else {
+                $servers = Server::whereRelation('settings', 'is_usable', true)->get();
+
+                foreach ($servers as $server) {
+                    $status = get_container_status(server: $server, container_id: $container_name);
+                    if ($status === 'running') {
+                        continue;
+                    }
+                    resolve(InstallProxy::class)($server);
+                }
             }
         } catch (\Throwable $th) {
+            ray($th->getMessage());
             //throw $th;
         }
     }

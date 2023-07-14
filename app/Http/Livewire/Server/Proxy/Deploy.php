@@ -11,7 +11,7 @@ class Deploy extends Component
 {
     public Server $server;
     public $proxy_settings = null;
-    protected $listeners = ['proxyStatusUpdated', 'serverValidated' => 'proxyStatusUpdated'];
+    protected $listeners = ['proxyStatusUpdated'];
     public function proxyStatusUpdated()
     {
         $this->server->refresh();

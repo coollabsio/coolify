@@ -114,7 +114,7 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
         if (!$throwError) {
             return null;
         }
-        throw new \RuntimeException($process->errorOutput());
+        throw new \RuntimeException($process->errorOutput(), $exitCode);
     }
     return $output;
 }

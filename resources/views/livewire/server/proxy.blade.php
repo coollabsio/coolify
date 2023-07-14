@@ -12,7 +12,9 @@
                             @if ($server->proxy->status === 'exited')
                                 <x-forms.button wire:click.prevent="switchProxy">Switch Proxy</x-forms.button>
                             @endif
-                            <livewire:server.proxy.status :server="$server" />
+                            @if ($server->settings->is_reachable)
+                                <livewire:server.proxy.status :server="$server" />
+                            @endif
                         </div>
 
                         <div class="pt-3 pb-4 ">Traefik v2</div>
@@ -23,11 +25,11 @@
                                 configs.
                             </div>
                         @endif
-                        <x-forms.input placeholder="https://coolify.io" id="redirect_url" label="Default Redirect 404"
-                            helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
-                        <div class="container w-full mx-auto">
+                        <div class="container w-full pb-4 mx-auto">
                             <livewire:activity-monitor :header="true" />
                         </div>
+                        <x-forms.input placeholder="https://coolify.io" id="redirect_url" label="Default Redirect 404"
+                            helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
                         <div wire:loading wire:target="checkProxySettingsInSync" class="pt-4">
                             <x-loading text="Loading proxy configuration..." />
                         </div>
