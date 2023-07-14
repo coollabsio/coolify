@@ -17,9 +17,23 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
+    public function subscription()
+    {
+        if (!isCloud()) {
+            abort(404);
+        }
+        return view('subscription', [
+            'settings' => InstanceSettings::get()
+        ]);
+    }
     public function license()
     {
-        return view('license');
+        if (!isCloud()) {
+            abort(404);
+        }
+        return view('settings.license', [
+            'settings' => InstanceSettings::get()
+        ]);
     }
     public function dashboard()
     {
@@ -62,10 +76,20 @@ class Controller extends BaseController
     public function team()
     {
         $invitations = [];
-        if (auth()->user()->isAdmin()) {
+        if (auth()->user()->isAdminFromSession()) {
             $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
         }
         return view('team.show', [
+            'invitations' => $invitations,
+        ]);
+    }
+    public function members()
+    {
+        $invitations = [];
+        if (auth()->user()->isAdminFromSession()) {
+            $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
+        }
+        return view('team.members', [
             'invitations' => $invitations,
         ]);
     }

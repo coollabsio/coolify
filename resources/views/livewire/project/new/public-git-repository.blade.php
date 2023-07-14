@@ -14,7 +14,7 @@
                 @if ($branch_found)
                     <div class="py-2">
                         <div>Rate limit remaining: {{ $rate_limit_remaining }}</div>
-                        <div>Rate limit reset at: {{ date('Y-m-d H:i:s', substr($rate_limit_reset, 0, 10)) }}</div>
+                        <div>Rate limit reset at: {{ $rate_limit_reset }}</div>
                     </div>
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">

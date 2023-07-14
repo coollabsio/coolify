@@ -1,46 +1,31 @@
 <x-layout>
     <x-team.navbar :team="session('currentTeam')" />
     <livewire:team.form />
-    <h3>Members</h3>
-    <div class="pt-4 overflow-hidden">
-        <table>
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Role</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (auth()->user()->currentTeam()->members->sortBy('name') as $member)
-                    <livewire:team.member :member="$member" :wire:key="$member->id" />
-                @endforeach
-            </tbody>
-        </table>
-    </div>
-    @if (auth()->user()->isAdmin())
-        <div class="py-4">
-            @if (is_transactional_emails_active())
-                <h3 class="pb-4">Invite a new member</h3>
-            @else
-                <h3>Invite a new member</h3>
-                @if (auth()->user()->isInstanceAdmin())
-                    <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
-                            class="underline text-warning">Transactional Emails</a>
-                        before
-                        you can invite a
-                        new
-                        member
-                        via
-                        email.
-                    </div>
+    @if (isCloud())
+        <div class="pb-8">
+            <h3>Subscription</h3>
+            @if (data_get(auth()->user()->currentTeam(),
+                    'subscription'))
+                <div>Status: {{ auth()->user()->currentTeam()->subscription->lemon_status }}</div>
+                <div>Type: {{ auth()->user()->currentTeam()->subscription->lemon_variant_name }}</div>
+                @if (auth()->user()->currentTeam()->subscription->lemon_status === 'cancelled')
+                    <div class="pb-4">Subscriptions ends at: {{ getRenewDate() }}</div>
+                    <x-forms.button><a class="text-white" href="{{ getSubscriptionLink() }}">Subscribe
+                            Again</a>
+                    </x-forms.button>
+                @else
+                    <div class="pb-4">Renews at: {{ getRenewDate() }}</div>
                 @endif
+                <x-forms.button><a class="text-white" href="{{ getPaymentLink() }}">Update Payment Details</a>
+                </x-forms.button>
+            @else
+                <x-forms.button class="mt-4"><a class="text-white" href="{{ getSubscriptionLink() }}">Subscribe Now</a>
+                </x-forms.button>
             @endif
-            <livewire:team.invite-link />
+            <x-forms.button><a class="text-white" href="https://app.lemonsqueezy.com/my-orders">Manage My
+                    Subscription</a>
+            </x-forms.button>
         </div>
-        <livewire:team.invitations :invitations="$invitations" />
     @endif
-
     <livewire:team.delete />
 </x-layout>

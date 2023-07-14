@@ -6,7 +6,7 @@
         {{ data_get($member, 'pivot.role') }}</td>
     <td>
         {{-- TODO: This is not good --}}
-        @if (auth()->user()->isAdmin())
+        @if (auth()->user()->isAdminFromSession())
             @if ($member->id !== auth()->user()->id)
                 @if (data_get($member, 'pivot.role') !== 'owner')
                     @if (data_get($member, 'pivot.role') !== 'admin')

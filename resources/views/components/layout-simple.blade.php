@@ -30,26 +30,19 @@
     <x-version class="fixed left-2 bottom-1" />
     <script>
         function changePasswordFieldType(event) {
-            const element = event.target.parentElement.parentElement.children[0];
+            let element = event.target
+            for (let i = 0; i < 10; i++) {
+                if (element.className === "relative") {
+                    break;
+                }
+                element = element.parentElement;
+            }
+            element = element.children[1];
             if (element.nodeName === 'INPUT') {
                 if (element.type === 'password') {
                     element.type = 'text';
                 } else {
                     element.type = 'password';
-                }
-            }
-            if (element.nodeName === 'DIV') {
-                if (element.children[0].type === 'password') {
-                    element.children[0].type = 'text';
-                } else {
-                    element.children[0].type = 'password';
-                }
-            }
-            if (element.nodeName === 'svg') {
-                if (element.parentElement.parentElement.children[0].type === 'password') {
-                    element.parentElement.parentElement.children[0].type = 'text';
-                } else {
-                    element.parentElement.parentElement.children[0].type = 'password';
                 }
             }
         }

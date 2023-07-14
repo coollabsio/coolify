@@ -3,7 +3,6 @@
 namespace App\Http\Livewire\Server;
 
 use App\Actions\Proxy\CheckProxySettingsInSync;
-use App\Actions\Proxy\InstallProxy;
 use App\Enums\ProxyTypes;
 use Illuminate\Support\Str;
 use App\Models\Server;
@@ -17,37 +16,27 @@ class Proxy extends Component
     public $proxy_settings = null;
     public string|null $redirect_url = null;
 
-    protected $listeners = ['serverValidated', 'saveConfiguration'];
+    protected $listeners = ['proxyStatusUpdated', 'saveConfiguration'];
     public function mount()
     {
         $this->redirect_url = $this->server->proxy->redirect_url;
     }
-    public function serverValidated()
+    public function proxyStatusUpdated()
     {
         $this->server->refresh();
     }
     public function switchProxy()
     {
-        $this->server->proxy->type = null;
+        $this->server->proxy = null;
         $this->server->save();
+        $this->emit('proxyStatusUpdated');
     }
-    public function installProxy()
-    {
-        if (
-            $this->server->proxy->last_applied_settings &&
-            $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
-        ) {
-            $this->saveConfiguration($this->server);
-        }
-        $activity = resolve(InstallProxy::class)($this->server);
-        $this->emit('newMonitorActivity', $activity->id);
-    }
-
     public function setProxy(string $proxy_type)
     {
         $this->server->proxy->type = $proxy_type;
         $this->server->proxy->status = 'exited';
         $this->server->save();
+        $this->emit('proxyStatusUpdated');
     }
     public function stopProxy()
     {
@@ -56,6 +45,7 @@ class Proxy extends Component
         ], $this->server);
         $this->server->proxy->status = 'exited';
         $this->server->save();
+        $this->emit('proxyStatusUpdated');
     }
     public function saveConfiguration()
     {

@@ -1,13 +1,4 @@
-@props([
-    'id' => $attributes->has('id'),
-    'label' => $attributes->has('label'),
-    'required' => null,
-    'disabled' => null,
-    'helper' => $attributes->has('helper'),
-    'noDirty' => $attributes->has('noDirty'),
-])
-
-<div class=" form-control">
+<div class="form-control">
     @if ($label)
         <label class="label">
             <span class="label-text">
@@ -38,11 +29,9 @@
             </span>
         </label>
     @endif
-    <textarea {{ $attributes }}
-        @if ($id) name={{ $id }} wire:model.defer={{ $id }} @endisset
-        @if ($disabled !== null) disabled @endif
-        @if ($required !== null) required @endif name={{ $id }} wire:model.defer={{ $value ?? $id }}
-        @if (!$noDirty) wire:dirty.class="input-warning" @endif></textarea>
+    <textarea {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) wire:model.defer={{ $id }}
+        @disabled($disabled) id="{{ $id }}" name="{{ $name }}" name={{ $id }}
+        wire:model.defer={{ $value ?? $id }} wire:dirty.class="input-warning"></textarea>
     @error($id)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>

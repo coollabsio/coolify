@@ -9,7 +9,7 @@ use Livewire\Component;
 class Status extends Component
 {
     public Server $server;
-    protected $listeners = ['proxyStatusUpdated', 'serverValidated' => 'proxyStatusUpdated'];
+    protected $listeners = ['proxyStatusUpdated'];
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
@@ -17,7 +17,7 @@ class Status extends Component
     public function proxyStatus()
     {
         try {
-            dispatch(new ProxyContainerStatusJob(
+            dispatch_sync(new ProxyContainerStatusJob(
                 server: $this->server
             ));
             $this->emit('proxyStatusUpdated');

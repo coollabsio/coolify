@@ -107,7 +107,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     public function handle(): void
     {
-        ray()->measure();
+        // ray()->measure();
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -117,6 +117,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             } else {
                 $this->deploy();
             }
+            if ($this->application->fqdn) dispatch(new ProxyStartJob($this->server));
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (\Exception $e) {
             ray($e);
@@ -131,7 +132,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                     "hidden" => true,
                 ]
             );
-            ray()->measure();
+            // ray()->measure();
         }
     }
     public function failed(Throwable $exception): void
@@ -261,7 +262,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 location / {
                     root   /usr/share/nginx/html;
                     index  index.html;
-                    try_files \$uri \$uri/index.html \$uri/ /index.html =404;
+                    try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
                 }
             
                 error_page   500 502 503 504  /50x.html;

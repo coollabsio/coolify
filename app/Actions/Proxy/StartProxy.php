@@ -8,10 +8,11 @@ use App\Models\Server;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 
-class InstallProxy
+class StartProxy
 {
     public function __invoke(Server $server): Activity
     {
+        // TODO: check for other proxies
         if (is_null(data_get($server, 'proxy.type'))) {
             $server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
             $server->proxy->status = ProxyStatus::EXITED->value;

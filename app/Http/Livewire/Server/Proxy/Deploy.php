@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
-use App\Actions\Proxy\InstallProxy;
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 use Str;
@@ -11,7 +11,7 @@ class Deploy extends Component
 {
     public Server $server;
     public $proxy_settings = null;
-    protected $listeners = ['proxyStatusUpdated', 'serverValidated' => 'proxyStatusUpdated'];
+    protected $listeners = ['proxyStatusUpdated'];
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
@@ -24,7 +24,7 @@ class Deploy extends Component
         ) {
             $this->saveConfiguration($this->server);
         }
-        $activity = resolve(InstallProxy::class)($this->server);
+        $activity = resolve(StartProxy::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
     public function stop()

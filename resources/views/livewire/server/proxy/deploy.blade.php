@@ -1,6 +1,6 @@
 <div>
-    @if ($server->settings->is_reachable)
-        @if ($server->proxy->status === 'running')
+    @if (data_get($server, 'proxy.type'))
+        @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
                 <div class="group">
                     <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
@@ -12,14 +12,14 @@
                             <li>
                                 @if ($server->name === 'localhost')
                                     <a target="_blank"
-                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                         href="{{ base_ip() }}:8080">
                                         Traefik Dashboard
                                         <x-external-link />
                                     </a>
                                 @else
                                     <a target="_blank"
-                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                         href="http://{{ $server->ip }}:8080">
                                         Traefik Dashboard
                                         <x-external-link />
@@ -37,7 +37,7 @@
                         <ul tabindex="0"
                             class="relative text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200 -ml-14">
                             <li>
-                                <div class="rounded-none hover:bg-coollabs" wire:click='deploy'><svg
+                                <div class="rounded-none hover:bg-coollabs hover:text-white" wire:click='deploy'><svg
                                         xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                         stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                         stroke-linejoin="round">
@@ -49,7 +49,7 @@
                                     </svg>Restart</div>
                             </li>
                             <li>
-                                <div class="rounded-none hover:bg-red-500" wire:click='stop'><svg
+                                <div class="rounded-none hover:bg-red-500 hover:text-white" wire:click='stop'><svg
                                         xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                         stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                         stroke-linejoin="round">
@@ -66,9 +66,10 @@
                 </div>
             </div>
         @else
-            <button wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white"> <svg
-                    xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" stroke-width="1.5"
-                    stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <button wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
+                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                    stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M7 4v16l13 -8z" />
                 </svg>Start Proxy

@@ -84,15 +84,23 @@ class Server extends BaseModel
     {
         return "{$this->ip}_{$this->port}_{$this->user}";
     }
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
         return Server::whereTeamId(session('currentTeam')->id)->with('settings')->select($selectArray->all())->orderBy('name');
     }
 
-    static public function validated()
+    static public function isReachable()
     {
         return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
+    }
+    static public function isUsable()
+    {
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true);
     }
 
     static public function destinationsByServer(string $server_id)

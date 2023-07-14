@@ -4,12 +4,13 @@ namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
 
 use App\Models\EnvironmentVariable as ModelsEnvironmentVariable;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
     public $parameters;
     public ModelsEnvironmentVariable $env;
-
+    public string|null $modalId = null;
     protected $rules = [
         'env.key' => 'required|string',
         'env.value' => 'required|string',
@@ -22,6 +23,7 @@ class Show extends Component
     ];
     public function mount()
     {
+        $this->modalId = new Cuid2(7);
         $this->parameters = getRouteParameters();
     }
     public function submit()

@@ -17,7 +17,7 @@
     "dependencies": {
         "@tailwindcss/typography": "0.5.9",
         "alpinejs": "3.12.2",
-        "daisyui": "3.0.3",
+        "daisyui": "3.2.1",
         "tailwindcss-scrollbar": "0.1.0"
     }
 }

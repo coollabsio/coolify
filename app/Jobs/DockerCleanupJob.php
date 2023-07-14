@@ -36,16 +36,25 @@ class DockerCleanupJob implements ShouldQueue
                 } else {
                     $docker_root_filesystem = instant_remote_process(['stat --printf=%m $(docker info --format "{{json .DockerRootDir}}" |sed \'s/"//g\')'], $server);
                 }
-                $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\"disks\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\"mount\":\""$6"\",\"size\":\""$2"\",\"used\":\""$3"\",\"avail\":\""$4"\",\"use%\":\""$5"\"}";a++;}END{print"]}";}\''], $server), true);
-                $mount_point = collect(data_get($disk_usage, 'disks'))->where('mount', $docker_root_filesystem)->first();
-                if (Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value() >= $server->settings->cleanup_after_percentage) {
+                $disk_percentage_before = $this->get_disk_usage($server, $docker_root_filesystem);
+                if ($disk_percentage_before >= $server->settings->cleanup_after_percentage) {
                     instant_remote_process(['docker image prune -af'], $server);
                     instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server);
                     instant_remote_process(['docker builder prune -af'], $server);
+                    $disk_percentage_after = $this->get_disk_usage($server, $docker_root_filesystem);
+                    if ($disk_percentage_after < $disk_percentage_before) {
+                        ray('Saved ' . ($disk_percentage_before - $disk_percentage_after) . '% disk space on ' . $server->name);
+                    }
                 }
             }
         } catch (\Exception $e) {
             Log::error($e->getMessage());
         }
+    }
+    
+    private function get_disk_usage(Server $server, string $docker_root_filesystem) {
+        $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\"disks\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\"mount\":\""$6"\",\"size\":\""$2"\",\"used\":\""$3"\",\"avail\":\""$4"\",\"use%\":\""$5"\"}";a++;}END{print"]}";}\''], $server), true);
+        $mount_point = collect(data_get($disk_usage, 'disks'))->where('mount', $docker_root_filesystem)->first();
+        return Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value();
     }
 }

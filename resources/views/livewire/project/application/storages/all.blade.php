@@ -6,13 +6,16 @@
                 helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
             volume
             name, example: <span class='text-helper'>-pr-1</span>" />
+            <x-forms.button class="btn" onclick="newStorage.showModal()">+ Add</x-forms.button>
+            <livewire:project.application.storages.add />
         </div>
         <div class="">Persistent storage to preserve data between deployments.</div>
     </div>
     <div class="flex flex-col gap-2 py-4">
-        @foreach ($application->persistentStorages as $storage)
+        @forelse ($application->persistentStorages as $storage)
             <livewire:project.application.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
-        @endforeach
+        @empty
+            <div class="text-neutral-500">No storages found.</div>
+        @endforelse
     </div>
-    <livewire:project.application.storages.add />
 </div>

@@ -1,6 +1,9 @@
-<div x-data="{ deleteServer: false, changeLocalhost: false }">
-    <x-naked-modal show="deleteServer" title="Delete Server"
-        message='This server will be deleted. It is not reversible. <br>Please think again.' />
+<div x-data="{ changeLocalhost: false }">
+    <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Server">
+        <x-slot:modalBody>
+            <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
+        </x-slot:modalBody>
+    </x-modal>
     <x-naked-modal show="changeLocalhost" action="submit" title="Change localhost"
         message='You could lost a lot of functionalities if you change the server details of the server where Coolify is running on.<br>Please think again.' />
     <form wire:submit.prevent='submit' class="flex flex-col">
@@ -35,7 +38,8 @@
         </div>
         <h3 class="py-4">Settings</h3>
         <div class="flex items-center w-64 gap-2">
-            <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required helper="Disk cleanup job will be executed if disk usage is more than this number."/>
+            <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
+                helper="Disk cleanup job will be executed if disk usage is more than this number." />
         </div>
         <h3 class="py-4">Actions</h3>
         @if ($server->settings->is_reachable)
@@ -80,7 +84,7 @@
         back!
     </div>
     @if ($server->id !== 0 || isDev())
-        <x-forms.button x-on:click.prevent="deleteServer = true">
+        <x-forms.button isError isModal modalId="{{ $modalId }}">
             Delete
         </x-forms.button>
     @endif

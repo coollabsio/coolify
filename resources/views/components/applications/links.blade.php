@@ -6,7 +6,8 @@
     <div class="absolute hidden group-hover:block">
         <ul tabindex="0" class="relative -ml-24 text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
             <li>
-                <a target="_blank" class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                <a target="_blank"
+                    class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                     href="{{ $application->gitBranchLocation }}">
                     <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
                     Git Repository
@@ -15,8 +16,8 @@
             @if (data_get($application, 'fqdn'))
                 @foreach (Str::of(data_get($application, 'fqdn'))->explode(',') as $fqdn)
                     <li>
-                        <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs" target="_blank"
-                            href="{{ $fqdn }}">
+                        <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
+                            target="_blank" href="{{ $fqdn }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -34,7 +35,7 @@
                 @foreach (data_get($application, 'previews') as $preview)
                     @if (data_get($preview, 'fqdn'))
                         <li>
-                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                 target="_blank" href="{{ data_get($preview, 'fqdn') }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -55,7 +56,7 @@
                 @foreach ($application->ports_mappings_array as $port)
                     @if (isDev())
                         <li>
-                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                 target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -70,7 +71,7 @@
                         </li>
                     @else
                         <li>
-                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs"
+                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                 target="_blank"
                                 href="http://{{ $application->destination->server->ip }}:{{ explode(':', $port)[0] }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"

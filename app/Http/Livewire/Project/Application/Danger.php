@@ -4,14 +4,17 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Danger extends Component
 {
     public Application $application;
     public array $parameters;
+    public string|null $modalId = null;
 
     public function mount()
     {
+        $this->modalId = new Cuid2(7);
         $this->parameters = getRouteParameters();
     }
     public function delete()

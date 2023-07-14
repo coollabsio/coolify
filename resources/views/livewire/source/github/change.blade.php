@@ -33,7 +33,7 @@
         <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>
         @if ($github_app->app_id)
             <div class="w-48">
-                <x-forms.checkbox noDirty label="System Wide?"
+                <x-forms.checkbox label="System Wide?"
                     helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                     instantSave id="is_system_wide" />
             </div>
@@ -119,7 +119,7 @@
                 @endif
             </div>
             <x-forms.checkbox
-                helper="If checked, this GitHub App will be available for everyone in this Coolify instance." noDirty
+                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                 label="System Wide?" disabled id="is_system_wide" />
             <script>
                 function createGithubApp(webhook_endpoint, preview_deployment_permissions) {

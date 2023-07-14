@@ -3,10 +3,12 @@
 namespace App\Http\Livewire\Project\Application\Storages;
 
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
     public $storage;
+    public string|null $modalId = null;
     protected $rules = [
         'storage.name' => 'required|string',
         'storage.mount_path' => 'required|string',
@@ -17,6 +19,10 @@ class Show extends Component
         'mount_path' => 'mount',
         'host_path' => 'host',
     ];
+    public function mount()
+    {
+        $this->modalId = new Cuid2(7);
+    }
     public function submit()
     {
         $this->validate();

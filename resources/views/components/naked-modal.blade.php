@@ -34,7 +34,7 @@
                     </x-forms.button>
                     <div class="flex-1"></div>
                     <x-forms.button class="w-24" wire:click='{{ $action }}'
-                        x-on:click="{{ $show }} = false" isWarning type="button">Continue</x-forms.button>
+                        x-on:click="{{ $show }} = false" isError type="button">Continue</x-forms.button>
                 </div>
             </div>
         </div>
