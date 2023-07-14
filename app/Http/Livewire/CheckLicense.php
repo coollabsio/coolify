@@ -33,7 +33,7 @@ class CheckLicense extends Component
                 resolve(CheckResaleLicense::class)();
                 $this->emit('reloadWindow');
             } catch (\Throwable $th) {
-                session()->flash('error', 'License is not valid. Please contact support.');
+                session()->flash('error', 'Something went wrong. Please contact support. <br>Error: ' . $th->getMessage());
                 ray($th->getMessage());
                 return redirect()->to('/settings/license');
             }
