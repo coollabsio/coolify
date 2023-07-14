@@ -94,28 +94,15 @@ async function main() {
 	}
 }
 async function reEncryptSecrets() {
-	const { execaCommand } = await import('execa');
-	const oldSecret = process.env['COOLIFY_SECRET_KEY'];
-	let newSecret = process.env['COOLIFY_SECRET_KEY_BETTER'];
-	if (!newSecret) {
-		const { stdout: newKey } = await execaCommand(
-			'openssl rand -base64 1024 | sha256sum | base64 | head -c 32',
-			{
-				shell: true
-			}
-		);
-		await execaCommand(`echo "\nCOOLIFY_SECRET_KEY_BETTER=${newKey}" >> .env`, {
-			shell: true
-		});
-		await execaCommand(`sed -i /COOLIFY_SECRET_KEY=/cCOOLIFY_SECRET_KEY=${newKey} .env`, {
-			shell: true
-		});
-		newSecret = newKey;
+	const secretOld = process.env['COOLIFY_SECRET_KEY'];
+	const secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
+	if (secretOld !== secretNew) {
+		console.log('secrets are different, so re-encrypting');
 		const secrets = await prisma.secret.findMany();
 		if (secrets.length > 0) {
 			for (const secret of secrets) {
-				const value = decrypt(secret.value, oldSecret);
-				const newValue = encrypt(value, newSecret);
+				const value = decrypt(secret.value, secretOld);
+				const newValue = encrypt(value, secretNew);
 				console.log({ value: secret.value, newValue });
 			}
 		}
