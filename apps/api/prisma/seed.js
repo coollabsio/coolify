@@ -12,7 +12,7 @@ async function main() {
 		await prisma.setting.create({
 			data: {
 				id: '0',
-				arch: process.arch,
+				arch: process.arch
 			}
 		});
 	} else {
@@ -81,12 +81,42 @@ async function main() {
 		});
 	}
 	// Set new preview secrets
-	const secrets = await prisma.secret.findMany({ where: { isPRMRSecret: false } })
+	const secrets = await prisma.secret.findMany({ where: { isPRMRSecret: false } });
 	if (secrets.length > 0) {
 		for (const secret of secrets) {
-			const previewSecrets = await prisma.secret.findMany({ where: { applicationId: secret.applicationId, name: secret.name, isPRMRSecret: true } })
+			const previewSecrets = await prisma.secret.findMany({
+				where: { applicationId: secret.applicationId, name: secret.name, isPRMRSecret: true }
+			});
 			if (previewSecrets.length === 0) {
-				await prisma.secret.create({ data: { ...secret, id: undefined, isPRMRSecret: true } })
+				await prisma.secret.create({ data: { ...secret, id: undefined, isPRMRSecret: true } });
+			}
+		}
+	}
+}
+async function reEncryptSecrets() {
+	const { execaCommand } = await import('execa');
+	const oldSecret = process.env['COOLIFY_SECRET_KEY'];
+	let newSecret = process.env['COOLIFY_SECRET_KEY_BETTER'];
+	if (!newSecret) {
+		const { stdout: newKey } = await execaCommand(
+			'openssl rand -base64 1024 | sha256sum | base64 | head -c 32',
+			{
+				shell: true
+			}
+		);
+		await execaCommand(`echo "\nCOOLIFY_SECRET_KEY_BETTER=${newKey}" >> .env`, {
+			shell: true
+		});
+		await execaCommand(`sed -i /COOLIFY_SECRET_KEY=/cCOOLIFY_SECRET_KEY=${newKey} .env`, {
+			shell: true
+		});
+		newSecret = newKey;
+		const secrets = await prisma.secret.findMany();
+		if (secrets.length > 0) {
+			for (const secret of secrets) {
+				const value = decrypt(secret.value, oldSecret);
+				const newValue = encrypt(value, newSecret);
+				console.log({ value: secret.value, newValue });
 			}
 		}
 	}
@@ -100,14 +130,38 @@ main()
 		await prisma.$disconnect();
 	});
 
-const encrypt = (text) => {
-	if (text) {
+const encrypt = (text, secret) => {
+	if (text && secret) {
 		const iv = crypto.randomBytes(16);
-		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
-		const encrypted = Buffer.concat([cipher.update(text), cipher.final()]);
+		const cipher = crypto.createCipheriv(algorithm, secret, iv);
+		const encrypted = Buffer.concat([cipher.update(text.trim()), cipher.final()]);
 		return JSON.stringify({
 			iv: iv.toString('hex'),
 			content: encrypted.toString('hex')
 		});
 	}
 };
+const decrypt = (hashString, secret) => {
+	if (hashString && secret) {
+		try {
+			const hash = JSON.parse(hashString);
+			const decipher = crypto.createDecipheriv(algorithm, secret, Buffer.from(hash.iv, 'hex'));
+			const decrpyted = Buffer.concat([
+				decipher.update(Buffer.from(hash.content, 'hex')),
+				decipher.final()
+			]);
+			return decrpyted.toString();
+		} catch (error) {
+			console.log({ decryptionError: error.message });
+			return hashString;
+		}
+	}
+};
+reEncryptSecrets()
+	.catch((e) => {
+		console.error(e);
+		process.exit(1);
+	})
+	.finally(async () => {
+		await prisma.$disconnect();
+	});
