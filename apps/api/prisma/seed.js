@@ -94,11 +94,20 @@ async function main() {
 	}
 }
 async function reEncryptSecrets() {
+	const { execaCommand } = await import('execa');
+	await execaCommand('env | grep COOLIFY > .env', { shell: true });
 	const secretOld = process.env['COOLIFY_SECRET_KEY'];
-	const secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
+	let secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
 	if (!secretNew) {
-		console.log('no new secret found');
-		return;
+		console.log('no new secret found, generating new one');
+		const { stdout: newKey } = await execaCommand(
+			'openssl rand -base64 1024 | sha256sum | base64 | head -c 32',
+			{ shell: true }
+		);
+		await execaCommand('echo "COOLIFY_SECRET_KEY_BETTER=' + newKey + '" >> .env ', { shell: true });
+		await execaCommand(`sed -i '/COOLIFY_SECRET_KEY=/d' .env`, { shell: true });
+		await execaCommand(`echo "COOLIFY_SECRET_KEY=${newKey}" >> .env`, { shell: true });
+		secretNew = newKey;
 	}
 	if (secretOld !== secretNew) {
 		console.log('secrets are different, so re-encrypting');
@@ -113,6 +122,8 @@ async function reEncryptSecrets() {
 				});
 			}
 		}
+	} else {
+		console.log('secrets are the same, so no need to re-encrypt');
 	}
 }
 main()
