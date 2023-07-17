@@ -115,7 +115,7 @@ async function reEncryptSecrets() {
 		await execaCommand(`sed -i '/COOLIFY_SECRET_KEY_BETTER=/d' .env`, { shell: true });
 		await execaCommand(`echo "COOLIFY_SECRET_KEY=${secretNew}" >> .env`, { shell: true });
 		await execaCommand('echo "COOLIFY_SECRET_KEY_BETTER=' + secretNew + '" >> .env ', {
-			shell: trueps
+			shell: true
 		});
 		await execaCommand(`echo "COOLIFY_SECRET_KEY_OLD_${date}=${secretOld}" >> .env`, {
 			shell: true
