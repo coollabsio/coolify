@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          ref: "v3"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
       - name: Set up Docker Buildx
@@ -44,6 +46,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+        with:
+          ref: "v3"
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v1
       - name: Set up Docker Buildx
@@ -95,7 +99,6 @@ jobs:
       - name: Create & publish manifest
         run: |
           docker buildx imagetools create --append ${{ fromJSON(steps.meta.outputs.json).tags[0] }}-aarch64 --tag ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
