@@ -120,6 +120,8 @@ async function reEncryptSecrets() {
 		await execaCommand(`echo "COOLIFY_SECRET_KEY_OLD_${date}=${secretOld}" >> .env`, {
 			shell: true
 		});
+		console.log(`Backup database to /app/db/prod.db_${date}.`);
+		await execaCommand(`cp /app/db/prod.db /app/db/prod.db_${date}`, { shell: true });
 		const transactions = [];
 		const secrets = await prisma.secret.findMany();
 		if (secrets.length > 0) {
