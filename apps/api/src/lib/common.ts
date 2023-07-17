@@ -8,7 +8,6 @@ import type { Config } from 'unique-names-generator';
 import generator from 'generate-password';
 import crypto from 'crypto';
 import { promises as dns } from 'dns';
-import * as Sentry from '@sentry/node';
 import { PrismaClient } from '@prisma/client';
 import os from 'os';
 import * as SSHConfig from 'ssh-config/src/ssh-config';
@@ -19,12 +18,11 @@ import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 
-export const version = '3.12.32';
+export const version = '3.12.33';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
-export const sentryDSN =
-	'https://409f09bcb7af47928d3e0f46b78987f3@o1082494.ingest.sentry.io/4504236622217216';
+
 const algorithm = 'aes-256-ctr';
 const customConfig: Config = {
 	dictionaries: [adjectives, colors, animals],
@@ -172,13 +170,19 @@ export const base64Encode = (text: string): string => {
 export const base64Decode = (text: string): string => {
 	return Buffer.from(text, 'base64').toString('ascii');
 };
+export const getSecretKey = () => {
+	if (process.env['COOLIFY_SECRET_KEY_BETTER']) {
+		return process.env['COOLIFY_SECRET_KEY_BETTER'];
+	}
+	return process.env['COOLIFY_SECRET_KEY'];
+};
 export const decrypt = (hashString: string) => {
 	if (hashString) {
 		try {
 			const hash = JSON.parse(hashString);
 			const decipher = crypto.createDecipheriv(
 				algorithm,
-				process.env['COOLIFY_SECRET_KEY'],
+				getSecretKey(),
 				Buffer.from(hash.iv, 'hex')
 			);
 			const decrpyted = Buffer.concat([
@@ -195,7 +199,7 @@ export const decrypt = (hashString: string) => {
 export const encrypt = (text: string) => {
 	if (text) {
 		const iv = crypto.randomBytes(16);
-		const cipher = crypto.createCipheriv(algorithm, process.env['COOLIFY_SECRET_KEY'], iv);
+		const cipher = crypto.createCipheriv(algorithm, getSecretKey(), iv);
 		const encrypted = Buffer.concat([cipher.update(text.trim()), cipher.final()]);
 		return JSON.stringify({
 			iv: iv.toString('hex'),
@@ -841,7 +845,7 @@ export function generateToken() {
 		{
 			nbf: Math.floor(Date.now() / 1000) - 30
 		},
-		process.env['COOLIFY_SECRET_KEY']
+		getSecretKey()
 	);
 }
 export function generatePassword({
@@ -1677,9 +1681,6 @@ export function errorHandler({
 	if (message.message) message = message.message;
 	if (message.includes('Unique constraint failed')) {
 		message = 'This data is unique and already exists. Please try again with a different value.';
-	}
-	if (type === 'normal') {
-		Sentry.captureException(message);
 	}
 	throw { status, message };
 }

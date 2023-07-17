@@ -16,7 +16,7 @@ If you have a new service / build pack you would like to add, raise an idea [her
 
 ## How to install
 
-For more details goto the [docs](https://docs.coollabs.io/coolify/installation).
+For more details goto the [docs](https://docs.coollabs.io/coolify-v3/installation).
 
 Installation is automated with the following command:
 
@@ -79,9 +79,9 @@ Deploy your resource to:
 ### Services
 
 - [Appwrite](https://appwrite.io)
-- [WordPress](https://docs.coollabs.io/coolify/services/wordpress)
+- [WordPress](https://docs.coollabs.io/coolify-v3/services/wordpress)
 - [Ghost](https://ghost.org)
-- [Plausible Analytics](https://docs.coollabs.io/coolify/services/plausible-analytics)
+- [Plausible Analytics](https://docs.coollabs.io/coolify-v3/services/plausible-analytics)
 - [NocoDB](https://nocodb.com)
 - [VSCode Server](https://github.com/cdr/code-server)
 - [MinIO](https://min.io)
