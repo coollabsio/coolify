@@ -1,14 +1,19 @@
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import serve from '@fastify/static';
-import env from '@fastify/env';
-import cookie from '@fastify/cookie';
-import multipart from '@fastify/multipart';
-import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import env from '@fastify/env';
+import multipart from '@fastify/multipart';
+import serve from '@fastify/static';
+import Fastify from 'fastify';
 import socketIO from 'fastify-socket.io';
+import path, { join } from 'path';
 import socketIOServer from './realtime';
 
+import Graceful from '@ladjs/graceful';
+import { compareVersions } from 'compare-versions';
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
+import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
 import {
 	cleanupDockerStorage,
 	createRemoteEngineConfiguration,
@@ -22,14 +27,9 @@ import {
 	startTraefikTCPProxy,
 	version
 } from './lib/common';
-import { scheduler } from './lib/scheduler';
-import { compareVersions } from 'compare-versions';
-import Graceful from '@ladjs/graceful';
-import yaml from 'js-yaml';
-import fs from 'fs/promises';
-import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
-import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
+import { scheduler } from './lib/scheduler';
+import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
 declare module 'fastify' {
 	interface FastifyInstance {
@@ -548,7 +548,11 @@ async function copySSLCertificates() {
 	} catch (error) {
 		console.log(error);
 	} finally {
-		await executeCommand({ command: `find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete` });
+		try {
+			await executeCommand({ command: `find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete` });
+		} catch (e) {
+			console.log(e);
+		}
 	}
 }
 
