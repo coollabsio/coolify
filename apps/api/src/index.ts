@@ -188,17 +188,17 @@ const host = '0.0.0.0';
 		// Refresh and check templates
 		setInterval(async () => {
 			await refreshTemplates();
-		}, 60000);
+		}, 60000 * 10);
 
 		setInterval(async () => {
 			await refreshTags();
-		}, 60000);
+		}, 60000 * 10);
 
 		setInterval(
 			async () => {
 				await migrateServicesToNewTemplate();
 			},
-			isDev ? 10000 : 60000
+			isDev ? 10000 : 60000 * 10
 		);
 
 		setInterval(async () => {
@@ -233,7 +233,7 @@ async function getIPAddress() {
 			console.log(`Getting public IPv6 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } });
 		}
-	} catch (error) {}
+	} catch (error) { }
 }
 async function getTagsTemplates() {
 	const { default: got } = await import('got');
@@ -245,7 +245,7 @@ async function getTagsTemplates() {
 				if (await fs.stat('./testTemplate.yaml')) {
 					templates = templates + (await fs.readFile('./testTemplate.yaml', 'utf8'));
 				}
-			} catch (error) {}
+			} catch (error) { }
 			try {
 				if (await fs.stat('./testTags.json')) {
 					const testTags = await fs.readFile('./testTags.json', 'utf8');
@@ -253,7 +253,7 @@ async function getTagsTemplates() {
 						tags = JSON.stringify(JSON.parse(tags).concat(JSON.parse(testTags)));
 					}
 				}
-			} catch (error) {}
+			} catch (error) { }
 
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)));
 			await fs.writeFile('./tags.json', tags);
@@ -293,7 +293,7 @@ async function initServer() {
 	try {
 		console.log(`[001] Initializing server...`);
 		await executeCommand({ command: `docker network create --attachable coolify` });
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		console.log(`[002] Cleanup stucked builds...`);
 		const isOlder = compareVersions('3.8.1', version);
@@ -303,7 +303,7 @@ async function initServer() {
 				data: { status: 'failed' }
 			});
 		}
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
 		if (!isDev) await fs.rm('/tmp/build-sources', { recursive: true, force: true });
@@ -319,7 +319,7 @@ async function getArch() {
 			console.log(`Getting architecture...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { arch: process.arch } });
 		}
-	} catch (error) {}
+	} catch (error) { }
 }
 
 async function cleanupStuckedContainers() {
@@ -477,7 +477,7 @@ async function checkProxies() {
 				}
 				try {
 					await createRemoteEngineConfiguration(docker.id);
-				} catch (error) {}
+				} catch (error) { }
 			}
 		}
 		// TCP Proxies
@@ -516,7 +516,7 @@ async function checkProxies() {
 		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
 		// 	}
 		// }
-	} catch (error) {}
+	} catch (error) { }
 }
 
 async function copySSLCertificates() {
