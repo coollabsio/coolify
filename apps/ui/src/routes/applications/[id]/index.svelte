@@ -36,6 +36,7 @@
 	import Beta from '$lib/components/Beta.svelte';
 	import Explainer from '$lib/components/Explainer.svelte';
 	import Setting from '$lib/components/Setting.svelte';
+	import CopyPasswordField from '$lib/components/CopyPasswordField.svelte';
 	import {
 		addToast,
 		appSession,
@@ -215,9 +216,7 @@
 				isHttp2,
 				branch: application.branch,
 				projectId: application.projectId,
-				basicAuth,
-				basicAuthUser: application.basicAuthUser,
-				basicAuthPw: application.basicAuthPw
+				basicAuth
 			});
 			return addToast({
 				message: $t('application.settings_saved'),
@@ -282,6 +281,7 @@
 					}
 				}
 			}
+			console.log(application);
 			await saveForm(id, application, baseDatabaseBranch, dockerComposeConfiguration);
 			setLocation(application, settings);
 			$isDeploymentEnabled = checkIfDeploymentEnabledApplications(application);
@@ -762,55 +762,6 @@
 						/>
 					</div>
 
-					<div class="grid grid-cols-2 items-center">
-						<Setting
-							id="basicAuth"
-							dataTooltip={$t('forms.must_be_stopped_to_modify')}
-							disabled={isDisabled}
-							isCenter={false}
-							bind:setting={basicAuth}
-							title={$t('application.basic_auth')}
-							description="Activate basic authentication for your application. <br>Useful if you want to protect your application with a password. <br><br>Use the <span class='font-bold text-settings'>username</span> and <span class='font-bold text-settings'>password</span> fields to set the credentials."
-							on:click={() => !isDisabled && changeSettings('basicAuth')}
-						/>
-					</div>
-
-					{#if basicAuth}
-						<div class="grid grid-cols-2 items-center">
-							<label for="basicAuthUser">{$t('application.basic_auth_user')}</label>
-							<input
-								bind:this={fqdnEl}
-								class="w-full"
-								required={!application.settings?.basicAuth}
-								readonly={isDisabled}
-								disabled={isDisabled}
-								name="basicAuthUser"
-								id="basicAuthUser"
-								class:border={!application.settings?.basicAuth && !application.basicAuthUser}
-								class:border-red-500={!application.settings?.basicAuth &&
-									!application.basicAuthUser}
-								bind:value={application.basicAuthUser}
-								placeholder="eg: admin"
-							/>
-						</div>
-						<div class="grid grid-cols-2 items-center">
-							<label for="basicAuthPw">{$t('application.basic_auth_pw')}</label>
-							<input
-								bind:this={fqdnEl}
-								class="w-full"
-								required={!application.settings?.basicAuth}
-								readonly={isDisabled}
-								disabled={isDisabled}
-								name="basicAuthPw"
-								id="basicAuthPw"
-								class:border={!application.settings?.basicAuth && !application.basicAuthPw}
-								class:border-red-500={!application.settings?.basicAuth && !application.basicAuthPw}
-								bind:value={application.basicAuthPw}
-								placeholder="**********"
-							/>
-						</div>
-					{/if}
-
 					{#if isHttps && application.buildPack !== 'compose'}
 						<div class="grid grid-cols-2 items-center pb-4">
 							<Setting
@@ -833,6 +784,46 @@
 							on:click={() => changeSettings('isHttp2')}
 						/>
 					</div>
+					<div class="grid grid-cols-2 items-center">
+						<Setting
+							id="basicAuth"
+							isCenter={false}
+							bind:setting={basicAuth}
+							title={$t('application.basic_auth')}
+							description="Activate basic authentication for your application. <br>Useful if you want to protect your application with a password. <br><br>Use the <span class='font-bold text-settings'>username</span> and <span class='font-bold text-settings'>password</span> fields to set the credentials."
+							on:click={() => changeSettings('basicAuth')}
+						/>
+					</div>
+
+					{#if basicAuth}
+						<div class="grid grid-cols-2 items-center">
+							<label for="basicAuthUser">{$t('application.basic_auth_user')}</label>
+							<input
+								bind:this={fqdnEl}
+								class="w-full"
+								required={!application.settings?.basicAuth}
+								name="basicAuthUser"
+								id="basicAuthUser"
+								class:border={!application.settings?.basicAuth && !application.basicAuthUser}
+								class:border-red-500={!application.settings?.basicAuth &&
+									!application.basicAuthUser}
+								bind:value={application.basicAuthUser}
+								placeholder="eg: admin"
+							/>
+						</div>
+						<div class="grid grid-cols-2 items-center">
+							<label for="basicAuthPw">{$t('application.basic_auth_pw')}</label>
+							<CopyPasswordField
+								bind:this={fqdnEl}
+								isPasswordField={true}
+								required={!application.settings?.basicAuth}
+								name="basicAuthPw"
+								id="basicAuthPw"
+								bind:value={application.basicAuthPw}
+								placeholder="**********"
+							/>
+						</div>
+					{/if}
 				{/if}
 			</div>
 			{#if isSimpleDockerfile}

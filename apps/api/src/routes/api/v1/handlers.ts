@@ -19,8 +19,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { Login, Update } from '.';
 import type { GetCurrentUser } from './types';
 
-export async function hashPassword(password: string): Promise<string> {
-	const saltRounds = 15;
+export async function hashPassword(password: string, saltRounds = 15): Promise<string> {
 	return bcrypt.hash(password, saltRounds);
 }
 
@@ -77,7 +76,7 @@ export async function refreshTags() {
 							tags = JSON.parse(tags).concat(JSON.parse(testTags));
 						}
 					}
-				} catch (error) {}
+				} catch (error) { }
 				await fs.writeFile('./tags.json', tags);
 			} else {
 				const tags = await got.get('https://get.coollabs.io/coolify/service-tags.json').text();
@@ -102,7 +101,7 @@ export async function refreshTemplates() {
 					if (await fs.stat('./testTemplate.yaml')) {
 						templates = templates + (await fs.readFile('./testTemplate.yaml', 'utf8'));
 					}
-				} catch (error) {}
+				} catch (error) { }
 				const response = await fs.readFile('./devTemplates.yaml', 'utf8');
 				await fs.writeFile('./templates.json', JSON.stringify(yaml.load(response)));
 			} else {
