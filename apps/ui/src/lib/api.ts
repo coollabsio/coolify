@@ -1,5 +1,6 @@
 import { dev } from '$app/env';
 import Cookies from 'js-cookie';
+import { dashify } from './common';
 
 export function getAPIUrl() {
 	if (GITPOD_WORKSPACE_URL) {
@@ -100,6 +101,14 @@ async function send({
 			responseData = await response.json();
 		} else if (contentType?.indexOf('text/plain') !== -1) {
 			responseData = await response.text();
+		} else if (contentType?.indexOf('application/octet-stream') !== -1) {
+			responseData = await response.blob();
+			const fileName = dashify(data.id + '-' + data.name)
+			const fileLink = document.createElement('a');
+			fileLink.href = URL.createObjectURL(new Blob([responseData]))
+			fileLink.download = fileName + '.gz';
+			fileLink.click();
+			fileLink.remove();
 		} else {
 			return {};
 		}

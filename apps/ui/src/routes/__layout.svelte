@@ -65,7 +65,6 @@
 
 <script lang="ts">
 	export let settings: any;
-	export let sentryDSN: any;
 	export let baseSettings: any;
 	export let pendingInvitations: any = 0;
 
@@ -98,10 +97,6 @@
 	import Toasts from '$lib/components/Toasts.svelte';
 	import Tooltip from '$lib/components/Tooltip.svelte';
 	import { onMount } from 'svelte';
-	import LocalePicker from '$lib/components/LocalePicker.svelte';
-	import * as Sentry from '@sentry/svelte';
-	import { BrowserTracing } from '@sentry/tracing';
-	import { dev } from '$app/env';
 
 	if (userId) $appSession.userId = userId;
 	if (teamId) $appSession.teamId = teamId;
@@ -293,7 +288,7 @@
 						</a>
 						<a
 							id="documentation"
-							href="https://docs.coollabs.io/coolify/"
+							href="https://docs.coollabs.io/coolify-v3/"
 							target="_blank"
 							rel="noreferrer external"
 							class="icons hover:text-info"
@@ -384,7 +379,7 @@
 	</div>
 	<div class="drawer-side">
 		<label for="main-drawer" class="drawer-overlay w-full" />
-		<ul class="menu bg-coolgray-200 w-60 p-2  space-y-3 pt-4 ">
+		<ul class="menu bg-coolgray-200 w-60 p-2 space-y-3 pt-4">
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-pink-500"
@@ -498,7 +493,7 @@
 			<li>
 				<a
 					class="no-underline icons hover:text-white hover:bg-info"
-					href="https://docs.coollabs.io/coolify/"
+					href="https://docs.coollabs.io/coolify-v3/"
 					target="_blank"
 					rel="noreferrer external"
 				>

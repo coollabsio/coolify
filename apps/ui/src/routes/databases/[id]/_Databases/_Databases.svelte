@@ -13,17 +13,19 @@
 	import Redis from './_Redis.svelte';
 	import CouchDb from './_CouchDb.svelte';
 	import EdgeDB from './_EdgeDB.svelte';
-	import { post } from '$lib/api';
+	import { get, post } from '$lib/api';
 	import { t } from '$lib/translations';
 	import { errorNotification } from '$lib/common';
 	import { addToast, appSession, status } from '$lib/store';
 	import Explainer from '$lib/components/Explainer.svelte';
+	import Tooltip from '$lib/components/Tooltip.svelte';
 
 	const { id } = $page.params;
 
 	let loading = {
 		main: false,
-		public: false
+		public: false,
+		backup: false
 	};
 	let publicUrl = '';
 	let appendOnly = database.settings.appendOnly;
@@ -109,6 +111,7 @@
 			if ($status.database.isPublic) {
 				database.publicPort = publicPort;
 			}
+			generateUrl();
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
@@ -130,6 +133,22 @@
 			loading.main = false;
 		}
 	}
+	async function backupDatabase() {
+		try {
+			loading.backup = true;
+			addToast({
+				message:
+					'Backup will be downloaded soon and saved to /var/lib/docker/volumes/coolify-local-backup/ on the host system.',
+				type: 'success',
+				timeout: 15000
+			});
+			return await post(`/databases/${id}/backup`, { id, name: database.name });
+		} catch (error) {
+			return errorNotification(error);
+		} finally {
+			loading.backup = false;
+		}
+	}
 </script>
 
 <div class="mx-auto max-w-6xl p-4">
@@ -144,6 +163,19 @@
 					class:bg-databases={!loading.main}
 					disabled={loading.main}>{$t('forms.save')}</button
 				>
+				{#if database.type !== 'redis' && database.type !== 'edgedb'}
+					{#if $status.database.isRunning}
+						<button
+							class="btn btn-sm"
+							on:click={backupDatabase}
+							class:loading={loading.backup}
+							class:bg-databases={!loading.backup}
+							disabled={loading.backup}>Backup Database</button
+						>
+					{:else}
+						<button disabled class="btn btn-sm">Backup Database (start the database)</button>
+					{/if}
+				{/if}
 			{/if}
 		</div>
 		<div class="grid gap-2 grid-cols-2 auto-rows-max lg:px-10 px-2">

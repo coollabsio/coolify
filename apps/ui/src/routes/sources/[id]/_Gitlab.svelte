@@ -52,7 +52,7 @@
 					appSecret: source.gitlabApp.appSecret,
 					groupName: source.gitlabApp.groupName,
 					customPort: source.customPort,
-					customUser: source.customUser,
+					customUser: source.customUser
 				});
 				const from = $page.url.searchParams.get('from');
 				if (from) {
@@ -169,8 +169,8 @@
 		<div class="grid grid-flow-row gap-2 lg:px-10">
 			{#if !source.gitlabAppId}
 				<a
-					href="https://docs.coollabs.io/coolify/sources#how-to-integrate-with-gitlab"
-					class="font-bold "
+					href="https://docs.coollabs.io-v3/coolify/sources#how-to-integrate-with-gitlab"
+					class="font-bold"
 					target="_blank noreferrer"
 					rel="noopener noreferrer">Documentation and detailed instructions.</a
 				>

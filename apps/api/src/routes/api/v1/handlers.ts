@@ -12,7 +12,6 @@ import {
 	prisma,
 	uniqueName,
 	version,
-	sentryDSN,
 	executeCommand
 } from '../../../lib/common';
 import { scheduler } from '../../../lib/scheduler';
@@ -164,7 +163,7 @@ export async function update(request: FastifyRequest<Update>) {
 				await executeCommand({ command: `docker pull ${image}` });
 			}
 
-			await executeCommand({ shell: true, command: `env | grep COOLIFY > .env` });
+			await executeCommand({ shell: true, command: `ls .env || env | grep COOLIFY > .env` });
 			await executeCommand({
 				command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 			});
@@ -452,7 +451,6 @@ export async function getCurrentUser(request: FastifyRequest<GetCurrentUser>, fa
 	});
 	return {
 		settings: await prisma.setting.findUnique({ where: { id: '0' } }),
-		sentryDSN,
 		pendingInvitations,
 		token,
 		...request.user

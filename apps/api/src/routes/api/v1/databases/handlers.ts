@@ -5,6 +5,7 @@ import yaml from 'js-yaml';
 import fs from 'fs/promises';
 import {
 	ComposeFile,
+	backupPostgresqlDatabase,
 	createDirectories,
 	decrypt,
 	defaultComposeConfiguration,
@@ -347,6 +348,21 @@ export async function startDatabase(request: FastifyRequest<OnlyId>) {
 		});
 		if (isPublic) await startTraefikTCPProxy(destinationDocker, id, publicPort, privatePort);
 		return {};
+	} catch ({ status, message }) {
+		return errorHandler({ status, message });
+	}
+}
+export async function backupDatabase(request: FastifyRequest<OnlyId>, reply: FastifyReply) {
+	try {
+		const teamId = request.user.teamId;
+		const { id } = request.params;
+		const database = await prisma.database.findFirst({
+			where: { id, teams: { some: { id: teamId === '0' ? undefined : teamId } } },
+			include: { destinationDocker: true, settings: true }
+		});
+		if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
+		if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
+		return await backupPostgresqlDatabase(database, reply);
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
 	}

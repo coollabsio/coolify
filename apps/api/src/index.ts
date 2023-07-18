@@ -1,14 +1,19 @@
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import serve from '@fastify/static';
-import env from '@fastify/env';
-import cookie from '@fastify/cookie';
-import multipart from '@fastify/multipart';
-import path, { join } from 'path';
 import autoLoad from '@fastify/autoload';
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import env from '@fastify/env';
+import multipart from '@fastify/multipart';
+import serve from '@fastify/static';
+import Fastify from 'fastify';
 import socketIO from 'fastify-socket.io';
+import path, { join } from 'path';
 import socketIOServer from './realtime';
 
+import Graceful from '@ladjs/graceful';
+import { compareVersions } from 'compare-versions';
+import fs from 'fs/promises';
+import yaml from 'js-yaml';
+import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
 import {
 	cleanupDockerStorage,
 	createRemoteEngineConfiguration,
@@ -18,26 +23,20 @@ import {
 	isDev,
 	listSettings,
 	prisma,
-	sentryDSN,
 	startTraefikProxy,
 	startTraefikTCPProxy,
 	version
 } from './lib/common';
-import { scheduler } from './lib/scheduler';
-import { compareVersions } from 'compare-versions';
-import Graceful from '@ladjs/graceful';
-import yaml from 'js-yaml';
-import fs from 'fs/promises';
-import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { checkContainer } from './lib/docker';
-import { migrateApplicationPersistentStorage, migrateServicesToNewTemplate } from './lib';
+import { scheduler } from './lib/scheduler';
+import { verifyRemoteDockerEngineFn } from './routes/api/v1/destinations/handlers';
 import { refreshTags, refreshTemplates } from './routes/api/v1/handlers';
-import * as Sentry from '@sentry/node';
 declare module 'fastify' {
 	interface FastifyInstance {
 		config: {
 			COOLIFY_APP_ID: string;
 			COOLIFY_SECRET_KEY: string;
+			COOLIFY_SECRET_KEY_BETTER: string | null;
 			COOLIFY_DATABASE_URL: string;
 			COOLIFY_IS_ON: string;
 			COOLIFY_WHITE_LABELED: string;
@@ -66,6 +65,10 @@ const host = '0.0.0.0';
 			},
 			COOLIFY_SECRET_KEY: {
 				type: 'string'
+			},
+			COOLIFY_SECRET_KEY_BETTER: {
+				type: 'string',
+				default: null
 			},
 			COOLIFY_DATABASE_URL: {
 				type: 'string',
@@ -185,17 +188,17 @@ const host = '0.0.0.0';
 		// Refresh and check templates
 		setInterval(async () => {
 			await refreshTemplates();
-		}, 60000);
+		}, 60000 * 10);
 
 		setInterval(async () => {
 			await refreshTags();
-		}, 60000);
+		}, 60000 * 10);
 
 		setInterval(
 			async () => {
 				await migrateServicesToNewTemplate();
 			},
-			isDev ? 10000 : 60000
+			isDev ? 10000 : 60000 * 10
 		);
 
 		setInterval(async () => {
@@ -230,7 +233,7 @@ async function getIPAddress() {
 			console.log(`Getting public IPv6 address...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { ipv6 } });
 		}
-	} catch (error) {}
+	} catch (error) { }
 }
 async function getTagsTemplates() {
 	const { default: got } = await import('got');
@@ -242,7 +245,7 @@ async function getTagsTemplates() {
 				if (await fs.stat('./testTemplate.yaml')) {
 					templates = templates + (await fs.readFile('./testTemplate.yaml', 'utf8'));
 				}
-			} catch (error) {}
+			} catch (error) { }
 			try {
 				if (await fs.stat('./testTags.json')) {
 					const testTags = await fs.readFile('./testTags.json', 'utf8');
@@ -250,7 +253,7 @@ async function getTagsTemplates() {
 						tags = JSON.stringify(JSON.parse(tags).concat(JSON.parse(testTags)));
 					}
 				}
-			} catch (error) {}
+			} catch (error) { }
 
 			await fs.writeFile('./templates.json', JSON.stringify(yaml.load(templates)));
 			await fs.writeFile('./tags.json', tags);
@@ -276,9 +279,6 @@ async function initServer() {
 		if (settings.doNotTrack === true) {
 			console.log('[000] Telemetry disabled...');
 		} else {
-			if (settings.sentryDSN !== sentryDSN) {
-				await prisma.setting.update({ where: { id: '0' }, data: { sentryDSN } });
-			}
 			// Initialize Sentry
 			// Sentry.init({
 			// 	dsn: sentryDSN,
@@ -293,7 +293,7 @@ async function initServer() {
 	try {
 		console.log(`[001] Initializing server...`);
 		await executeCommand({ command: `docker network create --attachable coolify` });
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		console.log(`[002] Cleanup stucked builds...`);
 		const isOlder = compareVersions('3.8.1', version);
@@ -303,7 +303,7 @@ async function initServer() {
 				data: { status: 'failed' }
 			});
 		}
-	} catch (error) {}
+	} catch (error) { }
 	try {
 		console.log('[003] Cleaning up old build sources under /tmp/build-sources/...');
 		if (!isDev) await fs.rm('/tmp/build-sources', { recursive: true, force: true });
@@ -319,7 +319,7 @@ async function getArch() {
 			console.log(`Getting architecture...`);
 			await prisma.setting.update({ where: { id: settings.id }, data: { arch: process.arch } });
 		}
-	} catch (error) {}
+	} catch (error) { }
 }
 
 async function cleanupStuckedContainers() {
@@ -402,7 +402,9 @@ async function autoUpdater() {
 				if (!isDev) {
 					const { isAutoUpdateEnabled } = await prisma.setting.findFirst();
 					if (isAutoUpdateEnabled) {
-						await executeCommand({ command: `docker pull ghcr.io/coollabsio/coolify:${latestVersion}` });
+						await executeCommand({
+							command: `docker pull ghcr.io/coollabsio/coolify:${latestVersion}`
+						});
 						await executeCommand({ shell: true, command: `env | grep '^COOLIFY' > .env` });
 						await executeCommand({
 							command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
@@ -475,7 +477,7 @@ async function checkProxies() {
 				}
 				try {
 					await createRemoteEngineConfiguration(docker.id);
-				} catch (error) {}
+				} catch (error) { }
 			}
 		}
 		// TCP Proxies
@@ -514,7 +516,7 @@ async function checkProxies() {
 		// 		await startTraefikTCPProxy(destinationDocker, id, publicPort, 9000);
 		// 	}
 		// }
-	} catch (error) {}
+	} catch (error) { }
 }
 
 async function copySSLCertificates() {
@@ -546,7 +548,11 @@ async function copySSLCertificates() {
 	} catch (error) {
 		console.log(error);
 	} finally {
-		await executeCommand({ command: `find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete` });
+		try {
+			await executeCommand({ command: `find /tmp/ -maxdepth 1 -type f -name '*-*.pem' -delete` });
+		} catch (e) {
+			console.log(e);
+		}
 	}
 }
 
@@ -604,53 +610,54 @@ async function cleanupStorage() {
 			if (!destination.remoteVerified) continue;
 			enginesDone.add(destination.remoteIpAddress);
 		}
-		let lowDiskSpace = false;
-		try {
-			let stdout = null;
-			if (!isDev) {
-				const output = await executeCommand({
-					dockerId: destination.id,
-					command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'`,
-					shell: true
-				});
-				stdout = output.stdout;
-			} else {
-				const output = await executeCommand({
-					command: `df -kPT /`
-				});
-				stdout = output.stdout;
-			}
-			let lines = stdout.trim().split('\n');
-			let header = lines[0];
-			let regex =
-				/^Filesystem\s+|Type\s+|1024-blocks|\s+Used|\s+Available|\s+Capacity|\s+Mounted on\s*$/g;
-			const boundaries = [];
-			let match;
+		await cleanupDockerStorage(destination.id);
+		// let lowDiskSpace = false;
+		// try {
+		// 	let stdout = null;
+		// 	if (!isDev) {
+		// 		const output = await executeCommand({
+		// 			dockerId: destination.id,
+		// 			command: `CONTAINER=$(docker ps -lq | head -1) && docker exec $CONTAINER sh -c 'df -kPT /'`,
+		// 			shell: true
+		// 		});
+		// 		stdout = output.stdout;
+		// 	} else {
+		// 		const output = await executeCommand({
+		// 			command: `df -kPT /`
+		// 		});
+		// 		stdout = output.stdout;
+		// 	}
+		// 	let lines = stdout.trim().split('\n');
+		// 	let header = lines[0];
+		// 	let regex =
+		// 		/^Filesystem\s+|Type\s+|1024-blocks|\s+Used|\s+Available|\s+Capacity|\s+Mounted on\s*$/g;
+		// 	const boundaries = [];
+		// 	let match;
 
-			while ((match = regex.exec(header))) {
-				boundaries.push(match[0].length);
-			}
+		// 	while ((match = regex.exec(header))) {
+		// 		boundaries.push(match[0].length);
+		// 	}
 
-			boundaries[boundaries.length - 1] = -1;
-			const data = lines.slice(1).map((line) => {
-				const cl = boundaries.map((boundary) => {
-					const column = boundary > 0 ? line.slice(0, boundary) : line;
-					line = line.slice(boundary);
-					return column.trim();
-				});
-				return {
-					capacity: Number.parseInt(cl[5], 10) / 100
-				};
-			});
-			if (data.length > 0) {
-				const { capacity } = data[0];
-				if (capacity > 0.8) {
-					lowDiskSpace = true;
-				}
-			}
-		} catch (error) {}
-		if (lowDiskSpace) {
-			await cleanupDockerStorage(destination.id);
-		}
+		// 	boundaries[boundaries.length - 1] = -1;
+		// 	const data = lines.slice(1).map((line) => {
+		// 		const cl = boundaries.map((boundary) => {
+		// 			const column = boundary > 0 ? line.slice(0, boundary) : line;
+		// 			line = line.slice(boundary);
+		// 			return column.trim();
+		// 		});
+		// 		return {
+		// 			capacity: Number.parseInt(cl[5], 10) / 100
+		// 		};
+		// 	});
+		// 	if (data.length > 0) {
+		// 		const { capacity } = data[0];
+		// 		if (capacity > 0.8) {
+		// 			lowDiskSpace = true;
+		// 		}
+		// 	}
+		// } catch (error) {}
+		// if (lowDiskSpace) {
+		// await cleanupDockerStorage(destination.id);
+		// }
 	}
 }

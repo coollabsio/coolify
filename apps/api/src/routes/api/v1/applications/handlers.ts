@@ -646,8 +646,7 @@ export async function restartApplication(
 
 			const volumes =
 				persistentStorage?.map((storage) => {
-					return `${applicationId}${storage.path.replace(/\//gi, '-')}:${buildPack !== 'docker' ? '/app' : ''
-						}${storage.path}`;
+					return `${applicationId}${storage.path.replace(/\//gi, '-')}:${storage.path}`;
 				}) || [];
 			const composeVolumes = volumes.map((volume) => {
 				return {
