@@ -1,6 +1,5 @@
-import { exec } from 'node:child_process';
-import util from 'util';
 import fs from 'fs/promises';
+import fsNormal from 'fs';
 import yaml from 'js-yaml';
 import forge from 'node-forge';
 import { uniqueNamesGenerator, adjectives, colors, animals } from 'unique-names-generator';
@@ -17,6 +16,7 @@ import { day } from './dayjs';
 import { saveBuildLog } from './buildPacks/common';
 import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
+import { FastifyReply } from 'fastify';
 
 export const version = '3.12.34';
 export const isDev = process.env.NODE_ENV === 'development';
@@ -1941,4 +1941,52 @@ export function generateSecrets(
 		envs.push(`NODE_ENV=production`);
 	}
 	return envs;
+}
+
+export async function backupPostgresqlDatabase(database, reply) {
+	const backupFolder = '/tmp'
+	const fileName = `${database.id}-${new Date().getTime()}.gz`
+	const backupFileName = `${backupFolder}/${fileName}`
+	console.log({ database })
+	let command = null
+	switch (database?.type) {
+		case 'postgresql':
+			command = `docker exec ${database.id} sh -c "PGPASSWORD=${database.rootUserPassword} pg_dumpall -U postgres | gzip > ${backupFileName}"`
+			break;
+		case 'mongodb':
+			command = `docker exec ${database.id} sh -c "mongodump --archive=${backupFileName} --gzip --username=${database.rootUser} --password=${database.rootUserPassword}"`
+			break;
+		case 'mysql':
+			command = `docker exec ${database.id} sh -c "mysqldump --all-databases --single-transaction --quick --lock-tables=false --user=${database.rootUser} --password=${database.rootUserPassword} | gzip > ${backupFileName}"`
+			break;
+		case 'mariadb':
+			command = `docker exec ${database.id} sh -c "mysqldump --all-databases --single-transaction --quick --lock-tables=false --user=${database.rootUser} --password=${database.rootUserPassword} | gzip > ${backupFileName}"`
+			break;
+		case 'couchdb':
+			command = `docker exec ${database.id} sh -c "tar -czvf ${backupFileName} /bitnami/couchdb/data"`
+			break;
+		default:
+			return;
+	}
+	await executeCommand({
+		dockerId: database.destinationDockerId,
+		command,
+	});
+	const copyCommand = `docker cp ${database.id}:${backupFileName} ${backupFileName}`
+	await executeCommand({
+		dockerId: database.destinationDockerId,
+		command: copyCommand
+	});
+	if (isDev) {
+		await executeCommand({
+			dockerId: database.destinationDockerId,
+			command: `docker cp ${database.id}:${backupFileName} /app/backups/`
+		});
+	}
+	const stream = fsNormal.createReadStream(backupFileName);
+	reply.header('Content-Type', 'application/octet-stream');
+	reply.header('Content-Disposition', `attachment; filename=${fileName}`);
+	reply.header('Content-Length', fsNormal.statSync(backupFileName).size);
+	reply.header('Content-Transfer-Encoding', 'binary');
+	return reply.send(stream)
 }
