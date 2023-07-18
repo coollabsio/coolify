@@ -1,5 +1,5 @@
 import { FastifyRequest } from 'fastify';
-import { errorHandler, getDomain, isDev, prisma, executeCommand } from '../../../lib/common';
+import { errorHandler, executeCommand, getDomain, isDev, prisma } from '../../../lib/common';
 import { getTemplates } from '../../../lib/services';
 import { OnlyId } from '../../../types';
 import { parseAndFindServiceTemplates } from '../../api/v1/services/handlers';
@@ -48,20 +48,30 @@ function generateRouters(
 	isWWW,
 	isDualCerts,
 	isCustomSSL,
-	isHttp2 = false
+	isHttp2 = false,
+	basicAuth = false,
+	basicAuthUser = '',
+	basicAuthPw = ''
 ) {
-	let rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
-	let ruleWWW = `Host(\`www.${nakedDomain}\`)${
+	const rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
+	const ruleWWW = `Host(\`www.${nakedDomain}\`)${
 		pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''
 	}`;
-	let http: any = {
+
+	const httpBasicAuth: any = {
+		basicauth: {
+			users: [Buffer.from(basicAuthUser + ':' + basicAuthPw).toString('base64')]
+		}
+	};
+
+	const http: any = {
 		entrypoints: ['web'],
 		rule,
 		service: `${serviceId}`,
 		priority: 2,
 		middlewares: []
 	};
-	let https: any = {
+	const https: any = {
 		entrypoints: ['websecure'],
 		rule,
 		service: `${serviceId}`,
@@ -71,14 +81,14 @@ function generateRouters(
 		},
 		middlewares: []
 	};
-	let httpWWW: any = {
+	const httpWWW: any = {
 		entrypoints: ['web'],
 		rule: ruleWWW,
 		service: `${serviceId}`,
 		priority: 2,
 		middlewares: []
 	};
-	let httpsWWW: any = {
+	const httpsWWW: any = {
 		entrypoints: ['websecure'],
 		rule: ruleWWW,
 		service: `${serviceId}`,
@@ -97,6 +107,10 @@ function generateRouters(
 		httpsWWW.middlewares.push('redirect-to-non-www');
 		delete https.tls;
 		delete httpsWWW.tls;
+
+		if (basicAuth) {
+			http.middlewares.push(`${serviceId}-${pathPrefix}-basic-auth`);
+		}
 	}
 
 	// 3. http + www only
@@ -108,6 +122,10 @@ function generateRouters(
 		https.middlewares.push('redirect-to-www');
 		delete https.tls;
 		delete httpsWWW.tls;
+
+		if (basicAuth) {
+			httpWWW.middlewares.push(`${serviceId}-${pathPrefix}-basic-auth`);
+		}
 	}
 	// 5. https + non-www only
 	if (isHttps && !isWWW) {
@@ -136,6 +154,10 @@ function generateRouters(
 				};
 			}
 		}
+
+		if (basicAuth) {
+			https.middlewares.push(`${serviceId}-${pathPrefix}-basic-auth`);
+		}
 	}
 	// 6. https + www only
 	if (isHttps && isWWW) {
@@ -145,6 +167,11 @@ function generateRouters(
 			http.middlewares.push('redirect-to-www');
 			https.middlewares.push('redirect-to-www');
 		}
+
+		if (basicAuth) {
+			httpsWWW.middlewares.push(`${serviceId}-${pathPrefix}-basic-auth`);
+		}
+
 		if (isCustomSSL) {
 			if (isDualCerts) {
 				https.tls = true;
@@ -166,23 +193,23 @@ function generateRouters(
 		}
 	}
 	if (isHttp2) {
-		let http2 = {
+		const http2 = {
 			...http,
 			service: `${serviceId}-http2`,
 			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
 		};
-		let http2WWW = {
+		const http2WWW = {
 			...httpWWW,
 			service: `${serviceId}-http2`,
 			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
 		};
-		let https2 = {
+		const https2 = {
 			...https,
 			service: `${serviceId}-http2`,
 			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
 		};
 
-		let https2WWW = {
+		const https2WWW = {
 			...httpsWWW,
 			service: `${serviceId}-http2`,
 			rule: `${rule} && HeadersRegexp(\`Content-Type\`, \`application/grpc*\`)`
@@ -198,14 +225,21 @@ function generateRouters(
 			[`${serviceId}-${pathPrefix}-secure-www-http2`]: { ...https2WWW }
 		};
 	}
-	return {
+
+	const result = {
 		[`${serviceId}-${pathPrefix}`]: { ...http },
 		[`${serviceId}-${pathPrefix}-secure`]: { ...https },
 		[`${serviceId}-${pathPrefix}-www`]: { ...httpWWW },
 		[`${serviceId}-${pathPrefix}-secure-www`]: { ...httpsWWW }
 	};
+
+	if (basicAuth) {
+		result[`${serviceId}-${pathPrefix}-basic-auth`] = { ...httpBasicAuth };
+	}
+
+	return result;
 }
-export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote: boolean = false) {
+export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote = false) {
 	const traefik = {
 		tls: {
 			certificates: []
@@ -298,7 +332,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 			});
 		}
 
-		let parsedCertificates = [];
+		const parsedCertificates = [];
 		for (const certificate of certificates) {
 			parsedCertificates.push({
 				certFile: `${sslpath}/${certificate.id}-cert.pem`,
@@ -369,7 +403,9 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						dockerComposeConfiguration,
 						destinationDocker,
 						destinationDockerId,
-						settings
+						settings,
+						basicAuthUser,
+						basicAuthPw
 					} = application;
 					if (!destinationDockerId) {
 						continue;
@@ -424,7 +460,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						}
 						continue;
 					}
-					const { previews, dualCerts, isCustomSSL, isHttp2 } = settings;
+					const { previews, dualCerts, isCustomSSL, isHttp2, basicAuth } = settings;
 					const { network, id: dockerId } = destinationDocker;
 					if (!fqdn) {
 						continue;
@@ -446,7 +482,10 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							isWWW,
 							dualCerts,
 							isCustomSSL,
-							isHttp2
+							isHttp2,
+							basicAuth,
+							basicAuthUser,
+							basicAuthPw
 						)
 					};
 					traefik.http.services = {
@@ -482,7 +521,11 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 											isHttps,
 											isWWW,
 											dualCerts,
-											isCustomSSL
+											isCustomSSL,
+											false,
+											basicAuth,
+											basicAuthUser,
+											basicAuthPw
 										)
 									};
 									traefik.http.services = {
@@ -542,7 +585,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						if (isDomainAndProxyConfiguration.length > 0) {
 							const template: any = await parseAndFindServiceTemplates(service, null, true);
 							const { proxy } = template.services[oneService] || found.services[oneService];
-							for (let configuration of proxy) {
+							for (const configuration of proxy) {
 								if (configuration.hostPort) {
 									continue;
 								}

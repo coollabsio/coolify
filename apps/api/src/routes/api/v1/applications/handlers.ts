@@ -504,12 +504,17 @@ export async function saveApplicationSettings(
 			isBot,
 			isDBBranching,
 			isCustomSSL,
-			isHttp2
+			isHttp2,
+			basicAuth,
+			basicAuthUser,
+			basicAuthPw
 		} = request.body;
 		await prisma.application.update({
 			where: { id },
 			data: {
 				fqdn: isBot ? null : undefined,
+				basicAuthUser,
+				basicAuthPw,
 				settings: {
 					update: {
 						debug,
@@ -519,7 +524,8 @@ export async function saveApplicationSettings(
 						isBot,
 						isDBBranching,
 						isCustomSSL,
-						isHttp2
+						isHttp2,
+						basicAuth,
 					}
 				}
 			},
