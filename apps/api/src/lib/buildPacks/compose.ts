@@ -52,7 +52,6 @@ export default async function (data) {
 		}
 
 		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
-		console.log({ key, environment });
 		if (Object.keys(environment).length > 0) {
 			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
 		}
