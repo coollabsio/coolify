@@ -109,6 +109,7 @@
 			if ($status.database.isPublic) {
 				database.publicPort = publicPort;
 			}
+			generateUrl();
 		} catch (error) {
 			return errorNotification(error);
 		} finally {
