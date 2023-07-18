@@ -28,6 +28,8 @@ export interface SaveApplication extends OnlyId {
 		dockerComposeConfiguration: string;
 		simpleDockerfile: string;
 		dockerRegistryImageName: string;
+		basicAuthPw: string;
+		basicAuthUser: string;
 	};
 }
 export interface SaveApplicationSettings extends OnlyId {
@@ -44,8 +46,6 @@ export interface SaveApplicationSettings extends OnlyId {
 		isCustomSSL: boolean;
 		isHttp2: boolean;
 		basicAuth: boolean;
-		basicAuthUser: string;
-		basicAuthPw: string;
 	};
 }
 export interface DeleteApplication extends OnlyId {

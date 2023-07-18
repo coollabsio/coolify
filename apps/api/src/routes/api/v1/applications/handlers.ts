@@ -398,7 +398,9 @@ export async function saveApplication(
 			dockerComposeFileLocation,
 			dockerComposeConfiguration,
 			simpleDockerfile,
-			dockerRegistryImageName
+			dockerRegistryImageName,
+			basicAuthPw,
+			basicAuthUser,
 		} = request.body;
 		if (port) port = Number(port);
 		if (exposePort) {
@@ -453,6 +455,8 @@ export async function saveApplication(
 					dockerComposeConfiguration,
 					simpleDockerfile,
 					dockerRegistryImageName,
+					basicAuthPw,
+					basicAuthUser,
 					...defaultConfiguration,
 					connectedDatabase: { update: { hostedDatabaseDBName: baseDatabaseBranch } }
 				}
@@ -476,6 +480,8 @@ export async function saveApplication(
 					dockerComposeFileLocation,
 					dockerComposeConfiguration,
 					simpleDockerfile,
+					basicAuthPw,
+					basicAuthUser,
 					dockerRegistryImageName,
 					...defaultConfiguration
 				}
@@ -499,22 +505,16 @@ export async function saveApplicationSettings(
 			previews,
 			dualCerts,
 			autodeploy,
-			branch,
-			projectId,
 			isBot,
 			isDBBranching,
 			isCustomSSL,
 			isHttp2,
 			basicAuth,
-			basicAuthUser,
-			basicAuthPw
 		} = request.body;
 		await prisma.application.update({
 			where: { id },
 			data: {
 				fqdn: isBot ? null : undefined,
-				basicAuthUser,
-				basicAuthPw,
 				settings: {
 					update: {
 						debug,
