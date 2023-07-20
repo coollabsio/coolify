@@ -167,7 +167,7 @@ const host = '0.0.0.0';
 		// autoUpdater
 		setInterval(async () => {
 			await autoUpdater();
-		}, 60000 * 15);
+		}, 60000 * 60);
 
 		// cleanupStorage
 		setInterval(async () => {
