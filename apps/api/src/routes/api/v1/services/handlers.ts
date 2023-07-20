@@ -985,11 +985,22 @@ export async function cleanupPlausibleLogs(request: FastifyRequest<OnlyId>, repl
 		const teamId = request.user.teamId;
 		const { destinationDockerId, destinationDocker } = await getServiceFromDB({ id, teamId });
 		if (destinationDockerId) {
-			await executeCommand({
+			const logTables = await executeCommand({
 				dockerId: destinationDocker.id,
-				command: `docker exec ${id}-clickhouse /usr/bin/clickhouse-client -q \\"SELECT name FROM system.tables WHERE name LIKE '%log%';\\"| xargs -I{} /usr/bin/clickhouse-client -q \"TRUNCATE TABLE system.{};\"`,
-				shell: true
+				command: `docker exec ${id}-clickhouse clickhouse-client -q "SELECT name FROM system.tables;"`,
+				shell: false
 			});
+			if (logTables.stdout !== '') {
+				const tables = logTables.stdout.split('\n').filter((t) => t.includes('_log'));
+				for (const table of tables) {
+					console.log(`Truncating table ${table}`)
+					await executeCommand({
+						dockerId: destinationDocker.id,
+						command: `docker exec ${id}-clickhouse clickhouse-client -q "TRUNCATE TABLE system.${table};"`,
+						shell: false
+					});
+				}
+			}
 			return await reply.code(201).send();
 		}
 		throw { status: 500, message: 'Could cleanup logs.' };
@@ -1105,17 +1116,14 @@ export async function activateWordpressFtp(
 							shell: true
 						});
 					}
-				} catch (error) {}
+				} catch (error) { }
 				const volumes = [
 					`${id}-wordpress-data:/home/${ftpUser}/wordpress`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.ed25519:/etc/ssh/ssh_host_ed25519_key`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.rsa:/etc/ssh/ssh_host_rsa_key`,
-					`${
-						isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
+					`${isDev ? hostkeyDir : '/var/lib/docker/volumes/coolify-ssl-certs/_data/hostkeys'
 					}/${id}.sh:/etc/sftp.d/chmod.sh`
 				];
 
@@ -1185,6 +1193,6 @@ export async function activateWordpressFtp(
 			await executeCommand({
 				command: `rm -fr ${hostkeyDir}/${id}-docker-compose.yml ${hostkeyDir}/${id}.ed25519 ${hostkeyDir}/${id}.ed25519.pub ${hostkeyDir}/${id}.rsa ${hostkeyDir}/${id}.rsa.pub ${hostkeyDir}/${id}.sh`
 			});
-		} catch (error) {}
+		} catch (error) { }
 	}
 }
