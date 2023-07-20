@@ -18,7 +18,7 @@ import { scheduler } from './scheduler';
 import type { ExecaChildProcess } from 'execa';
 import { FastifyReply } from 'fastify';
 
-export const version = '3.12.34';
+export const version = '3.12.35';
 export const isDev = process.env.NODE_ENV === 'development';
 export const proxyPort = process.env.COOLIFY_PROXY_PORT;
 export const proxySecurePort = process.env.COOLIFY_PROXY_SECURE_PORT;
