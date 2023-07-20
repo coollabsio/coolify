@@ -2546,7 +2546,7 @@
         - '3000'
 - templateVersion: 1.0.0
   defaultVersion: v2.0.0
-  documentation: https://plausible.io/doc/
+  documentation: https://plausible.io/docs/
   type: plausibleanalytics-arm
   name: Plausible Analytics (ARM)
   description: A lightweight and open-source website analytics tool.
@@ -2710,7 +2710,7 @@
       description: This is the default script name.
 - templateVersion: 1.0.0
   defaultVersion: v2.0.0
-  documentation: https://plausible.io/doc/
+  documentation: https://plausible.io/docs/
   arch: amd64
   type: plausibleanalytics
   name: Plausible Analytics
