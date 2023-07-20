@@ -415,9 +415,6 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							}
 						};
 					}
-					console.log({ httpBasicAuth })
-
-
 					if (buildPack === 'compose') {
 						const services = Object.entries(JSON.parse(dockerComposeConfiguration));
 						if (services.length > 0) {
