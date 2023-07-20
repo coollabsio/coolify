@@ -185,14 +185,14 @@ const host = '0.0.0.0';
 			await checkFluentBit();
 		}, 60000);
 
-		// Refresh and check templates
-		setInterval(async () => {
-			await refreshTemplates();
-		}, 60000 * 10);
+		// // Refresh and check templates
+		// setInterval(async () => {
+		// 	await refreshTemplates();
+		// }, 60000 * 10);
 
-		setInterval(async () => {
-			await refreshTags();
-		}, 60000 * 10);
+		// setInterval(async () => {
+		// 	await refreshTags();
+		// }, 60000 * 10);
 
 		setInterval(
 			async () => {

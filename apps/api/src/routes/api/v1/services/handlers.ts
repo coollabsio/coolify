@@ -50,6 +50,7 @@ import type {
 	SetWordpressSettings
 } from './types';
 import type { OnlyId } from '../../../../types';
+import { refreshTags, refreshTemplates } from '../handlers';
 
 export async function listServices(request: FastifyRequest) {
 	try {
@@ -391,6 +392,13 @@ export async function getService(request: FastifyRequest<OnlyId>) {
 }
 export async function getServiceType(request: FastifyRequest) {
 	try {
+		try {
+			await refreshTemplates();
+			await refreshTags();
+
+		} catch (error) {
+			console.log(error)
+		}
 		return {
 			services: await getTemplates()
 		};
