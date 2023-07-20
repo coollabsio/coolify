@@ -95,10 +95,22 @@ async function main() {
 }
 async function reEncryptSecrets() {
 	const { execaCommand } = await import('execa');
+	const image = await execaCommand("docker inspect coolify --format '{{ .Config.Image }}'", {
+		shell: true
+	});
+	const version = image.stdout.split(':')[1] ?? null;
 	const date = new Date().getTime();
+
+	let backupfile = `/app/db/prod.db_${date}`;
+	if (version) {
+		backupfile = `/app/db/prod.db_${version}_${date}`;
+	}
+	console.log(`Backup database to ${backupfile}.`);
+	await execaCommand(`cp /app/db/prod.db ${backupfile}`, { shell: true });
 	await execaCommand('env | grep COOLIFY > .env', { shell: true });
 	const secretOld = process.env['COOLIFY_SECRET_KEY'];
 	let secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
+
 	if (!secretNew) {
 		console.log('No COOLIFY_SECRET_KEY_BETTER found... Generating new one...');
 		const { stdout: newKey } = await execaCommand(
@@ -120,8 +132,7 @@ async function reEncryptSecrets() {
 		await execaCommand(`echo "COOLIFY_SECRET_KEY_OLD_${date}=${secretOld}" >> .env`, {
 			shell: true
 		});
-		console.log(`Backup database to /app/db/prod.db_${date}.`);
-		await execaCommand(`cp /app/db/prod.db /app/db/prod.db_${date}`, { shell: true });
+
 		const transactions = [];
 		const secrets = await prisma.secret.findMany();
 		if (secrets.length > 0) {
@@ -321,14 +332,14 @@ const decrypt = (hashString, secret) => {
 	}
 };
 
-main()
-	.catch((e) => {
-		console.error(e);
-		process.exit(1);
-	})
-	.finally(async () => {
-		await prisma.$disconnect();
-	});
+// main()
+// 	.catch((e) => {
+// 		console.error(e);
+// 		process.exit(1);
+// 	})
+// 	.finally(async () => {
+// 		await prisma.$disconnect();
+// 	});
 reEncryptSecrets()
 	.catch((e) => {
 		console.error(e);
