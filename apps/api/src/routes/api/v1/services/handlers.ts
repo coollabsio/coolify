@@ -392,13 +392,6 @@ export async function getService(request: FastifyRequest<OnlyId>) {
 }
 export async function getServiceType(request: FastifyRequest) {
 	try {
-		try {
-			await refreshTemplates();
-			await refreshTags();
-
-		} catch (error) {
-			console.log(error)
-		}
 		return {
 			services: await getTemplates()
 		};
