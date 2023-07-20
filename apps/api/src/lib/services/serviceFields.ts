@@ -624,7 +624,7 @@ export const glitchTip = [{
 	isEncrypted: false
 },
 {
-	name: 'emailSmtpUseSsl',
+	name: 'emailSmtpUseTls',
 	isEditable: true,
 	isLowerCase: false,
 	isNumber: false,
