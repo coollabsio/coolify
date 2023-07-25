@@ -71,10 +71,10 @@ services:
     networks:
       - coolify
 
-  buggregator:
-    image: ghcr.io/buggregator/server:latest
-    container_name: coolify-debug
-    ports:
-      - 8001:8000
-    networks:
-      - coolify
+  # buggregator:
+  #   image: ghcr.io/buggregator/server:latest
+  #   container_name: coolify-debug
+  #   ports:
+  #     - 8001:8000
+  #   networks:
+  #     - coolify
