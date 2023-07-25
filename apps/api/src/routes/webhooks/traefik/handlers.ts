@@ -394,7 +394,8 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						destinationDockerId,
 						settings,
 						basicAuthUser,
-						basicAuthPw
+						basicAuthPw,
+						settings: { basicAuth: isBasicAuthEnabled }
 					} = application;
 					if (!destinationDockerId) {
 						continue;
@@ -408,7 +409,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						continue;
 					}
 					let httpBasicAuth = null;
-					if (basicAuthUser && basicAuthPw) {
+					if (basicAuthUser && basicAuthPw && isBasicAuthEnabled) {
 						httpBasicAuth = {
 							basicAuth: {
 								users: [basicAuthUser + ':' + await hashPassword(basicAuthPw, 1)]
