@@ -105,6 +105,9 @@ async function reEncryptSecrets() {
 	if (version) {
 		backupfile = `/app/db/prod.db_${version}_${date}`;
 	}
+	await execaCommand('env | grep "^COOLIFY" | sort > .env', {
+		shell: true
+	});
 	const secretOld = process.env['COOLIFY_SECRET_KEY'];
 	let secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
 	if (!secretNew) {
