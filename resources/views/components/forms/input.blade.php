@@ -14,7 +14,7 @@
         <input {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
             wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
             wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-            @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
+            @disabled($readonly) @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
     @elseif ($type === 'password')
         <div class="relative" x-data>
             @if ($allowToPeak)
@@ -31,7 +31,8 @@
             <input {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }} @required($required)
                 wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
                 wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-                @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
+                @disabled($readonly) @disabled($disabled) id="{{ $id }}"
+                name="{{ $name }}">
         </div>
     @endif
     @if (!$label && $helper)
