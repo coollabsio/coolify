@@ -8,17 +8,17 @@
             ]) }}">
             <button>General</button>
         </a>
-        <a class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
-            href="{{ route('server.proxy', [
-                'server_uuid' => Route::current()->parameters()['server_uuid'],
-            ]) }}">
-            <button>Proxy</button>
-        </a>
         <a class="{{ request()->routeIs('server.private-key') ? 'text-white' : '' }}"
             href="{{ route('server.private-key', [
                 'server_uuid' => Route::current()->parameters()['server_uuid'],
             ]) }}">
             <button>Private Key</button>
+        </a>
+        <a class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
+            href="{{ route('server.proxy', [
+                'server_uuid' => Route::current()->parameters()['server_uuid'],
+            ]) }}">
+            <button>Proxy</button>
         </a>
         <a class="{{ request()->routeIs('server.destinations') ? 'text-white' : '' }}"
             href="{{ route('server.destinations', [

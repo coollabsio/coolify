@@ -41,7 +41,7 @@ class Change extends Component
                 $this->private_key->private_key .= "\n";
             }
             $this->private_key->save();
-            session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+            refreshPrivateKey($this->private_key);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }
