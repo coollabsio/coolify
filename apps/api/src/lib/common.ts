@@ -1972,10 +1972,14 @@ export async function backupDatabaseNow(database, reply) {
 		dockerId: database.destinationDockerId,
 		command,
 	});
-	const copyCommand = `docker cp ${database.id}:${backupFileName} ${backupStorageFilename}`
+	const copyCommand = `docker cp ${database.id}:${backupFileName} ${backupFileName}`
 	await executeCommand({
 		dockerId: database.destinationDockerId,
 		command: copyCommand
+	});
+	await executeCommand({
+		dockerId: database.destinationDockerId,
+		command: `docker cp ${database.id}:${backupFileName} /app/backups/`
 	});
 	const stream = fsNormal.createReadStream(backupFileName);
 	reply.header('Content-Type', 'application/octet-stream');
