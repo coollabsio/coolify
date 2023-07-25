@@ -105,12 +105,8 @@ async function reEncryptSecrets() {
 	if (version) {
 		backupfile = `/app/db/prod.db_${version}_${date}`;
 	}
-	console.log(`Backup database to ${backupfile}.`);
-	await execaCommand(`cp /app/db/prod.db ${backupfile}`, { shell: true });
-	await execaCommand('env | grep COOLIFY > .env', { shell: true });
 	const secretOld = process.env['COOLIFY_SECRET_KEY'];
 	let secretNew = process.env['COOLIFY_SECRET_KEY_BETTER'];
-
 	if (!secretNew) {
 		console.log('No COOLIFY_SECRET_KEY_BETTER found... Generating new one...');
 		const { stdout: newKey } = await execaCommand(
@@ -120,6 +116,8 @@ async function reEncryptSecrets() {
 		secretNew = newKey;
 	}
 	if (secretOld !== secretNew) {
+		console.log(`Backup database to ${backupfile}.`);
+		await execaCommand(`cp /app/db/prod.db ${backupfile}`, { shell: true });
 		console.log(
 			'Secrets (COOLIFY_SECRET_KEY & COOLIFY_SECRET_KEY_BETTER) are different, so re-encrypting everything...'
 		);
@@ -132,170 +130,209 @@ async function reEncryptSecrets() {
 		await execaCommand(`echo "COOLIFY_SECRET_KEY_OLD_${date}=${secretOld}" >> .env`, {
 			shell: true
 		});
-
 		const transactions = [];
 		const secrets = await prisma.secret.findMany();
 		if (secrets.length > 0) {
 			for (const secret of secrets) {
-				const value = decrypt(secret.value, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.secret.update({
-						where: { id: secret.id },
-						data: { value: newValue }
-					})
-				);
+				try {
+					const value = decrypt(secret.value, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.secret.update({
+							where: { id: secret.id },
+							data: { value: newValue }
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const serviceSecrets = await prisma.serviceSecret.findMany();
 		if (serviceSecrets.length > 0) {
 			for (const secret of serviceSecrets) {
-				const value = decrypt(secret.value, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.serviceSecret.update({
-						where: { id: secret.id },
-						data: { value: newValue }
-					})
-				);
+				try {
+					const value = decrypt(secret.value, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.serviceSecret.update({
+							where: { id: secret.id },
+							data: { value: newValue }
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const gitlabApps = await prisma.gitlabApp.findMany();
 		if (gitlabApps.length > 0) {
 			for (const gitlabApp of gitlabApps) {
-				const value = decrypt(gitlabApp.privateSshKey, secretOld);
-				const newValue = encrypt(value, secretNew);
-				const appSecret = decrypt(gitlabApp.appSecret, secretOld);
-				const newAppSecret = encrypt(appSecret, secretNew);
-				transactions.push(
-					prisma.gitlabApp.update({
-						where: { id: gitlabApp.id },
-						data: { privateSshKey: newValue, appSecret: newAppSecret }
-					})
-				);
+				try {
+					const value = decrypt(gitlabApp.privateSshKey, secretOld);
+					const newValue = encrypt(value, secretNew);
+					const appSecret = decrypt(gitlabApp.appSecret, secretOld);
+					const newAppSecret = encrypt(appSecret, secretNew);
+					transactions.push(
+						prisma.gitlabApp.update({
+							where: { id: gitlabApp.id },
+							data: { privateSshKey: newValue, appSecret: newAppSecret }
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const githubApps = await prisma.githubApp.findMany();
 		if (githubApps.length > 0) {
 			for (const githubApp of githubApps) {
-				const clientSecret = decrypt(githubApp.clientSecret, secretOld);
-				const newClientSecret = encrypt(clientSecret, secretNew);
-				const webhookSecret = decrypt(githubApp.webhookSecret, secretOld);
-				const newWebhookSecret = encrypt(webhookSecret, secretNew);
-				const privateKey = decrypt(githubApp.privateKey, secretOld);
-				const newPrivateKey = encrypt(privateKey, secretNew);
+				try {
+					const clientSecret = decrypt(githubApp.clientSecret, secretOld);
+					const newClientSecret = encrypt(clientSecret, secretNew);
+					const webhookSecret = decrypt(githubApp.webhookSecret, secretOld);
+					const newWebhookSecret = encrypt(webhookSecret, secretNew);
+					const privateKey = decrypt(githubApp.privateKey, secretOld);
+					const newPrivateKey = encrypt(privateKey, secretNew);
 
-				transactions.push(
-					prisma.githubApp.update({
-						where: { id: githubApp.id },
-						data: {
-							clientSecret: newClientSecret,
-							webhookSecret: newWebhookSecret,
-							privateKey: newPrivateKey
-						}
-					})
-				);
+					transactions.push(
+						prisma.githubApp.update({
+							where: { id: githubApp.id },
+							data: {
+								clientSecret: newClientSecret,
+								webhookSecret: newWebhookSecret,
+								privateKey: newPrivateKey
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const databases = await prisma.database.findMany();
 		if (databases.length > 0) {
 			for (const database of databases) {
-				const dbUserPassword = decrypt(database.dbUserPassword, secretOld);
-				const newDbUserPassword = encrypt(dbUserPassword, secretNew);
-				const rootUserPassword = decrypt(database.rootUserPassword, secretOld);
-				const newRootUserPassword = encrypt(rootUserPassword, secretNew);
-				transactions.push(
-					prisma.database.update({
-						where: { id: database.id },
-						data: {
-							dbUserPassword: newDbUserPassword,
-							rootUserPassword: newRootUserPassword
-						}
-					})
-				);
+				try {
+					const dbUserPassword = decrypt(database.dbUserPassword, secretOld);
+					const newDbUserPassword = encrypt(dbUserPassword, secretNew);
+					const rootUserPassword = decrypt(database.rootUserPassword, secretOld);
+					const newRootUserPassword = encrypt(rootUserPassword, secretNew);
+					transactions.push(
+						prisma.database.update({
+							where: { id: database.id },
+							data: {
+								dbUserPassword: newDbUserPassword,
+								rootUserPassword: newRootUserPassword
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const databaseSecrets = await prisma.databaseSecret.findMany();
 		if (databaseSecrets.length > 0) {
 			for (const databaseSecret of databaseSecrets) {
-				const value = decrypt(databaseSecret.value, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.databaseSecret.update({
-						where: { id: databaseSecret.id },
-						data: { value: newValue }
-					})
-				);
+				try {
+					const value = decrypt(databaseSecret.value, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.databaseSecret.update({
+							where: { id: databaseSecret.id },
+							data: { value: newValue }
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const wordpresses = await prisma.wordpress.findMany();
 		if (wordpresses.length > 0) {
 			for (const wordpress of wordpresses) {
-				const value = decrypt(wordpress.ftpHostKey, secretOld);
-				const newValue = encrypt(value, secretNew);
-				const ftpHostKeyPrivate = decrypt(wordpress.ftpHostKeyPrivate, secretOld);
-				const newFtpHostKeyPrivate = encrypt(ftpHostKeyPrivate, secretNew);
-				let newFtpPassword = undefined;
-				if (wordpress.ftpPassword != null) {
-					const ftpPassword = decrypt(wordpress.ftpPassword, secretOld);
-					newFtpPassword = encrypt(ftpPassword, secretNew);
-				}
+				try {
+					const value = decrypt(wordpress.ftpHostKey, secretOld);
+					const newValue = encrypt(value, secretNew);
+					const ftpHostKeyPrivate = decrypt(wordpress.ftpHostKeyPrivate, secretOld);
+					const newFtpHostKeyPrivate = encrypt(ftpHostKeyPrivate, secretNew);
+					let newFtpPassword = undefined;
+					if (wordpress.ftpPassword != null) {
+						const ftpPassword = decrypt(wordpress.ftpPassword, secretOld);
+						newFtpPassword = encrypt(ftpPassword, secretNew);
+					}
 
-				transactions.push(
-					prisma.wordpress.update({
-						where: { id: wordpress.id },
-						data: {
-							ftpHostKey: newValue,
-							ftpHostKeyPrivate: newFtpHostKeyPrivate,
-							ftpPassword: newFtpPassword
-						}
-					})
-				);
+					transactions.push(
+						prisma.wordpress.update({
+							where: { id: wordpress.id },
+							data: {
+								ftpHostKey: newValue,
+								ftpHostKeyPrivate: newFtpHostKeyPrivate,
+								ftpPassword: newFtpPassword
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const sshKeys = await prisma.sshKey.findMany();
 		if (sshKeys.length > 0) {
 			for (const key of sshKeys) {
-				const value = decrypt(key.privateKey, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.sshKey.update({
-						where: { id: key.id },
-						data: {
-							privateKey: newValue
-						}
-					})
-				);
+				try {
+					const value = decrypt(key.privateKey, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.sshKey.update({
+							where: { id: key.id },
+							data: {
+								privateKey: newValue
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const dockerRegistries = await prisma.dockerRegistry.findMany();
 		if (dockerRegistries.length > 0) {
 			for (const registry of dockerRegistries) {
-				const value = decrypt(registry.password, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.dockerRegistry.update({
-						where: { id: registry.id },
-						data: {
-							password: newValue
-						}
-					})
-				);
+				try {
+					const value = decrypt(registry.password, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.dockerRegistry.update({
+							where: { id: registry.id },
+							data: {
+								password: newValue
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		const certificates = await prisma.certificate.findMany();
 		if (certificates.length > 0) {
 			for (const certificate of certificates) {
-				const value = decrypt(certificate.key, secretOld);
-				const newValue = encrypt(value, secretNew);
-				transactions.push(
-					prisma.certificate.update({
-						where: { id: certificate.id },
-						data: {
-							key: newValue
-						}
-					})
-				);
+				try {
+					const value = decrypt(certificate.key, secretOld);
+					const newValue = encrypt(value, secretNew);
+					transactions.push(
+						prisma.certificate.update({
+							where: { id: certificate.id },
+							data: {
+								key: newValue
+							}
+						})
+					);
+				} catch (e) {
+					console.log(e);
+				}
 			}
 		}
 		await prisma.$transaction(transactions);
@@ -317,29 +354,27 @@ const encrypt = (text, secret) => {
 };
 const decrypt = (hashString, secret) => {
 	if (hashString && secret) {
-		try {
-			const hash = JSON.parse(hashString);
-			const decipher = crypto.createDecipheriv(algorithm, secret, Buffer.from(hash.iv, 'hex'));
-			const decrpyted = Buffer.concat([
-				decipher.update(Buffer.from(hash.content, 'hex')),
-				decipher.final()
-			]);
-			return decrpyted.toString();
-		} catch (error) {
-			console.log({ decryptionError: error.message });
-			return hashString;
+		const hash = JSON.parse(hashString);
+		const decipher = crypto.createDecipheriv(algorithm, secret, Buffer.from(hash.iv, 'hex'));
+		const decrpyted = Buffer.concat([
+			decipher.update(Buffer.from(hash.content, 'hex')),
+			decipher.final()
+		]);
+		if (/�/.test(decrpyted.toString())) {
+			throw new Error('Invalid secret. Skipping...');
 		}
+		return decrpyted.toString();
 	}
 };
 
-// main()
-// 	.catch((e) => {
-// 		console.error(e);
-// 		process.exit(1);
-// 	})
-// 	.finally(async () => {
-// 		await prisma.$disconnect();
-// 	});
+main()
+	.catch((e) => {
+		console.error(e);
+		process.exit(1);
+	})
+	.finally(async () => {
+		await prisma.$disconnect();
+	});
 reEncryptSecrets()
 	.catch((e) => {
 		console.error(e);

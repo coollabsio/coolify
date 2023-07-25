@@ -162,7 +162,7 @@ export async function update(request: FastifyRequest<Update>) {
 				await executeCommand({ command: `docker pull ${image}` });
 			}
 
-			await executeCommand({ shell: true, command: `ls .env || env | grep COOLIFY > .env` });
+			await executeCommand({ shell: true, command: `ls .env || env | grep "^COOLIFY" | sort > .env` });
 			await executeCommand({
 				command: `sed -i '/COOLIFY_AUTO_UPDATE=/cCOOLIFY_AUTO_UPDATE=${isAutoUpdateEnabled}' .env`
 			});
