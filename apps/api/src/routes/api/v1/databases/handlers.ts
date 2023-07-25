@@ -5,7 +5,7 @@ import yaml from 'js-yaml';
 import fs from 'fs/promises';
 import {
 	ComposeFile,
-	backupPostgresqlDatabase,
+	backupDatabaseNow,
 	createDirectories,
 	decrypt,
 	defaultComposeConfiguration,
@@ -362,7 +362,7 @@ export async function backupDatabase(request: FastifyRequest<OnlyId>, reply: Fas
 		});
 		if (database.dbUserPassword) database.dbUserPassword = decrypt(database.dbUserPassword);
 		if (database.rootUserPassword) database.rootUserPassword = decrypt(database.rootUserPassword);
-		return await backupPostgresqlDatabase(database, reply);
+		return await backupDatabaseNow(database, reply);
 	} catch ({ status, message }) {
 		return errorHandler({ status, message });
 	}

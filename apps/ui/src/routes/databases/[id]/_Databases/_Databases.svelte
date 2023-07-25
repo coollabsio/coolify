@@ -138,7 +138,7 @@
 			loading.backup = true;
 			addToast({
 				message:
-					'Backup will be downloaded soon and saved to /var/lib/docker/volumes/coolify-local-backup/ on the host system.',
+					'Backup will be downloaded soon and saved to /var/lib/docker/volumes/coolify-local-backup/_data/ on the host system.',
 				type: 'success',
 				timeout: 15000
 			});

@@ -1943,11 +1943,11 @@ export function generateSecrets(
 	return envs;
 }
 
-export async function backupPostgresqlDatabase(database, reply) {
+export async function backupDatabaseNow(database, reply) {
 	const backupFolder = '/tmp'
 	const fileName = `${database.id}-${new Date().getTime()}.gz`
 	const backupFileName = `${backupFolder}/${fileName}`
-	console.log({ database })
+	const backupStorageFilename = `/app/backups/${fileName}`
 	let command = null
 	switch (database?.type) {
 		case 'postgresql':
@@ -1972,17 +1972,11 @@ export async function backupPostgresqlDatabase(database, reply) {
 		dockerId: database.destinationDockerId,
 		command,
 	});
-	const copyCommand = `docker cp ${database.id}:${backupFileName} ${backupFileName}`
+	const copyCommand = `docker cp ${database.id}:${backupFileName} ${backupStorageFilename}`
 	await executeCommand({
 		dockerId: database.destinationDockerId,
 		command: copyCommand
 	});
-	if (isDev) {
-		await executeCommand({
-			dockerId: database.destinationDockerId,
-			command: `docker cp ${database.id}:${backupFileName} /app/backups/`
-		});
-	}
 	const stream = fsNormal.createReadStream(backupFileName);
 	reply.header('Content-Type', 'application/octet-stream');
 	reply.header('Content-Disposition', `attachment; filename=${fileName}`);
