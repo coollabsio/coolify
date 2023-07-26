@@ -15,6 +15,7 @@ use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
+    public $current_step = 'github_apps';
     public $github_apps;
     public GithubApp $github_app;
     public $parameters;
@@ -90,6 +91,7 @@ class GithubPrivateRepository extends Component
             }
         }
         $this->selected_repository_id = $this->repositories[0]['id'];
+        $this->current_step = 'repository';
     }
     public function loadBranches()
     {

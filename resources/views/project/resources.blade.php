@@ -2,6 +2,9 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
+            <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+                class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
+                Add</a>
             @if ($environment->applications->count() === 0)
                 <livewire:project.delete-environment :environment_id="$environment->id" />
             @endif

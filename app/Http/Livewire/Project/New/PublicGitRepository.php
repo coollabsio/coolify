@@ -82,7 +82,9 @@ class PublicGitRepository extends Component
         $this->get_git_source();
         try {
             $this->get_branch();
+            $this->selected_branch = $this->git_branch;
         } catch (\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
         }
 
         if (!$this->branch_found && $this->git_branch == 'main') {

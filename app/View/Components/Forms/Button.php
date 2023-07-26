@@ -15,7 +15,7 @@ class Button extends Component
         public bool $disabled = false,
         public bool $isModal = false,
         public string|null $modalId = null,
-        public string $defaultClass = "btn btn-primary btn-xs text-white normal-case no-animation rounded border-none"
+        public string $defaultClass = "btn btn-primary btn-sm font-normal text-white normal-case no-animation rounded border-none"
     ) {
         //
     }

@@ -14,6 +14,7 @@ use Spatie\Url\Url;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
+    public $current_step = 'private_keys';
     public $parameters;
     public $query;
     public $private_keys;
@@ -70,6 +71,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public function setPrivateKey($private_key_id)
     {
         $this->private_key_id = $private_key_id;
+        $this->current_step = 'repository';
     }
     private function get_git_source()
     {

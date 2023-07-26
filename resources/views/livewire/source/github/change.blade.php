@@ -7,9 +7,7 @@
             <div class="flex gap-2">
                 @if ($github_app->app_id)
                     <x-forms.button type="submit">Save</x-forms.button>
-                    <x-forms.button x-on:click.prevent="deleteSource = true">
-                        Delete
-                    </x-forms.button>
+
                     <a href="{{ get_installation_path($github_app) }}">
                         <x-forms.button>
                             @if ($github_app->installation_id)
@@ -21,9 +19,12 @@
                             @endif
                         </x-forms.button>
                     </a>
+                    <x-forms.button isError x-on:click.prevent="deleteSource = true">
+                        Delete
+                    </x-forms.button>
                 @else
                     <x-forms.button disabled type="submit">Save</x-forms.button>
-                    <x-forms.button x-on:click.prevent="deleteSource = true">
+                    <x-forms.button isError x-on:click.prevent="deleteSource = true">
                         Delete
                     </x-forms.button>
 

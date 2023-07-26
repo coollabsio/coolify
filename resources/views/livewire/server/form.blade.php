@@ -1,12 +1,14 @@
 <div x-data="{ changeLocalhost: false }">
+    <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Server">
+        <x-slot:modalBody>
+            <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
+        </x-slot:modalBody>
+    </x-modal>
+    <x-naked-modal show="changeLocalhost" action="submit" title="Change localhost"
+        message='You could lost a lot of functionalities if you change the server details of the server where Coolify is running on.<br>Please think again.' />
     @if ($server->settings->is_reachable)
-        <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Server">
-            <x-slot:modalBody>
-                <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
-            </x-slot:modalBody>
-        </x-modal>
-        <x-naked-modal show="changeLocalhost" action="submit" title="Change localhost"
-            message='You could lost a lot of functionalities if you change the server details of the server where Coolify is running on.<br>Please think again.' />
+
+
         <form wire:submit.prevent='submit' class="flex flex-col">
             <div class="flex gap-2">
                 <h2>General</h2>
@@ -70,22 +72,22 @@
                 </div>
             @endisset
         </form>
-        <h3>Danger Zone</h3>
-        <div class="">Woah. I hope you know what are you doing.</div>
-        <h4 class="pt-4">Delete Server</h4>
-        <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
-            back!
-        </div>
-        @if ($server->id !== 0 || isDev())
-            <x-forms.button isError isModal modalId="{{ $modalId }}">
-                Delete
-            </x-forms.button>
-        @endif
     @else
-        <div class="w-full">
+        <div class="w-full pb-4">
             <div class="cursor-pointer box" wire:click.prevent='validateServer'>
                 Validate Server
             </div>
         </div>
+    @endif
+    <h3>Danger Zone</h3>
+    <div class="">Woah. I hope you know what are you doing.</div>
+    <h4 class="pt-4">Delete Server</h4>
+    <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
+        back!
+    </div>
+    @if ($server->id !== 0 || isDev())
+        <x-forms.button isError isModal modalId="{{ $modalId }}">
+            Delete
+        </x-forms.button>
     @endif
 </div>

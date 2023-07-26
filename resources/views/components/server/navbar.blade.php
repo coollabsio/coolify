@@ -1,7 +1,7 @@
 <div class="pb-6">
     <h1>Server</h1>
     <div class="pt-2 pb-10 ">{{ data_get($server, 'name') }}</div>
-    <nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+    <nav class="navbar-main">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [
                 'server_uuid' => Route::current()->parameters()['server_uuid'],

@@ -20,7 +20,7 @@
             @endif
         </ol>
     </nav>
-    <nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+    <nav class="navbar-main">
         <a class="{{ request()->routeIs('team.show') ? 'text-white' : '' }}" href="{{ route('team.show') }}">
             <button>General</button>
         </a>

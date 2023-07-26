@@ -12,7 +12,7 @@
         @empty
             <div>
                 <div>No private keys found.</div>
-                <x-use-magic-bar />
+                <x-use-magic-bar link="/private-key/new" />
             </div>
         @endforelse
     </div>

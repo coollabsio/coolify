@@ -3,15 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Server;
 
 class ProjectController extends Controller
 {
     public function all()
     {
-        $teamId = session('currentTeam')->id;
-
-        $projects = Project::where('team_id', $teamId)->get();
-        return view('projects', ['projects' => $projects]);
+        return view('projects', [
+            'projects' => Project::ownedByCurrentTeam()->get(),
+            'servers' => Server::ownedByCurrentTeam()->count(),
+        ]);
     }
 
     public function edit()
@@ -34,9 +35,6 @@ class ProjectController extends Controller
             return redirect()->route('dashboard');
         }
         $project->load(['environments']);
-        if (count($project->environments) == 1) {
-            return redirect()->route('project.resources', ['project_uuid' => $project->uuid, 'environment_name' => $project->environments->first()->name]);
-        }
         return view('project.show', ['project' => $project]);
     }
 

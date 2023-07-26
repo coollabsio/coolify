@@ -15,6 +15,10 @@ class Project extends BaseModel
                 'project_id' => $project->id,
             ]);
         });
+        static::deleted(function ($project) {
+            $project->environments()->delete();
+            $project->settings()->delete();
+        });
     }
     protected $fillable = [
         'name',

@@ -8,7 +8,7 @@
                 Save
             </x-forms.button>
             @if ($private_key->id > 0)
-                <x-forms.button x-on:click.prevent="deletePrivateKey = true">
+                <x-forms.button isError x-on:click.prevent="deletePrivateKey = true">
                     Delete
                 </x-forms.button>
             @endif

@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class Create extends Component
 {
-    protected string|null $from = null;
+    public string|null $from = null;
     public string $name;
     public string|null $description = null;
     public string $value;
