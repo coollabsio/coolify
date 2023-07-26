@@ -477,7 +477,7 @@ export async function saveServiceType(
 						const [volumeName, path] = volume.split(':');
 						if (!volumeName.startsWith('/')) {
 							const found = await prisma.servicePersistentStorage.findFirst({
-								where: { volumeName, serviceId: id }
+								where: { volumeName, serviceId: id, path }
 							});
 							if (!found) {
 								await prisma.servicePersistentStorage.create({

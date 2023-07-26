@@ -2440,6 +2440,7 @@
       image: n8nio/n8n:$$core_version
       volumes:
         - $$id-data:/root/.n8n
+        - $$id-data:/home/node/.n8n
         - $$id-data-write:/files
         - /var/run/docker.sock:/var/run/docker.sock
       environment:
