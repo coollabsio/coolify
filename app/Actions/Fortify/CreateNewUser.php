@@ -25,7 +25,6 @@ class CreateNewUser implements CreatesNewUsers
     {
         $settings = InstanceSettings::get();
         if (!$settings->is_registration_enabled) {
-            Log::info('Registration is disabled');
             abort(403);
         }
         Validator::make($input, [

@@ -43,7 +43,7 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 $this->application->save();
             }
         } catch (\Exception $e) {
-            Log::error($e->getMessage());
+            ray($e->getMessage());
         }
     }
 }
