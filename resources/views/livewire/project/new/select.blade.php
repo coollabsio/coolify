@@ -4,7 +4,7 @@
     <div class="flex flex-col pt-10">
         @if ($current_step === 'type')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Application Type</li>
+                <li class="step step-secondary">Select Source Type</li>
                 <li class="step">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
@@ -43,7 +43,7 @@
         @endif
         @if ($current_step === 'servers')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Application Type</li>
+                <li class="step step-secondary">Select Source Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
@@ -64,7 +64,7 @@
         @endif
         @if ($current_step === 'destinations')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Application Type</li>
+                <li class="step step-secondary">Select Source Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
@@ -77,7 +77,7 @@
                                 {{ $destination->name }}
                             </div>
                             <div class="text-xs group-hover:text-white">
-                                {{ $destination->description }}</div>
+                                {{ $destination->network }}</div>
                         </div>
                     </div>
                 @endforeach
