@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Application;
 
 use App\Jobs\ApplicationContainerStatusJob;
 use App\Models\Application;
+use App\Notifications\Notifications\Application\ApplicationStoppedNotification;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -54,6 +55,7 @@ class Heading extends Component
         );
         $this->application->status = 'stopped';
         $this->application->save();
+        $this->application->environment->project->team->notify(new ApplicationStoppedNotification($this->application));
     }
     protected function setDeploymentUuid()
     {

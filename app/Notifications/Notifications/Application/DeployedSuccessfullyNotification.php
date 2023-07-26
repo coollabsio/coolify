@@ -62,7 +62,7 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
-            $mail->subject("✅ New version is deployed of {$this->application_name}");
+            $mail->subject("✅New version is deployed of {$this->application_name}");
         } else {
             $fqdn = $this->preview->fqdn;
             $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
@@ -79,15 +79,19 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = '✅ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** deployed successfully: ';
+            $message = '✅ New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . ' 
+            
+';
             if ($this->preview->fqdn) {
-                $message .= '[Application Link](' . $this->preview->fqdn . ') |';
+                $message .= '[Open Application](' . $this->preview->fqdn . ') | ';
             }
             $message .= '[Deployment logs](' . $this->deployment_url . ')';
         } else {
-            $message = '✅ A new version has been deployed of **' . $this->application_name . '**: ';
+            $message = '✅ New version successfully deployed of ' . $this->application_name . ' 
+            
+';
             if ($this->fqdn) {
-                $message .= '[Application Link](' . $this->fqdn . ') |';
+                $message .= '[Open Application](' . $this->fqdn . ') | ';
             }
             $message .= '[Deployment logs](' . $this->deployment_url . ')';
         }

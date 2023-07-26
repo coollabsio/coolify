@@ -12,6 +12,8 @@ use App\Models\GitlabApp;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Notifications\Notifications\Application\DeployedSuccessfullyNotification;
+use App\Notifications\Notifications\Application\DeployedWithErrorNotification;
 use App\Traits\ExecuteRemoteCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -221,6 +223,12 @@ class ApplicationDeploymentJob implements ShouldQueue
             ]);
         }
         queue_next_deployment($this->application);
+        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
+            $this->application->environment->project->team->notify(new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid, $this->preview));
+        }
+        if ($status === ApplicationDeploymentStatus::FAILED->value) {
+            $this->application->environment->project->team->notify(new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->preview));
+        }
     }
     private function start_by_compose_file()
     {

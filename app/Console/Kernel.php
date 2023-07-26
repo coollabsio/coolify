@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\InstanceApplicationsStatusJob;
 use App\Jobs\CheckResaleLicenseJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ProxyCheckJob;
@@ -16,12 +17,14 @@ class Kernel extends ConsoleKernel
     {
         if (isDev()) {
             $schedule->command('horizon:snapshot')->everyMinute();
+            $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
             // $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
+            $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
             $schedule->job(new CheckResaleLicenseJob)->hourly();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
             $schedule->job(new DockerCleanupJob)->everyTenMinutes();
