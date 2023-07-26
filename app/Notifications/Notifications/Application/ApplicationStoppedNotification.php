@@ -40,35 +40,28 @@ class ApplicationStoppedNotification extends Notification implements ShouldQueue
         $channels = [];
         $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
         $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
-        $isSubscribedToEmailDeployments = data_get($notifiable, 'smtp_notifications.deployments');
-        $isSubscribedToDiscordDeployments = data_get($notifiable, 'discord_notifications.deployments');
+        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.stopped');
+        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.stopped');
 
-        if ($isEmailEnabled && $isSubscribedToEmailDeployments) {
+        if ($isEmailEnabled && $isSubscribedToEmailEvent) {
             $channels[] = EmailChannel::class;
         }
-        if ($isDiscordEnabled && $isSubscribedToDiscordDeployments) {
+        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
             $channels[] = DiscordChannel::class;
         }
         return $channels;
     }
     public function toMail(): MailMessage
     {
-        // $mail = new MailMessage();
-        // $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
-        // $fqdn = $this->fqdn;
-        // if ($pull_request_id === 0) {
-        //     $mail->subject("✅New version is deployed of {$this->application_name}");
-        // } else {
-        //     $fqdn = $this->preview->fqdn;
-        //     $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
-        // }
-        // $mail->view('emails.application-deployed-successfully', [
-        //     'name' => $this->application_name,
-        //     'fqdn' => $fqdn,
-        //     'deployment_url' => $this->deployment_url,
-        //     'pull_request_id' => $pull_request_id,
-        // ]);
-        // return $mail;
+        $mail = new MailMessage();
+        $fqdn = $this->fqdn;
+        $mail->subject("⛔ {$this->application_name} has been stopped");
+        $mail->view('emails.application-stopped', [
+            'name' => $this->application_name,
+            'fqdn' => $fqdn,
+            'application_url' => $this->application_url,
+        ]);
+        return $mail;
     }
 
     public function toDiscord(): string

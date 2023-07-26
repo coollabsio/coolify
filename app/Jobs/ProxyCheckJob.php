@@ -28,6 +28,7 @@ class ProxyCheckJob implements ShouldQueue
                 if ($status === 'running') {
                     continue;
                 }
+                // $server->team->notify(new ProxyStoppedNotification($server));
                 resolve(StartProxy::class)($server);
             }
         } catch (\Throwable $th) {

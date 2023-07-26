@@ -26,8 +26,10 @@
                 <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications.test"
                     label="Test Notifications" />
             @endif
+            <h5 class="mt-4">Applications</h5>
             <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications.deployments"
-                label="New Deployments" />
+                label="New Deployment" />
+            <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications.stopped" label="Stopped" />
         </div>
     @endif
 </div>

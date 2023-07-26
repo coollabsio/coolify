@@ -33,11 +33,9 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
     }
     public function handle(): void
     {
-        ray('checking status of ' . $this->container_name);
         try {
             $status = get_container_status(server: $this->application->destination->server, container_id: $this->container_name, throwError: false);
-            ray($this->application->status, $status);
-            if ($this->application->status === 'running' && $status !== 'running') {
+            if ($this->application->status === 'running' && $status === 'stopped') {
                 $this->application->environment->project->team->notify(new ApplicationStoppedNotification($this->application));
             }
 
