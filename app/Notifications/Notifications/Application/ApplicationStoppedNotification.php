@@ -40,8 +40,8 @@ class ApplicationStoppedNotification extends Notification implements ShouldQueue
         $channels = [];
         $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
         $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.stopped');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.stopped');
+        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.status_changes');
+        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.status_changes');
 
         if ($isEmailEnabled && $isSubscribedToEmailEvent) {
             $channels[] = EmailChannel::class;
