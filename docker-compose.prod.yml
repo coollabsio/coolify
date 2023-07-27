@@ -33,7 +33,6 @@ services:
       - SELF_HOSTED
       - LEMON_SQUEEZY_WEBHOOK_SECRET
       - LEMON_SQUEEZY_CHECKOUT_ID
-      - LEMON_SQUEEZY_PRODUCT_ID
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

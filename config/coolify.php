@@ -2,8 +2,8 @@
 
 return [
     'self_hosted' => env('SELF_HOSTED', true),
+    'license_url' => 'https://license.coolify.io',
     'lemon_squeezy_webhook_secret' => env('LEMON_SQUEEZY_WEBHOOK_SECRET'),
-    'lemon_squeezy_product_id' => env('LEMON_SQUEEZY_PRODUCT_ID'),
     'lemon_squeezy_checkout_id' => env('LEMON_SQUEEZY_CHECKOUT_ID'),
     'mux_enabled' => env('MUX_ENABLED', true),
     'dev_webhook' => env('SERVEO_URL'),

@@ -29,6 +29,6 @@
                 Subscription</a>
         </x-forms.button>
     @else
-        <div>Resale license is not active. Please contact your instance admin.</div>
+        <div class="px-10">Resale license is not active. Please contact your instance admin.</div>
     @endif
 </x-layout-subscription>

@@ -18,7 +18,7 @@
     </div>
     @if (session()->has('error'))
         <div class="text-error">
-            {{ session('error') }}
+            {!! session('error') !!}
         </div>
     @endif
 </form>
