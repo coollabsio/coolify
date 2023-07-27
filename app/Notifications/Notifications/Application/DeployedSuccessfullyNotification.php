@@ -43,10 +43,10 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.deployments');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.deployments');
+        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_deployments');
+        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_deployments');
 
         if ($isEmailEnabled && $isSubscribedToEmailEvent) {
             $channels[] = EmailChannel::class;
@@ -79,16 +79,16 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = '✅ New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . ' 
-            
+            $message = '✅ New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '
+
 ';
             if ($this->preview->fqdn) {
                 $message .= '[Open Application](' . $this->preview->fqdn . ') | ';
             }
             $message .= '[Deployment logs](' . $this->deployment_url . ')';
         } else {
-            $message = '✅ New version successfully deployed of ' . $this->application_name . ' 
-            
+            $message = '✅ New version successfully deployed of ' . $this->application_name . '
+
 ';
             if ($this->fqdn) {
                 $message .= '[Open Application](' . $this->fqdn . ') | ';

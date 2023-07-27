@@ -12,37 +12,35 @@ class EmailSettings extends Component
     public Team $model;
 
     protected $rules = [
-        'model.smtp.enabled' => 'nullable|boolean',
-        'model.smtp.from_address' => 'required|email',
-        'model.smtp.from_name' => 'required',
-        'model.smtp.recipients' => 'nullable',
-        'model.smtp.host' => 'required',
-        'model.smtp.port' => 'required',
-        'model.smtp.encryption' => 'nullable',
-        'model.smtp.username' => 'nullable',
-        'model.smtp.password' => 'nullable',
-        'model.smtp.timeout' => 'nullable',
-        'model.smtp.test_recipients' => 'nullable',
-        'model.smtp_notifications.test' => 'nullable|boolean',
-        'model.smtp_notifications.deployments' => 'nullable|boolean',
-        'model.smtp_notifications.status_changes' => 'nullable|boolean',
+        'model.smtp_enabled' => 'nullable|boolean',
+        'model.smtp_from_address' => 'required|email',
+        'model.smtp_from_name' => 'required',
+        'model.smtp_recipients' => 'nullable',
+        'model.smtp_host' => 'required',
+        'model.smtp_port' => 'required',
+        'model.smtp_encryption' => 'nullable',
+        'model.smtp_username' => 'nullable',
+        'model.smtp_password' => 'nullable',
+        'model.smtp_timeout' => 'nullable',
+        'model.smtp_notifications_test' => 'nullable|boolean',
+        'model.smtp_notifications_deployments' => 'nullable|boolean',
+        'model.smtp_notifications_status_changes' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
-        'model.smtp.from_address' => 'From Address',
-        'model.smtp.from_name' => 'From Name',
-        'model.smtp.recipients' => 'Recipients',
-        'model.smtp.host' => 'Host',
-        'model.smtp.port' => 'Port',
-        'model.smtp.encryption' => 'Encryption',
-        'model.smtp.username' => 'Username',
-        'model.smtp.password' => 'Password',
-        'model.smtp.test_recipients' => 'Test Recipients',
+        'model.smtp_from_address' => 'From Address',
+        'model.smtp_from_name' => 'From Name',
+        'model.smtp_recipients' => 'Recipients',
+        'model.smtp_host' => 'Host',
+        'model.smtp_port' => 'Port',
+        'model.smtp_encryption' => 'Encryption',
+        'model.smtp_username' => 'Username',
+        'model.smtp_password' => 'Password',
     ];
     private function decrypt()
     {
-        if (data_get($this->model, 'smtp.password')) {
+        if (data_get($this->model, 'smtp_password')) {
             try {
-                $this->model->smtp->password = decrypt($this->model->smtp->password);
+                $this->model->smtp_password = decrypt($this->model->smtp_password);
             } catch (\Exception $e) {
             }
         }
@@ -54,18 +52,17 @@ class EmailSettings extends Component
     public function copyFromInstanceSettings()
     {
         $settings = InstanceSettings::get();
-        if ($settings->smtp->enabled) {
-            $this->model->smtp->enabled = true;
-            $this->model->smtp->from_address = $settings->smtp->from_address;
-            $this->model->smtp->from_name = $settings->smtp->from_name;
-            $this->model->smtp->recipients = $settings->smtp->recipients;
-            $this->model->smtp->host = $settings->smtp->host;
-            $this->model->smtp->port = $settings->smtp->port;
-            $this->model->smtp->encryption = $settings->smtp->encryption;
-            $this->model->smtp->username = $settings->smtp->username;
-            $this->model->smtp->password = $settings->smtp->password;
-            $this->model->smtp->timeout = $settings->smtp->timeout;
-            $this->model->smtp->test_recipients = $settings->smtp->test_recipients;
+        if ($settings->smtp_enabled) {
+            $this->model->smtp_enabled = true;
+            $this->model->smtp_from_address = $settings->smtp_from_address;
+            $this->model->smtp_from_name = $settings->smtp_from_name;
+            $this->model->smtp_recipients = $settings->smtp_recipients;
+            $this->model->smtp_host = $settings->smtp_host;
+            $this->model->smtp_port = $settings->smtp_port;
+            $this->model->smtp_encryption = $settings->smtp_encryption;
+            $this->model->smtp_username = $settings->smtp_username;
+            $this->model->smtp_password = $settings->smtp_password;
+            $this->model->smtp_timeout = $settings->smtp_timeout;
             $this->saveModel();
         } else {
             $this->emit('error', 'Instance SMTP settings are not enabled.');
@@ -76,14 +73,13 @@ class EmailSettings extends Component
         $this->resetErrorBag();
         $this->validate();
 
-        if ($this->model->smtp->password) {
-            $this->model->smtp->password = encrypt($this->model->smtp->password);
+        if ($this->model->smtp_password) {
+            $this->model->smtp_password = encrypt($this->model->smtp_password);
         } else {
-            $this->model->smtp->password = null;
+            $this->model->smtp_password = null;
         }
 
-        $this->model->smtp->recipients = str_replace(' ', '', $this->model->smtp->recipients);
-        $this->model->smtp->test_recipients = str_replace(' ', '', $this->model->smtp->test_recipients);
+        $this->model->smtp_recipients = str_replace(' ', '', $this->model->smtp_recipients);
         $this->saveModel();
     }
     public function saveModel()
@@ -105,7 +101,7 @@ class EmailSettings extends Component
         try {
             $this->submit();
         } catch (\Exception $e) {
-            $this->model->smtp->enabled = false;
+            $this->model->smtp_enabled = false;
             $this->validate();
         }
     }

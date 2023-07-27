@@ -12,27 +12,27 @@ class Email extends Component
     public InstanceSettings $settings;
 
     protected $rules = [
-        'settings.smtp.enabled' => 'nullable|boolean',
-        'settings.smtp.host' => 'required',
-        'settings.smtp.port' => 'required|numeric',
-        'settings.smtp.encryption' => 'nullable',
-        'settings.smtp.username' => 'nullable',
-        'settings.smtp.password' => 'nullable',
-        'settings.smtp.timeout' => 'nullable',
-        'settings.smtp.test_recipients' => 'nullable',
-        'settings.smtp.from_address' => 'required|email',
-        'settings.smtp.from_name' => 'required',
+        'settings.smtp_enabled' => 'nullable|boolean',
+        'settings.smtp_host' => 'required',
+        'settings.smtp_port' => 'required|numeric',
+        'settings.smtp_encryption' => 'nullable',
+        'settings.smtp_username' => 'nullable',
+        'settings.smtp_password' => 'nullable',
+        'settings.smtp_timeout' => 'nullable',
+        'settings.smtp_test_recipients' => 'nullable',
+        'settings.smtp_from_address' => 'required|email',
+        'settings.smtp_from_name' => 'required',
     ];
     protected $validationAttributes = [
-        'settings.smtp.from_address' => 'From Address',
-        'settings.smtp.from_name' => 'From Name',
-        'settings.smtp.recipients' => 'Recipients',
-        'settings.smtp.host' => 'Host',
-        'settings.smtp.port' => 'Port',
-        'settings.smtp.encryption' => 'Encryption',
-        'settings.smtp.username' => 'Username',
-        'settings.smtp.password' => 'Password',
-        'settings.smtp.test_recipients' => 'Test Recipients',
+        'settings.smtp_from_address' => 'From Address',
+        'settings.smtp_from_name' => 'From Name',
+        'settings.smtp_recipients' => 'Recipients',
+        'settings.smtp_host' => 'Host',
+        'settings.smtp_port' => 'Port',
+        'settings.smtp_encryption' => 'Encryption',
+        'settings.smtp_username' => 'Username',
+        'settings.smtp_password' => 'Password',
+        'settings.smtp_test_recipients' => 'Test Recipients',
     ];
     public function mount()
     {
@@ -44,7 +44,7 @@ class Email extends Component
             $this->submit();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Exception $e) {
-            $this->settings->smtp->enabled = false;
+            $this->settings->smtp_enabled = false;
             $this->validate();
         }
     }
@@ -55,9 +55,9 @@ class Email extends Component
     }
     private function decrypt()
     {
-        if (data_get($this->settings, 'smtp.password')) {
+        if (data_get($this->settings, 'smtp_password')) {
             try {
-                $this->settings->smtp->password = decrypt($this->settings->smtp->password);
+                $this->settings->smtp_password = decrypt($this->settings->smtp_password);
             } catch (\Exception $e) {
             }
         }
@@ -66,13 +66,12 @@ class Email extends Component
     {
         $this->resetErrorBag();
         $this->validate();
-        if ($this->settings->smtp->password) {
-            $this->settings->smtp->password = encrypt($this->settings->smtp->password);
+        if ($this->settings->smtp_password) {
+            $this->settings->smtp_password = encrypt($this->settings->smtp_password);
         } else {
-            $this->settings->smtp->password = null;
+            $this->settings->smtp_password = null;
         }
 
-        $this->settings->smtp->test_recipients = str_replace(' ', '', $this->settings->smtp->test_recipients);
         $this->settings->save();
         $this->emit('success', 'Transaction email settings updated successfully.');
         $this->decrypt();

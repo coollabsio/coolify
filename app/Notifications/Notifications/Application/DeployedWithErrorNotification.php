@@ -44,10 +44,10 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.deployments');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.deployments');
+        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_deployments');
+        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_deployments');
 
         if ($isEmailEnabled && $isSubscribedToEmailEvent) {
             $channels[] = EmailChannel::class;

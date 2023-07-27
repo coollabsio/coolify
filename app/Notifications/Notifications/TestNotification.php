@@ -23,8 +23,8 @@ class TestNotification extends Notification implements ShouldQueue
 
         $isSmtp = $this->type === 'smtp' || is_null($this->type);
         $isDiscord = $this->type === 'discord' || is_null($this->type);
-        $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
+        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
 
         if ($isEmailEnabled && $isSmtp) {
             $channels[] = EmailChannel::class;

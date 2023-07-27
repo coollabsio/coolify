@@ -12,59 +12,25 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class Team extends Model implements SendsDiscord, SendsEmail
 {
-    use Notifiable, SchemalessAttributesTrait;
+    use Notifiable;
 
-    protected $schemalessAttributes = [
-        'smtp',
-        'discord',
-        'smtp_notifications',
-        'discord_notifications',
-    ];
+    protected $guarded = [];
     protected $casts = [
-        'smtp' => SchemalessAttributes::class,
-        'discord' => SchemalessAttributes::class,
-        'smtp_notifications' => SchemalessAttributes::class,
-        'discord_notifications' => SchemalessAttributes::class,
         'personal_team' => 'boolean',
-    ];
-    public function scopeWithSmtp(): Builder
-    {
-        return $this->smtp->modelScope();
-    }
-    public function scopeWithDiscord(): Builder
-    {
-        return $this->discord->modelScope();
-    }
-    public function scopeWithSmtpNotifications(): Builder
-    {
-        return $this->smtp_notifications->modelScope();
-    }
-    public function scopeWithDiscordNotifications(): Builder
-    {
-        return $this->discord_notifications->modelScope();
-    }
-    protected $fillable = [
-        'id',
-        'name',
-        'description',
-        'personal_team',
-        'smtp',
-        'discord'
     ];
 
     public function routeNotificationForDiscord()
     {
-        return $this->discord->get('webhook_url');
+        return data_get($this, 'discord_webhook_url', null);
     }
     public function routeNotificationForEmail(string $attribute = 'recipients')
     {
-        $recipients = $this->smtp->get($attribute, '');
+        $recipients = data_get($this, 'smtp_recipients', '');
         if (is_null($recipients) || $recipients === '') {
             return [];
         }
         return explode(',', $recipients);
     }
-
 
     public function subscription()
     {

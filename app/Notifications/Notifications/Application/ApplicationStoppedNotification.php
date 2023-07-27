@@ -38,10 +38,10 @@ class ApplicationStoppedNotification extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp.enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord.enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications.status_changes');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications.status_changes');
+        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_status_changes');
+        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_status_changes');
 
         if ($isEmailEnabled && $isSubscribedToEmailEvent) {
             $channels[] = EmailChannel::class;
@@ -67,7 +67,7 @@ class ApplicationStoppedNotification extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         $message = '⛔ ' . $this->application_name . ' has been stopped.
-            
+
 ';
         $message .= '[Application URL](' . $this->application_url . ')';
         return $message;

@@ -70,24 +70,24 @@ function generate_application_name(string $git_repository, string $git_branch)
 
 function is_transactional_emails_active()
 {
-    return data_get(InstanceSettings::get(), 'smtp.enabled');
+    return data_get(InstanceSettings::get(), 'smtp_enabled');
 }
 
 function set_transanctional_email_settings()
 {
     $settings = InstanceSettings::get();
-    $password = data_get($settings, 'smtp.password');
+    $password = data_get($settings, 'smtp_password');
     if ($password) $password = decrypt($password);
 
     config()->set('mail.default', 'smtp');
     config()->set('mail.mailers.smtp', [
         "transport" => "smtp",
-        "host" => data_get($settings, 'smtp.host'),
-        "port" => data_get($settings, 'smtp.port'),
-        "encryption" => data_get($settings, 'smtp.encryption'),
-        "username" => data_get($settings, 'smtp.username'),
+        "host" => data_get($settings, 'smtp_host'),
+        "port" => data_get($settings, 'smtp_port'),
+        "encryption" => data_get($settings, 'smtp_encryption'),
+        "username" => data_get($settings, 'smtp_username'),
         "password" => $password,
-        "timeout" => data_get($settings, 'smtp.timeout'),
+        "timeout" => data_get($settings, 'smtp_timeout'),
         "local_domain" => null,
     ]);
 }

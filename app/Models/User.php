@@ -34,20 +34,6 @@ class User extends Authenticatable implements SendsEmail
             $team = [
                 'name' => $user->name . "'s Team",
                 'personal_team' => true,
-                'smtp' => [
-                    'enabled' => false,
-                ],
-                'smtp_notifications' => [
-                    'test' => true,
-                    'deployments' => false,
-                ],
-                'discord' => [
-                    'enabled' => false,
-                ],
-                'discord_notifications' => [
-                    'test' => true,
-                    'deployments' => false,
-                ],
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;

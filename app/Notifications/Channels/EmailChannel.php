@@ -24,8 +24,8 @@ class EmailChannel
             [],
             fn (Message $message) => $message
                 ->from(
-                    data_get($notifiable, 'smtp.from_address'),
-                    data_get($notifiable, 'smtp.from_name'),
+                    data_get($notifiable, 'smtp_from_address'),
+                    data_get($notifiable, 'smtp_from_name'),
                 )
                 ->bcc($bcc)
                 ->subject($mailMessage->subject)
@@ -35,18 +35,18 @@ class EmailChannel
 
     private function bootConfigs($notifiable): void
     {
-        $password = data_get($notifiable, 'smtp.password');
+        $password = data_get($notifiable, 'smtp_password');
         if ($password) $password = decrypt($password);
 
         config()->set('mail.default', 'smtp');
         config()->set('mail.mailers.smtp', [
             "transport" => "smtp",
-            "host" => data_get($notifiable, 'smtp.host'),
-            "port" => data_get($notifiable, 'smtp.port'),
-            "encryption" => data_get($notifiable, 'smtp.encryption'),
-            "username" => data_get($notifiable, 'smtp.username'),
+            "host" => data_get($notifiable, 'smtp_host'),
+            "port" => data_get($notifiable, 'smtp_port'),
+            "encryption" => data_get($notifiable, 'smtp_encryption'),
+            "username" => data_get($notifiable, 'smtp_username'),
             "password" => $password,
-            "timeout" => data_get($notifiable, 'smtp.timeout'),
+            "timeout" => data_get($notifiable, 'smtp_timeout'),
             "local_domain" => null,
         ]);
     }

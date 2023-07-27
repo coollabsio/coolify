@@ -33,9 +33,15 @@
                 wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
                 @disabled($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}">
+
         </div>
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif
+    @error($id)
+        <label class="label">
+            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+        </label>
+    @enderror
 </div>
