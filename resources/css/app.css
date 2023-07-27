@@ -15,7 +15,7 @@ button[isError] {
     @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
 }
 .main {
-    @apply max-w-screen-xl pt-4 pl-24 pr-10 mx-auto;
+    @apply pt-4 pl-24 pr-10 mx-auto;
 }
 .label-text,
 label {
@@ -108,4 +108,8 @@ tr td {
 }
 tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
+}
+
+.buyme {
+    @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-sm bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200;
 }

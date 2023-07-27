@@ -32,7 +32,7 @@
         <div class="fixed top-3 left-4" id="vue">
             <magic-bar></magic-bar>
         </div>
-        <main class="main">
+        <main class="main max-w-screen-2xl">
             {{ $slot }}
         </main>
         <x-version class="fixed left-2 bottom-1" />
