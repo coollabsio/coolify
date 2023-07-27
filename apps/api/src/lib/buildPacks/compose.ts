@@ -52,29 +52,36 @@ export default async function (data) {
 		}
 
 		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
+		let finalEnvs = [...envs];
 		if (Object.keys(environment).length > 0) {
-			environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
+			for (const arg of Object.keys(environment)) {
+				const [key, _] = arg.split('=');
+				if (finalEnvs.filter((env) => env.startsWith(key)).length === 0) {
+					finalEnvs.push(arg);
+				}
+			}
+			// environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
 		}
-		value['environment'] = [...environment, ...envs];
+		value['environment'] = [...finalEnvs];
 
 		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
 		if (typeof build === 'string') {
 			build = { context: build };
 		}
 		const buildArgs = typeof build['args'] === 'undefined' ? [] : build['args'];
-		let finalArgs = [...buildEnvs];
+		let finalBuildArgs = [...buildEnvs];
 		if (Object.keys(buildArgs).length > 0) {
 			for (const arg of Object.keys(buildArgs)) {
 				const [key, _] = arg.split('=');
-				if (finalArgs.filter((env) => env.startsWith(key)).length === 0) {
-					finalArgs.push(arg);
+				if (finalBuildArgs.filter((env) => env.startsWith(key)).length === 0) {
+					finalBuildArgs.push(arg);
 				}
 			}
 		}
 		if (build.length > 0 || buildArgs.length > 0) {
 			value['build'] = {
 				...build,
-				args: finalArgs
+				args: finalBuildArgs
 			};
 		}
 
@@ -121,7 +128,6 @@ export default async function (data) {
 							.replace(/^\./, `~`)
 							.replace(/^\.\./, '~')
 							.replace(/^\$PWD/, '~');
-						console.log({ source });
 					} else {
 						if (!target) {
 							target = source;
