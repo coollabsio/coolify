@@ -10,7 +10,7 @@
                 <div>Type: {{ auth()->user()->currentTeam()->subscription->lemon_variant_name }}</div>
                 @if (auth()->user()->currentTeam()->subscription->lemon_status === 'cancelled')
                     <div class="pb-4">Subscriptions ends at: {{ getRenewDate() }}</div>
-                    <x-forms.button><a class="text-white" href="{{ getSubscriptionLink() }}">Subscribe
+                    <x-forms.button><a class="text-white" href="{{ route('subscription') }}">Subscribe
                             Again</a>
                     </x-forms.button>
                 @else
@@ -19,7 +19,7 @@
                 <x-forms.button><a class="text-white" href="{{ getPaymentLink() }}">Update Payment Details</a>
                 </x-forms.button>
             @else
-                <x-forms.button class="mt-4"><a class="text-white" href="{{ getSubscriptionLink() }}">Subscribe Now</a>
+                <x-forms.button class="mt-4"><a class="text-white" href="{{ route('subscription') }}">Subscribe Now</a>
                 </x-forms.button>
             @endif
             <x-forms.button><a class="text-white" href="https://app.lemonsqueezy.com/my-orders">Manage My
