@@ -23,11 +23,14 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return data_get($this, 'discord_webhook_url', null);
     }
-    public function routeNotificationForEmail(string $attribute = 'recipients')
+    public function getRecepients($notification)
     {
-        $recipients = data_get($this, 'smtp_recipients', '');
-        if (is_null($recipients) || $recipients === '') {
-            return [];
+        $recipients = data_get($notification,'emails',null);
+        ray($recipients);
+        if (is_null($recipients)) {
+            $recipients = $this->members()->pluck('email')->toArray();
+            ray($recipients);
+            return $recipients;
         }
         return explode(',', $recipients);
     }

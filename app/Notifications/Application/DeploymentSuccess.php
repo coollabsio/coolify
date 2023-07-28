@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications\Notifications\Application;
+namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -13,7 +13,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class DeployedSuccessfullyNotification extends Notification implements ShouldQueue
+class DeploymentSuccess extends Notification implements ShouldQueue
 {
     use Queueable;
     public Application $application;
@@ -67,7 +67,7 @@ class DeployedSuccessfullyNotification extends Notification implements ShouldQue
             $fqdn = $this->preview->fqdn;
             $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
         }
-        $mail->view('emails.application-deployed-successfully', [
+        $mail->view('emails.application-deployment-success', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,

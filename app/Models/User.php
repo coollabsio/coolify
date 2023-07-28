@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Visus\Cuid2\Cuid2;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use App\Notifications\TrnsactionalEmails\ResetPassword;
 
 class User extends Authenticatable implements SendsEmail
 {
@@ -43,9 +44,13 @@ class User extends Authenticatable implements SendsEmail
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
-    public function routeNotificationForEmail()
+    public function getRecepients($notification)
     {
         return $this->email;
+    }
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new ResetPassword($token));
     }
     public function isAdmin()
     {

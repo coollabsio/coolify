@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications\Notifications;
+namespace App\Notifications;
 
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
@@ -9,30 +9,25 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TestNotification extends Notification implements ShouldQueue
+class Test extends Notification implements ShouldQueue
 {
     use Queueable;
-    public string|null $type = null;
-    public function __construct(string|null $type = null)
-    {
-        $this->type = $type;
-    }
+    public function __construct(public string|null $emails = null)
+    {}
+
     public function via(object $notifiable): array
     {
         $channels = [];
-
-        $isSmtp = $this->type === 'smtp' || is_null($this->type);
-        $isDiscord = $this->type === 'discord' || is_null($this->type);
         $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
 
-        if ($isEmailEnabled && $isSmtp) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isDiscordEnabled && $isDiscord) {
+        if ($isDiscordEnabled && empty($this->emails)) {
             $channels[] = DiscordChannel::class;
         }
 
+        if ($isEmailEnabled && !empty($this->emails)) {
+            $channels[] = EmailChannel::class;
+        }
         return $channels;
     }
     public function toMail(): MailMessage
@@ -42,7 +37,6 @@ class TestNotification extends Notification implements ShouldQueue
         $mail->view('emails.test');
         return $mail;
     }
-
     public function toDiscord(): string
     {
         $message = 'This is a test Discord notification from Coolify.';

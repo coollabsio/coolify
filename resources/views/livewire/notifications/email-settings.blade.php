@@ -3,7 +3,7 @@
         <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
             <x-forms.input placeholder="test@example.com" id="emails" label="Recepients" required />
             <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
-                Send Test Emails
+                Send Email
             </x-forms.button>
         </form>
         <form method="dialog" class="modal-backdrop">
@@ -44,8 +44,8 @@
                 label="Encryption" />
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
-            <x-forms.input id="model.smtp_username" helper="SMTP Username" label="SMTP Username" />
-            <x-forms.input type="password" helper="SMTP Password" id="model.smtp_password" label="SMTP Password" />
+            <x-forms.input id="model.smtp_username" label="SMTP Username" />
+            <x-forms.input type="password" id="model.smtp_password" label="SMTP Password" />
             <x-forms.input id="model.smtp_timeout" helper="Timeout value for sending emails." label="Timeout" />
         </div>
         <div class="flex flex-col gap-2 xl:flex-row">
@@ -58,12 +58,10 @@
         <h4 class="mt-4">Subscribe to events</h4>
         <div class="w-64">
             @if (isDev())
-                <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_test"
-                    label="Test Notifications" />
+                <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_test" label="Test" />
             @endif
             <h5 class="mt-4">Applications</h5>
-            <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_deployments"
-                label="New Deployment" />
+            <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_deployments" label="Deployments" />
             <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_status_changes"
                 label="Status Changes" />
         </div>

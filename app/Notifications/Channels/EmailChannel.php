@@ -11,13 +11,13 @@ class EmailChannel
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
+        ray($notification);
+        $recepients = $notifiable->getRecepients($notification);
 
-        $bcc = $notifiable->routeNotificationForEmail('test_recipients');
-        if (count($bcc) === 0) {
-            if ($notifiable instanceof \App\Models\Team) {
-                $bcc = $notifiable->members()->pluck('email')->toArray();
-            }
+        if (count($recepients) === 0) {
+            throw new \Exception('No email recipients found');
         }
+
         $mailMessage = $notification->toMail($notifiable);
         Mail::send(
             [],
@@ -27,7 +27,7 @@ class EmailChannel
                     data_get($notifiable, 'smtp_from_address'),
                     data_get($notifiable, 'smtp_from_name'),
                 )
-                ->bcc($bcc)
+                ->bcc($recepients)
                 ->subject($mailMessage->subject)
                 ->html((string)$mailMessage->render())
         );

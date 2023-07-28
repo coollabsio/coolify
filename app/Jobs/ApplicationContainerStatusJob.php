@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Notifications\Notifications\Application\ApplicationStoppedNotification;
+use App\Notifications\Application\StatusChanged;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -36,7 +36,7 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
         try {
             $status = get_container_status(server: $this->application->destination->server, container_id: $this->container_name, throwError: false);
             if ($this->application->status === 'running' && $status === 'stopped') {
-                $this->application->environment->project->team->notify(new ApplicationStoppedNotification($this->application));
+                $this->application->environment->project->team->notify(new StatusChanged($this->application));
             }
 
             if ($this->pull_request_id) {

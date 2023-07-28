@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications\Notifications\Application;
+namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -12,7 +12,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class ApplicationStoppedNotification extends Notification implements ShouldQueue
+class StatusChanged extends Notification implements ShouldQueue
 {
     use Queueable;
     public Application $application;
@@ -56,7 +56,7 @@ class ApplicationStoppedNotification extends Notification implements ShouldQueue
         $mail = new MailMessage();
         $fqdn = $this->fqdn;
         $mail->subject("⛔ {$this->application_name} has been stopped");
-        $mail->view('emails.application-stopped', [
+        $mail->view('emails.application-status-changes', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'application_url' => $this->application_url,

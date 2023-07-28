@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Notifications\Notifications\Application;
+namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
@@ -13,7 +13,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Str;
 
-class DeployedWithErrorNotification extends Notification implements ShouldQueue
+class DeploymentFailed extends Notification implements ShouldQueue
 {
     use Queueable;
     public Application $application;
@@ -69,7 +69,7 @@ class DeployedWithErrorNotification extends Notification implements ShouldQueue
             $mail->subject('❌ Pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . ' deployment failed.');
         }
 
-        $mail->view('emails.application-deployed-with-error', [
+        $mail->view('emails.application-deployment-failed', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
             'deployment_url' => $this->deployment_url,

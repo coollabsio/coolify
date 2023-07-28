@@ -3,7 +3,7 @@
 namespace App\Http\Livewire\Notifications;
 
 use App\Models\Team;
-use App\Notifications\Notifications\TestNotification;
+use App\Notifications\Test;
 use Livewire\Component;
 
 class DiscordSettings extends Component
@@ -46,7 +46,7 @@ class DiscordSettings extends Component
     }
     public function sendTestNotification()
     {
-        $this->model->notify(new TestNotification('discord'));
+        $this->model->notify(new Test);
         $this->emit('success', 'Test notification sent.');
     }
 }

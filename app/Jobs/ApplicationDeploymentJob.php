@@ -12,8 +12,8 @@ use App\Models\GitlabApp;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Notifications\Notifications\Application\DeployedSuccessfullyNotification;
-use App\Notifications\Notifications\Application\DeployedWithErrorNotification;
+use App\Notifications\Application\DeploymentSuccess;
+use App\Notifications\Application\DeploymentFailed;
 use App\Traits\ExecuteRemoteCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -224,10 +224,10 @@ class ApplicationDeploymentJob implements ShouldQueue
         }
         queue_next_deployment($this->application);
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            $this->application->environment->project->team->notify(new DeployedSuccessfullyNotification($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
         if ($status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team->notify(new DeployedWithErrorNotification($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
         }
     }
     private function start_by_compose_file()
@@ -266,13 +266,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 listen       80;
                 listen  [::]:80;
                 server_name  localhost;
-            
+
                 location / {
                     root   /usr/share/nginx/html;
                     index  index.html;
                     try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
                 }
-            
+
                 error_page   500 502 503 504  /50x.html;
                 location = /50x.html {
                     root   /usr/share/nginx/html;

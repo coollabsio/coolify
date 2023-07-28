@@ -3,14 +3,14 @@
 namespace App\Http\Livewire\Settings;
 
 use App\Models\InstanceSettings;
-use App\Notifications\TransactionalEmails\TestEmail;
+use App\Notifications\TransactionalEmails\Test;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class Email extends Component
 {
     public InstanceSettings $settings;
-
+    public string $emails;
     protected $rules = [
         'settings.smtp_enabled' => 'nullable|boolean',
         'settings.smtp_host' => 'required',
@@ -35,6 +35,7 @@ class Email extends Component
     public function mount()
     {
         $this->decrypt();
+        $this->emails = auth()->user()->email;
     }
     public function instantSave()
     {
@@ -46,9 +47,9 @@ class Email extends Component
             $this->validate();
         }
     }
-    public function testNotification()
+    public function sendTestNotification()
     {
-        $this->settings->notify(new TestEmail);
+        $this->settings->notify(new Test($this->emails));
         $this->emit('success', 'Test email sent.');
     }
     private function decrypt()

@@ -8,13 +8,18 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class TestEmail extends Notification implements ShouldQueue
+class Test extends Notification implements ShouldQueue
 {
     use Queueable;
+
+    public function __construct(public string $emails)
+    {}
+
     public function via(): array
     {
         return [EmailChannel::class];
     }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();

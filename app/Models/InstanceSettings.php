@@ -15,9 +15,9 @@ class InstanceSettings extends Model implements SendsEmail
     protected $casts = [
         'resale_license' => 'encrypted',
     ];
-    public function routeNotificationForEmail(string $attribute = 'test_recipients')
+    public function getRecepients($notification)
     {
-        $recipients = data_get($this,'smtp','');
+        $recipients = data_get($notification,'emails',null);
         if (is_null($recipients) || $recipients === '') {
             return [];
         }

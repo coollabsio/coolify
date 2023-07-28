@@ -4,12 +4,13 @@ namespace App\Http\Livewire\Notifications;
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
-use App\Notifications\Notifications\TestNotification;
+use App\Notifications\Test;
 use Livewire\Component;
 
 class EmailSettings extends Component
 {
     public Team $model;
+    public string $emails;
 
     protected $rules = [
         'model.smtp_enabled' => 'nullable|boolean',
@@ -48,6 +49,7 @@ class EmailSettings extends Component
     public function mount()
     {
         $this->decrypt();
+        $this->emails = auth()->user()->email;
     }
     public function copyFromInstanceSettings()
     {
@@ -93,8 +95,8 @@ class EmailSettings extends Component
     }
     public function sendTestNotification()
     {
-        $this->model->notify(new TestNotification('smtp'));
-        $this->emit('success', 'Test notification sent.');
+        $this->model->notify(new Test($this->emails));
+        $this->emit('success', 'Test Email sent successfully.');
     }
     public function instantSave()
     {

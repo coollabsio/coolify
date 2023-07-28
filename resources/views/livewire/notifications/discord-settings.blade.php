@@ -23,12 +23,11 @@
         <h4 class="mt-4">Subscribe to events</h4>
         <div class="w-64 ">
             @if (isDev())
-                <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_test"
-                    label="Test Notifications" />
+                <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_test" label="Test" />
             @endif
             <h5 class="mt-4">Applications</h5>
             <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_deployments"
-                label="New Deployment" />
+                label="Deployments" />
             <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_status_changes"
                 label="Status Changes" />
         </div>

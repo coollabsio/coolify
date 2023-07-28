@@ -4,7 +4,7 @@ namespace App\Http\Livewire\Team;
 
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Notifications\TransactionalEmails\InvitationLinkEmail;
+use App\Notifications\TransactionalEmails\InvitationLink;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -58,7 +58,7 @@ class InviteLink extends Component
                 'via' => $isEmail ? 'email' : 'link',
             ]);
             if ($isEmail) {
-                $user->first()->notify(new InvitationLinkEmail());
+                $user->first()->notify(new InvitationLink);
                 $this->emit('success', 'Invitation sent via email successfully.');
             } else {
                 $this->emit('success', 'Invitation link generated.');
