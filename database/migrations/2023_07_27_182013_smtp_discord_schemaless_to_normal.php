@@ -21,8 +21,8 @@ return new class extends Migration
             $table->string('smtp_host')->nullable();
             $table->integer('smtp_port')->nullable();
             $table->string('smtp_encryption')->nullable();
-            $table->string('smtp_username')->nullable();
-            $table->string('smtp_password')->nullable();
+            $table->text('smtp_username')->nullable();
+            $table->text('smtp_password')->nullable();
             $table->integer('smtp_timeout')->nullable();
             $table->boolean('smtp_notifications_test')->default(true);
             $table->boolean('smtp_notifications_deployments')->default(false);
@@ -69,12 +69,12 @@ return new class extends Migration
             $table->boolean('smtp_enabled')->default(false);
             $table->string('smtp_from_address')->nullable();
             $table->string('smtp_from_name')->nullable();
-            $table->string('smtp_recipients')->nullable();
+            $table->text('smtp_recipients')->nullable();
             $table->string('smtp_host')->nullable();
             $table->integer('smtp_port')->nullable();
             $table->string('smtp_encryption')->nullable();
-            $table->string('smtp_username')->nullable();
-            $table->string('smtp_password')->nullable();
+            $table->text('smtp_username')->nullable();
+            $table->text('smtp_password')->nullable();
             $table->integer('smtp_timeout')->nullable();
         });
         $instance_settings = InstanceSettings::all();
