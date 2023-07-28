@@ -31,27 +31,29 @@
         <div class="w-48">
             <x-forms.checkbox instantSave id="model.smtp_enabled" label="Notification Enabled" />
         </div>
-
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <x-forms.input id="model.smtp_recipients" placeholder="If empty, all users will be notified in the team."
-                helper="Email list to send the all notifications to, separated by comma." label="Recipients" />
-        </div>
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <x-forms.input required id="model.smtp_host" helper="SMTP Hostname" placeholder="smtp.mailgun.org"
-                label="Host" />
-            <x-forms.input required id="model.smtp_port" helper="SMTP Port" placeholder="587" label="Port" />
-            <x-forms.input helper="If SMTP through SSL, set it to 'tls'." placeholder="tls" id="model.smtp_encryption"
-                label="Encryption" />
-        </div>
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <x-forms.input id="model.smtp_username" label="SMTP Username" />
-            <x-forms.input type="password" id="model.smtp_password" label="SMTP Password" />
-            <x-forms.input id="model.smtp_timeout" helper="Timeout value for sending emails." label="Timeout" />
-        </div>
-        <div class="flex flex-col gap-2 xl:flex-row">
-            <x-forms.input required id="model.smtp_from_name" helper="Name used in emails." label="From Name" />
-            <x-forms.input required id="model.smtp_from_address" helper="Email address used in emails."
-                label="From Address" />
+        <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-2 xl:flex-row">
+                <x-forms.input id="model.smtp_recipients"
+                    placeholder="If empty, all users will be notified in the team."
+                    helper="Email list to send the all notifications to, separated by comma." label="Recipients" />
+            </div>
+            <div class="flex flex-col gap-2 xl:flex-row">
+                <x-forms.input required id="model.smtp_host" helper="SMTP Hostname" placeholder="smtp.mailgun.org"
+                    label="Host" />
+                <x-forms.input required id="model.smtp_port" helper="SMTP Port" placeholder="587" label="Port" />
+                <x-forms.input helper="If SMTP through SSL, set it to 'tls'." placeholder="tls"
+                    id="model.smtp_encryption" label="Encryption" />
+            </div>
+            <div class="flex flex-col gap-2 xl:flex-row">
+                <x-forms.input id="model.smtp_username" label="SMTP Username" />
+                <x-forms.input type="password" id="model.smtp_password" label="SMTP Password" />
+                <x-forms.input id="model.smtp_timeout" helper="Timeout value for sending emails." label="Timeout" />
+            </div>
+            <div class="flex flex-col gap-2 xl:flex-row">
+                <x-forms.input required id="model.smtp_from_name" helper="Name used in emails." label="From Name" />
+                <x-forms.input required id="model.smtp_from_address" helper="Email address used in emails."
+                    label="From Address" />
+            </div>
         </div>
     </form>
     @if (data_get($model, 'smtp_enabled'))

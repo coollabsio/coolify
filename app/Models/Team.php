@@ -26,10 +26,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
     public function getRecepients($notification)
     {
         $recipients = data_get($notification,'emails',null);
-        ray($recipients);
         if (is_null($recipients)) {
             $recipients = $this->members()->pluck('email')->toArray();
-            ray($recipients);
             return $recipients;
         }
         return explode(',', $recipients);
