@@ -93,6 +93,9 @@ function set_transanctional_email_settings()
 }
 function base_ip()
 {
+    if (isDev()) {
+        return "http://localhost";
+    }
     $settings = InstanceSettings::get();
     return "http://{$settings->public_ipv4}";
 }
