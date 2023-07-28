@@ -1,14 +1,17 @@
-<div x-data="{ deleteDestination: false }">
-    <x-naked-modal show="deleteDestination" title="Delete Destination"
-        message='This destination will be deleted. It is not reversible. <br>Please think again.' />
+<div>
+    <x-modal yesOrNo modalId="deleteDestination" modalTitle="Delete Destination">
+        <x-slot:modalBody>
+            <p>This destination will be deleted. It is not reversible. <br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     <form class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Destination</h1>
             <x-forms.button wire:click.prevent='submit' type="submit">
                 Save
             </x-forms.button>
-            @if ($destination->server->id === 0 && $destination->network !== 'coolify')
-                <x-forms.button x-on:click.prevent="deleteDestination = true">
+            @if ($destination->network !== 'coolify')
+                <x-forms.button isError isModal modalId="deleteDestination">
                     Delete
                 </x-forms.button>
             @endif

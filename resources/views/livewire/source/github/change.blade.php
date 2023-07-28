@@ -1,6 +1,9 @@
-<div x-data="{ deleteSource: false }">
-    <x-naked-modal show="deleteSource" title="Delete Source"
-        message='This source will be deleted. It is not reversible. <br>Please think again.' />
+<div>
+    <x-modal yesOrNo modalId="deleteSource" modalTitle="Delete Source">
+        <x-slot:modalBody>
+            <p>This source will be deleted. It is not reversible. <br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     <form wire:submit.prevent='submit'>
         <div class="flex items-center gap-2">
             <h1>GitHub App</h1>
@@ -19,16 +22,12 @@
                             @endif
                         </x-forms.button>
                     </a>
-                    <x-forms.button isError x-on:click.prevent="deleteSource = true">
-                        Delete
-                    </x-forms.button>
                 @else
                     <x-forms.button disabled type="submit">Save</x-forms.button>
-                    <x-forms.button isError x-on:click.prevent="deleteSource = true">
-                        Delete
-                    </x-forms.button>
-
                 @endif
+                <x-forms.button isError isModal modalId="deleteSource">
+                    Delete
+                </x-forms.button>
             </div>
         </div>
         <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>

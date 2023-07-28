@@ -1,6 +1,9 @@
-<div x-data="{ deleteTeam: false }">
-    <x-naked-modal show="deleteTeam" title="Delete Team"
-        message='This team will be deleted. It is not reversible. <br>Please think again.' />
+<div>
+    <x-modal yesOrNo modalId="deleteTeam" modalTitle="Delete Team">
+        <x-slot:modalBody>
+            <p>This team be deleted. It is not reversible. <br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     <h3>Danger Zone</h3>
     <div class="pb-4">Woah. I hope you know what are you doing.</div>
     <h4 class="pb-4">Delete Team</h4>
@@ -8,12 +11,13 @@
         <div>This is the default team. You can't delete it.</div>
     @elseif(auth()->user()->teams()->get()->count() === 1)
         <div>You can't delete your last team.</div>
-    @elseif(auth()->user()->currentTeam()->subscription?->lemon_status !== 'cancelled')
+    @elseif(auth()->user()->currentTeam()->subscription &&
+            auth()->user()->currentTeam()->subscription?->lemon_status !== 'cancelled')
         <div>Please cancel your subscription before delete this team (Manage My Subscription button).</div>
     @else
         @if (session('currentTeam')->isEmpty())
             <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-            <x-forms.button isError x-on:click.prevent="deleteTeam = true">
+            <x-forms.button isError isModal modalId="deleteTeam">
                 Delete
             </x-forms.button>
         @else

@@ -14,7 +14,6 @@ class Form extends Component
     public $dockerVersion;
     public string|null $wildcard_domain = null;
     public int $cleanup_after_percentage;
-    public string|null $modalId = null;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -37,7 +36,6 @@ class Form extends Component
     ];
     public function mount()
     {
-        $this->modalId = new Cuid2(7);
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }

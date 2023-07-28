@@ -1,6 +1,9 @@
-<div x-data="{ deletePrivateKey: false, showPrivateKey: false }">
-    <x-naked-modal show="deletePrivateKey" title="Delete Private Key"
-        message='This private key will be deleted. It is not reversible. <br>Please think again.' />
+<div x-data="{ showPrivateKey: false }">
+    <x-modal yesOrNo modalId="deletePrivateKey" modalTitle="Delete Private Key">
+        <x-slot:modalBody>
+            <p>This private key will be deleted. It is not reversible. <br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     <form class="flex flex-col gap-2" wire:submit.prevent='changePrivateKey'>
         <div class="flex items-end gap-2">
             <h1>Private Key</h1>
@@ -8,7 +11,7 @@
                 Save
             </x-forms.button>
             @if ($private_key->id > 0)
-                <x-forms.button isError x-on:click.prevent="deletePrivateKey = true">
+                <x-forms.button isError isModal modalId="deletePrivateKey">
                     Delete
                 </x-forms.button>
             @endif

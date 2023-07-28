@@ -6,7 +6,7 @@
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="network" label="Network" required />
         </div>
-        <x-forms.select id="server_id" label="Select a server" required>
+        <x-forms.select id="server_id" label="Select a server" required wire:change="generate_name">
             <option disabled>Select a server</option>
             @foreach ($servers as $server)
                 <option value="{{ $server->id }}">{{ $server->name }}</option>

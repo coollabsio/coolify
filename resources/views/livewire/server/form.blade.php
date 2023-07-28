@@ -1,19 +1,21 @@
-<div x-data="{ changeLocalhost: false }">
-    <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Server">
+<div>
+    <x-modal yesOrNo modalId="deleteServer" modalTitle="Delete Server">
         <x-slot:modalBody>
             <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
         </x-slot:modalBody>
     </x-modal>
-    <x-naked-modal show="changeLocalhost" action="submit" title="Change localhost"
-        message='You could lost a lot of functionalities if you change the server details of the server where Coolify is running on.<br>Please think again.' />
+    <x-modal yesOrNo modalId="changeLocalhost" modalTitle="Change Localhost" action="submit">
+        <x-slot:modalBody>
+            <p>You could lost a lot of functionalities if you change the server details of the server where Coolify is
+                running on.<br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     @if ($server->settings->is_reachable)
-
-
         <form wire:submit.prevent='submit' class="flex flex-col">
             <div class="flex gap-2">
                 <h2>General</h2>
                 @if ($server->id === 0)
-                    <x-forms.button x-on:click.prevent="changeLocalhost = true">Save</x-forms.button>
+                    <x-forms.button isModal modalId="changeLocalhost">Save</x-forms.button>
                 @else
                     <x-forms.button type="submit">Save</x-forms.button>
                 @endif
@@ -86,7 +88,7 @@
         back!
     </div>
     @if ($server->id !== 0 || isDev())
-        <x-forms.button isError isModal modalId="{{ $modalId }}">
+        <x-forms.button isError isModal modalId="deleteServer">
             Delete
         </x-forms.button>
     @endif

@@ -1,6 +1,14 @@
 <div>
     @if (data_get($server, 'proxy.type'))
         @if (data_get($server, 'proxy.status') === 'running')
+            <x-modal yesOrNo modalId="stopProxy" modalTitle="Stop Proxy" action="stop">
+                <x-slot:modalBody>
+                    <p>This proxy will be stopped. It is not reversible. <br>All resources will be unavailable.
+                        <br>Please think
+                        again.
+                    </p>
+                </x-slot:modalBody>
+            </x-modal>
             <div class="flex gap-4">
                 <div class="group">
                     <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
@@ -49,8 +57,9 @@
                                     </svg>Restart</div>
                             </li>
                             <li>
-                                <div class="rounded-none hover:bg-red-500 hover:text-white" wire:click='stop'><svg
-                                        xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                <x-forms.button isModal noStyle modalId="stopProxy"
+                                    class="rounded-none hover:bg-red-500 hover:text-white">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                         stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                         stroke-linejoin="round">
                                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -59,7 +68,9 @@
                                         <path d="M14 5.5a1.5 1.5 0 0 1 3 0v6.5" />
                                         <path
                                             d="M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47" />
-                                    </svg>Stop</div>
+                                    </svg>Stop
+                                </x-forms.button>
+
                             </li>
                         </ul>
                     </div>

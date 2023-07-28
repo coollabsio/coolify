@@ -7,6 +7,7 @@ use App\Models\StandaloneDocker as ModelsStandaloneDocker;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
+use Illuminate\Support\Str;
 
 class StandaloneDocker extends Component
 {
@@ -41,7 +42,11 @@ class StandaloneDocker extends Component
         } else {
             $this->network = new Cuid2(7);
         }
-        $this->name = generate_random_name();
+        $this->name = Str::kebab("{$this->servers->first()->name}-{$this->network}");
+    }
+    public function generate_name() {
+        $this->server = Server::find($this->server_id);
+        $this->name = Str::kebab("{$this->server->name}-{$this->network}");
     }
     private function createNetworkAndAttachToProxy()
     {
@@ -50,7 +55,6 @@ class StandaloneDocker extends Component
     }
     public function submit()
     {
-
         $this->validate();
         try {
             $this->server = Server::find($this->server_id);
