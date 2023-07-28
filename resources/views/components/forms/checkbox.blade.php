@@ -1,5 +1,5 @@
 <div class="form-control min-w-fit">
-    <label class="flex gap-4 cursor-pointer label">
+    <label class="flex gap-4 px-0 cursor-pointer label">
         <span class="flex gap-2 label-text min-w-fit">
             @if ($label)
                 {{ $label }}

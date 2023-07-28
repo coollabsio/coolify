@@ -19,7 +19,6 @@ class Email extends Component
         'settings.smtp_username' => 'nullable',
         'settings.smtp_password' => 'nullable',
         'settings.smtp_timeout' => 'nullable',
-        'settings.smtp_test_recipients' => 'nullable',
         'settings.smtp_from_address' => 'required|email',
         'settings.smtp_from_name' => 'required',
     ];
@@ -32,7 +31,6 @@ class Email extends Component
         'settings.smtp_encryption' => 'Encryption',
         'settings.smtp_username' => 'Username',
         'settings.smtp_password' => 'Password',
-        'settings.smtp_test_recipients' => 'Test Recipients',
     ];
     public function mount()
     {

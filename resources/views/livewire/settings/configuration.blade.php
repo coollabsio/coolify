@@ -6,8 +6,8 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="flex flex-col gap-2">
-            <div class="flex gap-2">
+        <div class="flex flex-col gap-2 pt-4">
+            <div class="flex gap-2 w-96">
                 <x-forms.input id="settings.fqdn" label="Coolify's Domain" />
             </div>
 
