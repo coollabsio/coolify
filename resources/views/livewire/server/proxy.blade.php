@@ -12,13 +12,12 @@
                             @endif
                             <livewire:server.proxy.status :server="$server" />
                         </div>
-
                         <div class="pt-3 pb-4 ">Traefik v2</div>
                         @if (
                             $server->proxy->last_applied_settings &&
                                 $server->proxy->last_saved_settings !== $server->proxy->last_applied_settings)
-                            <div class="text-red-500 ">Configuration out of sync. Restart to get the new
-                                configs.
+                            <div class="text-red-500 ">Configuration out of sync. Restart the proxy to apply the new
+                                configurations.
                             </div>
                         @endif
                         <div class="container w-full pb-4 mx-auto">

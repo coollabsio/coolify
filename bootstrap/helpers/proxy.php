@@ -2,13 +2,19 @@
 
 use App\Models\Server;
 use Spatie\Url\Url;
+use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
-function getProxyConfiguration(Server $server)
+function get_proxy_path() {
+    $base_path = config('coolify.base_config_path');
+    $proxy_path = "$base_path/proxy";
+    return $proxy_path;
+}
+function generate_default_proxy_configuration(Server $server)
 {
-    $proxy_path = config('coolify.proxy_config_path');
+    $proxy_path = get_proxy_path();
     if (isDev()) {
-        $proxy_path = $proxy_path . '/testing-host-1/';
+        $proxy_path = config('coolify.dev_config_path') . '/' . $server->name . '/proxy';
     }
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
@@ -53,7 +59,7 @@ function getProxyConfiguration(Server $server)
                     "--ping=true",
                     "--ping.entrypoint=http",
                     "--api.dashboard=true",
-                    "--api.insecure=true",
+                    "--api.insecure=false",
                     "--entrypoints.http.address=:80",
                     "--entrypoints.https.address=:443",
                     "--entrypoints.http.http.encodequerysemicolons=true",
@@ -86,8 +92,10 @@ function getProxyConfiguration(Server $server)
 }
 function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
-    $traefik_dynamic_conf_path = '/data/coolify/proxy/dynamic';
+    ray('called');
+    $traefik_dynamic_conf_path = get_proxy_path() . "/dynamic";
     $traefik_default_redirect_file = "$traefik_dynamic_conf_path/default_redirect_404.yaml";
+    ray($redirect_url);
     if (empty($redirect_url)) {
         remote_process([
             "rm -f $traefik_default_redirect_file",

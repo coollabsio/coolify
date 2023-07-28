@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proxy;
 
+use App\Actions\Proxy\CheckConfigurationSync;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
@@ -18,8 +19,7 @@ class StartProxy
             $server->proxy->status = ProxyStatus::EXITED->value;
             $server->save();
         }
-        $proxy_path = config('coolify.proxy_config_path');
-
+        $proxy_path = get_proxy_path();
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
@@ -30,23 +30,16 @@ class StartProxy
             return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
         });
 
-        $configuration = instant_remote_process([
-            "cat $proxy_path/docker-compose.yml",
-        ], $server, false);
-        if (is_null($configuration)) {
-            $configuration = Str::of(getProxyConfiguration($server))->trim()->value;
-        } else {
-            $configuration = Str::of($configuration)->trim()->value;
-        }
+        $configuration = resolve(CheckConfigurationSync::class)($server);
+
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
+
         $activity = remote_process([
             "echo 'Creating required Docker networks...'",
             ...$create_networks_command,
-            "mkdir -p $proxy_path",
             "cd $proxy_path",
-            "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             "echo 'Creating Docker Compose file...'",
             "echo 'Pulling docker image...'",
             'docker compose pull -q',

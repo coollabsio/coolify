@@ -1,7 +1,6 @@
-version: '3.8'
+version: "3.8"
 
-x-testing-host:
-  &testing-host-base
+x-testing-host: &testing-host-base
   build:
     dockerfile: Dockerfile
     context: ./docker/testing-host
@@ -55,19 +54,19 @@ services:
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/proxy/testing-host-1:/data/coolify/proxy"
+      - "./_data/coolify/testing-local-docker-container/proxy:/data/coolify/proxy"
   testing-host-2:
     <<: *testing-host-base
     container_name: coolify-testing-host-2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/proxy/testing-host-2:/data/coolify/proxy"
+      - "./_data/coolify/testing-local-docker-container-2/proxy:/data/coolify/proxy"
   mailpit:
-    image: 'axllent/mailpit:latest'
+    image: "axllent/mailpit:latest"
     container_name: coolify-mail
     ports:
-      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
-      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
       - coolify
 
