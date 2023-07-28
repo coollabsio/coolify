@@ -70,7 +70,7 @@ class EmailSettings extends Component
             ]);
             $this->decrypt();
             if (is_a($team, Team::class)) {
-                session(['currentTeam' => $this->model]);
+                session(['currentTeam' => $team]);
             }
             $this->emit('success', 'Settings saved.');
         } else {
