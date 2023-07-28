@@ -14,7 +14,7 @@ class Status extends Component
     {
         $this->server->refresh();
     }
-    public function proxyStatus()
+    public function get_status()
     {
         try {
             dispatch_sync(new ProxyContainerStatusJob(

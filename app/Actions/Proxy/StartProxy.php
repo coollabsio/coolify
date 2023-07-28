@@ -50,9 +50,11 @@ class StartProxy
             "echo 'Creating Docker Compose file...'",
             "echo 'Pulling docker image...'",
             'docker compose pull -q',
-            "echo 'Stopping old proxy...'",
+            "echo 'Stopping existing proxy...'",
             'docker compose down -v --remove-orphans',
-            "echo 'Starting new proxy...'",
+            "lsof -nt -i:80 | xargs -r kill -9",
+            "lsof -nt -i:443 | xargs -r kill -9",
+            "echo 'Starting proxy...'",
             'docker compose up -d --remove-orphans',
             "echo 'Proxy installed successfully...'"
         ], $server);

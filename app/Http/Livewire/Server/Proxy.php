@@ -25,29 +25,20 @@ class Proxy extends Component
     {
         $this->server->refresh();
     }
-    public function switchProxy()
+    public function change_proxy()
     {
         $this->server->proxy = null;
         $this->server->save();
         $this->emit('proxyStatusUpdated');
     }
-    public function setProxy(string $proxy_type)
+    public function select_proxy(string $proxy_type)
     {
         $this->server->proxy->type = $proxy_type;
         $this->server->proxy->status = 'exited';
         $this->server->save();
         $this->emit('proxyStatusUpdated');
     }
-    public function stopProxy()
-    {
-        instant_remote_process([
-            "docker rm -f coolify-proxy",
-        ], $this->server);
-        $this->server->proxy->status = 'exited';
-        $this->server->save();
-        $this->emit('proxyStatusUpdated');
-    }
-    public function saveConfiguration()
+    public function submit()
     {
         try {
             $proxy_path = config('coolify.proxy_config_path');
@@ -67,7 +58,7 @@ class Proxy extends Component
             return general_error_handler(err: $e);
         }
     }
-    public function resetProxy()
+    public function reset_proxy_configuration()
     {
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server, true);
@@ -75,7 +66,7 @@ class Proxy extends Component
             return general_error_handler(err: $e);
         }
     }
-    public function checkProxySettingsInSync()
+    public function load_proxy_configuration()
     {
         try {
             $this->proxy_settings = resolve(CheckProxySettingsInSync::class)($this->server);

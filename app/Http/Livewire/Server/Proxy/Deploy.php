@@ -16,7 +16,7 @@ class Deploy extends Component
     {
         $this->server->refresh();
     }
-    public function deploy()
+    public function start_proxy()
     {
         if (
             $this->server->proxy->last_applied_settings &&

@@ -1,14 +1,14 @@
 <div>
     @if ($server->settings->is_usable)
         @if ($server->proxy->type)
-            <div x-init="$wire.checkProxySettingsInSync">
+            <div x-init="$wire.load_proxy_configuration">
                 @if ($selectedProxy->value === 'TRAEFIK_V2')
-                    <form wire:submit.prevent='saveConfiguration'>
+                    <form wire:submit.prevent='submit'>
                         <div class="flex items-center gap-2">
                             <h2>Proxy</h2>
                             <x-forms.button type="submit">Save</x-forms.button>
                             @if ($server->proxy->status === 'exited')
-                                <x-forms.button wire:click.prevent="switchProxy">Switch Proxy</x-forms.button>
+                                <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
                             @endif
                             <livewire:server.proxy.status :server="$server" />
                         </div>
@@ -26,15 +26,15 @@
                         </div>
                         <x-forms.input placeholder="https://coolify.io" id="redirect_url" label="Default Redirect 404"
                             helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
-                        <div wire:loading wire:target="checkProxySettingsInSync" class="pt-4">
+                        <div wire:loading wire:target="load_proxy_configuration" class="pt-4">
                             <x-loading text="Loading proxy configuration..." />
                         </div>
-                        <div wire:loading.remove wire:target="checkProxySettingsInSync">
+                        <div wire:loading.remove wire:target="load_proxy_configuration">
                             @if ($proxy_settings)
                                 <div class="flex flex-col gap-2 pt-2">
                                     <x-forms.textarea label="Configuration file: traefik.conf" name="proxy_settings"
                                         wire:model.defer="proxy_settings" rows="30" />
-                                    <x-forms.button wire:click.prevent="resetProxy">
+                                    <x-forms.button wire:click.prevent="reset_proxy_configuration">
                                         Reset configuration to default
                                     </x-forms.button>
                                 </div>
@@ -48,7 +48,7 @@
                     <div class="pt-2 pb-10 ">Select a proxy you would like to use on this server.</div>
                     <div class="flex gap-2">
                         <x-forms.button class="w-32 box"
-                            wire:click="setProxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">
+                            wire:click="select_proxy('{{ \App\Enums\ProxyTypes::TRAEFIK_V2 }}')">
                             Traefik
                             v2
                         </x-forms.button>

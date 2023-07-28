@@ -1,4 +1,4 @@
-<div wire:poll.10000ms="proxyStatus" x-init="$wire.proxyStatus">
+<div wire:poll.10000ms="get_status" x-init="$wire.get_status">
     @if ($server->proxy->status === 'running')
         <x-status.running />
     @elseif ($server->proxy->status === 'restarting')

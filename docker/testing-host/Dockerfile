@@ -14,7 +14,7 @@ ARG NIXPACKS_VERSION=1.9.0
 
 USER root
 WORKDIR /root
-RUN apk add --no-cache bash curl git git-lfs openssh-client openssh-server tar tini postgresql-client
+RUN apk add --no-cache bash curl git git-lfs openssh-client openssh-server tar tini postgresql-client lsof
 RUN mkdir -p ~/.docker/cli-plugins
 RUN if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
     curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \

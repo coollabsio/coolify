@@ -1,14 +1,24 @@
 <div>
+    <x-modal yesOrNo modalId="stopProxy" modalTitle="Stop Proxy" action="stop">
+        <x-slot:modalBody>
+            <p>This proxy will be stopped. It is not reversible. <br>All resources will be unavailable.
+                <br>Please think
+                again.
+            </p>
+        </x-slot:modalBody>
+    </x-modal>
+    <x-modal yesOrNo modalId="startProxy" modalTitle="Start Proxy" action="start_proxy">
+        <x-slot:modalBody>
+            <p>This will start the proxy on this server and <span class="text-warning">stop any running process that is
+                    using port 80 and
+                    443</span>.
+                <br>Please think
+                again.
+            </p>
+        </x-slot:modalBody>
+    </x-modal>
     @if (data_get($server, 'proxy.type'))
         @if (data_get($server, 'proxy.status') === 'running')
-            <x-modal yesOrNo modalId="stopProxy" modalTitle="Stop Proxy" action="stop">
-                <x-slot:modalBody>
-                    <p>This proxy will be stopped. It is not reversible. <br>All resources will be unavailable.
-                        <br>Please think
-                        again.
-                    </p>
-                </x-slot:modalBody>
-            </x-modal>
             <div class="flex gap-4">
                 <button>
                     <a target="_blank" href="{{ base_ip() }}:8080">
@@ -16,91 +26,27 @@
                         <x-external-link />
                     </a>
                 </button>
-                {{-- <div class="group">
-                    <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
-                        <x-chevron-down />
-                    </label>
-                    <div class="absolute hidden group-hover:block ">
-                        <ul tabindex="0"
-                            class="relative text-xs text-white normal-case rounded -ml-28 min-w-max menu bg-coolgray-200">
-                            <li>
-
-                            </li>
-                        </ul>
-                    </div>
-                </div> --}}
-                <button wire:click='deploy'
-                    class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
-                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                        stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
-                        <path
-                            d="M10.09 4.01l.496 -.495a2 2 0 0 1 2.828 0l7.071 7.07a2 2 0 0 1 0 2.83l-7.07 7.07a2 2 0 0 1 -2.83 0l-7.07 -7.07a2 2 0 0 1 0 -2.83l3.535 -3.535h-3.988">
-                        </path>
-                        <path d="M7.05 11.038v-3.988"></path>
-                    </svg>
-                    Restart
-                </button>
                 <x-forms.button isModal noStyle modalId="stopProxy"
                     class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
-                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
-                        stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2"
+                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                         <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"></path>
                         <path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"></path>
                     </svg>
                     Stop
                 </x-forms.button>
-                {{-- <div class="group">
-                    <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Actions
-                        <x-chevron-down />
-                    </label>
-                    <div class="absolute hidden group-hover:block ">
-                        <ul tabindex="0"
-                            class="relative text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200 -ml-14">
-                            <li>
-                                <div class="rounded-none hover:bg-coollabs hover:text-white" wire:click='deploy'><svg
-                                        xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-                                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-                                        <path d="M12 9l0 3" />
-                                        <path d="M12 15l.01 0" />
-                                    </svg>Restart</div>
-                            </li>
-                            <li>
-                                <x-forms.button isModal noStyle modalId="stopProxy"
-                                    class="rounded-none hover:bg-red-500 hover:text-white">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
-                                        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                        <path d="M8 13v-7.5a1.5 1.5 0 0 1 3 0v6.5" />
-                                        <path d="M11 5.5v-2a1.5 1.5 0 1 1 3 0v8.5" />
-                                        <path d="M14 5.5a1.5 1.5 0 0 1 3 0v6.5" />
-                                        <path
-                                            d="M17 7.5a1.5 1.5 0 0 1 3 0v8.5a6 6 0 0 1 -6 6h-2h.208a6 6 0 0 1 -5.012 -2.7a69.74 69.74 0 0 1 -.196 -.3c-.312 -.479 -1.407 -2.388 -3.286 -5.728a1.5 1.5 0 0 1 .536 -2.022a1.867 1.867 0 0 1 2.28 .28l1.47 1.47" />
-                                    </svg>Stop
-                                </x-forms.button>
-
-                            </li>
-                        </ul>
-                    </div>
-                </div> --}}
             </div>
         @else
-            <button wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white">
+            <x-forms.button isModal noStyle modalId="startProxy"
+                class="flex items-center gap-2 cursor-pointer hover:text-white">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round">
                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                     <path d="M7 4v16l13 -8z" />
                 </svg>Start Proxy
-            </button>
+            </x-forms.button>
         @endif
     @endif
 </div>
