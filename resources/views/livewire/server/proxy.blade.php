@@ -10,7 +10,6 @@
                             @if ($server->proxy->status === 'exited')
                                 <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
                             @endif
-                            <livewire:server.proxy.status :server="$server" />
                         </div>
                         <div class="pt-3 pb-4 ">Traefik v2</div>
                         @if (

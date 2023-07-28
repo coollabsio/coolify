@@ -1,5 +1,8 @@
 <div class="pb-6">
-    <h1>Server</h1>
+    <div class="flex items-center gap-2">
+        <h1>Server</h1>
+        <livewire:server.proxy.status :server="$server" />
+    </div>
     <div class="pt-2 pb-10 ">{{ data_get($server, 'name') }}</div>
     <nav class="navbar-main">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
@@ -26,9 +29,7 @@
             ]) }}">
             <button>Destinations</button>
         </a>
-        @if (request()->routeIs('server.proxy'))
-            <div class="flex-1"></div>
-            <livewire:server.proxy.deploy :server="$server" />
-        @endif
+        <div class="flex-1"></div>
+        <livewire:server.proxy.deploy :server="$server" />
     </nav>
 </div>

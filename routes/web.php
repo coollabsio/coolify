@@ -67,7 +67,7 @@ Route::middleware(['auth'])->group(function () {
         'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.create');
     Route::get('/server/{server_uuid}', fn () => view('server.show', [
-        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user'])->whereUuid(request()->server_uuid)->firstOrFail(),
+        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.show');
     Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
@@ -77,7 +77,7 @@ Route::middleware(['auth'])->group(function () {
         'privateKeys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.private-key');
     Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
-        'server' => Server::ownedByCurrentTeam(['name'])->whereUuid(request()->server_uuid)->firstOrFail()
+        'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail()
     ]))->name('server.destinations');
 });
 
