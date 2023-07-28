@@ -72,6 +72,7 @@ class EmailSettings extends Component
             if (is_a($team, Team::class)) {
                 session(['currentTeam' => $team]);
             }
+            $this->model = $team;
             $this->emit('success', 'Settings saved.');
         } else {
             $this->emit('error', 'Instance SMTP settings are not enabled.');
