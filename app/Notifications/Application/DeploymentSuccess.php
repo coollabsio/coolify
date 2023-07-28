@@ -24,7 +24,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     public string|null $deployment_url = null;
     public string $project_uuid;
     public string $environment_name;
-    public string $fqdn;
+    public string|null $fqdn;
 
     public function __construct(Application $application, string $deployment_uuid, ApplicationPreview|null $preview = null)
     {

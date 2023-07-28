@@ -15,7 +15,7 @@
         <div class="w-48">
             <x-forms.checkbox instantSave id="model.discord_enabled" label="Notification Enabled" />
         </div>
-        <x-forms.input type="string"
+        <x-forms.input type="password"
             helper="Generate a webhook in Discord.<br>Example: https://discord.com/api/webhooks/...." required
             id="model.discord_webhook_url" label="Webhook" />
     </form>

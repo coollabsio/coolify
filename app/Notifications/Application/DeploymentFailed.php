@@ -31,7 +31,6 @@ class DeploymentFailed extends Notification implements ShouldQueue
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
         $this->preview = $preview;
-
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
         $this->environment_name = data_get($application, 'environment.name');
