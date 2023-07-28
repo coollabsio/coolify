@@ -56,17 +56,18 @@ class EmailSettings extends Component
         $settings = InstanceSettings::get();
         if ($settings->smtp_enabled) {
             $team = auth()->user()->currentTeam();
-            $team->smtp_enabled = true;
-            $team->smtp_from_address = $settings->smtp_from_address;
-            $team->smtp_from_name = $settings->smtp_from_name;
-            $team->smtp_recipients = $settings->smtp_recipients;
-            $team->smtp_host = $settings->smtp_host;
-            $team->smtp_port = $settings->smtp_port;
-            $team->smtp_encryption = $settings->smtp_encryption;
-            $team->smtp_username = $settings->smtp_username;
-            $team->smtp_password = $settings->smtp_password;
-            $team->smtp_timeout = $settings->smtp_timeout;
-            $team->save();
+            $team->update([
+                'smtp_enabled' => $settings->smtp_enabled,
+                'smtp_from_address' => $settings->smtp_from_address,
+                'smtp_from_name' => $settings->smtp_from_name,
+                'smtp_recipients' => $settings->smtp_recipients,
+                'smtp_host' => $settings->smtp_host,
+                'smtp_port' => $settings->smtp_port,
+                'smtp_encryption' => $settings->smtp_encryption,
+                'smtp_username' => $settings->smtp_username,
+                'smtp_password' => $settings->smtp_password,
+                'smtp_timeout' => $settings->smtp_timeout,
+            ]);
             $this->decrypt();
             if (is_a($team, Team::class)) {
                 session(['currentTeam' => $this->model]);
