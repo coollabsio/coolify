@@ -9,6 +9,7 @@ export let debugTranslation = writable(false);
 export const config = {
 	fallbackLocale: 'en',
 	translations: {
+		az: { lang },
 		en: { lang },
 		es: { lang },
 		pt: { lang },
@@ -16,6 +17,11 @@ export const config = {
 		fr: { lang }
 	},
 	loaders: [
+		{
+			locale: 'az',
+			key: '',
+			loader: async () => (await import('./locales/az.json')).default
+		},
 		{
 			locale: 'en',
 			key: '',
