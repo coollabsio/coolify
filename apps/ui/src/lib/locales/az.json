@@ -1,7 +1,7 @@
 {
   "layout": {
-    "update_done": "Yenileme tamamlandı.",
-    "wait_new_version_startup": "Yeni versiyanın başlamasını gözləyir...",
+    "update_done": "Yeniləmə tamamlandı.",
+    "wait_new_version_startup": "Yeni versiyanın başlanmasını gözləyir...",
     "new_version": "Yeni versiya əlçatandır. Yenidən yüklənir...",
     "switch_to_a_different_team": "Başqa bir komandaya keç...",
     "update_available": "Yeniləmə Mövcuddur"
