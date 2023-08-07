@@ -42,7 +42,10 @@ class StandalonePostgresql extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class);
     }
-
+    public function runtime_environment_variables(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class);
+    }
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
