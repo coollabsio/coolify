@@ -24,6 +24,9 @@ return new class extends Migration
             $table->string('postgres_host_auth_method')->nullable();
             $table->json('init_scripts')->nullable();
 
+            $table->boolean('is_public')->default(false);
+            $table->integer('public_port')->nullable();
+
             $table->timestamp('started_at')->nullable();
             $table->morphs('destination');
 
