@@ -38,7 +38,7 @@
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
-                @if ($database->getMorphClass() === 'App\Models\Postgresql')
+                @if ($database->type() === 'postgresql')
                     <livewire:project.database.postgresql.general :database="$database" />
                 @endif
             </div>

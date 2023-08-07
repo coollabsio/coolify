@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
-class Postgresql extends BaseModel
+class StandalonePostgres extends BaseModel
 {
     use HasFactory;
     protected $guarded = [];
