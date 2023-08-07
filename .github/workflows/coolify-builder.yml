@@ -2,7 +2,7 @@ name: Coolify Builder (v4)
 
 on:
   push:
-    branches: ["main", "v4"]
+    branches: ["main", "next"]
     paths:
       - .github/workflows/coolify-builder.yml
       - docker/coolify-builder/Dockerfile
