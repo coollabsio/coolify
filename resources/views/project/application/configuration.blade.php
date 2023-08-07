@@ -38,16 +38,16 @@
                 <livewire:project.application.general :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <livewire:project.application.environment-variable.all :application="$application" />
+                <livewire:project.shared.environment-variable.all :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'source'">
                 <livewire:project.application.source :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'destination'">
-                <livewire:project.application.destination :destination="$application->destination" />
+                <livewire:project.shared.destination :destination="$application->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.application.storages.all :application="$application" />
+                <livewire:project.shared.storages.all :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
@@ -56,10 +56,10 @@
                 <livewire:project.application.rollback :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
-                <livewire:project.application.resource-limits :application="$application" />
+                <livewire:project.shared.resource-limits :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
-                <livewire:project.application.danger :application="$application" />
+                <livewire:project.shared.danger :resource="$application" />
             </div>
         </div>
     </div>

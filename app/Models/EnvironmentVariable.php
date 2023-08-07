@@ -9,26 +9,27 @@ use Illuminate\Support\Str;
 
 class EnvironmentVariable extends Model
 {
-    protected static function booted()
-    {
-        static::created(function ($environment_variable) {
-            if (!$environment_variable->is_preview) {
-                ModelsEnvironmentVariable::create([
-                    'key' => $environment_variable->key,
-                    'value' => $environment_variable->value,
-                    'is_build_time' => $environment_variable->is_build_time,
-                    'application_id' => $environment_variable->application_id,
-                    'is_preview' => true,
-                ]);
-            }
-        });
-    }
-    protected $fillable = ['key', 'value', 'is_build_time', 'application_id', 'is_preview'];
+    protected $guarded = [];
     protected $casts = [
         "key" => 'string',
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
     ];
+    protected static function booted()
+    {
+        static::created(function ($environment_variable) {
+                if ($environment_variable->application_id && !$environment_variable->is_preview) {
+                    ModelsEnvironmentVariable::create([
+                        'key' => $environment_variable->key,
+                        'value' => $environment_variable->value,
+                        'is_build_time' => $environment_variable->is_build_time,
+                        'application_id' => $environment_variable->application_id,
+                        'is_preview' => true,
+                    ]);
+                }
+        });
+    }
+
     private function get_environment_variables(string $environment_variable): string|null
     {
         // $team_id = session('currentTeam')->id;

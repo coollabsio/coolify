@@ -1,18 +1,17 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application\Storages;
+namespace App\Http\Livewire\Project\Shared\Storages;
 
-use App\Models\Application;
 use App\Models\LocalPersistentVolume;
 use Livewire\Component;
 
 class All extends Component
 {
-    public Application $application;
+    public $resource;
     protected $listeners = ['refreshStorages', 'submit'];
     public function refreshStorages()
     {
-        $this->application->refresh();
+        $this->resource->refresh();
     }
     public function submit($data)
     {
@@ -21,10 +20,10 @@ class All extends Component
                 'name' => $data['name'],
                 'mount_path' => $data['mount_path'],
                 'host_path' => $data['host_path'],
-                'resource_id' => $this->application->id,
-                'resource_type' => Application::class,
+                'resource_id' => $this->resource->id,
+                'resource_type' => $this->resource->getMorphClass(),
             ]);
-            $this->application->refresh();
+            $this->resource->refresh();
             $this->emit('success', 'Storage added successfully');
             $this->emit('clearAddStorage');
         } catch (\Exception $e) {

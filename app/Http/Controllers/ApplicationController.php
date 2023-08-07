@@ -25,6 +25,7 @@ class ApplicationController extends Controller
         if (!$application) {
             return redirect()->route('dashboard');
         }
+        ray($application->persistentStorages()->get());
         return view('project.application.configuration', ['application' => $application]);
     }
     public function deployments()

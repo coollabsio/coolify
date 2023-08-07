@@ -32,7 +32,7 @@ class DatabaseSeeder extends Seeder
             EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
             S3StorageSeeder::class,
-            StandalonePostgresSeeder::class,
+            StandalonePostgresqlSeeder::class,
         ]);
     }
 }

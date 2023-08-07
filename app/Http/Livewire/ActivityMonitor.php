@@ -42,6 +42,7 @@ class ActivityMonitor extends Component
                 $this->setStatus(ProcessStatus::ERROR);
             }
             $this->isPollingActive = false;
+            $this->emit('activityFinished');
         }
     }
     protected function setStatus($status)

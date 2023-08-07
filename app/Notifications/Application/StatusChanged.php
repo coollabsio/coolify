@@ -15,21 +15,21 @@ use Illuminate\Support\Str;
 class StatusChanged extends Notification implements ShouldQueue
 {
     use Queueable;
-    public Application $application;
+    public $application;
 
     public string $application_name;
     public string|null $application_url = null;
     public string $project_uuid;
     public string $environment_name;
-    public string $fqdn;
+    public string|null $fqdn;
 
-    public function __construct(Application $application)
+    public function __construct($application)
     {
         $this->application = $application;
         $this->application_name = data_get($application, 'name');
         $this->project_uuid = data_get($application, 'environment.project.uuid');
         $this->environment_name = data_get($application, 'environment.name');
-        $this->fqdn = data_get($application, 'fqdn');
+        $this->fqdn = data_get($application, 'fqdn', null);
         if (Str::of($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
         }

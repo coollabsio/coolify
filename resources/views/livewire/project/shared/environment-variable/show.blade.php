@@ -8,7 +8,9 @@
     <form wire:submit.prevent='submit' class="flex flex-col items-center gap-2 xl:flex-row">
         <x-forms.input id="env.key" />
         <x-forms.input type="password" id="env.value" />
-        <x-forms.checkbox disabled id="env.is_build_time" label="Build Variable?" />
+        @if (data_get($parameters, 'application_uuid'))
+            <x-forms.checkbox disabled id="env.is_build_time" label="Build Variable?" />
+        @endif
         <div class="flex gap-2">
             <x-forms.button type="submit">
                 Update

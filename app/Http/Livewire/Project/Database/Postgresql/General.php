@@ -7,6 +7,8 @@ use Livewire\Component;
 class General extends Component
 {
     public $database;
+    protected $listeners = ['refresh'];
+
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
@@ -16,6 +18,7 @@ class General extends Component
         'database.postgres_initdb_args' => 'nullable',
         'database.postgres_host_auth_method' => 'nullable',
         'database.init_scripts' => 'nullable',
+        'database.image' => 'required',
     ];
     protected $validationAttributes = [
         'database.name' => 'Name',
@@ -26,7 +29,11 @@ class General extends Component
         'database.postgres_initdb_args' => 'Postgres Initdb Args',
         'database.postgres_host_auth_method' => 'Postgres Host Auth Method',
         'database.init_scripts' => 'Init Scripts',
+        'database.image' => 'Image',
     ];
+    public function refresh() {
+        $this->database->refresh();
+    }
     public function submit() {
         try {
             $this->validate();

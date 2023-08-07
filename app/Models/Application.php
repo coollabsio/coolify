@@ -43,7 +43,9 @@ class Application extends BaseModel
         'publish_directory',
         'private_key_id'
     ];
-
+    public function type() {
+        return 'application';
+    }
     public function publishDirectory(): Attribute
     {
         return Attribute::make(

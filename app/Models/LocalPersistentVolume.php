@@ -8,15 +8,12 @@ use Illuminate\Support\Str;
 
 class LocalPersistentVolume extends Model
 {
-    protected $fillable = [
-        'name',
-        'mount_path',
-        'host_path',
-        'container_id',
-        'resource_id',
-        'resource_type',
-    ];
+    protected $guarded = [];
     public function application()
+    {
+        return $this->morphTo();
+    }
+    public function standalone_postgresql()
     {
         return $this->morphTo();
     }

@@ -4,17 +4,17 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use App\Models\StandalonePostgres;
+use App\Models\StandalonePostgresql;
 use App\Models\StandaloneDocker;
 
-class StandalonePostgresSeeder extends Seeder
+class StandalonePostgresqlSeeder extends Seeder
 {
     /**
      * Run the database seeds.
      */
     public function run(): void
     {
-        StandalonePostgres::create([
+        StandalonePostgresql::create([
             'name' => 'Local PostgreSQL',
             'description' => 'Local PostgreSQL for testing',
             'postgres_password' => 'postgres',

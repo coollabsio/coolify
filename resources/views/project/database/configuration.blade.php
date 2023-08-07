@@ -19,8 +19,6 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'source' && 'text-white'"
-                @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
             <a :class="activeTab === 'destination' && 'text-white'"
                 @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
                 href="#">Destination
@@ -38,27 +36,24 @@
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
-                @if ($database->type() === 'postgresql')
+                @if ($database->type() === 'standalone-postgresql')
                     <livewire:project.database.postgresql.general :database="$database" />
                 @endif
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                {{-- <livewire:project.application.environment-variable.all :application="$application" /> --}}
-            </div>
-            <div x-cloak x-show="activeTab === 'source'">
-                {{-- <livewire:project.application.source :application="$application" /> --}}
+                <livewire:project.shared.environment-variable.all :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'destination'">
-                {{-- <livewire:project.application.destination :destination="$application->destination" /> --}}
+                <livewire:project.shared.destination :destination="$database->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                {{-- <livewire:project.application.storages.all :application="$application" /> --}}
+                <livewire:project.shared.storages.all :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
-                {{-- <livewire:project.application.resource-limits :application="$application" /> --}}
+                <livewire:project.shared.resource-limits :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
-                {{-- <livewire:project.application.danger :application="$application" /> --}}
+                <livewire:project.shared.danger :resource="$database" />
             </div>
         </div>
     </div>

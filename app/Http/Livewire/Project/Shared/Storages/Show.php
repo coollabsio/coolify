@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application\Storages;
+namespace App\Http\Livewire\Project\Shared\Storages;
 
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;

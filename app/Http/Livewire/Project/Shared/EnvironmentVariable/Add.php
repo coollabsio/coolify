@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application\EnvironmentVariable;
+namespace App\Http\Livewire\Project\Shared\EnvironmentVariable;
 
 use Livewire\Component;
 

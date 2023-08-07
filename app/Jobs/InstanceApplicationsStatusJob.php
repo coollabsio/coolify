@@ -23,8 +23,8 @@ class InstanceApplicationsStatusJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             foreach ($this->applications as $application) {
-                dispatch(new ApplicationContainerStatusJob(
-                    application: $application,
+                dispatch(new ContainerStatusJob(
+                    resource: $application,
                     container_name: generate_container_name($application->uuid),
                 ));
             }

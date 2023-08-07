@@ -15,7 +15,7 @@ class StandaloneDocker extends BaseModel
     }
     public function postgresqls()
     {
-        return $this->morphMany(StandalonePostgres::class, 'destination');
+        return $this->morphMany(StandalonePostgresql::class, 'destination');
     }
     public function server()
     {

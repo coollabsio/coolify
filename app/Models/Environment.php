@@ -33,7 +33,7 @@ class Environment extends Model
     }
     public function postgresqls()
     {
-        return $this->hasMany(StandalonePostgres::class);
+        return $this->hasMany(StandalonePostgresql::class);
     }
     public function services()
     {

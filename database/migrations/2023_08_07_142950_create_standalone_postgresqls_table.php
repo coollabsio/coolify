@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('standalone_postgres', function (Blueprint $table) {
+        Schema::create('standalone_postgresqls', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
             $table->string('name');
@@ -24,8 +24,20 @@ return new class extends Migration
             $table->string('postgres_host_auth_method')->nullable();
             $table->json('init_scripts')->nullable();
 
+            $table->string('status')->default('exited');
+
+            $table->string('image')->default('postgres:15-alpine');
             $table->boolean('is_public')->default(false);
             $table->integer('public_port')->nullable();
+
+            $table->string('limits_memory')->default("0");
+            $table->string('limits_memory_swap')->default("0");
+            $table->integer('limits_memory_swappiness')->default(60);
+            $table->string('limits_memory_reservation')->default("0");
+
+            $table->string('limits_cpus')->default("0");
+            $table->string('limits_cpuset')->nullable()->default("0");
+            $table->integer('limits_cpu_shares')->default(1024);
 
             $table->timestamp('started_at')->nullable();
             $table->morphs('destination');
@@ -40,6 +52,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('standalone_postgres');
+        Schema::dropIfExists('standalone_postgresqls');
     }
 };
