@@ -8,6 +8,7 @@ use App\Models\Project;
 use App\Models\Server;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\S3Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
@@ -39,7 +40,7 @@ class Controller extends BaseController
     {
         $projects = Project::ownedByCurrentTeam()->get();
         $servers = Server::ownedByCurrentTeam()->get();
-
+        $s3s = S3Storage::ownedByCurrentTeam()->get();
         $resources = 0;
         foreach ($projects as $project) {
             $resources += $project->applications->count();
@@ -49,6 +50,7 @@ class Controller extends BaseController
             'servers' => $servers->count(),
             'projects' => $projects->count(),
             'resources' => $resources,
+            's3s' => $s3s,
         ]);
     }
     public function settings()
@@ -81,6 +83,18 @@ class Controller extends BaseController
         }
         return view('team.show', [
             'invitations' => $invitations,
+        ]);
+    }
+    public function storages() {
+        $s3 = S3Storage::ownedByCurrentTeam()->get();
+        return view('team.storages.all', [
+            's3' => $s3,
+        ]);
+    }
+    public function storages_show() {
+        $storage = S3Storage::ownedByCurrentTeam()->whereUuid(request()->storage_uuid)->firstOrFail();
+        return view('team.storages.show', [
+            'storage' => $storage,
         ]);
     }
     public function members()

@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
             ServiceSeeder::class,
             EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
+            S3StorageSeeder::class,
         ]);
     }
 }

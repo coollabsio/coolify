@@ -18,6 +18,7 @@
         "laravel/tinker": "^v2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^v2.12.3",
         "masmerise/livewire-toaster": "^1.2",
         "nubs/random-name-generator": "^2.2",

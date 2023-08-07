@@ -27,6 +27,10 @@
         <a class="{{ request()->routeIs('team.members') ? 'text-white' : '' }}" href="{{ route('team.members') }}">
             <button>Members</button>
         </a>
+        <a class="{{ request()->routeIs('team.storages.all') ? 'text-white' : '' }}"
+            href="{{ route('team.storages.all') }}">
+            <button>S3 Storages</button>
+        </a>
         <a class="{{ request()->routeIs('team.notifications') ? 'text-white' : '' }}"
             href="{{ route('team.notifications') }}">
             <button>Notifications</button>

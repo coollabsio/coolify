@@ -17,5 +17,12 @@
             <div class="stat-value">{{ $resources }}</div>
             <div class="stat-desc">Applications, databases, etc...</div>
         </div>
+        <div class="stat">
+            <div class="stat-title">S3 Storages</div>
+            <div class="stat-value">{{ $s3s->count() }}</div>
+        </div>
     </div>
+    @if (isDev())
+        <livewire:s3-test />
+    @endif
 </x-layout>

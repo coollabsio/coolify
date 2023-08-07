@@ -1,6 +1,6 @@
 <x-layout>
     <x-team.navbar :team="session('currentTeam')" />
-    <h3>Members</h3>
+    <h2>Members</h2>
     <div class="pt-4 overflow-hidden">
         <table>
             <thead>

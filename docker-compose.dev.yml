@@ -69,7 +69,20 @@ services:
       - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
       - coolify
-
+  minio:
+    image: minio/minio:latest
+    container_name: coolify-minio
+    command: server /data --console-address ":9001"
+    ports:
+      - "${FORWARD_MINIO_PORT:-9000}:9000"
+      - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
+    volumes:
+      - ./_data/_volumes/minio/:/data
+    networks:
+      - coolify
   # buggregator:
   #   image: ghcr.io/buggregator/server:latest
   #   container_name: coolify-debug
