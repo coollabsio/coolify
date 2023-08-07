@@ -3,7 +3,7 @@
          <li class="inline-flex items-center">
              <a class="text-xs truncate lg:text-sm"
                  href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
-                 {{ $application->environment->project->name }}</a>
+                 {{ $resource->environment->project->name }}</a>
          </li>
          <li>
              <div class="flex items-center">
@@ -25,7 +25,7 @@
                          d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
                          clip-rule="evenodd"></path>
                  </svg>
-                 <span class="text-xs truncate lg:text-sm">{{ data_get($application, 'name') }}</span>
+                 <span class="text-xs truncate lg:text-sm">{{ data_get($resource, 'name') }}</span>
              </div>
          </li>
          <li>
@@ -38,9 +38,9 @@
                  </svg>
              </div>
          </li>
-         @if ($application->status === 'running')
+         @if ($resource->status === 'running')
              <x-status.running />
-         @elseif($application->status === 'restarting')
+         @elseif($resource->status === 'restarting')
              <x-status.restarting />
          @else
              <x-status.stopped />

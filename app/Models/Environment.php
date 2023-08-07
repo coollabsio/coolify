@@ -17,6 +17,12 @@ class Environment extends Model
             set: fn (string $value) => strtolower($value),
         );
     }
+    public function can_delete_environment() {
+        return $this->applications()->count() == 0 && $this->postgresqls()->count() == 0;
+    }
+    public function databases() {
+        return $this->postgresqls();
+    }
     public function project()
     {
         return $this->belongsTo(Project::class);
@@ -25,9 +31,9 @@ class Environment extends Model
     {
         return $this->hasMany(Application::class);
     }
-    public function databases()
+    public function postgresqls()
     {
-        return $this->hasMany(Database::class);
+        return $this->hasMany(Postgresql::class);
     }
     public function services()
     {

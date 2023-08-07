@@ -19,13 +19,11 @@ class ApplicationSeeder extends Seeder
      */
     public function run(): void
     {
-        $environment_1 = Environment::find(1);
-        $standalone_docker_1 = StandaloneDocker::find(1);
-
         $github_public_source = GithubApp::where('name', 'Public GitHub')->first();
 
         Application::create([
             'name' => 'coollabsio/coolify-examples:nodejs-fastify',
+            'description' => 'NodeJS Fastify Example',
             'fqdn' => 'http://foo.com',
             'repository_project_id' => 603035348,
             'git_repository' => 'coollabsio/coolify-examples',
@@ -33,8 +31,8 @@ class ApplicationSeeder extends Seeder
             'build_pack' => 'nixpacks',
             'ports_exposes' => '3000',
             'ports_mappings' => '3000:3000',
-            'environment_id' => $environment_1->id,
-            'destination_id' => $standalone_docker_1->id,
+            'environment_id' => 1,
+            'destination_id' => 1,
             'destination_type' => StandaloneDocker::class,
             'source_id' => $github_public_source->id,
             'source_type' => GithubApp::class

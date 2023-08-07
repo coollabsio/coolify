@@ -46,4 +46,8 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(Application::class, Environment::class);
     }
+    public function postgresqls()
+    {
+        return $this->hasManyThrough(Postgresql::class, Environment::class);
+    }
 }

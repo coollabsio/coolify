@@ -33,6 +33,7 @@ class General extends Component
 
     protected $rules = [
         'application.name' => 'required',
+        'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
         'application.git_repository' => 'required',
         'application.git_branch' => 'required',
@@ -49,6 +50,7 @@ class General extends Component
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
+        'application.description' => 'description',
         'application.fqdn' => 'FQDN',
         'application.git_repository' => 'Git repository',
         'application.git_branch' => 'Git branch',

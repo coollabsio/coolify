@@ -10,21 +10,22 @@
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-forms.input id="application.name" label="Name" required />
-                <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
-                    helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
-                @if ($wildcard_domain)
-                    <div class="flex flex-row gap-2">
-                        @if ($global_wildcard_domain)
-                            <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
-                            </x-forms.button>
-                        @endif
-                        @if ($server_wildcard_domain)
-                            <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
-                            </x-forms.button>
-                        @endif
-                    </div>
-                @endif
+                <x-forms.input id="application.description" label="Description" />
             </div>
+            <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
+            @if ($wildcard_domain)
+                <div class="flex flex-row gap-2">
+                    @if ($global_wildcard_domain)
+                        <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
+                        </x-forms.button>
+                    @endif
+                    @if ($server_wildcard_domain)
+                        <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
+                        </x-forms.button>
+                    @endif
+                </div>
+            @endif
             <x-forms.select id="application.build_pack" label="Build Pack" required>
                 <option value="nixpacks">Nixpacks</option>
                 <option disabled value="docker">Docker</option>

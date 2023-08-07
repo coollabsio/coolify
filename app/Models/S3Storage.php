@@ -8,6 +8,10 @@ class S3Storage extends BaseModel
 {
     use HasFactory;
     protected $guarded = [];
+    protected $casts = [
+        'key' => 'encrypted',
+        'secret' => 'encrypted',
+    ];
 
     static public function ownedByCurrentTeam(array $select = ['*'])
     {

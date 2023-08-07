@@ -11,15 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('databases', function (Blueprint $table) {
-            $table->id();
-            $table->string('uuid')->unique();
-            $table->string('name');
-
-            $table->morphs('destination');
-
-            $table->foreignId('environment_id');
-            $table->timestamps();
+        Schema::table('applications', function (Blueprint $table) {
+            $table->string('description')->nullable();
         });
     }
 
@@ -28,6 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('databases');
+        Schema::table('applications', function (Blueprint $table) {
+            $table->dropColumn('description');
+        });
     }
 };

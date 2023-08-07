@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Dev;
 
 use App\Models\S3Storage;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +14,6 @@ class S3Test extends Component
     public $file;
     public function mount() {
         $this->s3 = S3Storage::first();
-        ray($this->s3);
     }
     public function save() {
         try {

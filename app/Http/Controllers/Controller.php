@@ -43,7 +43,9 @@ class Controller extends BaseController
         $s3s = S3Storage::ownedByCurrentTeam()->get();
         $resources = 0;
         foreach ($projects as $project) {
+            ray($project->postgresqls);
             $resources += $project->applications->count();
+            $resources += $project->postgresqls->count();
         }
 
         return view('dashboard', [

@@ -10,7 +10,9 @@
                     </svg>
                 </div>
                 <div class="flex flex-col w-full gap-2">
-                    <h3 class="text-lg font-bold">{{ $modalTitle }}</h3>
+                    @isset($modalTitle)
+                        <h3 class="text-lg font-bold">{{ $modalTitle }}</h3>
+                    @endisset
                     @isset($modalBody)
                         {{ $modalBody }}
                     @endisset
@@ -31,8 +33,11 @@
             </div>
         </form>
     @else
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
-            <h3 class="text-lg font-bold">{{ $modalTitle }}</h3>
+        <form method="dialog" class="flex flex-col w-11/12 max-w-5xl gap-2 rounded modal-box"
+            wire:submit.prevent='submit'>
+            @isset($modalTitle)
+                <h3 class="text-lg font-bold">{{ $modalTitle }}</h3>
+            @endisset
             @isset($modalBody)
                 {{ $modalBody }}
             @endisset

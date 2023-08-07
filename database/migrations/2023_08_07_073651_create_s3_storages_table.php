@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('s3_storages', function (Blueprint $table) {
             $table->id();
             $table->string('uuid')->unique();
-            $table->string('name')->nullable();
+            $table->string('name');
             $table->longText('description')->nullable();
             $table->string('region')->default('us-east-1');
             $table->longText('key');
