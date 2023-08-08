@@ -9,30 +9,36 @@ use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
-    public $database;
+    public StandalonePostgresql $database;
+    public array $commands = [];
+    public array $init_scripts = [];
+    public string $base_dir;
 
     public function __invoke(Server $server, StandalonePostgresql $database)
     {
         $this->database = $database;
-
         $container_name = generate_container_name($this->database->uuid);
-        $destination = $this->database->destination;
-        $image = $this->database->image;
+        $this->base_dir = '/data/coolify/databases/' . $container_name;
+
+        $this->commands = [
+            "mkdir -p $this->base_dir",
+            "mkdir -p $this->base_dir/docker-entrypoint-initdb.d/"
+        ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
-
+        $this->generate_init_scripts();
         $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $container_name => [
-                    'image' => $image,
+                    'image' => $this->database->image,
                     'container_name' => $container_name,
                     'environment' => $environment_variables,
                     'restart' => 'always',
                     'networks' => [
-                        $destination->network,
+                        $this->database->destination->network,
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -58,29 +64,37 @@ class StartPostgresql
                 ]
             ],
             'networks' => [
-                $destination->network => [
+                $this->database->destination->network => [
                     'external' => false,
-                    'name' => $destination->network,
+                    'name' => $this->database->destination->network,
                     'attachable' => true,
                 ]
             ]
         ];
+        if (count($this->database->ports_mappings_array) > 0) {
+            $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
+        }
         if (count($persistent_storages) > 0) {
             $docker_compose['services'][$container_name]['volumes'] = $persistent_storages;
         }
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-
+        if (count($this->init_scripts) > 0) {
+            foreach ($this->init_scripts as $init_script) {
+                $docker_compose['services'][$container_name]['volumes'][] = [
+                    'type' => 'bind',
+                    'source' => $init_script,
+                    'target' => '/docker-entrypoint-initdb.d/' . basename($init_script),
+                    'read_only' => true,
+                ];
+            }
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
-        $activity = remote_process([
-            "mkdir -p /tmp/{$container_name}",
-            "echo '{$docker_compose_base64}' | base64 -d > /tmp/{$container_name}/docker-compose.yml",
-            "docker compose -f /tmp/{$container_name}/docker-compose.yml up -d",
-
-        ], $server);
-        return $activity;
+        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->base_dir/docker-compose.yml";
+        $this->commands[] = "docker compose -f $this->base_dir/docker-compose.yml up -d";
+        return remote_process($this->commands, $server);
     }
 
     private function generate_local_persistent_volumes()
@@ -130,5 +144,19 @@ class StartPostgresql
             $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
         }
         return $environment_variables->all();
+    }
+
+    private function generate_init_scripts()
+    {
+        if (count($this->database->init_scripts) === 0) {
+            return;
+        }
+        foreach ($this->database->init_scripts as $init_script) {
+            $filename = data_get($init_script, 'filename');
+            $content = data_get($init_script, 'content');
+            $content_base64 = base64_encode($content);
+            $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->base_dir/docker-entrypoint-initdb.d/{$filename}";
+            $this->init_scripts[] = "$this->base_dir/docker-entrypoint-initdb.d/{$filename}";
+        }
     }
 }

@@ -14,8 +14,6 @@
 
             <pre class="font-mono whitespace-pre-wrap"
                  @if ($isPollingActive) wire:poll.2000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($this->activity) }}</pre>
-            {{-- @else
-            <pre class="whitespace-pre-wrap">Output will be here...</pre> --}}
         </div>
     @endif
 </div>

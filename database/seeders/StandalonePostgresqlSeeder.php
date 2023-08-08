@@ -8,9 +8,6 @@ use Illuminate\Database\Seeder;
 
 class StandalonePostgresqlSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         StandalonePostgresql::create([
@@ -20,6 +17,13 @@ class StandalonePostgresqlSeeder extends Seeder
             'environment_id' => 1,
             'destination_id' => 1,
             'destination_type' => StandaloneDocker::class,
+            'init_scripts' => [
+                [
+                    'index' => 0,
+                    'filename' => 'init_test_db.sql',
+                    'content' => 'CREATE DATABASE test;'
+                ]
+            ]
         ]);
     }
 }

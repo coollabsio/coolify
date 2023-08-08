@@ -29,7 +29,8 @@
             </span>
         </label>
     @endif
-    <textarea {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) wire:model.defer={{ $id }}
+    <textarea placeholder="{{$placeholder}}"
+              {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) wire:model.defer={{ $id }}
         @disabled($disabled) id="{{ $id }}" name="{{ $name }}" name={{ $id }}
         wire:model.defer={{ $value ?? $id }} wire:dirty.class="input-warning"></textarea>
     @error($id)

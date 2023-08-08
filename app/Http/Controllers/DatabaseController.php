@@ -23,7 +23,6 @@ class DatabaseController extends Controller
         if (!$database) {
             return redirect()->route('dashboard');
         }
-        ray($database->persistentStorages()->get());
         return view('project.database.configuration', ['database' => $database]);
     }
 }
