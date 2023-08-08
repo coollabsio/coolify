@@ -2,26 +2,36 @@
 
 namespace App\Notifications\TransactionalEmails;
 
+use App\Models\InstanceSettings;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
-use Illuminate\Support\Facades\Lang;
-use App\Models\InstanceSettings;
 
 class ResetPassword extends Notification
 {
-    public $token;
-    public InstanceSettings $settings;
     public static $createUrlCallback;
     public static $toMailCallback;
+    public $token;
+    public InstanceSettings $settings;
 
     public function __construct($token)
     {
         $this->settings = InstanceSettings::get();
         $this->token = $token;
     }
+
+    public static function createUrlUsing($callback)
+    {
+        static::$createUrlCallback = $callback;
+    }
+
+    public static function toMailUsing($callback)
+    {
+        static::$toMailCallback = $callback;
+    }
+
     public function via($notifiable)
     {
-        if ($this->settings->smtp_enabled){
+        if ($this->settings->smtp_enabled) {
             $password = data_get($this->settings, 'smtp_password');
             if ($password) $password = decrypt($password);
 
@@ -50,6 +60,7 @@ class ResetPassword extends Notification
 
         return $this->buildMailMessage($this->resetUrl($notifiable));
     }
+
     protected function buildMailMessage($url)
     {
         $mail = new MailMessage();
@@ -58,9 +69,10 @@ class ResetPassword extends Notification
             data_get($this->settings, 'smtp_from_name'),
         );
         $mail->subject('Reset Password');
-        $mail->view('emails.reset-password', ['url' => $url,'count' => config('auth.passwords.'.config('auth.defaults.passwords').'.expire')]);
+        $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.' . config('auth.defaults.passwords') . '.expire')]);
         return $mail;
     }
+
     protected function resetUrl($notifiable)
     {
         if (static::$createUrlCallback) {
@@ -71,13 +83,5 @@ class ResetPassword extends Notification
             'token' => $this->token,
             'email' => $notifiable->getEmailForPasswordReset(),
         ], false));
-    }
-    public static function createUrlUsing($callback)
-    {
-        static::$createUrlCallback = $callback;
-    }
-    public static function toMailUsing($callback)
-    {
-        static::$toMailCallback = $callback;
     }
 }

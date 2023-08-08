@@ -5,8 +5,8 @@
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')
                 <a class="flex gap-4 text-center hover:no-underline box group"
-                    href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
-                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
+                   href="{{ route('source.github.show', ['github_app_uuid' => data_get($source, 'uuid')]) }}">
+                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}"/>
                     <div class="group-hover:text-white">
                         <div>{{ $source->name }}</div>
                         @if (is_null($source->app_id))
@@ -18,8 +18,8 @@
             @endif
             @if ($source->getMorphClass() === 'App\Models\GitlabApp')
                 <a class="flex gap-4 text-center hover:no-underline box group"
-                    href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
-                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}" />
+                   href="{{ route('source.gitlab.show', ['gitlab_app_uuid' => data_get($source, 'uuid')]) }}">
+                    <x-git-icon class="text-white w-9 h-9" git="{{ $source->getMorphClass() }}"/>
                     <div class="group-hover:text-white">
                         <div>{{ $source->name }}</div>
                         @if (is_null($source->app_id))
@@ -31,7 +31,7 @@
         @empty
             <div>
                 <div>No sources found.</div>
-                <x-use-magic-bar />
+                <x-use-magic-bar/>
             </div>
         @endforelse
     </div>

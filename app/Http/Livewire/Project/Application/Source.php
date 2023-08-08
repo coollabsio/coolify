@@ -21,16 +21,19 @@ class Source extends Component
         'application.git_branch' => 'branch',
         'application.git_commit_sha' => 'commit sha',
     ];
+
+    public function mount()
+    {
+        $this->get_private_keys();
+    }
+
     private function get_private_keys()
     {
         $this->private_keys = PrivateKey::whereTeamId(session('currentTeam')->id)->get()->reject(function ($key) {
             return $key->id == $this->application->private_key_id;
         });
     }
-    public function mount()
-    {
-        $this->get_private_keys();
-    }
+
     public function setPrivateKey(int $private_key_id)
     {
         $this->application->private_key_id = $private_key_id;
@@ -38,6 +41,7 @@ class Source extends Component
         $this->application->refresh();
         $this->get_private_keys();
     }
+
     public function submit()
     {
         $this->validate();

@@ -16,6 +16,7 @@ class Danger extends Component
         $this->modalId = new Cuid2(7);
         $this->parameters = getRouteParameters();
     }
+
     public function delete()
     {
         $destination = $this->resource->destination->getMorphClass()::where('id', $this->resource->destination->id)->first();

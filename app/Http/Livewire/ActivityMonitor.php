@@ -15,12 +15,6 @@ class ActivityMonitor extends Component
     protected $activity;
     protected $listeners = ['newMonitorActivity'];
 
-    public function hydrateActivity()
-    {
-        $this->activity = Activity::query()
-            ->find($this->activityId);
-    }
-
     public function newMonitorActivity($activityId)
     {
         $this->activityId = $activityId;
@@ -28,6 +22,12 @@ class ActivityMonitor extends Component
         $this->hydrateActivity();
 
         $this->isPollingActive = true;
+    }
+
+    public function hydrateActivity()
+    {
+        $this->activity = Activity::query()
+            ->find($this->activityId);
     }
 
     public function polling()
@@ -45,6 +45,7 @@ class ActivityMonitor extends Component
             $this->emit('activityFinished');
         }
     }
+
     protected function setStatus($status)
     {
         $this->activity->properties = $this->activity->properties->merge([

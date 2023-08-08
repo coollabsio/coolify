@@ -5,12 +5,12 @@ namespace App\Http\Livewire\Server\Proxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
-use Str;
 
 class Deploy extends Component
 {
     public Server $server;
     public $proxy_settings = null;
+
     public function start_proxy()
     {
         if (
@@ -22,6 +22,7 @@ class Deploy extends Component
         $activity = resolve(StartProxy::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
+
     public function stop()
     {
         instant_remote_process([

@@ -3,15 +3,16 @@
     <div class="pt-2 pb-10 ">Instance wide settings for Coolify.</div>
     <nav class="navbar-main">
         <a class="{{ request()->routeIs('settings.configuration') ? 'text-white' : '' }}"
-            href="{{ route('settings.configuration') }}">
+           href="{{ route('settings.configuration') }}">
             <button>Configuration</button>
         </a>
-        <a class="{{ request()->routeIs('settings.emails') ? 'text-white' : '' }}" href="{{ route('settings.emails') }}">
+        <a class="{{ request()->routeIs('settings.emails') ? 'text-white' : '' }}"
+           href="{{ route('settings.emails') }}">
             <button>SMTP</button>
         </a>
         @if (isCloud())
             <a class="{{ request()->routeIs('settings.license') ? 'text-white' : '' }}"
-                href="{{ route('settings.license') }}">
+               href="{{ route('settings.license') }}">
                 <button>Resale License</button>
             </a>
         @endif

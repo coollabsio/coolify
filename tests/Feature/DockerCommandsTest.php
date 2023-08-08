@@ -2,8 +2,8 @@
 
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Actions\CoolifyTask\TidyOutput;
-use App\Models\User;
 use App\Models\Server;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -56,7 +56,7 @@ it('starts a docker container correctly', function () {
     // Stop testing containers
     $activity = remote_process([
         "docker ps --filter='name={$coolifyNamePrefix}*' -aq && " .
-            "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
     ], $host);
     expect($activity->getExtraProperty('exitCode'))->toBe(0);
 });

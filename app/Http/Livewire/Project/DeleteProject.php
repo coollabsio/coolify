@@ -14,6 +14,7 @@ class DeleteProject extends Component
     {
         $this->parameters = getRouteParameters();
     }
+
     public function delete()
     {
         $this->validate([

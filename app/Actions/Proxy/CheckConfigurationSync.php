@@ -2,8 +2,6 @@
 
 namespace App\Actions\Proxy;
 
-use App\Actions\Proxy\SaveConfigurationSync;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
 

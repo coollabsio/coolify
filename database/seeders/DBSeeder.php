@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Database;
 use App\Models\Environment;
 use App\Models\StandaloneDocker;
 use Illuminate\Database\Seeder;

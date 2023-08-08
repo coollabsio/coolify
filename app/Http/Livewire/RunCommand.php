@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire;
 
-use App\Enums\ActivityTypes;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -20,6 +19,7 @@ class RunCommand extends Component
         'server' => 'server',
         'command' => 'command',
     ];
+
     public function mount($servers)
     {
         $this->servers = $servers;

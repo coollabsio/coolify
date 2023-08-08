@@ -8,17 +8,16 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Process;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 
 class DeploymentNavbar extends Component
 {
-    protected $listeners = ['deploymentFinished'];
-
     public ApplicationDeploymentQueue $application_deployment_queue;
     public Application $application;
     public Server $server;
     public bool $is_debug_enabled = false;
+    protected $listeners = ['deploymentFinished'];
 
     public function mount()
     {
@@ -26,10 +25,12 @@ class DeploymentNavbar extends Component
         $this->server = $this->application->destination->server;
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
     }
+
     public function deploymentFinished()
     {
         $this->application_deployment_queue->refresh();
     }
+
     public function show_debug()
     {
         $this->application->settings->is_debug_enabled = !$this->application->settings->is_debug_enabled;
@@ -37,6 +38,7 @@ class DeploymentNavbar extends Component
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
         $this->emit('refreshQueue');
     }
+
     public function cancel()
     {
         try {

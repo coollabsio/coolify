@@ -22,10 +22,12 @@ class Add extends Component
         'mount_path' => 'mount',
         'host_path' => 'host',
     ];
+
     public function mount()
     {
         $this->parameters = getRouteParameters();
     }
+
     public function submit()
     {
         $this->validate();
@@ -35,6 +37,7 @@ class Add extends Component
             'host_path' => $this->host_path,
         ]);
     }
+
     public function clear()
     {
         $this->name = '';

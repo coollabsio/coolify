@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Models\Team;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class GithubAppSeeder extends Seeder

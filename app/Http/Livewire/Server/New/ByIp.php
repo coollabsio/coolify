@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire\Server\New;
 
-use App\Models\PrivateKey;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -35,19 +34,23 @@ class ByIp extends Component
         'user' => 'user',
         'port' => 'port',
     ];
+
     public function mount()
     {
         $this->name = generate_random_name();
         $this->private_key_id = $this->private_keys->first()->id;
     }
+
     public function setPrivateKey(string $private_key_id)
     {
         $this->private_key_id = $private_key_id;
     }
+
     public function instantSave()
     {
         $this->emit('success', 'Application settings updated!');
     }
+
     public function submit()
     {
         $this->validate();

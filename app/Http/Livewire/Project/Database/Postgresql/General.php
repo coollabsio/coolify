@@ -31,10 +31,14 @@ class General extends Component
         'database.init_scripts' => 'Init Scripts',
         'database.image' => 'Image',
     ];
-    public function refresh() {
+
+    public function refresh(): void
+    {
         $this->database->refresh();
     }
-    public function submit() {
+
+    public function submit()
+    {
         try {
             $this->validate();
             $this->database->save();

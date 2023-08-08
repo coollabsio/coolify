@@ -19,16 +19,19 @@ class Show extends Component
         'mount_path' => 'mount',
         'host_path' => 'host',
     ];
+
     public function mount()
     {
         $this->modalId = new Cuid2(7);
     }
+
     public function submit()
     {
         $this->validate();
         $this->storage->save();
         $this->emit('success', 'Storage updated successfully');
     }
+
     public function delete()
     {
         $this->storage->delete();

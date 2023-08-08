@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Server;
-use App\Models\Team;
 use Illuminate\Database\Seeder;
 
 class ServerSettingSeeder extends Seeder

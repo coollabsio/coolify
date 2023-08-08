@@ -20,6 +20,7 @@ class Deployments extends Component
         $this->current_url = url()->current();
         $this->show_more();
     }
+
     private function show_more()
     {
         if (count($this->deployments) !== 0) {
@@ -30,10 +31,12 @@ class Deployments extends Component
             return;
         }
     }
+
     public function reload_deployments()
     {
         $this->load_deployments();
     }
+
     public function load_deployments(int|null $take = null)
     {
         if ($take) {

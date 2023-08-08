@@ -1,13 +1,12 @@
 <?php
 
+use App\Models\InstanceSettings;
+use App\Models\Team;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
-use App\Models\Team;
-use App\Models\InstanceSettings;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * Run the migrations.
      */
@@ -35,7 +34,7 @@ return new class extends Migration
             $table->boolean('discord_notifications_status_changes')->default(true);
         });
         $teams = Team::all();
-        foreach($teams as $team) {
+        foreach ($teams as $team) {
             $team->smtp_enabled = data_get($team, 'smtp.enabled', false);
             $team->smtp_from_address = data_get($team, 'smtp.from_address');
             $team->smtp_from_name = data_get($team, 'smtp.from_name');
@@ -46,15 +45,15 @@ return new class extends Migration
             $team->smtp_username = data_get($team, 'smtp.username');
             $team->smtp_password = data_get($team, 'smtp.password');
             $team->smtp_timeout = data_get($team, 'smtp.timeout');
-            $team->smtp_notifications_test = data_get($team, 'smtp_notifications.test',true);
-            $team->smtp_notifications_deployments = data_get($team, 'smtp_notifications.deployments',false);
-            $team->smtp_notifications_status_changes = data_get($team, 'smtp_notifications.status_changes',false);
+            $team->smtp_notifications_test = data_get($team, 'smtp_notifications.test', true);
+            $team->smtp_notifications_deployments = data_get($team, 'smtp_notifications.deployments', false);
+            $team->smtp_notifications_status_changes = data_get($team, 'smtp_notifications.status_changes', false);
 
             $team->discord_enabled = data_get($team, 'discord.enabled', false);
             $team->discord_webhook_url = data_get($team, 'discord.webhook_url');
-            $team->discord_notifications_test = data_get($team, 'discord_notifications.test',true);
-            $team->discord_notifications_deployments = data_get($team, 'discord_notifications.deployments',true);
-            $team->discord_notifications_status_changes = data_get($team, 'discord_notifications.status_changes',true);
+            $team->discord_notifications_test = data_get($team, 'discord_notifications.test', true);
+            $team->discord_notifications_deployments = data_get($team, 'discord_notifications.deployments', true);
+            $team->discord_notifications_status_changes = data_get($team, 'discord_notifications.status_changes', true);
 
             $team->save();
         }
@@ -78,7 +77,7 @@ return new class extends Migration
             $table->integer('smtp_timeout')->nullable();
         });
         $instance_settings = InstanceSettings::all();
-        foreach($instance_settings as $instance_setting) {
+        foreach ($instance_settings as $instance_setting) {
             $instance_setting->smtp_enabled = data_get($instance_setting, 'smtp.enabled', false);
             $instance_setting->smtp_from_address = data_get($instance_setting, 'smtp.from_address');
             $instance_setting->smtp_from_name = data_get($instance_setting, 'smtp.from_name');
@@ -108,7 +107,7 @@ return new class extends Migration
             $table->schemalessAttributes('discord_notifications');
         });
         $teams = Team::all();
-        foreach($teams as $team) {
+        foreach ($teams as $team) {
             $team->smtp = [
                 'enabled' => $team->smtp_enabled,
                 'from_address' => $team->smtp_from_address,

@@ -10,6 +10,7 @@ class Show extends Component
 {
     public Server $server;
     public Collection|array $networks = [];
+
     public function scan()
     {
         $alreadyAddedNetworks = $this->server->standaloneDockers;

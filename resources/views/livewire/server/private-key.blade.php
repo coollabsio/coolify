@@ -29,7 +29,7 @@
             </div>
         @empty
             <div>No private keys found.
-                <x-use-magic-bar />
+                <x-use-magic-bar/>
             </div>
         @endforelse
     </div>

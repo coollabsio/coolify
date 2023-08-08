@@ -6,7 +6,6 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Str;
 
 class Input extends Component
 {
@@ -16,13 +15,14 @@ class Input extends Component
         public string|null $type = 'text',
         public string|null $value = null,
         public string|null $label = null,
-        public bool $required = false,
-        public bool $disabled = false,
-        public bool $readonly = false,
+        public bool        $required = false,
+        public bool        $disabled = false,
+        public bool        $readonly = false,
         public string|null $helper = null,
-        public bool $allowToPeak = true,
-        public string $defaultClass = "input input-sm bg-coolgray-200 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500"
-    ) {
+        public bool        $allowToPeak = true,
+        public string      $defaultClass = "input input-sm bg-coolgray-200 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500"
+    )
+    {
     }
 
     public function render(): View|Closure|string

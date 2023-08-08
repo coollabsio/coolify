@@ -19,17 +19,20 @@ class Select extends Component
     {
         $this->parameters = getRouteParameters();
     }
+
     public function set_type(string $type)
     {
         $this->type = $type;
         $this->current_step = 'servers';
     }
+
     public function set_server(Server $server)
     {
         $this->server_id = $server->id;
         $this->destinations = $server->destinations();
         $this->current_step = 'destinations';
     }
+
     public function set_destination(string $destination_uuid)
     {
         $this->destination_uuid = $destination_uuid;
@@ -40,6 +43,7 @@ class Select extends Component
             'destination' => $this->destination_uuid,
         ]);
     }
+
     public function load_servers()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();

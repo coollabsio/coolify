@@ -5,7 +5,7 @@
                 <a href="{{ route('dashboard') }}">
                     <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 </a>
-                <x-version />
+                <x-version/>
             </div>
             <div class="flex items-center gap-2">
                 <h1>{{ __('auth.reset_password') }}</h1>
@@ -15,12 +15,12 @@
                     @csrf
                     <input hidden id="token" name="token" value="{{ request()->route('token') }}">
                     <input hidden value="{{ request()->query('email') }}" type="email" name="email"
-                        label="{{ __('input.email') }}" />
+                           label="{{ __('input.email') }}"/>
                     <div class="flex gap-2">
                         <x-forms.input required type="password" id="password" name="password"
-                            label="{{ __('input.password') }}" autofocus />
+                                       label="{{ __('input.password') }}" autofocus/>
                         <x-forms.input required type="password" id="password_confirmation" name="password_confirmation"
-                            label="{{ __('input.password.again') }}" />
+                                       label="{{ __('input.password.again') }}"/>
                     </div>
                     <x-forms.button type="submit">{{ __('auth.reset_password') }}</x-forms.button>
                 </form>

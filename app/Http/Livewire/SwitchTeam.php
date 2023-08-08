@@ -8,10 +8,12 @@ use Livewire\Component;
 class SwitchTeam extends Component
 {
     public string $selectedTeamId = 'default';
+
     public function updatedSelectedTeamId()
     {
         $this->switch_to($this->selectedTeamId);
     }
+
     public function switch_to($team_id)
     {
         if (!auth()->user()->teams->contains($team_id)) {

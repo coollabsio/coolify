@@ -9,8 +9,8 @@ use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\SerializesModels;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 
 class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
@@ -20,18 +20,22 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
     public Server $server;
     public $tries = 1;
     public $timeout = 120;
-    public function middleware(): array
-    {
-        return [new WithoutOverlapping($this->server->id)];
-    }
+
     public function __construct(Server $server)
     {
         $this->server = $server;
     }
+
+    public function middleware(): array
+    {
+        return [new WithoutOverlapping($this->server->id)];
+    }
+
     public function uniqueId(): int
     {
         return $this->server->id;
     }
+
     public function handle(): void
     {
         try {

@@ -16,6 +16,17 @@ class GithubApp extends BaseModel
         'client_secret',
         'webhook_secret',
     ];
+
+    static public function public()
+    {
+        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(true)->whereNotNull('app_id')->get();
+    }
+
+    static public function private()
+    {
+        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(false)->whereNotNull('app_id')->get();
+    }
+
     protected static function booted(): void
     {
         static::deleting(function (GithubApp $github_app) {
@@ -25,14 +36,17 @@ class GithubApp extends BaseModel
             }
         });
     }
+
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');
     }
+
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);
     }
+
     public function type(): Attribute
     {
         return Attribute::make(
@@ -42,13 +56,5 @@ class GithubApp extends BaseModel
                 }
             },
         );
-    }
-    static public function public()
-    {
-        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(true)->whereNotNull('app_id')->get();
-    }
-    static public function private()
-    {
-        return GithubApp::whereTeamId(session('currentTeam')->id)->whereisPublic(false)->whereNotNull('app_id')->get();
     }
 }

@@ -16,7 +16,7 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     ]);
     $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'queued')->get()->sortByDesc('created_at');
     $running_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'in_progress')->get()->sortByDesc('created_at');
-    ray('Q:' . $queued_deployments->count() . 'R:' . $running_deployments->count() .  '| Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
+    ray('Q:' . $queued_deployments->count() . 'R:' . $running_deployments->count() . '| Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
     if ($queued_deployments->count() > 1) {
         $queued_deployments = $queued_deployments->skip(1);
         $queued_deployments->each(function ($queued_deployment, $key) {

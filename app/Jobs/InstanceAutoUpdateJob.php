@@ -3,9 +3,6 @@
 namespace App\Jobs;
 
 use App\Actions\Server\UpdateCoolify;
-use App\Models\InstanceSettings;
-use App\Models\Server;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,6 +19,7 @@ class InstanceAutoUpdateJob implements ShouldQueue, ShouldBeUnique
     public function __construct(private bool $force = false)
     {
     }
+
     public function handle(): void
     {
         resolve(UpdateCoolify::class)($this->force);

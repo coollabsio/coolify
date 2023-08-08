@@ -23,10 +23,12 @@ class Add extends Component
         'value' => 'value',
         'is_build_time' => 'build',
     ];
+
     public function mount()
     {
         $this->parameters = getRouteParameters();
     }
+
     public function submit()
     {
         ray('submitting');
@@ -39,6 +41,7 @@ class Add extends Component
         ]);
         $this->clear();
     }
+
     public function clear()
     {
         $this->key = '';

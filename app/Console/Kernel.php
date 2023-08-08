@@ -2,12 +2,12 @@
 
 namespace App\Console;
 
-use App\Jobs\InstanceApplicationsStatusJob;
 use App\Jobs\CheckResaleLicenseJob;
+use App\Jobs\CheckResaleLicenseKeys;
+use App\Jobs\DockerCleanupJob;
+use App\Jobs\InstanceApplicationsStatusJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ProxyCheckJob;
-use App\Jobs\DockerCleanupJob;
-use App\Jobs\CheckResaleLicenseKeys;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -31,6 +31,7 @@ class Kernel extends ConsoleKernel
             $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }
     }
+
     protected function commands(): void
     {
         $this->load(__DIR__ . '/Commands');

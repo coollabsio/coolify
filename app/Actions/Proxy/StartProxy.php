@@ -2,12 +2,11 @@
 
 namespace App\Actions\Proxy;
 
-use App\Actions\Proxy\CheckConfigurationSync;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
-use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {

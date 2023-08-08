@@ -18,6 +18,7 @@ class Create extends Component
         'name' => 'name',
         'description' => 'description',
     ];
+
     public function submit()
     {
         $this->validate();

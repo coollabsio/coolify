@@ -2,13 +2,10 @@
 
 namespace App\Models;
 
-use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsDiscord;
-use Illuminate\Database\Eloquent\Builder;
+use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
-use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
-use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class Team extends Model implements SendsDiscord, SendsEmail
 {
@@ -23,9 +20,10 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return data_get($this, 'discord_webhook_url', null);
     }
+
     public function getRecepients($notification)
     {
-        $recipients = data_get($notification,'emails',null);
+        $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients)) {
             $recipients = $this->members()->pluck('email')->toArray();
             return $recipients;
@@ -33,10 +31,34 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return explode(',', $recipients);
     }
 
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
+    }
+
     public function subscription()
     {
         return $this->hasOne(Subscription::class);
     }
+
+    public function applications()
+    {
+        return $this->hasManyThrough(Application::class, Project::class);
+    }
+
+    public function invitations()
+    {
+        return $this->hasMany(TeamInvitation::class);
+    }
+
+    public function isEmpty()
+    {
+        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
+            return true;
+        }
+        return false;
+    }
+
     public function projects()
     {
         return $this->hasMany(Project::class);
@@ -47,23 +69,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return $this->hasMany(Server::class);
     }
 
-    public function applications()
-    {
-        return $this->hasManyThrough(Application::class, Project::class);
-    }
-
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);
     }
-    public function members()
-    {
-        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
-    }
-    public function invitations()
-    {
-        return $this->hasMany(TeamInvitation::class);
-    }
+
     public function sources()
     {
         $sources = collect([]);
@@ -72,12 +82,5 @@ class Team extends Model implements SendsDiscord, SendsEmail
         // $bitbucket_apps = $this->hasMany(BitbucketApp::class)->get();
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
         return $sources;
-    }
-    public function isEmpty()
-    {
-        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
-            return true;
-        }
-        return false;
     }
 }

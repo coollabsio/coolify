@@ -1,17 +1,17 @@
 <?php
 
 use App\Http\Controllers\ApplicationController;
-use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
-use App\Models\InstanceSettings;
-use App\Models\PrivateKey;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
@@ -62,23 +62,23 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/servers', fn () => view('server.all', [
+    Route::get('/servers', fn() => view('server.all', [
         'servers' => Server::ownedByCurrentTeam()->get()
     ]))->name('server.all');
-    Route::get('/server/new', fn () => view('server.create', [
+    Route::get('/server/new', fn() => view('server.create', [
         'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.create');
-    Route::get('/server/{server_uuid}', fn () => view('server.show', [
+    Route::get('/server/{server_uuid}', fn() => view('server.show', [
         'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.show');
-    Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
+    Route::get('/server/{server_uuid}/proxy', fn() => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.proxy');
-    Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key', [
+    Route::get('/server/{server_uuid}/private-key', fn() => view('server.private-key', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
         'privateKeys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.private-key');
-    Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
+    Route::get('/server/{server_uuid}/destinations', fn() => view('server.destinations', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail()
     ]))->name('server.destinations');
 });
@@ -90,32 +90,32 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
-    Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
+    Route::get('/profile', fn() => view('profile', ['request' => request()]))->name('profile');
     Route::get('/team', [Controller::class, 'team'])->name('team.show');
-    Route::get('/team/new', fn () => view('team.create'))->name('team.create');
-    Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
+    Route::get('/team/new', fn() => view('team.create'))->name('team.create');
+    Route::get('/team/notifications', fn() => view('team.notifications'))->name('team.notifications');
     Route::get('/team/storages', [Controller::class, 'storages'])->name('team.storages.all');
-    Route::get('/team/storages/new', fn () => view('team.storages.create'))->name('team.storages.new');
+    Route::get('/team/storages/new', fn() => view('team.storages.create'))->name('team.storages.new');
     Route::get('/team/storages/{storage_uuid}', [Controller::class, 'storages_show'])->name('team.storages.show');
     Route::get('/team/members', [Controller::class, 'members'])->name('team.members');
-    Route::get('/command-center', fn () => view('command-center', ['servers' => Server::isReachable()->get()]))->name('command-center');
+    Route::get('/command-center', fn() => view('command-center', ['servers' => Server::isReachable()->get()]))->name('command-center');
     Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
     Route::get('/invitations/{uuid}/revoke', [Controller::class, 'revokeInvitation'])->name('team.invitation.revoke');
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/private-keys', fn () => view('private-key.all', [
+    Route::get('/private-keys', fn() => view('private-key.all', [
         'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', false)->get()
     ]))->name('private-key.all');
-    Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
-    Route::get('/private-key/{private_key_uuid}', fn () => view('private-key.show', [
+    Route::get('/private-key/new', fn() => view('private-key.new'))->name('private-key.new');
+    Route::get('/private-key/{private_key_uuid}', fn() => view('private-key.show', [
         'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail()
     ]))->name('private-key.show');
 });
 
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/source/new', fn () => view('source.new'))->name('source.new');
+    Route::get('/source/new', fn() => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
         $sources = session('currentTeam')->sources();
         return view('source.all', [

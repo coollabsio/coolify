@@ -2,9 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Data\ServerMetadata;
-use App\Enums\ProxyStatus;
-use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\Team;

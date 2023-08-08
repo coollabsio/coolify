@@ -14,6 +14,7 @@ use Illuminate\Notifications\Notification;
 class InvitationLink extends Notification implements ShouldQueue
 {
     use Queueable;
+
     public function via()
     {
         return [TransactionalEmailChannel::class];

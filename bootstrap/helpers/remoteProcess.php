@@ -23,11 +23,12 @@ use Spatie\Activitylog\Models\Activity;
 function remote_process(
     array   $command,
     Server  $server,
-    string $type = ActivityTypes::INLINE->value,
+    string  $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
     bool    $ignore_errors = false,
-): Activity {
+): Activity
+{
 
     $command_string = implode("\n", $command);
     if (auth()->user()) {
@@ -55,11 +56,13 @@ function remote_process(
         ),
     ])();
 }
+
 function get_private_key_for_server(Server $server)
 {
     $temp_file = "id.root@{$server->ip}";
     return '/var/www/html/storage/app/ssh/keys/' . $temp_file;
 }
+
 function save_private_key_for_server(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
@@ -138,10 +141,10 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     }
     $formatted = collect($decoded);
     if (!$is_debug_enabled) {
-        $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
+        $formatted = $formatted->filter(fn($i) => $i['hidden'] === false ?? false);
     }
     $formatted = $formatted
-        ->sortBy(fn ($i) => $i['order'])
+        ->sortBy(fn($i) => $i['order'])
         ->map(function ($i) {
             $i['timestamp'] = Carbon::parse($i['timestamp'])->format('Y-M-d H:i:s.u');
             return $i;

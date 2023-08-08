@@ -25,6 +25,7 @@ class ResourceLimits extends Component
         'resource.limits_cpuset' => 'cpuset',
         'resource.limits_cpu_shares' => 'cpu shares',
     ];
+
     public function submit()
     {
         try {

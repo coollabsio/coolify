@@ -9,10 +9,12 @@ class All extends Component
 {
     public $resource;
     protected $listeners = ['refreshStorages', 'submit'];
+
     public function refreshStorages()
     {
         $this->resource->refresh();
     }
+
     public function submit($data)
     {
         try {

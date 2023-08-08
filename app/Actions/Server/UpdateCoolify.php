@@ -23,7 +23,7 @@ class UpdateCoolify
             $this->server = Server::where('name', $localhost_name)->firstOrFail();
             $this->latest_version = get_latest_version_of_coolify();
             $this->current_version = config('version');
-            ray('latest version:' . $this->latest_version . " current version: " .  $this->current_version . ' force: ' . $force);
+            ray('latest version:' . $this->latest_version . " current version: " . $this->current_version . ' force: ' . $force);
             if ($settings->next_channel) {
                 ray('next channel enabled');
                 $this->latest_version = 'next';
@@ -49,6 +49,7 @@ class UpdateCoolify
             return;
         }
     }
+
     private function update()
     {
         if (isDev()) {

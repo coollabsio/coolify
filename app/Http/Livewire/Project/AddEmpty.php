@@ -17,6 +17,7 @@ class AddEmpty extends Component
         'name' => 'Project Name',
         'description' => 'Project Description',
     ];
+
     public function submit()
     {
         try {

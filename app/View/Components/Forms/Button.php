@@ -12,12 +12,13 @@ class Button extends Component
      * Create a new component instance.
      */
     public function __construct(
-        public bool $disabled = false,
-        public bool $isModal = false,
-        public bool $noStyle = false,
+        public bool        $disabled = false,
+        public bool        $isModal = false,
+        public bool        $noStyle = false,
         public string|null $modalId = null,
-        public string $defaultClass = "btn btn-primary btn-sm font-normal text-white normal-case no-animation rounded border-none"
-    ) {
+        public string      $defaultClass = "btn btn-primary btn-sm font-normal text-white normal-case no-animation rounded border-none"
+    )
+    {
         if ($this->noStyle) {
             $this->defaultClass = "";
         }

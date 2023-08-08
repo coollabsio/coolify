@@ -4,6 +4,18 @@ namespace App\Models;
 
 class Project extends BaseModel
 {
+    protected $fillable = [
+        'name',
+        'description',
+        'team_id',
+        'project_id'
+    ];
+
+    static public function ownedByCurrentTeam()
+    {
+        return Project::whereTeamId(session('currentTeam')->id)->orderBy('name');
+    }
+
     protected static function booted()
     {
         static::created(function ($project) {
@@ -20,32 +32,27 @@ class Project extends BaseModel
             $project->settings()->delete();
         });
     }
-    protected $fillable = [
-        'name',
-        'description',
-        'team_id',
-        'project_id'
-    ];
-    static public function ownedByCurrentTeam()
-    {
-        return Project::whereTeamId(session('currentTeam')->id)->orderBy('name');
-    }
-    public function team()
-    {
-        return $this->belongsTo(Team::class);
-    }
+
     public function environments()
     {
         return $this->hasMany(Environment::class);
     }
+
     public function settings()
     {
         return $this->hasOne(ProjectSetting::class);
     }
+
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
+
     public function applications()
     {
         return $this->hasManyThrough(Application::class, Environment::class);
     }
+
     public function postgresqls()
     {
         return $this->hasManyThrough(StandalonePostgresql::class, Environment::class);

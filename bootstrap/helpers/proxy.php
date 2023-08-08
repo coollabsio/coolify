@@ -1,15 +1,15 @@
 <?php
 
 use App\Models\Server;
-use Spatie\Url\Url;
-use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 
-function get_proxy_path() {
+function get_proxy_path()
+{
     $base_path = config('coolify.base_config_path');
     $proxy_path = "$base_path/proxy";
     return $proxy_path;
 }
+
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();
@@ -90,6 +90,7 @@ function generate_default_proxy_configuration(Server $server)
     }
     return Yaml::dump($config, 4, 2);
 }
+
 function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
     ray('called');
@@ -103,52 +104,52 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
     } else {
         $traefik_dynamic_conf = [
             'http' =>
-            [
-                'routers' =>
                 [
-                    'catchall' =>
-                    [
-                        'entryPoints' => [
-                            0 => 'http',
-                            1 => 'https',
-                        ],
-                        'service' => 'noop',
-                        'rule' => "HostRegexp(`{catchall:.*}`)",
-                        'priority' => 1,
-                        'middlewares' => [
-                            0 => 'redirect-regexp@file',
-                        ],
-                    ],
-                ],
-                'services' =>
-                [
-                    'noop' =>
-                    [
-                        'loadBalancer' =>
+                    'routers' =>
                         [
-                            'servers' =>
-                            [
-                                0 =>
+                            'catchall' =>
                                 [
-                                    'url' => '',
+                                    'entryPoints' => [
+                                        0 => 'http',
+                                        1 => 'https',
+                                    ],
+                                    'service' => 'noop',
+                                    'rule' => "HostRegexp(`{catchall:.*}`)",
+                                    'priority' => 1,
+                                    'middlewares' => [
+                                        0 => 'redirect-regexp@file',
+                                    ],
                                 ],
-                            ],
                         ],
-                    ],
-                ],
-                'middlewares' =>
-                [
-                    'redirect-regexp' =>
-                    [
-                        'redirectRegex' =>
+                    'services' =>
                         [
-                            'regex' => '(.*)',
-                            'replacement' => $redirect_url,
-                            'permanent' => false,
+                            'noop' =>
+                                [
+                                    'loadBalancer' =>
+                                        [
+                                            'servers' =>
+                                                [
+                                                    0 =>
+                                                        [
+                                                            'url' => '',
+                                                        ],
+                                                ],
+                                        ],
+                                ],
                         ],
-                    ],
+                    'middlewares' =>
+                        [
+                            'redirect-regexp' =>
+                                [
+                                    'redirectRegex' =>
+                                        [
+                                            'regex' => '(.*)',
+                                            'replacement' => $redirect_url,
+                                            'permanent' => false,
+                                        ],
+                                ],
+                        ],
                 ],
-            ],
         ];
         $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
         $yaml =

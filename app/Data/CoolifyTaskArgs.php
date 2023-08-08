@@ -22,6 +22,7 @@ class CoolifyTaskArgs extends Data
         public ?Model  $model = null,
         public string  $status = ProcessStatus::QUEUED->value,
         public bool    $ignore_errors = false,
-    ) {
+    )
+    {
     }
 }

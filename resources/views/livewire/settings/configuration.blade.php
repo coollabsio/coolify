@@ -8,7 +8,7 @@
         </div>
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex gap-2 w-96">
-                <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
+                <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io"/>
             </div>
 
             {{-- <div class="flex gap-2 ">
@@ -19,10 +19,10 @@
     </form>
     <h2 class="pt-6">Advanced</h2>
     <div class="flex flex-col py-6 text-right w-80">
-        <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
-        <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
-        <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
+        <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify"/>
+        <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed"/>
+        <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track"/>
         <x-forms.checkbox instantSave helper="Do not recommended, only if you like to live on the edge."
-            id="next_channel" label="Enable pre-release (early) updates" />
+                          id="next_channel" label="Enable pre-release (early) updates"/>
     </div>
 </div>

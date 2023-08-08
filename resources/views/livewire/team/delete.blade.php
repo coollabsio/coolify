@@ -47,7 +47,7 @@
                         <li>{{ $resource->name }}</li>
                     @endforeach
                 </ul>
-        @endif
-    @endif
+                @endif
+                @endif
 
-</div>
+            </div>

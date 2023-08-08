@@ -12,8 +12,8 @@ use App\Models\GitlabApp;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\DeploymentFailed;
+use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -22,8 +22,8 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
-use Spatie\Url\Url;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 use Visus\Cuid2\Cuid2;
@@ -61,6 +61,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private $log_model;
     private Collection $saved_outputs;
+
     public function __construct(int $application_deployment_queue_id)
     {
         ray()->clearScreen();
@@ -137,62 +138,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             // ray()->measure();
         }
     }
-    public function failed(Throwable $exception): void
-    {
-        $this->execute_remote_command(
-            ["echo 'Oops something is not okay, are you okay? 😢'"],
-            ["echo '{$exception->getMessage()}'"]
-        );
-        $this->next(ApplicationDeploymentStatus::FAILED->value);
-    }
-    private function execute_in_builder(string $command)
-    {
-        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
-        // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
-    }
-    private function deploy()
-    {
 
-        $this->execute_remote_command(
-            [
-                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
-            ],
-        );
-        $this->prepare_builder_image();
-        $this->clone_repository();
-
-        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
-        if (strlen($tag) > 128) {
-            $tag = $tag->substr(0, 128);
-        };
-
-        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
-        $this->production_image_name = "{$this->application->uuid}:{$tag}";
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
-
-        if (!$this->force_rebuild) {
-            $this->execute_remote_command([
-                "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
-            ]);
-            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
-                $this->execute_remote_command([
-                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
-                ]);
-                $this->generate_compose_file();
-                $this->stop_running_container();
-                $this->start_by_compose_file();
-                return;
-            }
-        }
-        $this->cleanup_git();
-        $this->generate_buildpack();
-        $this->generate_compose_file();
-        $this->generate_build_env_variables();
-        $this->add_build_env_variables_to_dockerfile();
-        $this->build_image();
-        $this->stop_running_container();
-        $this->start_by_compose_file();
-    }
     private function deploy_pull_request()
     {
         $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
@@ -214,117 +160,154 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->start_by_compose_file();
     }
 
-    private function next(string $status)
-    {
-        // If the deployment is cancelled by the user, don't update the status
-        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
-            $this->application_deployment_queue->update([
-                'status' => $status,
-            ]);
-        }
-        queue_next_deployment($this->application);
-        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            $this->application->environment->project->team->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
-        }
-        if ($status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
-        }
-    }
-    private function start_by_compose_file()
+    private function prepare_builder_image()
     {
         $this->execute_remote_command(
-            ["echo -n 'Starting new application... '"],
-            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
-            ["echo 'Done. 🎉'"],
+            [
+                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder).'",
+            ],
+            [
+                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
+                "hidden" => true,
+            ],
+            [
+                "command" => $this->execute_in_builder("mkdir -p {$this->workdir}")
+            ],
         );
     }
-    private function stop_running_container()
+
+    private function execute_in_builder(string $command)
+    {
+        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
+        // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
+    }
+
+    private function clone_repository()
     {
         $this->execute_remote_command(
-            ["echo -n 'Removing old running application.'"],
-            [$this->execute_in_builder("docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
+            [
+                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}. '"
+            ],
+            [
+                $this->importing_git_repository()
+            ],
+            [
+                $this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD"),
+                "hidden" => true,
+                "save" => "git_commit_sha"
+            ],
+        );
+        $this->commit = $this->saved_outputs->get('git_commit_sha');
+    }
+
+    private function importing_git_repository()
+    {
+        $commands = collect([]);
+        $git_clone_command = "git clone -q -b {$this->application->git_branch}";
+        if ($this->pull_request_id !== 0) {
+            $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
+        }
+
+        if ($this->application->deploymentType() === 'source') {
+            $source_html_url = data_get($this->application, 'source.html_url');
+            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
+            $source_html_url_host = $url['host'];
+            $source_html_url_scheme = $url['scheme'];
+
+            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
+                if ($this->source->is_public) {
+                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
+                    $git_clone_command = $this->set_git_import_settings($git_clone_command);
+
+                    $commands->push($this->execute_in_builder($git_clone_command));
+                } else {
+                    $github_access_token = generate_github_installation_token($this->source);
+                    $commands->push($this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}"));
+                }
+                if ($this->pull_request_id !== 0) {
+                    $commands->push($this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
+                }
+                return $commands->implode(' && ');
+            }
+        }
+        if ($this->application->deploymentType() === 'deploy_key') {
+            $private_key = base64_encode($this->application->private_key->private_key);
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->workdir}";
+            $git_clone_command = $this->set_git_import_settings($git_clone_command);
+            $commands = collect([
+                $this->execute_in_builder("mkdir -p /root/.ssh"),
+                $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
+                $this->execute_in_builder($git_clone_command)
+            ]);
+            return $commands->implode(' && ');
+        }
+    }
+
+    private function set_git_import_settings($git_clone_command)
+    {
+        if ($this->application->git_commit_sha !== 'HEAD') {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
+        }
+        if ($this->application->settings->is_git_submodules_enabled) {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
+        }
+        if ($this->application->settings->is_git_lfs_enabled) {
+            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
+        }
+        return $git_clone_command;
+    }
+
+    private function cleanup_git()
+    {
+        $this->execute_remote_command(
+            [$this->execute_in_builder("rm -fr {$this->workdir}/.git")],
         );
     }
-    private function build_image()
+
+    private function generate_buildpack()
     {
-        $this->execute_remote_command([
-            "echo -n 'Building docker image.'",
-        ]);
-
-        if ($this->application->settings->is_static) {
-            $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
-            ]);
-
-            $dockerfile = base64_encode("FROM {$this->application->static_image}
-WORKDIR /usr/share/nginx/html/
-LABEL coolify.deploymentId={$this->deployment_uuid}
-COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
-COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
-
-            $nginx_config = base64_encode("server {
-                listen       80;
-                listen  [::]:80;
-                server_name  localhost;
-
-                location / {
-                    root   /usr/share/nginx/html;
-                    index  index.html;
-                    try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
-                }
-
-                error_page   500 502 503 504  /50x.html;
-                location = /50x.html {
-                    root   /usr/share/nginx/html;
-                }
-            }");
-            $this->execute_remote_command(
-                [
-                    $this->execute_in_builder("echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
-                ],
-                [
-                    $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
-                ],
-                [
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
-                ]
-            );
-        } else {
-            $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
-            ]);
-        }
+        $this->execute_remote_command(
+            [
+                "echo -n 'Generating nixpacks configuration.'",
+            ],
+            [$this->nixpacks_build_cmd()],
+            [$this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
+            [$this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile")]
+        );
     }
-    private function add_build_env_variables_to_dockerfile()
-    {
-        $this->execute_remote_command([
-            $this->execute_in_builder("cat {$this->workdir}/Dockerfile"), "hidden" => true, "save" => 'dockerfile'
-        ]);
-        $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
-        foreach ($this->application->build_environment_variables as $env) {
-            $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
-        }
-        $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
-        $this->execute_remote_command([
-            $this->execute_in_builder("echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile"),
-            "hidden" => true
-        ]);
-    }
-    private function generate_build_env_variables()
+    private function nixpacks_build_cmd()
     {
-        $this->build_args = collect(["--build-arg SOURCE_COMMIT={$this->commit}"]);
+        $this->generate_env_variables();
+        $nixpacks_command = "nixpacks build -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        if ($this->application->build_command) {
+            $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
+        }
+        if ($this->application->start_command) {
+            $nixpacks_command .= " --start-cmd \"{$this->application->start_command}\"";
+        }
+        if ($this->application->install_command) {
+            $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
+        }
+        $nixpacks_command .= " {$this->workdir}";
+        return $this->execute_in_builder($nixpacks_command);
+    }
+
+    private function generate_env_variables()
+    {
+        $this->env_args = collect([]);
         if ($this->pull_request_id === 0) {
-            foreach ($this->application->build_environment_variables as $env) {
-                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+            foreach ($this->application->nixpacks_environment_variables as $env) {
+                $this->env_args->push("--env {$env->key}={$env->value}");
             }
         } else {
-            foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
+                $this->env_args->push("--env {$env->key}={$env->value}");
             }
         }
 
-        $this->build_args = $this->build_args->implode(' ');
+        $this->env_args = $this->env_args->implode(' ');
     }
 
     private function generate_compose_file()
@@ -388,6 +371,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([$this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
     }
+
     private function generate_local_persistent_volumes()
     {
         $local_persistent_volumes = [];
@@ -400,6 +384,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         return $local_persistent_volumes;
     }
+
     private function generate_local_persistent_volumes_only_volume_names()
     {
         $local_persistent_volumes_names = [];
@@ -420,6 +405,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         return $local_persistent_volumes_names;
     }
+
     private function generate_environment_variables($ports)
     {
         $environment_variables = collect();
@@ -436,27 +422,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }
         }
         // Add PORT if not exists, use the first port as default
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
+        if ($environment_variables->filter(fn($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
         }
         return $environment_variables->all();
     }
-    private function generate_healthcheck_commands()
-    {
-        if (!$this->application->health_check_port) {
-            $this->application->health_check_port = $this->application->ports_exposes_array[0];
-        }
-        if ($this->application->health_check_path) {
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
-            ];
-        } else {
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
-            ];
-        }
-        return implode(' ', $generated_healthchecks_commands);
-    }
+
     private function set_labels_for_applications()
     {
         $labels = [];
@@ -520,140 +491,192 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         return $labels;
     }
-    private function generate_buildpack()
+
+    private function generate_healthcheck_commands()
+    {
+        if (!$this->application->health_check_port) {
+            $this->application->health_check_port = $this->application->ports_exposes_array[0];
+        }
+        if ($this->application->health_check_path) {
+            $generated_healthchecks_commands = [
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
+            ];
+        } else {
+            $generated_healthchecks_commands = [
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
+            ];
+        }
+        return implode(' ', $generated_healthchecks_commands);
+    }
+
+    private function build_image()
+    {
+        $this->execute_remote_command([
+            "echo -n 'Building docker image.'",
+        ]);
+
+        if ($this->application->settings->is_static) {
+            $this->execute_remote_command([
+                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+            ]);
+
+            $dockerfile = base64_encode("FROM {$this->application->static_image}
+WORKDIR /usr/share/nginx/html/
+LABEL coolify.deploymentId={$this->deployment_uuid}
+COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
+
+            $nginx_config = base64_encode("server {
+                listen       80;
+                listen  [::]:80;
+                server_name  localhost;
+
+                location / {
+                    root   /usr/share/nginx/html;
+                    index  index.html;
+                    try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
+                }
+
+                error_page   500 502 503 504  /50x.html;
+                location = /50x.html {
+                    root   /usr/share/nginx/html;
+                }
+            }");
+            $this->execute_remote_command(
+                [
+                    $this->execute_in_builder("echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
+                ],
+                [
+                    $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
+                ],
+                [
+                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                ]
+            );
+        } else {
+            $this->execute_remote_command([
+                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+            ]);
+        }
+    }
+
+    private function stop_running_container()
     {
         $this->execute_remote_command(
-            [
-                "echo -n 'Generating nixpacks configuration.'",
-            ],
-            [$this->nixpacks_build_cmd()],
-            [$this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
-            [$this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile")]
+            ["echo -n 'Removing old running application.'"],
+            [$this->execute_in_builder("docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
         );
     }
-    private function nixpacks_build_cmd()
+
+    private function start_by_compose_file()
     {
-        $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build -o {$this->workdir} {$this->env_args} --no-error-without-start";
-        if ($this->application->build_command) {
-            $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
-        }
-        if ($this->application->start_command) {
-            $nixpacks_command .= " --start-cmd \"{$this->application->start_command}\"";
-        }
-        if ($this->application->install_command) {
-            $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
-        }
-        $nixpacks_command .= " {$this->workdir}";
-        return $this->execute_in_builder($nixpacks_command);
+        $this->execute_remote_command(
+            ["echo -n 'Starting new application... '"],
+            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            ["echo 'Done. 🎉'"],
+        );
     }
-    private function generate_env_variables()
+
+    private function deploy()
     {
-        $this->env_args = collect([]);
+
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->clone_repository();
+
+        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
+        if (strlen($tag) > 128) {
+            $tag = $tag->substr(0, 128);
+        };
+
+        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
+        $this->production_image_name = "{$this->application->uuid}:{$tag}";
+        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+
+        if (!$this->force_rebuild) {
+            $this->execute_remote_command([
+                "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
+            ]);
+            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+                $this->execute_remote_command([
+                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
+                ]);
+                $this->generate_compose_file();
+                $this->stop_running_container();
+                $this->start_by_compose_file();
+                return;
+            }
+        }
+        $this->cleanup_git();
+        $this->generate_buildpack();
+        $this->generate_compose_file();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
+        $this->build_image();
+        $this->stop_running_container();
+        $this->start_by_compose_file();
+    }
+
+    private function generate_build_env_variables()
+    {
+        $this->build_args = collect(["--build-arg SOURCE_COMMIT={$this->commit}"]);
         if ($this->pull_request_id === 0) {
-            foreach ($this->application->nixpacks_environment_variables as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+            foreach ($this->application->build_environment_variables as $env) {
+                $this->build_args->push("--build-arg {$env->key}={$env->value}");
             }
         } else {
-            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+            foreach ($this->application->build_environment_variables_preview as $env) {
+                $this->build_args->push("--build-arg {$env->key}={$env->value}");
             }
         }
 
-        $this->env_args = $this->env_args->implode(' ');
+        $this->build_args = $this->build_args->implode(' ');
     }
-    private function cleanup_git()
-    {
-        $this->execute_remote_command(
-            [$this->execute_in_builder("rm -fr {$this->workdir}/.git")],
-        );
-    }
-    private function prepare_builder_image()
-    {
-        $this->execute_remote_command(
-            [
-                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder).'",
-            ],
-            [
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
-                "hidden" => true,
-            ],
-            [
-                "command" => $this->execute_in_builder("mkdir -p {$this->workdir}")
-            ],
-        );
-    }
-    private function set_git_import_settings($git_clone_command)
-    {
-        if ($this->application->git_commit_sha !== 'HEAD') {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
-        }
-        if ($this->application->settings->is_git_submodules_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
-        }
-        if ($this->application->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
-        }
-        return $git_clone_command;
-    }
-    private function importing_git_repository()
-    {
-        $commands = collect([]);
-        $git_clone_command = "git clone -q -b {$this->application->git_branch}";
-        if ($this->pull_request_id !== 0) {
-            $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
-        }
 
-        if ($this->application->deploymentType() === 'source') {
-            $source_html_url = data_get($this->application, 'source.html_url');
-            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-            $source_html_url_host = $url['host'];
-            $source_html_url_scheme = $url['scheme'];
+    private function add_build_env_variables_to_dockerfile()
+    {
+        $this->execute_remote_command([
+            $this->execute_in_builder("cat {$this->workdir}/Dockerfile"), "hidden" => true, "save" => 'dockerfile'
+        ]);
+        $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
-            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
-                if ($this->source->is_public) {
-                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
-                    $git_clone_command = $this->set_git_import_settings($git_clone_command);
-
-                    $commands->push($this->execute_in_builder($git_clone_command));
-                } else {
-                    $github_access_token = generate_github_installation_token($this->source);
-                    $commands->push($this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}"));
-                }
-                if ($this->pull_request_id !== 0) {
-                    $commands->push($this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
-                }
-                return $commands->implode(' && ');
-            }
+        foreach ($this->application->build_environment_variables as $env) {
+            $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
         }
-        if ($this->application->deploymentType() === 'deploy_key') {
-            $private_key = base64_encode($this->application->private_key->private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->workdir}";
-            $git_clone_command = $this->set_git_import_settings($git_clone_command);
-            $commands = collect([
-                $this->execute_in_builder("mkdir -p /root/.ssh"),
-                $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
-                $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
-                $this->execute_in_builder($git_clone_command)
+        $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
+        $this->execute_remote_command([
+            $this->execute_in_builder("echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile"),
+            "hidden" => true
+        ]);
+    }
+
+    private function next(string $status)
+    {
+        // If the deployment is cancelled by the user, don't update the status
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+            $this->application_deployment_queue->update([
+                'status' => $status,
             ]);
-            return $commands->implode(' && ');
+        }
+        queue_next_deployment($this->application);
+        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
+            $this->application->environment->project->team->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+        }
+        if ($status === ApplicationDeploymentStatus::FAILED->value) {
+            $this->application->environment->project->team->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
         }
     }
-    private function clone_repository()
+
+    public function failed(Throwable $exception): void
     {
         $this->execute_remote_command(
-            [
-                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}. '"
-            ],
-            [
-                $this->importing_git_repository()
-            ],
-            [
-                $this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD"),
-                "hidden" => true,
-                "save" => "git_commit_sha"
-            ],
+            ["echo 'Oops something is not okay, are you okay? 😢'"],
+            ["echo '{$exception->getMessage()}'"]
         );
-        $this->commit = $this->saved_outputs->get('git_commit_sha');
+        $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }

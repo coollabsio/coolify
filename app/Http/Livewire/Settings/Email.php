@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Settings;
 
 use App\Models\InstanceSettings;
 use App\Notifications\TransactionalEmails\Test;
-use Illuminate\Support\Facades\Notification;
 use Livewire\Component;
 
 class Email extends Component
@@ -32,11 +31,23 @@ class Email extends Component
         'settings.smtp_username' => 'Username',
         'settings.smtp_password' => 'Password',
     ];
+
     public function mount()
     {
         $this->decrypt();
         $this->emails = auth()->user()->email;
     }
+
+    private function decrypt()
+    {
+        if (data_get($this->settings, 'smtp_password')) {
+            try {
+                $this->settings->smtp_password = decrypt($this->settings->smtp_password);
+            } catch (\Exception $e) {
+            }
+        }
+    }
+
     public function instantSave()
     {
         try {
@@ -47,20 +58,7 @@ class Email extends Component
             $this->validate();
         }
     }
-    public function sendTestNotification()
-    {
-        $this->settings->notify(new Test($this->emails));
-        $this->emit('success', 'Test email sent.');
-    }
-    private function decrypt()
-    {
-        if (data_get($this->settings, 'smtp_password')) {
-            try {
-                $this->settings->smtp_password = decrypt($this->settings->smtp_password);
-            } catch (\Exception $e) {
-            }
-        }
-    }
+
     public function submit()
     {
         $this->resetErrorBag();
@@ -74,5 +72,11 @@ class Email extends Component
         $this->settings->save();
         $this->emit('success', 'Transaction email settings updated successfully.');
         $this->decrypt();
+    }
+
+    public function sendTestNotification()
+    {
+        $this->settings->notify(new Test($this->emails));
+        $this->emit('success', 'Test email sent.');
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Notifications;
 
-use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -12,8 +12,10 @@ use Illuminate\Notifications\Notification;
 class Test extends Notification implements ShouldQueue
 {
     use Queueable;
+
     public function __construct(public string|null $emails = null)
-    {}
+    {
+    }
 
     public function via(object $notifiable): array
     {
@@ -30,6 +32,7 @@ class Test extends Notification implements ShouldQueue
         }
         return $channels;
     }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
@@ -37,6 +40,7 @@ class Test extends Notification implements ShouldQueue
         $mail->view('emails.test');
         return $mail;
     }
+
     public function toDiscord(): string
     {
         $message = 'This is a test Discord notification from Coolify.';

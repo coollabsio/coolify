@@ -19,6 +19,7 @@ class DiscordSettings extends Component
     protected $validationAttributes = [
         'model.discord_webhook_url' => 'Discord Webhook',
     ];
+
     public function instantSave()
     {
         try {
@@ -29,6 +30,14 @@ class DiscordSettings extends Component
             $this->validate();
         }
     }
+
+    public function submit()
+    {
+        $this->resetErrorBag();
+        $this->validate();
+        $this->saveModel();
+    }
+
     public function saveModel()
     {
         ray($this->model);
@@ -38,12 +47,7 @@ class DiscordSettings extends Component
         }
         $this->emit('success', 'Settings saved.');
     }
-    public function submit()
-    {
-        $this->resetErrorBag();
-        $this->validate();
-        $this->saveModel();
-    }
+
     public function sendTestNotification()
     {
         $this->model->notify(new Test);

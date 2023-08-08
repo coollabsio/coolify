@@ -15,19 +15,28 @@ class EnvironmentVariable extends Model
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
     ];
+
     protected static function booted()
     {
         static::created(function ($environment_variable) {
-                if ($environment_variable->application_id && !$environment_variable->is_preview) {
-                    ModelsEnvironmentVariable::create([
-                        'key' => $environment_variable->key,
-                        'value' => $environment_variable->value,
-                        'is_build_time' => $environment_variable->is_build_time,
-                        'application_id' => $environment_variable->application_id,
-                        'is_preview' => true,
-                    ]);
-                }
+            if ($environment_variable->application_id && !$environment_variable->is_preview) {
+                ModelsEnvironmentVariable::create([
+                    'key' => $environment_variable->key,
+                    'value' => $environment_variable->value,
+                    'is_build_time' => $environment_variable->is_build_time,
+                    'application_id' => $environment_variable->application_id,
+                    'is_preview' => true,
+                ]);
+            }
         });
+    }
+
+    protected function value(): Attribute
+    {
+        return Attribute::make(
+            get: fn(string $value) => $this->get_environment_variables($value),
+            set: fn(string $value) => $this->set_environment_variables($value),
+        );
     }
 
     private function get_environment_variables(string $environment_variable): string|null
@@ -45,6 +54,7 @@ class EnvironmentVariable extends Model
         }
         return decrypt($environment_variable);
     }
+
     private function set_environment_variables(string $environment_variable): string|null
     {
         $environment_variable = trim($environment_variable);
@@ -53,17 +63,11 @@ class EnvironmentVariable extends Model
         }
         return $environment_variable;
     }
-    protected function value(): Attribute
-    {
-        return Attribute::make(
-            get: fn (string $value) => $this->get_environment_variables($value),
-            set: fn (string $value) => $this->set_environment_variables($value),
-        );
-    }
+
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn (string $value) => Str::of($value)->trim(),
+            set: fn(string $value) => Str::of($value)->trim(),
         );
     }
 }

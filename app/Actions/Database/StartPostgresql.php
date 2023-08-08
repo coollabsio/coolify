@@ -3,15 +3,14 @@
 namespace App\Actions\Database;
 
 use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\Team;
 use App\Models\StandalonePostgresql;
-use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 class StartPostgresql
 {
     public $database;
+
     public function __invoke(Server $server, StandalonePostgresql $database)
     {
         $this->database = $database;
@@ -83,28 +82,7 @@ class StartPostgresql
         ], $server);
         return $activity;
     }
-    private function generate_environment_variables()
-    {
-        $environment_variables = collect();
-        ray('Generate Environment Variables')->green();
-        ray($this->database->runtime_environment_variables)->green();
-        foreach ($this->database->runtime_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->value");
-        }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_USER'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
-        }
-
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
-        }
-
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_DB'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
-        }
-        return $environment_variables->all();
-    }
     private function generate_local_persistent_volumes()
     {
         $local_persistent_volumes = [];
@@ -114,6 +92,7 @@ class StartPostgresql
         }
         return $local_persistent_volumes;
     }
+
     private function generate_local_persistent_volumes_only_volume_names()
     {
         $local_persistent_volumes_names = [];
@@ -128,5 +107,28 @@ class StartPostgresql
             ];
         }
         return $local_persistent_volumes_names;
+    }
+
+    private function generate_environment_variables()
+    {
+        $environment_variables = collect();
+        ray('Generate Environment Variables')->green();
+        ray($this->database->runtime_environment_variables)->green();
+        foreach ($this->database->runtime_environment_variables as $env) {
+            $environment_variables->push("$env->key=$env->value");
+        }
+
+        if ($environment_variables->filter(fn($env) => Str::of($env)->contains('POSTGRES_USER'))->isEmpty()) {
+            $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
+        }
+
+        if ($environment_variables->filter(fn($env) => Str::of($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
+            $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
+        }
+
+        if ($environment_variables->filter(fn($env) => Str::of($env)->contains('POSTGRES_DB'))->isEmpty()) {
+            $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
+        }
+        return $environment_variables->all();
     }
 }

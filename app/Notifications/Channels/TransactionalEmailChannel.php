@@ -25,7 +25,7 @@ class TransactionalEmailChannel
         Mail::send(
             [],
             [],
-            fn (Message $message) => $message
+            fn(Message $message) => $message
                 ->from(
                     data_get($settings, 'smtp_from_address'),
                     data_get($settings, 'smtp_from_name')

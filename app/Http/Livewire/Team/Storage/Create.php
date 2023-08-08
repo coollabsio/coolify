@@ -2,8 +2,8 @@
 
 namespace App\Http\Livewire\Team\Storage;
 
-use Livewire\Component;
 use App\Models\S3Storage;
+use Livewire\Component;
 
 class Create extends Component
 {
@@ -33,7 +33,9 @@ class Create extends Component
         'bucket' => 'Bucket',
         'endpoint' => 'Endpoint',
     ];
-    public function mount() {
+
+    public function mount()
+    {
         if (isDev()) {
             $this->name = 'Local MinIO';
             $this->description = 'Local MinIO';
@@ -43,15 +45,9 @@ class Create extends Component
             $this->endpoint = 'http://coolify-minio:9000';
         }
     }
-    private function test_s3_connection() {
-        try {
-            $this->storage->testConnection();
-            return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
-        } catch(\Throwable $th) {
-            return general_error_handler($th, $this);
-        }
-    }
-    public function submit() {
+
+    public function submit()
+    {
         try {
             $this->validate();
             $this->storage = new S3Storage();
@@ -71,9 +67,19 @@ class Create extends Component
             $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
             $this->storage->save();
             return redirect()->route('team.storages.show', $this->storage->uuid);
-        }   catch(\Throwable $th) {
+        } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }
 
+    }
+
+    private function test_s3_connection()
+    {
+        try {
+            $this->storage->testConnection();
+            return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
+        } catch (\Throwable $th) {
+            return general_error_handler($th, $this);
+        }
     }
 }

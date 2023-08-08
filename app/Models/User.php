@@ -3,18 +3,17 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\TrnsactionalEmails\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
-use Visus\Cuid2\Cuid2;
 use Laravel\Fortify\TwoFactorAuthenticatable;
-use App\Notifications\TrnsactionalEmails\ResetPassword;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
+
     protected $fillable = [
         'id',
         'name',
@@ -28,6 +27,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
     ];
+
     protected static function boot()
     {
         parent::boot();
@@ -44,18 +44,27 @@ class User extends Authenticatable implements SendsEmail
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
+
+    public function teams()
+    {
+        return $this->belongsToMany(Team::class)->withPivot('role');
+    }
+
     public function getRecepients($notification)
     {
         return $this->email;
     }
+
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new ResetPassword($token));
     }
+
     public function isAdmin()
     {
         return $this->pivot->role === 'admin' || $this->pivot->role === 'owner';
     }
+
     public function isAdminFromSession()
     {
         if (auth()->user()->id === 0) {
@@ -73,6 +82,7 @@ class User extends Authenticatable implements SendsEmail
         $role = $teams->where('id', session('currentTeam')->id)->first()->pivot->role;
         return $role === 'admin' || $role === 'owner';
     }
+
     public function isInstanceAdmin()
     {
         $found_root_team = auth()->user()->teams->filter(function ($team) {
@@ -83,18 +93,17 @@ class User extends Authenticatable implements SendsEmail
         });
         return $found_root_team->count() > 0;
     }
+
     public function personalTeam()
     {
         return $this->teams()->where('personal_team', true)->first();
     }
-    public function teams()
-    {
-        return $this->belongsToMany(Team::class)->withPivot('role');
-    }
+
     public function currentTeam()
     {
         return $this->teams()->where('team_id', session('currentTeam')->id)->first();
     }
+
     public function otherTeams()
     {
         $team_id = session('currentTeam')->id;
@@ -102,6 +111,7 @@ class User extends Authenticatable implements SendsEmail
             return $team->id != $team_id;
         });
     }
+
     public function role()
     {
         if ($this->teams()->where('team_id', 0)->first()) {
@@ -109,6 +119,7 @@ class User extends Authenticatable implements SendsEmail
         }
         return $this->teams()->where('team_id', session('currentTeam')->id)->first()->pivot->role;
     }
+
     public function resources()
     {
         $team_id = session('currentTeam')->id;

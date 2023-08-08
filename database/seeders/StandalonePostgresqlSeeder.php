@@ -2,10 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-use App\Models\StandalonePostgresql;
 use App\Models\StandaloneDocker;
+use App\Models\StandalonePostgresql;
+use Illuminate\Database\Seeder;
 
 class StandalonePostgresqlSeeder extends Seeder
 {

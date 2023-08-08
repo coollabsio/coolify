@@ -27,18 +27,22 @@ function getSubscriptionLink($id)
     }
     return $url;
 }
+
 function getPaymentLink()
 {
     return auth()->user()->currentTeam()->subscription->lemon_update_payment_menthod_url;
 }
+
 function getRenewDate()
 {
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
+
 function getEndDate()
 {
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
+
 function isSubscribed()
 {
     return

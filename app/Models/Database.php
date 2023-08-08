@@ -8,6 +8,7 @@ class Database extends BaseModel
     {
         return $this->belongsTo(Environment::class);
     }
+
     public function destination()
     {
         return $this->morphTo();

@@ -2,10 +2,10 @@
 
 namespace Tests;
 
-use Illuminate\Support\Collection;
 use Facebook\WebDriver\Chrome\ChromeOptions;
 use Facebook\WebDriver\Remote\DesiredCapabilities;
 use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Illuminate\Support\Collection;
 use Laravel\Dusk\TestCase as BaseTestCase;
 
 abstract class DuskTestCase extends BaseTestCase
@@ -19,7 +19,7 @@ abstract class DuskTestCase extends BaseTestCase
      */
     public static function prepare(): void
     {
-        if (! static::runningInSail()) {
+        if (!static::runningInSail()) {
             static::startChromeDriver();
         }
     }
@@ -46,9 +46,13 @@ abstract class DuskTestCase extends BaseTestCase
         );
     }
 
-    protected function baseUrl()
+    /**
+     * Determine if the browser window should start maximized.
+     */
+    protected function shouldStartMaximized(): bool
     {
-        return rtrim(config('app.url'), '/');
+        return isset($_SERVER['DUSK_START_MAXIMIZED']) ||
+            isset($_ENV['DUSK_START_MAXIMIZED']);
     }
 
     /**
@@ -57,15 +61,11 @@ abstract class DuskTestCase extends BaseTestCase
     protected function hasHeadlessDisabled(): bool
     {
         return isset($_SERVER['DUSK_HEADLESS_DISABLED']) ||
-               isset($_ENV['DUSK_HEADLESS_DISABLED']);
+            isset($_ENV['DUSK_HEADLESS_DISABLED']);
     }
 
-    /**
-     * Determine if the browser window should start maximized.
-     */
-    protected function shouldStartMaximized(): bool
+    protected function baseUrl()
     {
-        return isset($_SERVER['DUSK_START_MAXIMIZED']) ||
-               isset($_ENV['DUSK_START_MAXIMIZED']);
+        return rtrim(config('app.url'), '/');
     }
 }

@@ -19,6 +19,7 @@ class Create extends Component
         'name' => 'name',
         'value' => 'private Key',
     ];
+
     public function createPrivateKey()
     {
         $this->validate();

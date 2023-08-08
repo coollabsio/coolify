@@ -5,12 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Http\Request;
-use Spatie\Activitylog\Models\Activity;
 
 class ApplicationController extends Controller
 {
     use AuthorizesRequests, ValidatesRequests;
+
     public function configuration()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -28,6 +27,7 @@ class ApplicationController extends Controller
         ray($application->persistentStorages()->get());
         return view('project.application.configuration', ['application' => $application]);
     }
+
     public function deployments()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();

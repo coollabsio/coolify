@@ -64,7 +64,8 @@ class NotifyDemo extends Command
                 </ul>
             </div>
         </div>
-        HTML);
+        HTML
+        );
 
         ask(<<<'HTML'
         <div class="mr-1">

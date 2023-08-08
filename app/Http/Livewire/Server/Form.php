@@ -5,7 +5,6 @@ namespace App\Http\Livewire\Server;
 use App\Actions\Server\InstallDocker;
 use App\Models\Server;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Form extends Component
 {
@@ -34,16 +33,19 @@ class Form extends Component
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'
     ];
+
     public function mount()
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
+
     public function installDocker()
     {
         $activity = resolve(InstallDocker::class)($this->server, session('currentTeam'));
         $this->emit('newMonitorActivity', $activity->id);
     }
+
     public function validateServer()
     {
         try {
@@ -59,6 +61,7 @@ class Form extends Component
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }
+
     public function delete()
     {
         if (!$this->server->isEmpty()) {
@@ -68,6 +71,7 @@ class Form extends Component
         $this->server->delete();
         redirect()->route('server.all');
     }
+
     public function submit()
     {
         $this->validate();

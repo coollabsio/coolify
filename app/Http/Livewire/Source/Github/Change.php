@@ -34,12 +34,14 @@ class Change extends Component
         'github_app.webhook_secret' => 'nullable',
         'github_app.is_system_wide' => 'required|bool',
     ];
+
     public function mount()
     {
         $this->webhook_endpoint = $this->ipv4;
         $this->parameters = getRouteParameters();
         $this->is_system_wide = $this->github_app->is_system_wide;
     }
+
     public function submit()
     {
         try {
@@ -49,6 +51,7 @@ class Change extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function instantSave()
     {
     }

@@ -23,6 +23,6 @@
         </div>
     </div>
     @if (isDev())
-        <livewire:dev.s3-test />
+        <livewire:dev.s3-test/>
     @endif
 </x-layout>

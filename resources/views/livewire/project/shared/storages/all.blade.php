@@ -5,15 +5,15 @@
             <x-helper
                 helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
             volume
-            name, example: <span class='text-helper'>-pr-1</span>" />
+            name, example: <span class='text-helper'>-pr-1</span>"/>
             <x-forms.button class="btn" onclick="newStorage.showModal()">+ Add</x-forms.button>
-            <livewire:project.shared.storages.add />
+            <livewire:project.shared.storages.add/>
         </div>
         <div class="">Persistent storage to preserve data between deployments.</div>
     </div>
     <div class="flex flex-col gap-2 py-4">
         @forelse ($resource->persistentStorages as $storage)
-            <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
+            <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage"/>
         @empty
             <div class="text-neutral-500">No storages found.</div>
         @endforelse

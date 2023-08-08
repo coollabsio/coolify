@@ -2,17 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Livewire\Team\Invitations;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Models\S3Storage;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Support\Facades\DB;
 
 class Controller extends BaseController
 {
@@ -27,6 +25,7 @@ class Controller extends BaseController
             'settings' => InstanceSettings::get()
         ]);
     }
+
     public function license()
     {
         if (!isCloud()) {
@@ -36,6 +35,7 @@ class Controller extends BaseController
             'settings' => InstanceSettings::get()
         ]);
     }
+
     public function dashboard()
     {
         $projects = Project::ownedByCurrentTeam()->get();
@@ -55,6 +55,7 @@ class Controller extends BaseController
             's3s' => $s3s,
         ]);
     }
+
     public function settings()
     {
         if (auth()->user()->isInstanceAdmin()) {
@@ -66,6 +67,7 @@ class Controller extends BaseController
             return redirect()->route('dashboard');
         }
     }
+
     public function emails()
     {
         if (auth()->user()->isInstanceAdmin()) {
@@ -77,6 +79,7 @@ class Controller extends BaseController
             return redirect()->route('dashboard');
         }
     }
+
     public function team()
     {
         $invitations = [];
@@ -87,18 +90,23 @@ class Controller extends BaseController
             'invitations' => $invitations,
         ]);
     }
-    public function storages() {
+
+    public function storages()
+    {
         $s3 = S3Storage::ownedByCurrentTeam()->get();
         return view('team.storages.all', [
             's3' => $s3,
         ]);
     }
-    public function storages_show() {
+
+    public function storages_show()
+    {
         $storage = S3Storage::ownedByCurrentTeam()->whereUuid(request()->storage_uuid)->firstOrFail();
         return view('team.storages.show', [
             'storage' => $storage,
         ]);
     }
+
     public function members()
     {
         $invitations = [];
@@ -109,6 +117,7 @@ class Controller extends BaseController
             'invitations' => $invitations,
         ]);
     }
+
     public function acceptInvitation()
     {
         try {
@@ -135,6 +144,7 @@ class Controller extends BaseController
             throw $th;
         }
     }
+
     public function revokeInvitation()
     {
         try {

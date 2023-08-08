@@ -5,7 +5,7 @@
         @forelse ($destinations as $destination)
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
                 <a class="flex gap-4 text-center hover:no-underline box group"
-                    href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
+                   href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
                     <div class="group-hover:text-white">
                         <div>{{ $destination->name }}</div>
                     </div>
@@ -13,7 +13,7 @@
             @endif
             @if ($destination->getMorphClass() === 'App\Models\SwarmDocker')
                 <a class="flex gap-4 text-center hover:no-underline box group"
-                    href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
+                   href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
 
                     <div class="group-hover:text-white">
                         <div>{{ $destination->name }}</div>
@@ -23,7 +23,7 @@
         @empty
             <div>
                 <div>No destinations found.</div>
-                <x-use-magic-bar />
+                <x-use-magic-bar/>
             </div>
         @endforelse
     </div>

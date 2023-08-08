@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\Application\StatusChanged;
 use Illuminate\Bus\Queueable;
@@ -11,7 +10,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
 {
@@ -27,10 +25,12 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
         $this->container_name = $container_name;
         $this->pull_request_id = $pull_request_id;
     }
+
     public function uniqueId(): string
     {
         return $this->container_name;
     }
+
     public function handle(): void
     {
         try {

@@ -13,7 +13,8 @@ class Test extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(public string $emails)
-    {}
+    {
+    }
 
     public function via(): array
     {

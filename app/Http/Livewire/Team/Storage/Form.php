@@ -2,8 +2,8 @@
 
 namespace App\Http\Livewire\Team\Storage;
 
-use Livewire\Component;
 use App\Models\S3Storage;
+use Livewire\Component;
 
 class Form extends Component
 {
@@ -26,22 +26,27 @@ class Form extends Component
         'storage.bucket' => 'Bucket',
         'storage.endpoint' => 'Endpoint',
     ];
-    public function test_s3_connection() {
+
+    public function test_s3_connection()
+    {
         try {
             $this->storage->testConnection();
             return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
-        } catch(\Throwable $th) {
+        } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }
     }
-    public function delete() {
+
+    public function delete()
+    {
         try {
             $this->storage->delete();
             return redirect()->route('team.storages.all');
-        } catch(\Throwable $th) {
+        } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }
     }
+
     public function submit()
     {
         $this->validate();

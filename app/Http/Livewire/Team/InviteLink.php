@@ -12,14 +12,17 @@ class InviteLink extends Component
 {
     public string $email;
     public string $role = 'member';
+
     public function mount()
     {
         $this->email = isDev() ? 'test3@example.com' : '';
     }
+
     public function viaEmail()
     {
         $this->generate_invite_link(isEmail: true);
     }
+
     private function generate_invite_link(bool $isEmail = false)
     {
         try {
@@ -72,6 +75,7 @@ class InviteLink extends Component
             return general_error_handler(err: $e, that: $this, customErrorMessage: $error_message);
         }
     }
+
     public function viaLink()
     {
         $this->generate_invite_link();

@@ -25,6 +25,7 @@ class ProjectController extends Controller
         }
         return view('project.edit', ['project' => $project]);
     }
+
     public function show()
     {
         $projectUuid = request()->route('project_uuid');
@@ -55,6 +56,7 @@ class ProjectController extends Controller
             'type' => $type
         ]);
     }
+
     public function resources()
     {
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();

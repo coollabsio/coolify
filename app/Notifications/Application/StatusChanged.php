@@ -2,10 +2,8 @@
 
 namespace App\Notifications\Application;
 
-use App\Models\Application;
-use App\Models\ApplicationPreview;
-use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,6 +13,7 @@ use Illuminate\Support\Str;
 class StatusChanged extends Notification implements ShouldQueue
 {
     use Queueable;
+
     public $application;
 
     public string $application_name;
@@ -33,8 +32,9 @@ class StatusChanged extends Notification implements ShouldQueue
         if (Str::of($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
         }
-        $this->application_url =  base_url() . "/project/{$this->project_uuid}/{$this->environment_name}/application/{$this->application->uuid}";
+        $this->application_url = base_url() . "/project/{$this->project_uuid}/{$this->environment_name}/application/{$this->application->uuid}";
     }
+
     public function via(object $notifiable): array
     {
         $channels = [];
@@ -51,6 +51,7 @@ class StatusChanged extends Notification implements ShouldQueue
         }
         return $channels;
     }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();

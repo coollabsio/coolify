@@ -3,8 +3,8 @@
     <div class="pt-2 pb-10 ">Destinations are used to segregate resources by network.</div>
     <form class="flex flex-col gap-4" wire:submit.prevent='submit'>
         <div class="flex gap-2">
-            <x-forms.input id="name" label="Name" required />
-            <x-forms.input id="network" label="Network" required />
+            <x-forms.input id="name" label="Name" required/>
+            <x-forms.input id="network" label="Network" required/>
         </div>
         <x-forms.select id="server_id" label="Select a server" required wire:change="generate_name">
             <option disabled>Select a server</option>

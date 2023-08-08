@@ -4,9 +4,8 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Models\Team;
-use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -16,6 +15,7 @@ use Illuminate\Support\Str;
 class DeploymentFailed extends Notification implements ShouldQueue
 {
     use Queueable;
+
     public Application $application;
     public string $deployment_uuid;
     public ApplicationPreview|null $preview;
@@ -38,8 +38,9 @@ class DeploymentFailed extends Notification implements ShouldQueue
         if (Str::of($this->fqdn)->explode(',')->count() > 1) {
             $this->fqdn = Str::of($this->fqdn)->explode(',')->first();
         }
-        $this->deployment_url =  base_url() . "/project/{$this->project_uuid}/{$this->environment_name}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
+        $this->deployment_url = base_url() . "/project/{$this->project_uuid}/{$this->environment_name}/application/{$this->application->uuid}/deployment/{$this->deployment_uuid}";
     }
+
     public function via(object $notifiable): array
     {
         $channels = [];
@@ -56,6 +57,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
         }
         return $channels;
     }
+
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();

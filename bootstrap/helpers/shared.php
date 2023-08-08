@@ -4,9 +4,8 @@ use App\Models\InstanceSettings;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\URL;
-use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
+use Visus\Cuid2\Cuid2;
 
 function general_error_handler(\Throwable|null $err = null, $that = null, $isJson = false, $customErrorMessage = null)
 {
@@ -62,6 +61,7 @@ function generate_random_name()
     $cuid = new Cuid2(7);
     return Str::kebab("{$generator->getName()}-{$cuid}");
 }
+
 function generate_application_name(string $git_repository, string $git_branch)
 {
     $cuid = new Cuid2(7);
@@ -91,6 +91,7 @@ function set_transanctional_email_settings()
         "local_domain" => null,
     ]);
 }
+
 function base_ip()
 {
     if (isDev()) {
@@ -99,6 +100,7 @@ function base_ip()
     $settings = InstanceSettings::get();
     return "http://{$settings->public_ipv4}";
 }
+
 function base_url(bool $withPort = true)
 {
     $settings = InstanceSettings::get();
@@ -131,6 +133,7 @@ function isDev()
 {
     return config('app.env') === 'local';
 }
+
 function isCloud()
 {
     return !config('coolify.self_hosted');

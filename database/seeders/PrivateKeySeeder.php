@@ -3,9 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\PrivateKey;
-use App\Models\Server;
 use App\Models\Team;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class PrivateKeySeeder extends Seeder

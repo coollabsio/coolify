@@ -1,7 +1,7 @@
 <x-layout>
     <h1>Profile</h1>
     <div class="pt-2 pb-10 ">Your user profile settings.</div>
-    <livewire:profile.form :request="$request" />
+    <livewire:profile.form :request="$request"/>
     <h3 class="py-4">Two-factor Authentication</h3>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">
@@ -11,7 +11,7 @@
         <div class="flex flex-col gap-2">
             <form action="/user/confirmed-two-factor-authentication" method="POST" class="flex items-end w-32 gap-2">
                 @csrf
-                <x-forms.input type="number" id="code" label="One-time code" required />
+                <x-forms.input type="number" id="code" label="One-time code" required/>
                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
             </form>
             <div>
@@ -30,7 +30,8 @@
         </div>
         <div>
             <div class="pb-6 ">Here are the recovery codes for your account. Please store them in a secure
-                location.</div>
+                location.
+            </div>
             <div class="text-white">
                 @foreach ($request->user()->recoveryCodes() as $code)
                     <div>{{ $code }}</div>
@@ -55,7 +56,8 @@
                 <div>
                     <div class="py-6 ">Here are the recovery codes for your account. Please store them in a
                         secure
-                        location.</div>
+                        location.
+                    </div>
                     <div class="text-white">
                         @foreach ($request->user()->recoveryCodes() as $code)
                             <div>{{ $code }}</div>

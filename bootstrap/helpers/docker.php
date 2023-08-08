@@ -8,15 +8,16 @@ function format_docker_command_output_to_json($rawOutput): Collection
     $outputLines = explode(PHP_EOL, $rawOutput);
 
     return collect($outputLines)
-        ->reject(fn ($line) => empty($line))
-        ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
+        ->reject(fn($line) => empty($line))
+        ->map(fn($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
 }
+
 function format_docker_labels_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
 
     return collect($outputLines)
-        ->reject(fn ($line) => empty($line))
+        ->reject(fn($line) => empty($line))
         ->map(function ($outputLine) {
             $outputArray = explode(',', $outputLine);
             return collect($outputArray)

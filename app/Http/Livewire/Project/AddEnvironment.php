@@ -17,6 +17,7 @@ class AddEnvironment extends Component
     protected $validationAttributes = [
         'name' => 'Environment Name',
     ];
+
     public function submit()
     {
         try {

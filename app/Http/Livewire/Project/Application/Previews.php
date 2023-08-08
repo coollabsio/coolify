@@ -22,6 +22,7 @@ class Previews extends Component
         $this->pull_requests = collect();
         $this->parameters = getRouteParameters();
     }
+
     public function loadStatus($pull_request_id)
     {
         dispatch(new ContainerStatusJob(
@@ -30,11 +31,7 @@ class Previews extends Component
             pull_request_id: $pull_request_id
         ));
     }
-    protected function setDeploymentUuid()
-    {
-        $this->deployment_uuid = new Cuid2(7);
-        $this->parameters['deployment_uuid'] = $this->deployment_uuid;
-    }
+
     public function load_prs()
     {
         try {
@@ -46,6 +43,7 @@ class Previews extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function deploy(int $pull_request_id, string|null $pull_request_html_url = null)
     {
         try {
@@ -74,6 +72,13 @@ class Previews extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
+    protected function setDeploymentUuid()
+    {
+        $this->deployment_uuid = new Cuid2(7);
+        $this->parameters['deployment_uuid'] = $this->deployment_uuid;
+    }
+
     public function stop(int $pull_request_id)
     {
         try {
@@ -87,6 +92,7 @@ class Previews extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function previewRefresh()
     {
         $this->application->previews->each(function ($preview) {

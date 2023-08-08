@@ -7,10 +7,10 @@
     <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @env('local')
-    <title>Coolify - localhost</title>
+        <title>Coolify - localhost</title>
     @endenv
     @env('production')
-    <title>{{ $title ?? 'Coolify' }}</title>
+        <title>{{ $title ?? 'Coolify' }}</title>
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
@@ -23,30 +23,30 @@
 </head>
 
 <body>
-    @livewireScripts
-    <main>
-        {{ $slot }}
-    </main>
-    <x-version class="fixed left-2 bottom-1" />
-    <script>
-        function changePasswordFieldType(event) {
-            let element = event.target
-            for (let i = 0; i < 10; i++) {
-                if (element.className === "relative") {
-                    break;
-                }
-                element = element.parentElement;
+@livewireScripts
+<main>
+    {{ $slot }}
+</main>
+<x-version class="fixed left-2 bottom-1"/>
+<script>
+    function changePasswordFieldType(event) {
+        let element = event.target
+        for (let i = 0; i < 10; i++) {
+            if (element.className === "relative") {
+                break;
             }
-            element = element.children[1];
-            if (element.nodeName === 'INPUT') {
-                if (element.type === 'password') {
-                    element.type = 'text';
-                } else {
-                    element.type = 'password';
-                }
+            element = element.parentElement;
+        }
+        element = element.children[1];
+        if (element.nodeName === 'INPUT') {
+            if (element.type === 'password') {
+                element.type = 'text';
+            } else {
+                element.type = 'password';
             }
         }
-    </script>
+    }
+</script>
 </body>
 
 </html>

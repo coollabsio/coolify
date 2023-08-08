@@ -4,8 +4,8 @@ namespace App\Http\Livewire;
 
 use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
-use Masmerise\Toaster\Toaster;
 use Livewire\Component;
+use Masmerise\Toaster\Toaster;
 
 class Upgrade extends Component
 {
@@ -27,6 +27,7 @@ class Upgrade extends Component
             $this->latestVersion = 'next';
         }
     }
+
     public function upgrade()
     {
         try {

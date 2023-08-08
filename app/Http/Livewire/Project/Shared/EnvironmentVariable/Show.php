@@ -21,17 +21,20 @@ class Show extends Component
         'value' => 'value',
         'is_build_time' => 'build',
     ];
+
     public function mount()
     {
         $this->modalId = new Cuid2(7);
         $this->parameters = getRouteParameters();
     }
+
     public function submit()
     {
         $this->validate();
         $this->env->save();
         $this->emit('success', 'Environment variable updated successfully.');
     }
+
     public function delete()
     {
         $this->env->delete();

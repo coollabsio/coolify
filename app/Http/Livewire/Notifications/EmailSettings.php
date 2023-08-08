@@ -37,6 +37,13 @@ class EmailSettings extends Component
         'model.smtp_username' => 'Username',
         'model.smtp_password' => 'Password',
     ];
+
+    public function mount()
+    {
+        $this->decrypt();
+        $this->emails = auth()->user()->email;
+    }
+
     private function decrypt()
     {
         if (data_get($this->model, 'smtp_password')) {
@@ -46,11 +53,7 @@ class EmailSettings extends Component
             }
         }
     }
-    public function mount()
-    {
-        $this->decrypt();
-        $this->emails = auth()->user()->email;
-    }
+
     public function copyFromInstanceSettings()
     {
         $settings = InstanceSettings::get();
@@ -78,6 +81,23 @@ class EmailSettings extends Component
             $this->emit('error', 'Instance SMTP settings are not enabled.');
         }
     }
+
+    public function sendTestNotification()
+    {
+        $this->model->notify(new Test($this->emails));
+        $this->emit('success', 'Test Email sent successfully.');
+    }
+
+    public function instantSave()
+    {
+        try {
+            $this->submit();
+        } catch (\Exception $e) {
+            $this->model->smtp_enabled = false;
+            $this->validate();
+        }
+    }
+
     public function submit()
     {
         $this->resetErrorBag();
@@ -92,6 +112,7 @@ class EmailSettings extends Component
         $this->model->smtp_recipients = str_replace(' ', '', $this->model->smtp_recipients);
         $this->saveModel();
     }
+
     public function saveModel()
     {
         $this->model->save();
@@ -100,19 +121,5 @@ class EmailSettings extends Component
             session(['currentTeam' => $this->model]);
         }
         $this->emit('success', 'Settings saved.');
-    }
-    public function sendTestNotification()
-    {
-        $this->model->notify(new Test($this->emails));
-        $this->emit('success', 'Test Email sent successfully.');
-    }
-    public function instantSave()
-    {
-        try {
-            $this->submit();
-        } catch (\Exception $e) {
-            $this->model->smtp_enabled = false;
-            $this->validate();
-        }
     }
 }

@@ -28,6 +28,12 @@ class Heading extends Component
         ));
         $this->application->refresh();
     }
+
+    public function force_deploy_without_cache()
+    {
+        $this->deploy(force_rebuild: true);
+    }
+
     public function deploy(bool $force_rebuild = false)
     {
         $this->setDeploymentUuid();
@@ -43,10 +49,13 @@ class Heading extends Component
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }
-    public function force_deploy_without_cache()
+
+    protected function setDeploymentUuid()
     {
-        $this->deploy(force_rebuild: true);
+        $this->deploymentUuid = new Cuid2(7);
+        $this->parameters['deployment_uuid'] = $this->deploymentUuid;
     }
+
     public function stop()
     {
         remote_process(
@@ -56,10 +65,5 @@ class Heading extends Component
         $this->application->status = 'stopped';
         $this->application->save();
         $this->application->environment->project->team->notify(new StatusChanged($this->application));
-    }
-    protected function setDeploymentUuid()
-    {
-        $this->deploymentUuid = new Cuid2(7);
-        $this->parameters['deployment_uuid'] = $this->deploymentUuid;
     }
 }

@@ -19,6 +19,7 @@ class Create extends Component
     {
         $this->name = generate_random_name();
     }
+
     public function createGitHubApp()
     {
         try {

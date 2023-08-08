@@ -20,6 +20,7 @@ class Change extends Component
         'private_key.description' => 'description',
         'private_key.private_key' => 'private key'
     ];
+
     public function delete()
     {
         try {
@@ -33,6 +34,7 @@ class Change extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function changePrivateKey()
     {
         try {

@@ -31,6 +31,7 @@ class Configuration extends Component
         'settings.public_port_min' => 'Public port min',
         'settings.public_port_max' => 'Public port max',
     ];
+
     public function mount()
     {
         $this->do_not_track = $this->settings->do_not_track;
@@ -38,6 +39,7 @@ class Configuration extends Component
         $this->is_registration_enabled = $this->settings->is_registration_enabled;
         $this->next_channel = $this->settings->next_channel;
     }
+
     public function instantSave()
     {
         $this->settings->do_not_track = $this->do_not_track;
@@ -47,6 +49,21 @@ class Configuration extends Component
         $this->settings->save();
         $this->emit('success', 'Settings updated!');
     }
+
+    public function submit()
+    {
+        $this->resetErrorBag();
+        if ($this->settings->public_port_min > $this->settings->public_port_max) {
+            $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
+            return;
+        }
+        $this->validate();
+        $this->settings->save();
+        $this->server = Server::findOrFail(0);
+        $this->setup_instance_fqdn();
+        $this->emit('success', 'Instance settings updated successfully!');
+    }
+
     private function setup_instance_fqdn()
     {
         $file = "$this->dynamic_config_path/coolify.yaml";
@@ -60,35 +77,35 @@ class Configuration extends Component
             $schema = $url->getScheme();
             $traefik_dynamic_conf = [
                 'http' =>
-                [
-                    'routers' =>
                     [
-                        'coolify-http' =>
-                        [
-                            'entryPoints' => [
-                                0 => 'http',
-                            ],
-                            'service' => 'coolify',
-                            'rule' => "Host(`{$host}`)",
-                        ],
-                    ],
-                    'services' =>
-                    [
-                        'coolify' =>
-                        [
-                            'loadBalancer' =>
+                        'routers' =>
                             [
-                                'servers' =>
-                                [
-                                    0 =>
+                                'coolify-http' =>
                                     [
-                                        'url' => 'http://coolify:80',
+                                        'entryPoints' => [
+                                            0 => 'http',
+                                        ],
+                                        'service' => 'coolify',
+                                        'rule' => "Host(`{$host}`)",
                                     ],
-                                ],
                             ],
-                        ],
+                        'services' =>
+                            [
+                                'coolify' =>
+                                    [
+                                        'loadBalancer' =>
+                                            [
+                                                'servers' =>
+                                                    [
+                                                        0 =>
+                                                            [
+                                                                'url' => 'http://coolify:80',
+                                                            ],
+                                                    ],
+                                            ],
+                                    ],
+                            ],
                     ],
-                ],
             ];
 
             if ($schema === 'https') {
@@ -110,6 +127,7 @@ class Configuration extends Component
             dispatch(new ProxyStartJob($this->server));
         }
     }
+
     private function save_configuration_to_disk(array $traefik_dynamic_conf, string $file)
     {
         $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
@@ -127,18 +145,5 @@ class Configuration extends Component
         if (config('app.env') == 'local') {
             ray($yaml);
         }
-    }
-    public function submit()
-    {
-        $this->resetErrorBag();
-        if ($this->settings->public_port_min > $this->settings->public_port_max) {
-            $this->addError('settings.public_port_min', 'The minimum port must be lower than the maximum port.');
-            return;
-        }
-        $this->validate();
-        $this->settings->save();
-        $this->server = Server::findOrFail(0);
-        $this->setup_instance_fqdn();
-        $this->emit('success', 'Instance settings updated successfully!');
     }
 }

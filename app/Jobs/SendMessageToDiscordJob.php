@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -29,7 +28,8 @@ class SendMessageToDiscordJob implements ShouldQueue
     public function __construct(
         public string $text,
         public string $webhookUrl
-    ) {
+    )
+    {
     }
 
     /**

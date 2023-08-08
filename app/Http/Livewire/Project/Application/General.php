@@ -4,8 +4,8 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\InstanceSettings;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use Spatie\Url\Url;
 
 class General extends Component
@@ -65,6 +65,7 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
     ];
+
     public function instantSave()
     {
         // @TODO: find another way - if possible
@@ -86,6 +87,7 @@ class General extends Component
         $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
     }
+
     protected function checkWildCardDomain()
     {
         $coolify_instance_settings = InstanceSettings::get();
@@ -93,6 +95,7 @@ class General extends Component
         $this->global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
         $this->wildcard_domain = $this->server_wildcard_domain ?? $this->global_wildcard_domain ?? null;
     }
+
     public function mount()
     {
         $this->is_static = $this->application->settings->is_static;
@@ -104,6 +107,7 @@ class General extends Component
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
     }
+
     public function generateGlobalRandomDomain()
     {
         // Set wildcard domain based on Global wildcard domain
@@ -115,6 +119,7 @@ class General extends Component
         $this->application->save();
         $this->emit('success', 'Application settings updated!');
     }
+
     public function generateServerRandomDomain()
     {
         // Set wildcard domain based on Server wildcard domain
@@ -126,6 +131,7 @@ class General extends Component
         $this->application->save();
         $this->emit('success', 'Application settings updated!');
     }
+
     public function submit()
     {
         try {

@@ -10,6 +10,7 @@ class ServerSetting extends Model
         'server_id',
         'is_usable',
     ];
+
     public function server()
     {
         return $this->belongsTo(Server::class);

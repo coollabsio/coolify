@@ -15,10 +15,12 @@ class InstanceApplicationsStatusJob implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $applications;
+
     public function __construct()
     {
         $this->applications = Application::all();
     }
+
     public function handle(): void
     {
         try {

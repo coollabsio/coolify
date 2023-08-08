@@ -4,9 +4,9 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Str;
 
 class Textarea extends Component
 {
@@ -20,12 +20,13 @@ class Textarea extends Component
         public string|null $value = null,
         public string|null $label = null,
         public string|null $placeholder = null,
-        public bool $required = false,
-        public bool $disabled = false,
-        public bool $readonly = false,
+        public bool        $required = false,
+        public bool        $disabled = false,
+        public bool        $readonly = false,
         public string|null $helper = null,
-        public string $defaultClass = "textarea bg-coolgray-200 rounded text-white scrollbar disabled:bg-coolgray-200/50 disabled:border-none"
-    ) {
+        public string      $defaultClass = "textarea bg-coolgray-200 rounded text-white scrollbar disabled:bg-coolgray-200/50 disabled:border-none"
+    )
+    {
         //
     }
 

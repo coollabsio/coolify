@@ -9,6 +9,7 @@ use Livewire\Component;
 class Status extends Component
 {
     public Server $server;
+
     public function get_status()
     {
         dispatch_sync(new ProxyContainerStatusJob(
