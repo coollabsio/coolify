@@ -30,8 +30,8 @@
         </label>
     @endif
     <textarea placeholder="{{$placeholder}}"
-              {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) wire:model.defer={{ $id }}
-        @disabled($disabled) id="{{ $id }}" name="{{ $name }}" name={{ $id }}
+              {{ $attributes->merge(['class' => $defaultClass]) }}  wire:model.defer={{ $id }}
+        @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}" name="{{ $name }}" name={{ $id }}
         wire:model.defer={{ $value ?? $id }} wire:dirty.class="input-warning"></textarea>
     @error($id)
     <label class="label">

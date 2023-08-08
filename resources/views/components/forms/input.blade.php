@@ -9,12 +9,7 @@
             @endif
         </label>
     @endif
-    @if ($type !== 'password')
-        <input {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-               wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
-               wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-               @disabled($readonly) @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
-    @elseif ($type === 'password')
+    @if ($type === 'password')
         <div class="relative" x-data>
             @if ($allowToPeak)
                 <div x-on:click="changePasswordFieldType"
@@ -29,11 +24,18 @@
             @endif
             <input {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }} @required($required)
                    wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
-                   wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-                   @disabled($readonly) @disabled($disabled) id="{{ $id }}"
+                   wire:dirty.class="input-warning" wire:loading.attr="disabled" type="{{ $type }}"
+                   @readonly($readonly)
+                   @disabled($disabled) id="{{ $id }}"
                    name="{{ $name }}">
 
         </div>
+    @else
+        <input
+            {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
+            wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
+            wire:dirty.class="input-warning" wire:loading.attr="disabled" type="{{ $type }}"
+            @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper"/>
