@@ -24,5 +24,6 @@
     </div>
     @if (isDev())
         <livewire:dev.s3-test/>
+        <livewire:dev.scheduled-backups/>
     @endif
 </x-layout>

@@ -2,6 +2,7 @@
 
 namespace App\Notifications\Channels;
 
+use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
@@ -15,7 +16,7 @@ class EmailChannel
         $recepients = $notifiable->getRecepients($notification);
 
         if (count($recepients) === 0) {
-            throw new \Exception('No email recipients found');
+            throw new Exception('No email recipients found');
         }
 
         $mailMessage = $notification->toMail($notifiable);

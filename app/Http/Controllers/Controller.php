@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
+use Throwable;
 
 class Controller extends BaseController
 {
@@ -43,7 +44,6 @@ class Controller extends BaseController
         $s3s = S3Storage::ownedByCurrentTeam()->get();
         $resources = 0;
         foreach ($projects as $project) {
-            ray($project->postgresqls);
             $resources += $project->applications->count();
             $resources += $project->postgresqls->count();
         }
@@ -140,7 +140,7 @@ class Controller extends BaseController
                 $invitation->delete();
                 abort(401);
             }
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
             throw $th;
         }
     }
@@ -158,7 +158,7 @@ class Controller extends BaseController
             }
             $invitation->delete();
             return redirect()->route('team.show');
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
             throw $th;
         }
     }

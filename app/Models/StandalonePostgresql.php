@@ -64,6 +64,11 @@ class StandalonePostgresql extends BaseModel
         return $this->morphTo();
     }
 
+    public function scheduled_database_backups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
+
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class);
