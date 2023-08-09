@@ -1,7 +1,7 @@
 <x-layout>
     <x-team.navbar :team="session('currentTeam')"/>
     <livewire:team.form/>
-    @if (isCloud())
+    @if (is_cloud())
         <div class="pb-8">
             <h3>Subscription</h3>
             @if (data_get(auth()->user()->currentTeam(),

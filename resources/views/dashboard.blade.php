@@ -22,7 +22,7 @@
             <div class="stat-value">{{ $s3s->count() }}</div>
         </div>
     </div>
-    @if (isDev())
+    @if (is_dev())
         <livewire:dev.s3-test/>
         <livewire:dev.scheduled-backups/>
     @endif

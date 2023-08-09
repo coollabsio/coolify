@@ -32,7 +32,7 @@ class DockerCleanupJob implements ShouldQueue
         try {
             $servers = Server::all();
             foreach ($servers as $server) {
-                if (isDev()) {
+                if (is_dev()) {
                     $docker_root_filesystem = "/";
                 } else {
                     $docker_root_filesystem = instant_remote_process(['stat --printf=%m $(docker info --format "{{json .DockerRootDir}}" |sed \'s/"//g\')'], $server);

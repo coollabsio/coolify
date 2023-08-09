@@ -18,7 +18,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
 //        $schedule->call(fn() => $this->check_scheduled_backups($schedule))->everyTenSeconds();
-        if (isDev()) {
+        if (is_dev()) {
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();

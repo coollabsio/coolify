@@ -20,7 +20,7 @@ class Previews extends Component
     public function mount()
     {
         $this->pull_requests = collect();
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
     }
 
     public function loadStatus($pull_request_id)

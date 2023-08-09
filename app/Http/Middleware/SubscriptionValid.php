@@ -12,7 +12,7 @@ class SubscriptionValid
     public function handle(Request $request, Closure $next): Response
     {
         if (auth()->user()) {
-            if (isCloud() && !isSubscribed()) {
+            if (is_cloud() && !isSubscribed()) {
                 ray('SubscriptionValid Middleware');
 
                 $allowed_paths = [

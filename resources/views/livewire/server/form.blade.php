@@ -87,7 +87,7 @@
     <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
         back!
     </div>
-    @if ($server->id !== 0 || isDev())
+    @if ($server->id !== 0 || is_dev())
         <x-forms.button isError isModal modalId="deleteServer">
             Delete
         </x-forms.button>

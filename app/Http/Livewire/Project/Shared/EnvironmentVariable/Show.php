@@ -25,7 +25,7 @@ class Show extends Component
     public function mount()
     {
         $this->modalId = new Cuid2(7);
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
     }
 
     public function submit()

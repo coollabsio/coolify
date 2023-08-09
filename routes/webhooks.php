@@ -174,7 +174,7 @@ Route::post('/source/github/events', function () {
     }
 });
 
-if (isCloud()) {
+if (is_cloud()) {
     Route::post('/payments/events', function () {
         try {
             $secret = config('coolify.lemon_squeezy_webhook_secret');

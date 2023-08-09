@@ -41,6 +41,9 @@ class ProjectController extends Controller
 
     public function new()
     {
+        $type = request()->query('type');
+        $destination_uuid = request()->query('destination');
+
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
@@ -49,9 +52,14 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-
-        $type = request()->query('type');
-
+        if (in_array($type, DATABASE_TYPES)) {
+            $standalone_postgresql = create_standalone_postgresql($environment->id, $destination_uuid);
+            return redirect()->route('project.database.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'database_uuid' => $standalone_postgresql->uuid,
+            ]);
+        }
         return view('project.new', [
             'type' => $type
         ]);

@@ -150,7 +150,7 @@ class StartPostgresql
 
     private function generate_init_scripts()
     {
-        if (count($this->database->init_scripts) === 0) {
+        if (is_null($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
             return;
         }
         foreach ($this->database->init_scripts as $init_script) {

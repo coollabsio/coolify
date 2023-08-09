@@ -36,7 +36,7 @@ class Create extends Component
 
     public function mount()
     {
-        if (isDev()) {
+        if (is_dev()) {
             $this->name = 'Local MinIO';
             $this->description = 'Local MinIO';
             $this->key = 'minioadmin';

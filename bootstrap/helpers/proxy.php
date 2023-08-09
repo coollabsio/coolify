@@ -13,7 +13,7 @@ function get_proxy_path()
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();
-    if (isDev()) {
+    if (is_dev()) {
         $proxy_path = config('coolify.dev_config_path') . '/' . $server->name . '/proxy';
     }
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
@@ -85,7 +85,7 @@ function generate_default_proxy_configuration(Server $server)
             ],
         ],
     ];
-    if (isDev()) {
+    if (is_dev()) {
         $config['services']['traefik']['command'][] = "--log.level=debug";
     }
     return Yaml::dump($config, 4, 2);

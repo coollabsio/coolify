@@ -50,10 +50,10 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public function mount()
     {
-        if (isDev()) {
+        if (is_dev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->where('id', '!=', 0)->get();
     }

@@ -38,7 +38,7 @@ class GithubPrivateRepository extends Component
 
     public function mount()
     {
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();

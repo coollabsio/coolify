@@ -17,7 +17,7 @@ class UpdateCoolify
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $localhost_name = 'localhost';
-            if (isDev()) {
+            if (is_dev()) {
                 $localhost_name = 'testing-local-docker-container';
             }
             $this->server = Server::where('name', $localhost_name)->firstOrFail();
@@ -52,7 +52,7 @@ class UpdateCoolify
 
     private function update()
     {
-        if (isDev()) {
+        if (is_dev()) {
             ray("Running update on local docker container. Updating to $this->latest_version");
             remote_process([
                 "sleep 10"

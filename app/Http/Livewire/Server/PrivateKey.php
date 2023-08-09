@@ -39,6 +39,6 @@ class PrivateKey extends Component
 
     public function mount()
     {
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
     }
 }

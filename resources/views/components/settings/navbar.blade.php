@@ -10,7 +10,7 @@
            href="{{ route('settings.emails') }}">
             <button>SMTP</button>
         </a>
-        @if (isCloud())
+        @if (is_cloud())
             <a class="{{ request()->routeIs('settings.license') ? 'text-white' : '' }}"
                href="{{ route('settings.license') }}">
                 <button>Resale License</button>

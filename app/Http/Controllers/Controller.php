@@ -19,7 +19,7 @@ class Controller extends BaseController
 
     public function subscription()
     {
-        if (!isCloud()) {
+        if (!is_cloud()) {
             abort(404);
         }
         return view('subscription', [
@@ -29,7 +29,7 @@ class Controller extends BaseController
 
     public function license()
     {
-        if (!isCloud()) {
+        if (!is_cloud()) {
             abort(404);
         }
         return view('settings.license', [

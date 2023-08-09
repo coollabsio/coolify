@@ -18,7 +18,7 @@ class CheckResaleLicense
                 return;
             }
             $base_url = config('coolify.license_url');
-            if (isDev()) {
+            if (is_dev()) {
                 $base_url = 'http://host.docker.internal:8787';
             }
             $instance_id = config('app.id');
