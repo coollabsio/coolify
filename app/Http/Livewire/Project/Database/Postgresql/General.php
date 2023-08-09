@@ -78,6 +78,9 @@ class General extends Component
             $this->emit('error', 'Filename already exists.');
             return;
         }
+        if (!isset($this->database->init_scripts)) {
+            $this->database->init_scripts = [];
+        }
         $this->database->init_scripts = array_merge($this->database->init_scripts, [
             [
                 'index' => count($this->database->init_scripts),

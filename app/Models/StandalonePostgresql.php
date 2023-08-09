@@ -49,7 +49,7 @@ class StandalonePostgresql extends BaseModel
         );
     }
 
-    public function type()
+    public function type(): string
     {
         return 'standalone-postgresql';
     }

@@ -64,7 +64,7 @@
             <x-forms.button class="btn" onclick="newInitScript.showModal()">+ Add</x-forms.button>
         </div>
         <div class="flex flex-col gap-2">
-            @forelse(data_get($database,'init_scripts') as $script)
+            @forelse(data_get($database,'init_scripts', []) as $script)
                 <livewire:project.database.init-script :script="$script" :wire:key="$script['index']"/>
             @empty
                 <div>No initialization scripts found.</div>

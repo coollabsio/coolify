@@ -12,17 +12,17 @@ class StartPostgresql
     public StandalonePostgresql $database;
     public array $commands = [];
     public array $init_scripts = [];
-    public string $base_dir;
+    public string $configuration_dir;
 
     public function __invoke(Server $server, StandalonePostgresql $database)
     {
         $this->database = $database;
         $container_name = generate_container_name($this->database->uuid);
-        $this->base_dir = '/data/coolify/databases/' . $container_name;
+        $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
-            "mkdir -p $this->base_dir",
-            "mkdir -p $this->base_dir/docker-entrypoint-initdb.d/"
+            "mkdir -p $this->configuration_dir",
+            "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/"
         ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
@@ -92,8 +92,10 @@ class StartPostgresql
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
-        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->base_dir/docker-compose.yml";
-        $this->commands[] = "docker compose -f $this->base_dir/docker-compose.yml up -d";
+        $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml";
+        $readme = generate_readme_file($this->database->name, now());
+        $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
+        $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         return remote_process($this->commands, $server);
     }
 
@@ -155,8 +157,8 @@ class StartPostgresql
             $filename = data_get($init_script, 'filename');
             $content = data_get($init_script, 'content');
             $content_base64 = base64_encode($content);
-            $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->base_dir/docker-entrypoint-initdb.d/{$filename}";
-            $this->init_scripts[] = "$this->base_dir/docker-entrypoint-initdb.d/{$filename}";
+            $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
+            $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
         }
     }
 }

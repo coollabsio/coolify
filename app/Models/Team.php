@@ -83,4 +83,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
         return $sources;
     }
+
+    public function s3()
+    {
+        return $this->hasOne(S3Storage::class);
+    }
 }

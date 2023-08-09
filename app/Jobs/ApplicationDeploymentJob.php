@@ -15,13 +15,13 @@ use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
+use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
@@ -51,6 +51,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private string $container_name;
     private string $workdir;
+    private string $configuration_dir;
     private string $build_workdir;
     private string $build_image_name;
     private string $production_image_name;
@@ -58,6 +59,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private $build_args;
     private $env_args;
     private $docker_compose;
+    private $docker_compose_base64;
 
     private $log_model;
     private Collection $saved_outputs;
@@ -78,9 +80,9 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->server = $this->destination->server;
-        $this->private_key_location = save_private_key_for_server($this->server);
 
         $this->workdir = "/artifacts/{$this->deployment_uuid}";
+        $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
         $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
@@ -122,12 +124,23 @@ class ApplicationDeploymentJob implements ShouldQueue
             }
             if ($this->application->fqdn) dispatch(new ProxyStartJob($this->server));
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             ray($e);
             $this->fail($e);
         } finally {
-            if (isset($this->docker_compose)) {
-                Storage::disk('deployments')->put(Str::kebab($this->application->name) . '/docker-compose.yml', $this->docker_compose);
+            if (isset($this->docker_compose_base64)) {
+                $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+                $this->execute_remote_command(
+                    [
+                        "mkdir -p $this->configuration_dir"
+                    ],
+                    [
+                        "echo '{$this->docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml",
+                    ],
+                    [
+                        "echo '{$readme}' > $this->configuration_dir/README.md",
+                    ]
+                );
             }
             $this->execute_remote_command(
                 [
@@ -135,7 +148,6 @@ class ApplicationDeploymentJob implements ShouldQueue
                     "hidden" => true,
                 ]
             );
-            // ray()->measure();
         }
     }
 
@@ -368,8 +380,8 @@ class ApplicationDeploymentJob implements ShouldQueue
             $docker_compose['volumes'] = $volume_names;
         }
         $this->docker_compose = Yaml::dump($docker_compose, 10);
-        $docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([$this->execute_in_builder("echo '{$docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
+        $this->docker_compose_base64 = base64_encode($this->docker_compose);
+        $this->execute_remote_command([$this->execute_in_builder("echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -591,7 +603,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
         if (strlen($tag) > 128) {
             $tag = $tag->substr(0, 128);
-        };
+        }
 
         $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
         $this->production_image_name = "{$this->application->uuid}:{$tag}";

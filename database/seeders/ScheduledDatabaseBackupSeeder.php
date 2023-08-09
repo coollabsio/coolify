@@ -13,19 +13,8 @@ class ScheduledDatabaseBackupSeeder extends Seeder
     public function run(): void
     {
         ScheduledDatabaseBackup::create([
+            'enabled' => true,
             'frequency' => '* * * * *',
-            'database_id' => 1,
-            'database_type' => 'App\Models\StandalonePostgresql',
-            'team_id' => 0,
-        ]);
-        ScheduledDatabaseBackup::create([
-            'frequency' => '*/2 * * * *',
-            'database_id' => 1,
-            'database_type' => 'App\Models\StandalonePostgresql',
-            'team_id' => 0,
-        ]);
-        ScheduledDatabaseBackup::create([
-            'frequency' => '*/3 * * * *',
             'database_id' => 1,
             'database_type' => 'App\Models\StandalonePostgresql',
             'team_id' => 0,

@@ -10,6 +10,8 @@ return new class extends Migration {
         Schema::create('scheduled_database_backups', function (Blueprint $table) {
             $table->id();
             $table->boolean('enabled')->default(true);
+            $table->boolean('keep_locally')->default(true);
+            $table->string('save_s3')->default(true);
             $table->string('frequency');
             $table->morphs('database');
             $table->foreignId('team_id');

@@ -30,5 +30,4 @@ class S3Storage extends BaseModel
         set_s3_target($this);
         return \Storage::disk('custom-s3')->files();
     }
-
 }

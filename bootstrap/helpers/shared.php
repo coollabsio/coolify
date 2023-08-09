@@ -7,6 +7,19 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
+function application_configuration_dir() :string {
+    return '/data/coolify/applications';
+}
+function database_configuration_dir(): string {
+    return '/data/coolify/databases';
+}
+function backup_dir(): string {
+    return '/data/coolify/backups';
+}
+function generate_readme_file(string $name, string $updated_at): string {
+    return "Resource name: {$name}\nLatest Deployment Date: {$updated_at}";
+}
+
 function general_error_handler(\Throwable|null $err = null, $that = null, $isJson = false, $customErrorMessage = null)
 {
     try {

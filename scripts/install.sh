@@ -12,7 +12,7 @@ CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
 OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
-DATE=$(date +"%Y%m%d-%H%M%S") 
+DATE=$(date +"%Y%m%d-%H%M%S")
 
 if [ $EUID != 0 ]; then
     echo "Please run as root"
@@ -84,7 +84,6 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/deployments
 mkdir -p /data/coolify/ssh/keys
 mkdir -p /data/coolify/ssh/mux
 mkdir -p /data/coolify/source

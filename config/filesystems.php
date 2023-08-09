@@ -62,6 +62,12 @@ return [
             'visibility' => 'private',
             'throw' => false,
         ],
+        'backups' => [
+            'driver' => 'local',
+            'root' => storage_path('app/backups'),
+            'visibility' => 'private',
+            'throw' => false,
+        ],
 
         's3' => [
             'driver' => 's3',

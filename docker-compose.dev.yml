@@ -54,13 +54,13 @@ services:
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/testing-local-docker-container/proxy:/data/coolify/proxy"
+      - "./_data/_servers/testing-local-docker-container:/data/coolify"
   testing-host-2:
     <<: *testing-host-base
     container_name: coolify-testing-host-2
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/testing-local-docker-container-2/proxy:/data/coolify/proxy"
+      - "./_data/_servers/testing-local-docker-container-2:/data/coolify"
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: coolify-mail
