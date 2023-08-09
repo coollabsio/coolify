@@ -37,7 +37,7 @@
                                readonly
                                helper="You can only modify it before the initial start."/>
             @else
-                <x-forms.input label="Username" id="database.postgres_username" placeholder="If empty: postgres"
+                <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres"
                                helper="You can only modify it before the initial start."/>
                 <x-forms.input label="Password" id="database.postgres_password" type="password" required
                                helper="You can only modify it before the initial start."/>
