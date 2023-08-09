@@ -4,7 +4,7 @@
             <p>This team be deleted. It is not reversible. <br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    <h3>Danger Zone</h3>
+    <h2>Danger Zone</h2>
     <div class="pb-4">Woah. I hope you know what are you doing.</div>
     <h4 class="pb-4">Delete Team</h4>
     @if (session('currentTeam.id') === 0)

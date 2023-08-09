@@ -52,13 +52,18 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
     Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
+
+    // Applications
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ApplicationController::class, 'configuration'])->name('project.application.configuration');
-    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment', [ApplicationController::class, 'deployments'])->name('project.application.deployments');
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
         [ApplicationController::class, 'deployment']
     )->name('project.application.deployment');
+
+    // Databases
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups');
 });
 
 Route::middleware(['auth'])->group(function () {

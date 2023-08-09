@@ -9,6 +9,7 @@ return new class extends Migration {
     {
         Schema::create('scheduled_database_backups', function (Blueprint $table) {
             $table->id();
+            $table->string('uuid')->unique();
             $table->boolean('enabled')->default(true);
             $table->boolean('keep_locally')->default(true);
             $table->string('save_s3')->default(true);

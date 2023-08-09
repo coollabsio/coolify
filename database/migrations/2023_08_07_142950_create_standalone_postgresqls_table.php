@@ -17,7 +17,7 @@ return new class extends Migration {
             $table->string('description')->nullable();
 
             $table->string('postgres_user')->default('postgres');
-            $table->string('postgres_password');
+            $table->text('postgres_password');
             $table->string('postgres_db')->default('postgres');
             $table->string('postgres_initdb_args')->nullable();
             $table->string('postgres_host_auth_method')->nullable();
@@ -28,6 +28,7 @@ return new class extends Migration {
             $table->string('image')->default('postgres:15-alpine');
             $table->boolean('is_public')->default(false);
             $table->integer('public_port')->nullable();
+            $table->text('ports_mappings')->nullable();
 
             $table->string('limits_memory')->default("0");
             $table->string('limits_memory_swap')->default("0");

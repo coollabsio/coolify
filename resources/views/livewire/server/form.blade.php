@@ -81,7 +81,7 @@
             </div>
         </div>
     @endif
-    <h3>Danger Zone</h3>
+    <h2>Danger Zone</h2>
     <div class="">Woah. I hope you know what are you doing.</div>
     <h4 class="pt-4">Delete Server</h4>
     <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming

@@ -83,4 +83,9 @@ class StandalonePostgresql extends BaseModel
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
+
+    public function scheduledBackups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
+    }
 }

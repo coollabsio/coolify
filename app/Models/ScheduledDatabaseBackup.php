@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 
-class ScheduledDatabaseBackup extends Model
+class ScheduledDatabaseBackup extends BaseModel
 {
     protected $guarded = [];
 
