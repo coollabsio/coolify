@@ -47,6 +47,9 @@ class Kernel extends ConsoleKernel
         }
         foreach ($scheduled_backups as $scheduled_backup) {
             if (!$scheduled_backup->enabled) continue;
+            if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
+                $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
+            }
             $schedule->job(new BackupDatabaseJob(
                 backup: $scheduled_backup
             ))->cron($scheduled_backup->frequency);

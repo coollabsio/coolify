@@ -8,7 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 
 class ActivityMonitor extends Component
 {
-    public bool $header = false;
+    public string|null $header = null;
     public $activityId;
     public $isPollingActive = false;
 

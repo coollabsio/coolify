@@ -1,18 +1,23 @@
 <x-layout>
     <h1>Backups</h1>
     <livewire:project.database.heading :database="$database"/>
+    <x-modal modalId="startDatabase">
+        <x-slot:modalBody>
+            <livewire:activity-monitor header="Startup Logs"/>
+        </x-slot:modalBody>
+        <x-slot:modalSubmit>
+            <x-forms.button onclick="startDatabase.close()" type="submit">
+                Close
+            </x-forms.button>
+        </x-slot:modalSubmit>
+    </x-modal>
+
+    <livewire:project.database.create-scheduled-backup :database="$database"/>
     <div class="pt-6">
-        <h2 class="pb-4">Scheduled Backups</h2>
-        <div class="flex flex-wrap gap-2">
-            @forelse($database->scheduledBackups as $backup)
-                <div class="box flex flex-col">
-                    <div>Frequency: {{$backup->frequency}}</div>
-                    <div>Keep locally: {{$backup->keep_locally}}</div>
-                    <div>Sync to S3: {{$backup->save_s3}}</div>
-                </div>
-            @empty
-                <div>No scheduled backups configured.</div>
-            @endforelse
+        <div class="flex gap-2 ">
+            <h2 class="pb-4">Scheduled Backups</h2>
+            <x-forms.button onclick="createScheduledBackup.showModal()">+ Add</x-forms.button>
         </div>
+        <livewire:project.database.scheduled-backups :database="$database"/>
     </div>
 </x-layout>

@@ -62,7 +62,7 @@
                 @endif
             </div>
             <div class="container w-full py-4 mx-auto">
-                <livewire:activity-monitor :header="true"/>
+                <livewire:activity-monitor header="Logs"/>
             </div>
             @isset($uptime)
                 <h3 class="pb-3">Server Info</h3>

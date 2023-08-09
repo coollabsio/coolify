@@ -22,7 +22,7 @@
             Stop
         </button>
     @else
-        <button wire:click='start' onclick="logs.showModal()"
+        <button wire:click='start' onclick="startDatabase.showModal()"
                 class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24" stroke-width="1.5"
                  stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">

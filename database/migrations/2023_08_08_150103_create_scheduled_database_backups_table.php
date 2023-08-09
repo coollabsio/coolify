@@ -11,7 +11,7 @@ return new class extends Migration {
             $table->id();
             $table->string('uuid')->unique();
             $table->boolean('enabled')->default(true);
-            $table->boolean('keep_locally')->default(true);
+            $table->boolean('keep_locally')->default(false);
             $table->string('save_s3')->default(true);
             $table->string('frequency');
             $table->morphs('database');

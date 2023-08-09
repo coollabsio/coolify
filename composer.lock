@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ca293cd95f3fcb41f9122aaf474adb69",
+    "content-hash": "ba59e457afa0cfb65b82118f7287147b",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -4444,6 +4444,50 @@
                 "source": "https://github.com/silexphp/Pimple/tree/v3.5.0"
             },
             "time": "2021-10-28T11:13:42+00:00"
+        },
+        {
+            "name": "poliander/cron",
+            "version": "3.0.6",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/poliander/cron.git",
+                "reference": "f604b1f734a64221ebef5b13da34c403488afd28"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/poliander/cron/zipball/f604b1f734a64221ebef5b13da34c403488afd28",
+                "reference": "f604b1f734a64221ebef5b13da34c403488afd28",
+                "shasum": ""
+            },
+            "require": {
+                "php": "7.4.* || 8.0.* || 8.1.* || 8.2.*"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "~9.0"
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "Poliander\\Cron\\": "src/Cron/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-3.0-or-later"
+            ],
+            "authors": [
+                {
+                    "name": "René Pollesch",
+                    "role": "Developer"
+                }
+            ],
+            "description": "Standard (V7) compliant crontab expression parser/validator with support for time zones",
+            "homepage": "https://github.com/poliander/cron",
+            "support": {
+                "issues": "https://github.com/poliander/cron/issues",
+                "source": "https://github.com/poliander/cron/tree/3.0.6"
+            },
+            "time": "2023-07-30T07:53:24+00:00"
         },
         {
             "name": "pragmarx/google2fa",
