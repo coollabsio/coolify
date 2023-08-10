@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
@@ -32,6 +33,7 @@ class DatabaseBackupJob implements ShouldQueue
     public string|null $backup_filename = null;
     public int $size = 0;
     public string|null $backup_output = null;
+    public S3Storage $s3;
 
     public function __construct($backup)
     {
@@ -41,6 +43,7 @@ class DatabaseBackupJob implements ShouldQueue
         $this->database_type = $this->database->type();
         $this->server = $this->database->destination->server;
         $this->database_status = $this->database->status;
+        $this->s3 = $this->team->s3;
     }
 
     public function middleware(): array
@@ -71,6 +74,10 @@ class DatabaseBackupJob implements ShouldQueue
         $this->calculate_size();
         $this->remove_old_backups();
         $this->save_backup_logs();
+        if ($this->backup->save_s3) {
+            $this->upload_to_s3();
+        }
+        // TODO: Notify user
     }
 
     private function backup_standalone_postgresql()
@@ -138,5 +145,27 @@ class DatabaseBackupJob implements ShouldQueue
             'size' => $this->size,
         ]);
 
+    }
+
+    private function upload_to_s3()
+    {
+        try {
+            if (is_null($this->s3)) {
+                return;
+            }
+            $key = $this->s3->key;
+            $secret = $this->s3->secret;
+//            $region = $this->s3->region;
+            $bucket = $this->s3->bucket;
+            $endpoint = $this->s3->endpoint;
+            $backup_dir = backup_dir() . "/{$this->database->uuid}";
+            $base_command = "docker run -t --network {$this->database->destination->network} -v {$this->backup_filename}:{$this->backup_filename}:ro --rm --entrypoint=/bin/sh minio/mc -c \"mc config host add temporary {$endpoint} $key $secret && mc cp $this->backup_filename temporary/$bucket/$backup_dir/ \"";
+            instant_remote_process([$base_command], $this->server);
+            $this->add_to_backup_output('Uploaded to S3.');
+        } catch (\Throwable $th) {
+            $this->add_to_backup_output($th->getMessage());
+            ray($th->getMessage());
+            //throw $th;
+        }
     }
 }
