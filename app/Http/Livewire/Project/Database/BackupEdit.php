@@ -7,6 +7,7 @@ use Livewire\Component;
 class BackupEdit extends Component
 {
     public $backup;
+    public array $parameters;
 
     protected $rules = [
         'backup.enabled' => 'required|boolean',
@@ -19,11 +20,16 @@ class BackupEdit extends Component
         'backup.number_of_backups_locally' => 'Number of Backups Locally',
     ];
 
+    public function mount()
+    {
+        $this->parameters = get_route_parameters();
+    }
+
     public function delete()
     {
+        // TODO: Delete backup from server and add a confirmation modal
         $this->backup->delete();
-        $this->emit('success', 'Backup deleted successfully');
-        $this->emit('refreshScheduledBackups');
+        redirect()->route('project.database.backups.all', $this->parameters);
     }
 
     public function instantSave()
