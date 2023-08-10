@@ -4,6 +4,7 @@
         <x-forms.button type="submit">
             Save
         </x-forms.button>
+        <x-forms.button isError wire:click="delete">Delete</x-forms.button>
     </div>
     <div class="flex py-2 gap-10">
         <x-forms.checkbox instantSave label="Enabled" id="backup.enabled"/>

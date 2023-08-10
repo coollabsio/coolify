@@ -19,6 +19,13 @@ class BackupEdit extends Component
         'backup.number_of_backups_locally' => 'Number of Backups Locally',
     ];
 
+    public function delete()
+    {
+        $this->backup->delete();
+        $this->emit('success', 'Backup deleted successfully');
+        $this->emit('refreshScheduledBackups');
+    }
+
     public function instantSave()
     {
         $this->backup->save();
