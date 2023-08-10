@@ -9,6 +9,6 @@ return [
     'lemon_squeezy_checkout_id_3' => env('LEMON_SQUEEZY_CHECKOUT_ID_3'),
     'mux_enabled' => env('MUX_ENABLED', true),
     'dev_webhook' => env('SERVEO_URL'),
-    'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
+    'base_config_path' => env('BASE_CONFIG_PATH', '/_data/coolify'),
     'dev_config_path' => env('DEV_CONFIG_PATH', './_data/coolify'),
 ];

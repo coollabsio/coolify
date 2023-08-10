@@ -15,6 +15,7 @@ class DiscordSettings extends Component
         'model.discord_notifications_test' => 'nullable|boolean',
         'model.discord_notifications_deployments' => 'nullable|boolean',
         'model.discord_notifications_status_changes' => 'nullable|boolean',
+        'model.discord_notifications_database_backups' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'model.discord_webhook_url' => 'Discord Webhook',

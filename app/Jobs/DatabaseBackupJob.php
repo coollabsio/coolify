@@ -8,6 +8,8 @@ use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
+use App\Notifications\Database\BackupFailed;
+use App\Notifications\Database\BackupSuccess;
 use Carbon\Carbon;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -73,10 +75,10 @@ class DatabaseBackupJob implements ShouldQueue
         }
         $this->calculate_size();
         $this->remove_old_backups();
-        $this->save_backup_logs();
         if ($this->backup->save_s3) {
-            $this->upload_to_s3();
+//            $this->upload_to_s3();
         }
+        $this->save_backup_logs();
         // TODO: Notify user
     }
 
@@ -98,10 +100,13 @@ class DatabaseBackupJob implements ShouldQueue
             ray('Backup done for ' . $this->database->uuid . ' at ' . $this->server->name . ':' . $this->backup_filename);
 
             $this->backup_status = 'success';
+            throw new \Error('test');
+            $this->team->notify(new BackupSuccess($this->backup, $this->database));
         } catch (Throwable $th) {
             $this->backup_status = 'failed';
             $this->add_to_backup_output($th->getMessage());
             ray('Backup failed for ' . $this->database->uuid . ' at ' . $this->server->name . ':' . $this->backup_filename . '\n\nError:' . $th->getMessage());
+            $this->team->notify(new BackupFailed($this->backup, $this->database));
         } finally {
             $this->backup_log->update([
                 'status' => $this->backup_status,
@@ -130,7 +135,6 @@ class DatabaseBackupJob implements ShouldQueue
         } else {
             $deletable = $this->backup->executions()->where('status', 'success')->orderByDesc('created_at')->skip($this->backup->number_of_backups_locally);
         }
-        ray($deletable->get());
         foreach ($deletable->get() as $execution) {
             delete_backup_locally($execution->filename, $this->server);
             $execution->delete();
@@ -159,13 +163,15 @@ class DatabaseBackupJob implements ShouldQueue
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
             $backup_dir = backup_dir() . "/{$this->database->uuid}";
+
             $base_command = "docker run -t --network {$this->database->destination->network} -v {$this->backup_filename}:{$this->backup_filename}:ro --rm --entrypoint=/bin/sh minio/mc -c \"mc config host add temporary {$endpoint} $key $secret && mc cp $this->backup_filename temporary/$bucket/$backup_dir/ \"";
+
             instant_remote_process([$base_command], $this->server);
+
             $this->add_to_backup_output('Uploaded to S3.');
         } catch (\Throwable $th) {
             $this->add_to_backup_output($th->getMessage());
             ray($th->getMessage());
-            //throw $th;
         }
     }
 }

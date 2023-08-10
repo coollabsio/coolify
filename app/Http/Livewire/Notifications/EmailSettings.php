@@ -26,6 +26,7 @@ class EmailSettings extends Component
         'model.smtp_notifications_test' => 'nullable|boolean',
         'model.smtp_notifications_deployments' => 'nullable|boolean',
         'model.smtp_notifications_status_changes' => 'nullable|boolean',
+        'model.smtp_notifications_database_backups' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'model.smtp_from_address' => 'From Address',

@@ -21,16 +21,20 @@
                        id="model.discord_webhook_url" label="Webhook"/>
     </form>
     @if (data_get($model, 'discord_enabled'))
-        <h4 class="mt-4">Subscribe to events</h4>
-        <div class="w-64 ">
+        <h3 class="mt-4">Subscribe to events</h3>
+        <div class="w-64">
             @if (is_dev())
                 <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_test" label="Test"/>
             @endif
-            <h5 class="mt-4">Applications</h5>
+            <h4 class="mt-4">General</h4>
+            <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_status_changes"
+                              label="Container Status Changes"/>
+            <h4 class="mt-4">Applications</h4>
             <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_deployments"
                               label="Deployments"/>
-            <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_status_changes"
-                              label="Status Changes"/>
+            <h4 class="mt-4">Databases</h4>
+            <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_database_backups"
+                              label="Backup Statuses"/>
         </div>
     @endif
 </div>

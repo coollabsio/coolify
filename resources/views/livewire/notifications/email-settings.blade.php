@@ -63,10 +63,15 @@
             @if (is_dev())
                 <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_test" label="Test"/>
             @endif
-            <h5 class="mt-4">Applications</h5>
-            <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_deployments" label="Deployments"/>
+            <h4 class="mt-4">General</h4>
             <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_status_changes"
-                              label="Status Changes"/>
+                              label="Container Status Changes"/>
+            <h4 class="mt-4">Applications</h4>
+            <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_deployments"
+                              label="Deployments"/>
+            <h4 class="mt-4">Databases</h4>
+            <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_database_backups"
+                              label="Backup Statuses"/>
         </div>
     @endif
 </div>

@@ -15,7 +15,7 @@ class InvitationLink extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public function via()
+    public function via(): array
     {
         return [TransactionalEmailChannel::class];
     }
