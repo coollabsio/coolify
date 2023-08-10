@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
 use Visus\Cuid2\Cuid2;
@@ -24,5 +25,18 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
     ]);
+}
 
+/**
+ * Delete file locally on the filesystem.
+ * @param string $filename
+ * @param Server $server
+ * @return void
+ */
+function delete_backup_locally(string|null $filename, Server $server): void
+{
+    if (empty($filename)) {
+        return;
+    }
+    instant_remote_process(["rm -f \"{$filename}\""], $server, throwError: false);
 }

@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Nubs\RandomNameGenerator\All;
+use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 
 function application_configuration_dir(): string
@@ -165,4 +166,17 @@ function is_cloud(): bool
 {
     return !config('coolify.self_hosted');
 }
+
+function validate_cron_expression($expression_to_validate): bool
+{
+    $isValid = false;
+    $expression = new CronExpression($expression_to_validate);
+    $isValid = $expression->isValid();
+
+    if (isset(VALID_CRON_STRINGS[$expression_to_validate])) {
+        $isValid = true;
+    }
+    return $isValid;
+}
+
 

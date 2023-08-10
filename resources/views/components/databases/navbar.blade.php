@@ -3,8 +3,8 @@
        href="{{ route('project.database.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
-    <a class="{{ request()->routeIs('project.database.backups') ? 'text-white' : '' }}"
-       href="{{ route('project.database.backups', $parameters) }}">
+    <a class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
+       href="{{ route('project.database.backups.all', $parameters) }}">
         <button>Backups</button>
     </a>
     {{-- <x-applications.links :application="$application" /> --}}

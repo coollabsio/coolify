@@ -2,9 +2,9 @@
 
 namespace App\Console;
 
-use App\Jobs\BackupDatabaseJob;
 use App\Jobs\CheckResaleLicenseJob;
 use App\Jobs\CheckResaleLicenseKeys;
+use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceApplicationsStatusJob;
 use App\Jobs\InstanceAutoUpdateJob;
@@ -50,7 +50,7 @@ class Kernel extends ConsoleKernel
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }
-            $schedule->job(new BackupDatabaseJob(
+            $schedule->job(new DatabaseBackupJob(
                 backup: $scheduled_backup
             ))->cron($scheduled_backup->frequency);
         }

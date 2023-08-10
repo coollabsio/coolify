@@ -15,7 +15,7 @@ class ScheduledDatabaseBackupSeeder extends Seeder
         ScheduledDatabaseBackup::create([
             'enabled' => true,
             'frequency' => '* * * * *',
-            'keep_locally' => true,
+            'number_of_backups_locally' => 2,
             'database_id' => 1,
             'database_type' => 'App\Models\StandalonePostgresql',
             'team_id' => 0,

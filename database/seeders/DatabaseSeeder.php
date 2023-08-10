@@ -32,7 +32,8 @@ class DatabaseSeeder extends Seeder
             LocalPersistentVolumeSeeder::class,
             S3StorageSeeder::class,
             StandalonePostgresqlSeeder::class,
-            ScheduledDatabaseBackupSeeder::class
+            ScheduledDatabaseBackupSeeder::class,
+            ScheduledDatabaseBackupExecutionSeeder::class,
         ]);
     }
 }

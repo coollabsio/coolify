@@ -63,7 +63,8 @@ Route::middleware(['auth'])->group(function () {
 
     // Databases
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
-    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups.all');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups/{backup_uuid}', [DatabaseController::class, 'backup_logs'])->name('project.database.backups.logs');
 });
 
 Route::middleware(['auth'])->group(function () {
