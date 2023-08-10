@@ -100,7 +100,6 @@ class DatabaseBackupJob implements ShouldQueue
             ray('Backup done for ' . $this->database->uuid . ' at ' . $this->server->name . ':' . $this->backup_filename);
 
             $this->backup_status = 'success';
-            throw new \Error('test');
             $this->team->notify(new BackupSuccess($this->backup, $this->database));
         } catch (Throwable $th) {
             $this->backup_status = 'failed';
