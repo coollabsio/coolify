@@ -13,17 +13,20 @@ class BackupEdit extends Component
         'backup.enabled' => 'required|boolean',
         'backup.frequency' => 'required|string',
         'backup.number_of_backups_locally' => 'required|integer|min:1',
+        'backup.save_s3' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'backup.enabled' => 'Enabled',
         'backup.frequency' => 'Frequency',
         'backup.number_of_backups_locally' => 'Number of Backups Locally',
+        'backup.save_s3' => 'Save to S3',
     ];
 
     public function mount()
     {
         $this->parameters = get_route_parameters();
     }
+
 
     public function delete()
     {

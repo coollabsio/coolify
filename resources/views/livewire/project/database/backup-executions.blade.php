@@ -16,7 +16,7 @@
             <livewire:project.database.backup-execution :execution="$execution" :wire:key="$execution->id"/>
         </form>
     @empty
-        <div>No logs found.</div>
+        <div>No executions found.</div>
     @endforelse
 
 </div>
