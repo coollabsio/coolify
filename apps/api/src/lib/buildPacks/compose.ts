@@ -19,7 +19,9 @@ export default async function (data) {
 		dockerComposeConfiguration,
 		dockerComposeFileLocation
 	} = data;
-	const fileYaml = `${workdir}${baseDirectory}${dockerComposeFileLocation}`;
+	const baseDir = `${workdir}${baseDirectory}`;
+	const envFile = `${baseDir}/.env`;
+	const fileYaml = `${baseDir}${dockerComposeFileLocation}`;
 	const dockerComposeRaw = await fs.readFile(fileYaml, 'utf8');
 	const dockerComposeYaml = yaml.load(dockerComposeRaw);
 	if (!dockerComposeYaml.services) {
@@ -31,7 +33,7 @@ export default async function (data) {
 		envs = [...envs, ...generateSecrets(secrets, pullmergeRequestId, false, null)];
 		buildEnvs = [...buildEnvs, ...generateSecrets(secrets, pullmergeRequestId, true, null, true)];
 	}
-
+	await fs.writeFile(envFile, envs.join('\n'));
 	const composeVolumes = [];
 	if (volumes.length > 0) {
 		for (const volume of volumes) {
@@ -50,19 +52,19 @@ export default async function (data) {
 		if (value['env_file']) {
 			delete value['env_file'];
 		}
+		value['env_file'] = [envFile];
 
-		let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
-		let finalEnvs = [...envs];
-		if (Object.keys(environment).length > 0) {
-			for (const arg of Object.keys(environment)) {
-				const [key, _] = arg.split('=');
-				if (finalEnvs.filter((env) => env.startsWith(key)).length === 0) {
-					finalEnvs.push(arg);
-				}
-			}
-			// environment = Object.entries(environment).map(([key, value]) => `${key}=${value}`);
-		}
-		value['environment'] = [...finalEnvs];
+		// let environment = typeof value['environment'] === 'undefined' ? [] : value['environment'];
+		// let finalEnvs = [...envs];
+		// if (Object.keys(environment).length > 0) {
+		// 	for (const arg of Object.keys(environment)) {
+		// 		const [key, _] = arg.split('=');
+		// 		if (finalEnvs.filter((env) => env.startsWith(key)).length === 0) {
+		// 			finalEnvs.push(arg);
+		// 		}
+		// 	}
+		// }
+		// value['environment'] = [...finalEnvs];
 
 		let build = typeof value['build'] === 'undefined' ? [] : value['build'];
 		if (typeof build === 'string') {
