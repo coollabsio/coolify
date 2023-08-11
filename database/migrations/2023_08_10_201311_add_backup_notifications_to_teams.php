@@ -8,8 +8,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('teams', function (Blueprint $table) {
-            $table->boolean('smtp_notifications_database_backups')->default(true);
-            $table->boolean('discord_notifications_database_backups')->default(true);
+            $table->boolean('smtp_notifications_database_backups')->default(true)->after('smtp_notifications_status_changes');
+            $table->boolean('discord_notifications_database_backups')->default(true)->after('discord_notifications_status_changes');
         });
     }
 
