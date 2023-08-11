@@ -11,8 +11,7 @@
             </x-forms.button>
         </x-slot:modalSubmit>
     </x-modal>
-
-    <livewire:project.database.create-scheduled-backup :database="$database"/>
+    <livewire:project.database.create-scheduled-backup :database="$database" :s3s="$s3s"/>
     <div class="pt-6">
         <div class="flex gap-2 ">
             <h2 class="pb-4">Scheduled Backups</h2>

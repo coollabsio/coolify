@@ -12,7 +12,7 @@
     </dialog>
     <form wire:submit.prevent='submit' class="flex flex-col pb-10">
         <div class="flex items-center gap-2">
-            <h3>Transactional Emails</h3>
+            <h2>Transactional Emails</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
@@ -23,7 +23,7 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="pt-2 pb-4 ">SMTP settings for password resets, invitations, etc.</div>
+        <div class="pb-4 ">SMTP settings for password resets, invitations, etc.</div>
         <div class="w-32 pb-4">
             <x-forms.checkbox instantSave id="settings.smtp_enabled" label="Enabled"/>
         </div>

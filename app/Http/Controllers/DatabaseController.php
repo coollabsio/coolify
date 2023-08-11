@@ -46,7 +46,12 @@ class DatabaseController extends Controller
             return redirect()->route('dashboard');
         }
         $executions = collect($backup->executions)->sortByDesc('created_at');
-        return view('project.database.backups.executions', ['database' => $database, 'backup' => $backup, 'executions' => $executions]);
+        return view('project.database.backups.executions', [
+            'database' => $database,
+            'backup' => $backup,
+            'executions' => $executions,
+            's3s' => auth()->user()->currentTeam()->s3s,
+        ]);
     }
 
     public function backups()
@@ -63,6 +68,9 @@ class DatabaseController extends Controller
         if (!$database) {
             return redirect()->route('dashboard');
         }
-        return view('project.database.backups.all', ['database' => $database]);
+        return view('project.database.backups.all', [
+            'database' => $database,
+            's3s' => auth()->user()->currentTeam()->s3s,
+        ]);
     }
 }

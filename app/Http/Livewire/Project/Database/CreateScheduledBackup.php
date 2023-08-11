@@ -11,6 +11,8 @@ class CreateScheduledBackup extends Component
     public $frequency;
     public bool $enabled = true;
     public bool $save_s3 = true;
+    public $s3_storage_id;
+    public $s3s;
 
     protected $rules = [
         'frequency' => 'required|string',
@@ -27,13 +29,14 @@ class CreateScheduledBackup extends Component
             $this->validate();
             $isValid = validate_cron_expression($this->frequency);
             if (!$isValid) {
-                $this->emit('error', 'Invalid Cron / Human expression');
+                $this->emit('error', 'Invalid Cron / Human expression.');
                 return;
             }
             ScheduledDatabaseBackup::create([
                 'enabled' => true,
                 'frequency' => $this->frequency,
                 'save_s3' => $this->save_s3,
+                's3_storage_id' => $this->s3_storage_id,
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => auth()->user()->currentTeam()->id,

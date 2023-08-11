@@ -36,7 +36,6 @@ class BackupSuccess extends Notification implements ShouldQueue
         if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
             $channels[] = DiscordChannel::class;
         }
-        ray($channels);
         return $channels;
     }
 

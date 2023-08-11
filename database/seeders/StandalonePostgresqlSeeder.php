@@ -15,7 +15,7 @@ class StandalonePostgresqlSeeder extends Seeder
             'description' => 'Local PostgreSQL for testing',
             'postgres_password' => 'postgres',
             'environment_id' => 1,
-            'destination_id' => 1,
+            'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
         ]);
     }

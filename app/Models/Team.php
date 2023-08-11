@@ -84,8 +84,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return $sources;
     }
 
-    public function s3()
+    public function s3s()
     {
-        return $this->hasOne(S3Storage::class);
+        return $this->hasMany(S3Storage::class);
     }
 }

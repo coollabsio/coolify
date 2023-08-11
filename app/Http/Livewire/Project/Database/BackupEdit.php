@@ -7,6 +7,7 @@ use Livewire\Component;
 class BackupEdit extends Component
 {
     public $backup;
+    public $s3s;
     public array $parameters;
 
     protected $rules = [
@@ -14,17 +15,25 @@ class BackupEdit extends Component
         'backup.frequency' => 'required|string',
         'backup.number_of_backups_locally' => 'required|integer|min:1',
         'backup.save_s3' => 'required|boolean',
+        'backup.s3_storage_id' => 'nullable|integer',
     ];
     protected $validationAttributes = [
         'backup.enabled' => 'Enabled',
         'backup.frequency' => 'Frequency',
         'backup.number_of_backups_locally' => 'Number of Backups Locally',
         'backup.save_s3' => 'Save to S3',
+        'backup.s3_storage_id' => 'S3 Storage',
+    ];
+    protected $messages = [
+        'backup.s3_storage_id' => 'Select a S3 Storage',
     ];
 
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        if (is_null($this->backup->s3_storage_id)) {
+            $this->backup->s3_storage_id = 'default';
+        }
     }
 
 
@@ -37,21 +46,43 @@ class BackupEdit extends Component
 
     public function instantSave()
     {
-        $this->backup->save();
-        $this->backup->refresh();
-        $this->emit('success', 'Backup updated successfully');
+        try {
+            $this->custom_validate();
+            $this->backup->save();
+            $this->backup->refresh();
+            $this->emit('success', 'Backup updated successfully');
+        } catch (\Exception $e) {
+            $this->emit('error', $e->getMessage());
+        }
+
+    }
+
+    private function custom_validate()
+    {
+//        if ($this->backup->save_s3) {
+//            if (!is_numeric($this->selected_storage_id)) {
+//                throw new \Exception('Invalid S3 Storage');
+//            } else {
+//                $this->backup->s3_storage_id = $this->selected_storage_id;
+//            }
+//        }
+        $isValid = validate_cron_expression($this->backup->frequency);
+        if (!$isValid) {
+            throw new \Exception('Invalid Cron / Human expression');
+        }
+        $this->validate();
     }
 
     public function submit()
     {
-        $isValid = validate_cron_expression($this->backup->frequency);
-        if (!$isValid) {
-            $this->emit('error', 'Invalid Cron / Human expression');
-            return;
+        ray($this->backup->s3_storage_id);
+        try {
+            $this->custom_validate();
+            $this->backup->save();
+            $this->backup->refresh();
+            $this->emit('success', 'Backup updated successfully');
+        } catch (\Exception $e) {
+            $this->emit('error', $e->getMessage());
         }
-        $this->validate();
-        $this->backup->save();
-        $this->backup->refresh();
-        $this->emit('success', 'Backup updated successfully');
     }
 }

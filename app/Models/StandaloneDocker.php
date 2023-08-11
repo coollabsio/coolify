@@ -4,11 +4,7 @@ namespace App\Models;
 
 class StandaloneDocker extends BaseModel
 {
-    protected $fillable = [
-        'name',
-        'network',
-        'server_id',
-    ];
+    protected $guarded = [];
 
     public function applications()
     {

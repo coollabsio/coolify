@@ -12,7 +12,7 @@
         </x-slot:modalSubmit>
     </x-modal>
     <div class="pt-6">
-        <livewire:project.database.backup-edit :backup="$backup"/>
+        <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s"/>
         <h3 class="py-4">Executions</h3>
         <livewire:project.database.backup-executions :backup="$backup" :executions="$executions"/>
     </div>

@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\EnvironmentVariable;
 use Illuminate\Database\Seeder;
 
 class EnvironmentVariableSeeder extends Seeder
@@ -12,11 +11,11 @@ class EnvironmentVariableSeeder extends Seeder
      */
     public function run(): void
     {
-        EnvironmentVariable::create([
-            'key' => 'NODE_ENV',
-            'value' => 'production',
-            'is_build_time' => true,
-            'application_id' => 1,
-        ]);
+//        EnvironmentVariable::create([
+//            'key' => 'NODE_ENV',
+//            'value' => 'production',
+//            'is_build_time' => true,
+//            'application_id' => 1,
+//        ]);
     }
 }

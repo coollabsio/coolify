@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
@@ -60,20 +61,16 @@ class Controller extends BaseController
     {
         if (auth()->user()->isInstanceAdmin()) {
             $settings = InstanceSettings::get();
+            $database = StandalonePostgresql::whereName('coolify-db')->first();
+            if ($database) {
+                $backup = $database->scheduledBackups->first();
+                $s3s = S3Storage::whereTeamId(0)->get();
+            }
             return view('settings.configuration', [
-                'settings' => $settings
-            ]);
-        } else {
-            return redirect()->route('dashboard');
-        }
-    }
-
-    public function emails()
-    {
-        if (auth()->user()->isInstanceAdmin()) {
-            $settings = InstanceSettings::get();
-            return view('settings.emails', [
-                'settings' => $settings
+                'settings' => $settings,
+                'database' => $database,
+                'backup' => $backup ?? null,
+                's3s' => $s3s ?? [],
             ]);
         } else {
             return redirect()->route('dashboard');

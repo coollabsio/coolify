@@ -42,7 +42,7 @@ return new class extends Migration {
             $table->timestamp('started_at')->nullable();
             $table->morphs('destination');
 
-            $table->foreignId('environment_id');
+            $table->foreignId('environment_id')->nullable();
             $table->timestamps();
         });
     }

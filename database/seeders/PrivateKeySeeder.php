@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\PrivateKey;
-use App\Models\Team;
 use Illuminate\Database\Seeder;
 
 class PrivateKeySeeder extends Seeder
@@ -13,10 +12,9 @@ class PrivateKeySeeder extends Seeder
      */
     public function run(): void
     {
-        $team_1 = Team::find(0);
         PrivateKey::create([
             "id" => 0,
-            "team_id" => $team_1->id,
+            "team_id" => 0,
             "name" => "Testing-host",
             "description" => "This is a test docker container",
             "private_key" => "-----BEGIN OPENSSH PRIVATE KEY-----
@@ -30,7 +28,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         ]);
         PrivateKey::create([
-            "team_id" => $team_1->id,
+            "team_id" => 0,
             "name" => "development-github-app",
             "description" => "This is the key for using the development GitHub app",
             "private_key" => "-----BEGIN RSA PRIVATE KEY-----
@@ -63,7 +61,7 @@ a1C8EDKapCw5hAhizEFOUQKOygL8Ipn+tmEUkORYdZ8Q8cWFCv9nIw==
             "is_git_related" => true
         ]);
         PrivateKey::create([
-            "team_id" => $team_1->id,
+            "team_id" => 0,
             "name" => "development-gitlab-app",
             "description" => "This is the key for using the development Gitlab app",
             "private_key" => "asdf"

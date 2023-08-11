@@ -30,6 +30,19 @@ function format_docker_labels_to_json($rawOutput): Collection
         })[0];
 }
 
+function format_docker_envs_to_json($rawOutput)
+{
+    try {
+        $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
+        return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
+            $env = explode('=', $env);
+            return [$env[0] => $env[1]];
+        });
+    } catch (\Throwable $th) {
+        return collect([]);
+    }
+}
+
 function get_container_status(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
     $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);

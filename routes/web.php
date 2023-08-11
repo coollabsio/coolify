@@ -94,7 +94,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
-    Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn() => view('profile', ['request' => request()]))->name('profile');
     Route::get('/team', [Controller::class, 'team'])->name('team.show');

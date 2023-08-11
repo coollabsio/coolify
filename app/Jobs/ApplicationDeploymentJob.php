@@ -176,10 +176,10 @@ class ApplicationDeploymentJob implements ShouldQueue
     {
         $this->execute_remote_command(
             [
-                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-builder).'",
+                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-helper).'",
             ],
             [
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-builder",
+                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper",
                 "hidden" => true,
             ],
             [

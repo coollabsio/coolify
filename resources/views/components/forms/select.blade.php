@@ -15,4 +15,9 @@
         @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model.defer={{ $id }} @endif>
         {{ $slot }}
     </select>
+    @error($id)
+    <label class="label">
+        <span class="text-red-500 label-text-alt">{{ $message }}</span>
+    </label>
+    @enderror
 </div>

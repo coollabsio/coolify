@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Data\ApplicationPreview;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\StandaloneDocker;
@@ -15,8 +14,6 @@ class ApplicationSeeder extends Seeder
      */
     public function run(): void
     {
-        $github_public_source = GithubApp::where('name', 'Public GitHub')->first();
-
         Application::create([
             'name' => 'coollabsio/coolify-examples:nodejs-fastify',
             'description' => 'NodeJS Fastify Example',
@@ -28,9 +25,9 @@ class ApplicationSeeder extends Seeder
             'ports_exposes' => '3000',
             'ports_mappings' => '3000:3000',
             'environment_id' => 1,
-            'destination_id' => 1,
+            'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
-            'source_id' => $github_public_source->id,
+            'source_id' => 1,
             'source_type' => GithubApp::class
         ]);
     }

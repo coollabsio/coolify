@@ -8,25 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 
 class Application extends BaseModel
 {
-    protected $fillable = [
-        'name',
-        'repository_project_id',
-        'project_id',
-        'description',
-        'git_repository',
-        'git_branch',
-        'git_full_url',
-        'build_pack',
-        'environment_id',
-        'destination_id',
-        'destination_type',
-        'source_id',
-        'source_type',
-        'ports_mappings',
-        'ports_exposes',
-        'publish_directory',
-        'private_key_id'
-    ];
+    protected $guarded = [];
 
     protected static function booted()
     {

@@ -26,8 +26,6 @@ class DatabaseSeeder extends Seeder
             ApplicationSeeder::class,
             ApplicationSettingsSeeder::class,
             ApplicationPreviewSeeder::class,
-            DBSeeder::class,
-            ServiceSeeder::class,
             EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
             S3StorageSeeder::class,

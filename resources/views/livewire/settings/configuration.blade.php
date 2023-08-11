@@ -1,11 +1,13 @@
 <div>
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
-            <h3>Configuration</h3>
+            <h2>Configuration</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
         </div>
+        <div class="">General configuration for your Coolify instance.</div>
+
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex gap-2 w-96">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io"/>
