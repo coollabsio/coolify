@@ -26,7 +26,7 @@ class DatabaseController extends Controller
         return view('project.database.configuration', ['database' => $database]);
     }
 
-    public function backup_logs()
+    public function executions()
     {
         $backup_uuid = request()->route('backup_uuid');
         $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -45,8 +45,8 @@ class DatabaseController extends Controller
         if (!$backup) {
             return redirect()->route('dashboard');
         }
-        $backup_executions = collect($backup->executions)->sortByDesc('created_at');
-        return view('project.database.backups.logs', ['database' => $database, 'backup' => $backup, 'backup_executions' => $backup_executions]);
+        $executions = collect($backup->executions)->sortByDesc('created_at');
+        return view('project.database.backups.executions', ['database' => $database, 'backup' => $backup, 'executions' => $executions]);
     }
 
     public function backups()

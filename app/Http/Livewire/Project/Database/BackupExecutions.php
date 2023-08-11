@@ -12,6 +12,6 @@ class BackupExecutions extends Component
 
     public function refreshBackupExecutions(): void
     {
-        $this->executions = collect($this->backup->executions)->sortByDesc('created_at');
+        $this->executions = $this->backup->executions;
     }
 }

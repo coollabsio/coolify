@@ -17,9 +17,9 @@ class BackupFailed extends Notification implements ShouldQueue
     public string $message = 'Backup FAILED';
 
 
-    public function __construct(ScheduledDatabaseBackup $backup, public $database)
+    public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output)
     {
-        $this->message = "❌ Database backup for {$database->name} with frequency of $backup->frequency was FAILED.";
+        $this->message = "❌ Database backup for {$database->name} with frequency of $backup->frequency was FAILED.\n\nReason: $output";
     }
 
     public function via(object $notifiable): array

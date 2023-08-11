@@ -105,7 +105,7 @@ class DatabaseBackupJob implements ShouldQueue
             $this->backup_status = 'failed';
             $this->add_to_backup_output($th->getMessage());
             ray('Backup failed for ' . $this->database->uuid . ' at ' . $this->server->name . ':' . $this->backup_filename . '\n\nError:' . $th->getMessage());
-            $this->team->notify(new BackupFailed($this->backup, $this->database));
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
         } finally {
             $this->backup_log->update([
                 'status' => $this->backup_status,

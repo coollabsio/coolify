@@ -14,6 +14,6 @@
     <div class="pt-6">
         <livewire:project.database.backup-edit :backup="$backup"/>
         <h3 class="py-4">Executions</h3>
-        <livewire:project.database.backup-executions :backup="$backup" :executions="$backup_executions"/>
+        <livewire:project.database.backup-executions :backup="$backup" :executions="$executions"/>
     </div>
 </x-layout>

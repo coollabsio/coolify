@@ -1,10 +1,11 @@
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-2 flex-col-reverse">
     @forelse($executions as $execution)
         <form class="border-1 bg-coolgray-300 p-2 border-dotted flex flex-col"
             @class([
                 'border-green-500' => data_get($execution,'status') === 'success',
                 'border-red-500' => data_get($execution,'status') === 'failed',
             ])>
+            <div>Started At: {{data_get($execution,'created_at')}}</div>
             <div>Status: {{data_get($execution,'status')}}</div>
             @if(data_get($execution,'message'))
                 <div>Message: {{data_get($execution,'message')}}</div>
@@ -18,5 +19,4 @@
     @empty
         <div>No executions found.</div>
     @endforelse
-
 </div>
