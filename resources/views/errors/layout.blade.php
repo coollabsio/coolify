@@ -45,13 +45,13 @@
 </head>
 
 <body>
-<div class="flex-center position-ref full-height">
-    <div class="content">
-        <div class="title">
-            @yield('message')
+    <div class="flex-center position-ref full-height">
+        <div class="content">
+            <div class="title">
+                @yield('message')
+            </div>
         </div>
     </div>
-</div>
 </body>
 
 </html>

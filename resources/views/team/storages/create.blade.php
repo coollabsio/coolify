@@ -1,3 +1,3 @@
 <x-layout>
-    <livewire:team.storage.create/>
+    <livewire:team.storage.create />
 </x-layout>

@@ -12,25 +12,25 @@
                     @foreach ($github_apps as $ghapp)
                         @if ($selected_github_app_id == $ghapp->id)
                             <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
+                                wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
                                 <div class="flex gap-4 mx-6">
                                     <div class="group-hover:text-white">
                                         {{ $ghapp->name }}
                                     </div>
                                     <span wire:target="loadRepositories" wire:loading.delay
-                                          class="loading loading-xs text-warning loading-spinner"></span>
+                                        class="loading loading-xs text-warning loading-spinner"></span>
                                 </div>
                             </div>
                         @else
                             <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
-                                 wire:key="{{ $ghapp->id }}">
+                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                                wire:key="{{ $ghapp->id }}">
                                 <div class="flex gap-4 mx-6">
                                     <div class="group-hover:text-white">
                                         {{ $ghapp->name }}
                                     </div>
                                     <span wire:target="loadRepositories" wire:loading.delay
-                                          class="loading loading-xs text-warning loading-spinner"></span>
+                                        class="loading loading-xs text-warning loading-spinner"></span>
                                 </div>
                             </div>
                         @endif
@@ -45,7 +45,7 @@
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
                         <x-forms.select class="w-full" label="Repository URL" helper="{!! __('repository.url') !!}"
-                                        wire:model.defer="selected_repository_id">
+                            wire:model.defer="selected_repository_id">
                             @foreach ($repositories as $repo)
                                 @if ($loop->first)
                                     <option selected value="{{ data_get($repo, 'id') }}">
@@ -86,29 +86,29 @@
                                     </x-forms.select>
                                     @if ($is_static)
                                         <x-forms.input id="publish_directory" label="Publish Directory"
-                                                       helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets."/>
+                                            helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
                                     @else
                                         <x-forms.input type="number" id="port" label="Port" :readonly="$is_static"
-                                                       helper="The port your application listens on."/>
+                                            helper="The port your application listens on." />
                                     @endif
                                 </div>
                                 <div class="w-52">
                                     <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                                                      helper="If your application is a static site or the final build assets should be served as a static site, enable this."/>
+                                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                                 </div>
                             </div>
                             <x-forms.button type="submit">
                                 Save New Application
                             </x-forms.button>
-                        @endif
-                        @endif
-                    </div>
-                @else
-                    <div>
-                        <div>No Git App found.</div>
-                        <a href="/source/new">
-                            <x-forms.button>Add</x-forms.button>
-                        </a>
-                    </div>
                 @endif
+            @endif
         </div>
+    @else
+        <div>
+            <div>No Git App found.</div>
+            <a href="/source/new">
+                <x-forms.button>Add</x-forms.button>
+            </a>
+        </div>
+    @endif
+</div>

@@ -6,20 +6,20 @@
             <a target="_blank" class="hover:no-underline" href="{{ $application?->gitBranchLocation }}">
                 <x-forms.button>
                     Open Repository
-                    <x-external-link/>
+                    <x-external-link />
                 </x-forms.button>
             </a>
             @if (!$application->source->is_public)
                 <a target="_blank" class="hover:no-underline" href="{{ get_installation_path($application->source) }}">
                     <x-forms.button>
                         Open Git App
-                        <x-external-link/>
+                        <x-external-link />
                     </x-forms.button>
                 </a>
             @endif
             <a target="_blank" class="flex hover:no-underline" href="{{ $application?->gitCommits }}">
                 <x-forms.button>Open Commits on Git
-                    <x-external-link/>
+                    <x-external-link />
                 </x-forms.button>
             </a>
         </div>
@@ -27,11 +27,11 @@
 
         <div class="flex gap-2">
             <x-forms.input placeholder="coollabsio/coolify-example" id="application.git_repository"
-                           label="Repository"/>
-            <x-forms.input placeholder="main" id="application.git_branch" label="Branch"/>
+                label="Repository" />
+            <x-forms.input placeholder="main" id="application.git_branch" label="Branch" />
         </div>
         <div class="flex items-end gap-2">
-            <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA"/>
+            <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
 
         </div>
         @isset($application->private_key_id)

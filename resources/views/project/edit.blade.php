@@ -1,3 +1,3 @@
 <x-layout>
-    <livewire:project.edit :project="$project"/>
+    <livewire:project.edit :project="$project" />
 </x-layout>

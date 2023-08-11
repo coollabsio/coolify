@@ -22,29 +22,29 @@
             </div>
             <div class="flex flex-col gap-2 ">
                 <div class="flex flex-col w-full gap-2 lg:flex-row">
-                    <x-forms.input id="server.name" label="Name" required/>
-                    <x-forms.input id="server.description" label="Description"/>
+                    <x-forms.input id="server.name" label="Name" required />
+                    <x-forms.input id="server.description" label="Description" />
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
-                                   helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>"/>
+                        helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>" />
                     {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" /> --}}
                 </div>
                 <div class="flex flex-col w-full gap-2 lg:flex-row">
                     @if ($server->id === 0)
-                        <x-forms.input id="server.ip" label="IP Address" required/>
+                        <x-forms.input id="server.ip" label="IP Address" required />
                     @else
-                        <x-forms.input id="server.ip" label="IP Address" readonly required/>
+                        <x-forms.input id="server.ip" label="IP Address" readonly required />
                     @endif
                     <div class="flex gap-2">
-                        <x-forms.input id="server.user" label="User" required/>
-                        <x-forms.input type="number" id="server.port" label="Port" required/>
+                        <x-forms.input id="server.user" label="User" required />
+                        <x-forms.input type="number" id="server.port" label="Port" required />
                     </div>
                 </div>
             </div>
             <h3 class="py-4">Settings</h3>
             <div class="flex items-center w-64 gap-2">
                 <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
-                               helper="Disk cleanup job will be executed if disk usage is more than this number."/>
+                    helper="Disk cleanup job will be executed if disk usage is more than this number." />
             </div>
             <h3 class="py-4">Actions</h3>
             <div class="flex items-center gap-2">
@@ -62,7 +62,7 @@
                 @endif
             </div>
             <div class="container w-full py-4 mx-auto">
-                <livewire:activity-monitor header="Logs"/>
+                <livewire:activity-monitor header="Logs" />
             </div>
             @isset($uptime)
                 <h3 class="pb-3">Server Info</h3>

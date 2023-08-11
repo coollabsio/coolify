@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -35,7 +36,9 @@
             line-height: 1.5
         }
 
-        *, :after, :before {
+        *,
+        :after,
+        :before {
             box-sizing: border-box;
             border: 0 solid #e2e8f0
         }
@@ -49,7 +52,8 @@
             font-family: Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace
         }
 
-        svg, video {
+        svg,
+        video {
             display: block;
             vertical-align: middle
         }
@@ -315,13 +319,14 @@
         }
 
         .grid-cols-1 {
-            grid-template-columns:repeat(1, minmax(0, 1fr))
+            grid-template-columns: repeat(1, minmax(0, 1fr))
         }
 
         @-webkit-keyframes spin {
             0% {
                 transform: rotate(0deg)
             }
+
             to {
                 transform: rotate(1turn)
             }
@@ -331,6 +336,7 @@
             0% {
                 transform: rotate(0deg)
             }
+
             to {
                 transform: rotate(1turn)
             }
@@ -341,7 +347,9 @@
                 transform: scale(1);
                 opacity: 1
             }
-            75%, to {
+
+            75%,
+            to {
                 transform: scale(2);
                 opacity: 0
             }
@@ -352,36 +360,47 @@
                 transform: scale(1);
                 opacity: 1
             }
-            75%, to {
+
+            75%,
+            to {
                 transform: scale(2);
                 opacity: 0
             }
         }
 
         @-webkit-keyframes pulse {
-            0%, to {
+
+            0%,
+            to {
                 opacity: 1
             }
+
             50% {
                 opacity: .5
             }
         }
 
         @keyframes pulse {
-            0%, to {
+
+            0%,
+            to {
                 opacity: 1
             }
+
             50% {
                 opacity: .5
             }
         }
 
         @-webkit-keyframes bounce {
-            0%, to {
+
+            0%,
+            to {
                 transform: translateY(-25%);
                 -webkit-animation-timing-function: cubic-bezier(.8, 0, 1, 1);
                 animation-timing-function: cubic-bezier(.8, 0, 1, 1)
             }
+
             50% {
                 transform: translateY(0);
                 -webkit-animation-timing-function: cubic-bezier(0, 0, .2, 1);
@@ -390,11 +409,14 @@
         }
 
         @keyframes bounce {
-            0%, to {
+
+            0%,
+            to {
                 transform: translateY(-25%);
                 -webkit-animation-timing-function: cubic-bezier(.8, 0, 1, 1);
                 animation-timing-function: cubic-bezier(.8, 0, 1, 1)
             }
+
             50% {
                 transform: translateY(0);
                 -webkit-animation-timing-function: cubic-bezier(0, 0, .2, 1);
@@ -459,7 +481,7 @@
             }
 
             .md\:grid-cols-2 {
-                grid-template-columns:repeat(2, minmax(0, 1fr))
+                grid-template-columns: repeat(2, minmax(0, 1fr))
             }
         }
 
@@ -509,19 +531,22 @@
         }
     </style>
 </head>
-<body class="antialiased">
-<div class="relative flex items-top justify-center min-h-screen bg-gray-100 dark:bg-gray-900 sm:items-center sm:pt-0">
-    <div class="max-w-xl mx-auto sm:px-6 lg:px-8">
-        <div class="flex items-center pt-8 sm:justify-start sm:pt-0">
-            <div class="px-4 text-lg text-gray-500 border-r border-gray-400 tracking-wider">
-                @yield('code')
-            </div>
 
-            <div class="ml-4 text-lg text-gray-500 uppercase tracking-wider">
-                @yield('message')
+<body class="antialiased">
+    <div
+        class="relative flex justify-center min-h-screen bg-gray-100 items-top dark:bg-gray-900 sm:items-center sm:pt-0">
+        <div class="max-w-xl mx-auto sm:px-6 lg:px-8">
+            <div class="flex items-center pt-8 sm:justify-start sm:pt-0">
+                <div class="px-4 text-lg tracking-wider text-gray-500 border-r border-gray-400">
+                    @yield('code')
+                </div>
+
+                <div class="ml-4 text-lg tracking-wider text-gray-500 uppercase">
+                    @yield('message')
+                </div>
             </div>
         </div>
     </div>
-</div>
 </body>
+
 </html>

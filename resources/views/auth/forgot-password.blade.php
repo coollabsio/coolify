@@ -5,7 +5,7 @@
                 <a href="{{ route('dashboard') }}">
                     <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 </a>
-                <x-version/>
+                <x-version />
             </div>
 
             <div class="flex items-center gap-2">
@@ -16,13 +16,13 @@
                     <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
                         @csrf
                         <x-forms.input required value="test@example.com" type="email" name="email"
-                                       label="{{ __('input.email') }}" autofocus/>
+                            label="{{ __('input.email') }}" autofocus />
                         <x-forms.button type="submit">{{ __('auth.forgot_password_send_email') }}</x-forms.button>
                     </form>
                 @else
                     <div>Transactional emails are not active on this instance.</div>
                     <div>See how to set it in our <a class="text-white" target="_blank"
-                                                     href="https://docs.coollabs.io/coolify">docs</a>, or how to
+                            href="https://docs.coollabs.io/coolify">docs</a>, or how to
                         manually reset password.
                     </div>
                 @endif

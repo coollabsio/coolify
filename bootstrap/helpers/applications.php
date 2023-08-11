@@ -4,7 +4,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 
-function queue_application_deployment(int $application_id, string $deployment_uuid, int|null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false)
+function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false)
 {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,

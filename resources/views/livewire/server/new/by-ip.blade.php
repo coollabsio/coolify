@@ -3,14 +3,14 @@
     <div class="pt-2 pb-10 ">Servers are the main blocks of your infrastructure.</div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex gap-2">
-            <x-forms.input id="name" label="Name" required/>
-            <x-forms.input id="description" label="Description"/>
+            <x-forms.input id="name" label="Name" required />
+            <x-forms.input id="description" label="Description" />
         </div>
         <div class="flex gap-2">
             <x-forms.input id="ip" label="IP Address" required
-                           helper="Could be IP Address (127.0.0.1) or Domain Name (duckduckgo.com)."/>
-            <x-forms.input id="user" label="User" required/>
-            <x-forms.input type="number" id="port" label="Port" required/>
+                helper="Could be IP Address (127.0.0.1) or Domain Name (duckduckgo.com)." />
+            <x-forms.input id="user" label="User" required />
+            <x-forms.input type="number" id="port" label="Port" required />
         </div>
         <x-forms.select label="Private Key" id="private_key_id">
             <option disabled>Select a private key</option>

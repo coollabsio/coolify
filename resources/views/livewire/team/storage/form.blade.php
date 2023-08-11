@@ -22,17 +22,17 @@
             </x-forms.button>
         </div>
         <div class="flex gap-2">
-            <x-forms.input label="Name" id="storage.name"/>
-            <x-forms.input label="Description" id="storage.description"/>
+            <x-forms.input label="Name" id="storage.name" />
+            <x-forms.input label="Description" id="storage.description" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input required label="Endpoint" id="storage.endpoint"/>
-            <x-forms.input required label="Bucket" id="storage.bucket"/>
-            <x-forms.input required label="Region" id="storage.region"/>
+            <x-forms.input required label="Endpoint" id="storage.endpoint" />
+            <x-forms.input required label="Bucket" id="storage.bucket" />
+            <x-forms.input required label="Region" id="storage.region" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input required type="password" label="Access Key" id="storage.key"/>
-            <x-forms.input required type="password" label="Secret Key" id="storage.secret"/>
+            <x-forms.input required type="password" label="Access Key" id="storage.key" />
+            <x-forms.input required type="password" label="Secret Key" id="storage.secret" />
         </div>
     </form>
 </div>

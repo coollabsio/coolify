@@ -9,7 +9,7 @@
 <div class="mt-4">
     <label>
         Enable dashboard?
-        <input type="checkbox"/>
+        <input type="checkbox" />
         (auto-save)
     </label>
 </div>
@@ -24,7 +24,7 @@
         <div class="mt-2"></div>
         <label>
             <div>Hostname <span class="text-xs"> Eg: dashboard.example.com </span></div>
-            <input type="text"/>
+            <input type="text" />
         </label>
         <button>Update</button>
     </label>
@@ -36,11 +36,11 @@
         <div class="mt-2"></div>
         <label>
             Username
-            <input type="text"/>
+            <input type="text" />
         </label>
         <label>
             Password
-            <input type="password"/>
+            <input type="password" />
         </label>
         <button>Update</button>
     </label>

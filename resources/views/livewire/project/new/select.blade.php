@@ -11,7 +11,7 @@
             <h3 class="pb-4">Applications</h3>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                     wire:click="set_type('public')">
+                    wire:click="set_type('public')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Public Repository
@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                     wire:click="set_type('private-gh-app')">
+                    wire:click="set_type('private-gh-app')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Private Repository
@@ -33,7 +33,7 @@
                     </div>
                 </div>
                 <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                     wire:click="set_type('private-deploy-key')">
+                    wire:click="set_type('private-deploy-key')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Private Repository (with deploy key)
@@ -47,7 +47,7 @@
             <h3 class="py-4">Databases</h3>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                     wire:click="set_type('postgresql')">
+                    wire:click="set_type('postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             PostgreSQL
@@ -69,7 +69,7 @@
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @foreach ($servers as $server)
                     <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                         wire:click="set_server({{ $server }})">
+                        wire:click="set_server({{ $server }})">
                         <div class="flex flex-col mx-6">
                             <div class="group-hover:text-white">
                                 {{ $server->name }}
@@ -90,7 +90,7 @@
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @foreach ($destinations as $destination)
                     <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                         wire:click="set_destination('{{ $destination->uuid }}')">
+                        wire:click="set_destination('{{ $destination->uuid }}')">
                         <div class="flex flex-col mx-6">
                             <div class="group-hover:text-white">
                                 {{ $destination->name }}

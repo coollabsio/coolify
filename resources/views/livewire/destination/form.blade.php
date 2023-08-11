@@ -23,10 +23,10 @@
             <div class="pt-2 pb-10 ">Your swarm docker network. WIP</div>
         @endif
         <div class="flex gap-2">
-            <x-forms.input id="destination.name" label="Name"/>
-            <x-forms.input id="destination.server.ip" label="Server IP" readonly/>
+            <x-forms.input id="destination.name" label="Name" />
+            <x-forms.input id="destination.server.ip" label="Server IP" readonly />
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
-                <x-forms.input id="destination.network" label="Docker Network" readonly/>
+                <x-forms.input id="destination.network" label="Docker Network" readonly />
             @endif
         </div>
     </form>

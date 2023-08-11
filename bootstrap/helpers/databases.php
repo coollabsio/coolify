@@ -33,7 +33,7 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
  * @param Server $server
  * @return void
  */
-function delete_backup_locally(string|null $filename, Server $server): void
+function delete_backup_locally(string | null $filename, Server $server): void
 {
     if (empty($filename)) {
         return;

@@ -7,10 +7,9 @@
         @endif
     </div>
     <div class="flex gap-2">
-        <x-forms.input type="password" id="settings.resale_license"
-                       placeholder="eg: BE558E91-0CC5-4AA2-B1C0-B6403C2988DD"
-                       label="License Key"/>
-        <x-forms.input type="password" id="instance_id" label="Instance Id (do not change this)" disabled/>
+        <x-forms.input type="password" id="settings.resale_license" placeholder="eg: BE558E91-0CC5-4AA2-B1C0-B6403C2988DD"
+            label="License Key" />
+        <x-forms.input type="password" id="instance_id" label="Instance Id (do not change this)" disabled />
     </div>
     <div class="flex gap-2">
         <x-forms.button type="submit">

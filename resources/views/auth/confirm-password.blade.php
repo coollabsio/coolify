@@ -3,13 +3,13 @@
         <div>
             <div class="flex flex-col items-center pb-8">
                 <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
-                <x-version/>
+                <x-version />
             </div>
             <div class="w-96">
                 <form action="/user/confirm-password" method="POST" class="flex flex-col gap-2">
                     @csrf
                     <x-forms.input required type="password" name="password " label="{{ __('input.password') }}"
-                                   autofocus/>
+                        autofocus />
                     <x-forms.button type="submit">{{ __('auth.confirm_password') }}</x-forms.button>
                 </form>
                 @if ($errors->any())
@@ -18,7 +18,7 @@
                     </div>
                 @endif
                 @if (session('status'))
-                    <div class="mb-4  font-medium text-green-600">
+                    <div class="mb-4 font-medium text-green-600">
                         {{ session('status') }}
                     </div>
                 @endif

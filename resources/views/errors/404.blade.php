@@ -13,7 +13,7 @@
                     </a>
                     <a target="_blank" class="text-xs" href="https://docs.coollabs.io/contact.html">Contact
                         support
-                        <x-external-link/>
+                        <x-external-link />
                     </a>
                 </div>
             </div>

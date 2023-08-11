@@ -13,7 +13,7 @@
                         {{ $server->name }}
                     </div>
                     <div class="text-xs group-hover:text-white"
-                         href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
+                        href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
                         {{ $server->description }}</div>
                     <div class="flex gap-1 text-xs text-error">
                         @if (!$server->settings->is_reachable)
@@ -32,7 +32,7 @@
         @empty
             <div>
                 <div>No servers found. Without a server, you won't be able to do much.</div>
-                <x-use-magic-bar link="/server/new"/>
+                <x-use-magic-bar link="/server/new" />
             </div>
         @endforelse
         <script>

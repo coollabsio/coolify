@@ -4,13 +4,13 @@
             <div>
                 <div class="flex gap-2">
                     <h3>Subscription</h3>
-                    <livewire:switch-team/>
+                    <livewire:switch-team />
                 </div>
                 <div class="flex items-center pb-8">
                     <span>Currently active team: <span
                             class="text-warning">{{ session('currentTeam.name') }}</span></span>
                 </div>
-                <x-pricing-plans/>
+                <x-pricing-plans />
             </div>
         </div>
     @else

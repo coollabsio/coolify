@@ -6,7 +6,7 @@
         </x-forms.button>
     </div>
     <div class="flex gap-2">
-        <x-forms.input id="team.name" label="Name" required/>
-        <x-forms.input id="team.description" label="Description"/>
+        <x-forms.input id="team.name" label="Name" required />
+        <x-forms.input id="team.description" label="Description" />
     </div>
 </form>

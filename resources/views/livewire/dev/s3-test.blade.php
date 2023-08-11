@@ -3,7 +3,7 @@
     <form wire:submit.prevent="save">
         <input type="file" wire:model="file">
         @error('file')
-        <span class="error">{{ $message }}</span>
+            <span class="error">{{ $message }}</span>
         @enderror
         <div wire:loading wire:target="file">Uploading to server...</div>
         @if ($file)
