@@ -104,52 +104,52 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
     } else {
         $traefik_dynamic_conf = [
             'http' =>
+            [
+                'routers' =>
                 [
-                    'routers' =>
-                        [
-                            'catchall' =>
-                                [
-                                    'entryPoints' => [
-                                        0 => 'http',
-                                        1 => 'https',
-                                    ],
-                                    'service' => 'noop',
-                                    'rule' => "HostRegexp(`{catchall:.*}`)",
-                                    'priority' => 1,
-                                    'middlewares' => [
-                                        0 => 'redirect-regexp@file',
-                                    ],
-                                ],
+                    'catchall' =>
+                    [
+                        'entryPoints' => [
+                            0 => 'http',
+                            1 => 'https',
                         ],
-                    'services' =>
-                        [
-                            'noop' =>
-                                [
-                                    'loadBalancer' =>
-                                        [
-                                            'servers' =>
-                                                [
-                                                    0 =>
-                                                        [
-                                                            'url' => '',
-                                                        ],
-                                                ],
-                                        ],
-                                ],
+                        'service' => 'noop',
+                        'rule' => "HostRegexp(`{catchall:.*}`)",
+                        'priority' => 1,
+                        'middlewares' => [
+                            0 => 'redirect-regexp@file',
                         ],
-                    'middlewares' =>
-                        [
-                            'redirect-regexp' =>
-                                [
-                                    'redirectRegex' =>
-                                        [
-                                            'regex' => '(.*)',
-                                            'replacement' => $redirect_url,
-                                            'permanent' => false,
-                                        ],
-                                ],
-                        ],
+                    ],
                 ],
+                'services' =>
+                [
+                    'noop' =>
+                    [
+                        'loadBalancer' =>
+                        [
+                            'servers' =>
+                            [
+                                0 =>
+                                [
+                                    'url' => '',
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'middlewares' =>
+                [
+                    'redirect-regexp' =>
+                    [
+                        'redirectRegex' =>
+                        [
+                            'regex' => '(.*)',
+                            'replacement' => $redirect_url,
+                            'permanent' => false,
+                        ],
+                    ],
+                ],
+            ],
         ];
         $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
         $yaml =

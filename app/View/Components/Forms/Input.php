@@ -21,8 +21,7 @@ class Input extends Component
         public string|null $helper = null,
         public bool        $allowToPeak = true,
         public string      $defaultClass = "input input-sm bg-coolgray-200 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
-    )
-    {
+    ) {
     }
 
     public function render(): View|Closure|string

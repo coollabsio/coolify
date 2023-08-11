@@ -54,18 +54,13 @@ class BackupEdit extends Component
         } catch (\Exception $e) {
             $this->emit('error', $e->getMessage());
         }
-
     }
 
     private function custom_validate()
     {
-//        if ($this->backup->save_s3) {
-//            if (!is_numeric($this->selected_storage_id)) {
-//                throw new \Exception('Invalid S3 Storage');
-//            } else {
-//                $this->backup->s3_storage_id = $this->selected_storage_id;
-//            }
-//        }
+        if (!is_numeric($this->backup->s3_storage_id)) {
+            $this->backup->s3_storage_id = null;
+        }
         $isValid = validate_cron_expression($this->backup->frequency);
         if (!$isValid) {
             throw new \Exception('Invalid Cron / Human expression');

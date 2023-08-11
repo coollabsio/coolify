@@ -45,7 +45,7 @@ class Environment extends Model
     protected function name(): Attribute
     {
         return Attribute::make(
-            set: fn(string $value) => strtolower($value),
+            set: fn (string $value) => strtolower($value),
         );
     }
 }

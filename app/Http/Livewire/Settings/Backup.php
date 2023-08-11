@@ -2,12 +2,12 @@
 
 namespace App\Http\Livewire\Settings;
 
+use App\Jobs\DatabaseBackupJob;
 use App\Models\InstanceSettings;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
-use App\Jobs\DatabaseBackupJob;
 use Livewire\Component;
 
 class Backup extends Component
@@ -16,6 +16,7 @@ class Backup extends Component
     public $s3s;
     public StandalonePostgresql|null $database = null;
     public ScheduledDatabaseBackup|null $backup = null;
+    public $executions = [];
 
     protected $rules = [
         'database.uuid' => 'required',
@@ -33,9 +34,13 @@ class Backup extends Component
         'database.postgres_password' => 'postgres password',
     ];
 
+    public function mount()
+    {
+        $this->backup = $this->database->scheduledBackups->first();
+        $this->executions = $this->backup->executions;
+    }
     public function add_coolify_database()
     {
-        ray('add_coolify_database');
         $server = Server::find(0);
         $out = instant_remote_process(['docker inspect coolify-db'], $server);
         $envs = format_docker_envs_to_json($out);
@@ -68,7 +73,8 @@ class Backup extends Component
         $this->s3s = S3Storage::whereTeamId(0)->get();
     }
 
-    public function backup_now() {
+    public function backup_now()
+    {
         dispatch(new DatabaseBackupJob(
             backup: $this->backup
         ));
@@ -78,5 +84,4 @@ class Backup extends Component
     {
         $this->emit('success', 'Backup updated successfully');
     }
-
 }

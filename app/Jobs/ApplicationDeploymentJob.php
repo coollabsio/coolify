@@ -434,7 +434,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             }
         }
         // Add PORT if not exists, use the first port as default
-        if ($environment_variables->filter(fn($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
         }
         return $environment_variables->all();

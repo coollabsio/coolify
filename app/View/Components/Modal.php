@@ -18,8 +18,7 @@ class Modal extends Component
         public string|null $modalSubmit = null,
         public bool        $yesOrNo = false,
         public string      $action = 'delete'
-    )
-    {
+    ) {
         //
     }
 

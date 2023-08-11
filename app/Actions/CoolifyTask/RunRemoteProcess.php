@@ -66,8 +66,8 @@ class RunRemoteProcess
         }
 
         return collect($decoded)
-            ->sortBy(fn($i) => $i['order'])
-            ->map(fn($i) => $i['output'])
+            ->sortBy(fn ($i) => $i['order'])
+            ->map(fn ($i) => $i['output'])
             ->implode("");
     }
 

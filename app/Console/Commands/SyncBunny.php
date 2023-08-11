@@ -64,7 +64,7 @@ class SyncBunny extends Command
             ]);
         });
         try {
-            Http::pool(fn(Pool $pool) => [
+            Http::pool(fn (Pool $pool) => [
                 $pool->storage(file: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
                 $pool->storage(file: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
                 $pool->storage(file: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
@@ -73,7 +73,7 @@ class SyncBunny extends Command
                 $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
             ]);
             ray("{$bunny_cdn}/{$bunny_cdn_path}");
-            Http::pool(fn(Pool $pool) => [
+            Http::pool(fn (Pool $pool) => [
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$production_env"),

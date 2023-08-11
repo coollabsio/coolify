@@ -14,7 +14,7 @@
                 <livewire:settings.configuration :settings="$settings" />
             </div>
             <div x-cloak x-show="activeTab === 'backup'" class="h-full">
-                <livewire:settings.backup :settings="$settings" :database="$database" :backup="$backup" :s3s="$s3s" />
+                <livewire:settings.backup :settings="$settings" :database="$database" :s3s="$s3s" />
             </div>
             <div x-cloak x-show="activeTab === 'smtp'" class="h-full">
                 <livewire:settings.email :settings="$settings" />

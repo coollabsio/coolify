@@ -178,5 +178,3 @@ function validate_cron_expression($expression_to_validate): bool
     }
     return $isValid;
 }
-
-

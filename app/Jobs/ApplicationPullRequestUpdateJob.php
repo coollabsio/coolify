@@ -25,8 +25,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue
         public int    $pull_request_id,
         public string $deployment_uuid,
         public string $status
-    )
-    {
+    ) {
     }
 
     public function handle()

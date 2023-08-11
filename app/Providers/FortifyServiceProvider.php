@@ -23,7 +23,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse {
+        $this->app->instance(RegisterResponse::class, new class implements RegisterResponse
+        {
             public function toResponse($request)
             {
                 // First user (root) will be redirected to /settings instead of / on registration.

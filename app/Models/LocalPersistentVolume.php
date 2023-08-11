@@ -23,14 +23,14 @@ class LocalPersistentVolume extends Model
     protected function name(): Attribute
     {
         return Attribute::make(
-            set: fn(string $value) => Str::of($value)->trim()->value,
+            set: fn (string $value) => Str::of($value)->trim()->value,
         );
     }
 
     protected function mountPath(): Attribute
     {
         return Attribute::make(
-            set: fn(string $value) => Str::of($value)->trim()->start('/')->value
+            set: fn (string $value) => Str::of($value)->trim()->start('/')->value
         );
     }
 

@@ -157,7 +157,7 @@ class DatabaseBackupJob implements ShouldQueue
             }
             $key = $this->s3->key;
             $secret = $this->s3->secret;
-//            $region = $this->s3->region;
+            //            $region = $this->s3->region;
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
 
@@ -183,6 +183,5 @@ class DatabaseBackupJob implements ShouldQueue
             'message' => $this->backup_output,
             'size' => $this->size,
         ]);
-
     }
 }

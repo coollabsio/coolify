@@ -34,8 +34,8 @@ class EnvironmentVariable extends Model
     protected function value(): Attribute
     {
         return Attribute::make(
-            get: fn(string $value) => $this->get_environment_variables($value),
-            set: fn(string $value) => $this->set_environment_variables($value),
+            get: fn (string $value) => $this->get_environment_variables($value),
+            set: fn (string $value) => $this->set_environment_variables($value),
         );
     }
 
@@ -67,7 +67,7 @@ class EnvironmentVariable extends Model
     protected function key(): Attribute
     {
         return Attribute::make(
-            set: fn(string $value) => Str::of($value)->trim(),
+            set: fn (string $value) => Str::of($value)->trim(),
         );
     }
 }

@@ -11,7 +11,6 @@ class BackupExecution extends Component
 
     public function download()
     {
-
     }
 
     public function delete(): void

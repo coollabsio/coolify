@@ -70,7 +70,6 @@ class Create extends Component
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }
-
     }
 
     private function test_s3_connection()

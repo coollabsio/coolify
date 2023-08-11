@@ -77,35 +77,35 @@ class Configuration extends Component
             $schema = $url->getScheme();
             $traefik_dynamic_conf = [
                 'http' =>
+                [
+                    'routers' =>
                     [
-                        'routers' =>
-                            [
-                                'coolify-http' =>
-                                    [
-                                        'entryPoints' => [
-                                            0 => 'http',
-                                        ],
-                                        'service' => 'coolify',
-                                        'rule' => "Host(`{$host}`)",
-                                    ],
+                        'coolify-http' =>
+                        [
+                            'entryPoints' => [
+                                0 => 'http',
                             ],
-                        'services' =>
-                            [
-                                'coolify' =>
-                                    [
-                                        'loadBalancer' =>
-                                            [
-                                                'servers' =>
-                                                    [
-                                                        0 =>
-                                                            [
-                                                                'url' => 'http://coolify:80',
-                                                            ],
-                                                    ],
-                                            ],
-                                    ],
-                            ],
+                            'service' => 'coolify',
+                            'rule' => "Host(`{$host}`)",
+                        ],
                     ],
+                    'services' =>
+                    [
+                        'coolify' =>
+                        [
+                            'loadBalancer' =>
+                            [
+                                'servers' =>
+                                [
+                                    0 =>
+                                    [
+                                        'url' => 'http://coolify:80',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
             ];
 
             if ($schema === 'https') {

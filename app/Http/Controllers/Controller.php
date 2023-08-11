@@ -24,7 +24,7 @@ class Controller extends BaseController
             abort(404);
         }
         return view('subscription', [
-            'settings' => InstanceSettings::get()
+            'settings' => InstanceSettings::get(),
         ]);
     }
 
@@ -34,7 +34,7 @@ class Controller extends BaseController
             abort(404);
         }
         return view('settings.license', [
-            'settings' => InstanceSettings::get()
+            'settings' => InstanceSettings::get(),
         ]);
     }
 
@@ -63,13 +63,11 @@ class Controller extends BaseController
             $settings = InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
             if ($database) {
-                $backup = $database->scheduledBackups->first();
                 $s3s = S3Storage::whereTeamId(0)->get();
             }
             return view('settings.configuration', [
                 'settings' => $settings,
                 'database' => $database,
-                'backup' => $backup ?? null,
                 's3s' => $s3s ?? [],
             ]);
         } else {

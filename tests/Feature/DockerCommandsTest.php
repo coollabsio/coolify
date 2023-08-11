@@ -56,7 +56,7 @@ it('starts a docker container correctly', function () {
     // Stop testing containers
     $activity = remote_process([
         "docker ps --filter='name={$coolifyNamePrefix}*' -aq && " .
-        "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
+            "docker rm -f $(docker ps --filter='name={$coolifyNamePrefix}*' -aq)"
     ], $host);
     expect($activity->getExtraProperty('exitCode'))->toBe(0);
 });

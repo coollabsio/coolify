@@ -28,8 +28,7 @@ class SendMessageToDiscordJob implements ShouldQueue
     public function __construct(
         public string $text,
         public string $webhookUrl
-    )
-    {
+    ) {
     }
 
     /**

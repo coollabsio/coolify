@@ -4,6 +4,7 @@
         <x-forms.button type="submit">
             Save
         </x-forms.button>
+        <livewire:project.database.backup-now :backup="$backup" />
         @if ($backup->database_id !== 0)
             <x-forms.button isError wire:click="delete">Delete</x-forms.button>
         @endif

@@ -49,7 +49,6 @@ class ResetPassword extends Notification
             return ['mail'];
         }
         throw new \Exception('SMTP is not enabled');
-
     }
 
     public function toMail($notifiable)

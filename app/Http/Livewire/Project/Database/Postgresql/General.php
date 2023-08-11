@@ -42,7 +42,7 @@ class General extends Component
 
     public function save_init_script($script)
     {
-        $this->database->init_scripts = filter($this->database->init_scripts, fn($s) => $s['filename'] !== $script['filename']);
+        $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
         $this->database->init_scripts = array_merge($this->database->init_scripts, [$script]);
         $this->database->save();
         $this->emit('success', 'Init script saved successfully.');
@@ -53,8 +53,8 @@ class General extends Component
         $collection = collect($this->database->init_scripts);
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
-            ray($collection->filter(fn($s) => $s['filename'] !== $script['filename'])->toArray());
-            $this->database->init_scripts = $collection->filter(fn($s) => $s['filename'] !== $script['filename'])->toArray();
+            ray($collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray());
+            $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
             $this->database->save();
             $this->refresh();
             $this->emit('success', 'Init script deleted successfully.');

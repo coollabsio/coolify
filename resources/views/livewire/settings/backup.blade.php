@@ -6,7 +6,6 @@
                 <x-forms.button type="submit" wire:click="submit">
                     Save
                 </x-forms.button>
-                <x-forms.button wire:click="backup_now">Backup Now</x-forms.button>
             @endif
         </div>
         <div class="pb-4">Backup your Coolify instance settings</div>
@@ -29,6 +28,10 @@
                 into Coolify.
                 <x-forms.button wire:click="add_coolify_database">Add Database</x-forms.button>
             @endif
+        </div>
+        <div class="py-4">
+            <h2 class="pb-4">Executions</h2>
+            <livewire:project.database.backup-executions :backup="$backup" :executions="$executions" />
         </div>
     </div>
 </div>

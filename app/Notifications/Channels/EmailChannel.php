@@ -23,7 +23,7 @@ class EmailChannel
         Mail::send(
             [],
             [],
-            fn(Message $message) => $message
+            fn (Message $message) => $message
                 ->from(
                     data_get($notifiable, 'smtp_from_address'),
                     data_get($notifiable, 'smtp_from_name'),

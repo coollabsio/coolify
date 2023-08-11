@@ -22,5 +22,4 @@ class CheckConfigurationSync
 
         return $proxy_configuration;
     }
-
 }

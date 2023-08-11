@@ -41,7 +41,7 @@ class Application extends BaseModel
     public function publishDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn($value) => $value ? '/' . ltrim($value, '/') : null,
+            set: fn ($value) => $value ? '/' . ltrim($value, '/') : null,
         );
     }
 
@@ -71,14 +71,14 @@ class Application extends BaseModel
     public function baseDirectory(): Attribute
     {
         return Attribute::make(
-            set: fn($value) => '/' . ltrim($value, '/'),
+            set: fn ($value) => '/' . ltrim($value, '/'),
         );
     }
 
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn($value) => $value === "" ? null : $value,
+            set: fn ($value) => $value === "" ? null : $value,
         );
     }
 
@@ -87,7 +87,7 @@ class Application extends BaseModel
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn() => is_null($this->ports_mappings)
+            get: fn () => is_null($this->ports_mappings)
                 ? []
                 : explode(',', $this->ports_mappings),
 
@@ -97,7 +97,7 @@ class Application extends BaseModel
     public function portsExposesArray(): Attribute
     {
         return Attribute::make(
-            get: fn() => is_null($this->ports_exposes)
+            get: fn () => is_null($this->ports_exposes)
                 ? []
                 : explode(',', $this->ports_exposes)
         );

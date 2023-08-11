@@ -31,7 +31,6 @@ class S3Test extends Component
         } catch (\Throwable $th) {
             return general_error_handler($th, $this, false);
         }
-
     }
 
     public function get_files()

@@ -33,7 +33,7 @@ class StandalonePostgresql extends BaseModel
     public function portsMappings(): Attribute
     {
         return Attribute::make(
-            set: fn($value) => $value === "" ? null : $value,
+            set: fn ($value) => $value === "" ? null : $value,
         );
     }
 
@@ -42,7 +42,7 @@ class StandalonePostgresql extends BaseModel
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
-            get: fn() => is_null($this->ports_mappings)
+            get: fn () => is_null($this->ports_mappings)
                 ? []
                 : explode(',', $this->ports_mappings),
 
