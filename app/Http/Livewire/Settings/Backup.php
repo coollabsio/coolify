@@ -7,6 +7,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Jobs\DatabaseBackupJob;
 use Livewire\Component;
 
 class Backup extends Component
@@ -67,6 +68,12 @@ class Backup extends Component
         $this->s3s = S3Storage::whereTeamId(0)->get();
     }
 
+    public function backup_now() {
+        dispatch(new DatabaseBackupJob(
+            backup: $this->backup
+        ));
+        $this->emit('success', 'Backup queued. It will be available in a few minutes');
+    }
     public function submit()
     {
         $this->emit('success', 'Backup updated successfully');
