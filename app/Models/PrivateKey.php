@@ -16,7 +16,7 @@ class PrivateKey extends BaseModel
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
-        return PrivateKey::whereTeamId(session('currentTeam')->id)->select($selectArray->all());
+        return PrivateKey::whereTeamId(auth()->user()->currentTeam()->id)->select($selectArray->all());
     }
 
     public function isEmpty()

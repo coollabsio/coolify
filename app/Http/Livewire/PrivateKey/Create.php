@@ -32,7 +32,7 @@ class Create extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'private_key' => $this->value,
-                'team_id' => session('currentTeam')->id
+                'team_id' => auth()->user()->currentTeam()->id
             ]);
             if ($this->from === 'server') {
                 return redirect()->route('server.create');

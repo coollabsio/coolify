@@ -158,8 +158,8 @@ function refreshPrivateKey(PrivateKey $private_key)
     foreach ($private_key->servers as $server) {
         // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
-        if (session('currentTeam')->id) {
-            session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+        if (auth()->user()->currentTeam()->id) {
+            auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
         }
     }
 }

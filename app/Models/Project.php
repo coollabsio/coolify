@@ -13,7 +13,7 @@ class Project extends BaseModel
 
     static public function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(session('currentTeam')->id)->orderBy('name');
+        return Project::whereTeamId(auth()->user()->currentTeam()->id)->orderBy('name');
     }
 
     protected static function booted()

@@ -35,9 +35,9 @@ class InviteLink extends Component
                 return general_error_handler(that: $this, customErrorMessage: "$this->email must be registered first (or activate transactional emails to invite via email).");
             }
 
-            $member_emails = session('currentTeam')->members()->get()->pluck('email');
+            $member_emails = auth()->user()->currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
-                return general_error_handler(that: $this, customErrorMessage: "$this->email is already a member of " . session('currentTeam')->name . ".");
+                return general_error_handler(that: $this, customErrorMessage: "$this->email is already a member of " . auth()->user()->currentTeam()->name . ".");
             }
 
             $invitation = TeamInvitation::whereEmail($this->email);
@@ -53,7 +53,7 @@ class InviteLink extends Component
             }
 
             TeamInvitation::firstOrCreate([
-                'team_id' => session('currentTeam')->id,
+                'team_id' => auth()->user()->currentTeam()->id,
                 'uuid' => $uuid,
                 'email' => $this->email,
                 'role' => $this->role,

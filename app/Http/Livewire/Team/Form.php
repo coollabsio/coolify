@@ -19,7 +19,7 @@ class Form extends Component
 
     public function mount()
     {
-        $this->team = session('currentTeam');
+        $this->team = auth()->user()->currentTeam();
     }
 
     public function submit()

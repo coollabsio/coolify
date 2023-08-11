@@ -42,7 +42,7 @@ class Form extends Component
 
     public function installDocker()
     {
-        $activity = resolve(InstallDocker::class)($this->server, session('currentTeam'));
+        $activity = resolve(InstallDocker::class)($this->server, auth()->user()->currentTeam());
         $this->emit('newMonitorActivity', $activity->id);
     }
 

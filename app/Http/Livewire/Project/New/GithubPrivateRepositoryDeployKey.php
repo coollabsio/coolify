@@ -55,7 +55,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->where('id', '!=', 0)->get();
+        $this->private_keys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->where('id', '!=', 0)->get();
     }
 
     public function instantSave()

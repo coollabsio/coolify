@@ -41,7 +41,7 @@ class MagicController extends Controller
     {
         $project = Project::firstOrCreate(
             ['name' => request()->query('name') ?? generate_random_name()],
-            ['team_id' => session('currentTeam')->id]
+            ['team_id' => auth()->user()->currentTeam()->id]
         );
         return response()->json([
             'project_uuid' => $project->uuid

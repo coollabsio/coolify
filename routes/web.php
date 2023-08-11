@@ -122,7 +122,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn() => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
-        $sources = session('currentTeam')->sources();
+        $sources = auth()->user()->currentTeam()->sources();
         return view('source.all', [
             'sources' => $sources,
         ]);

@@ -40,7 +40,7 @@ class Create extends Component
                 'custom_user' => $this->custom_user,
                 'custom_port' => $this->custom_port,
                 'is_system_wide' => $this->is_system_wide,
-                'team_id' => session('currentTeam')->id,
+                'team_id' => auth()->user()->currentTeam()->id,
             ]);
             redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Exception $e) {

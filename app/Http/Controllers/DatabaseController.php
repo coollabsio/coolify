@@ -11,7 +11,7 @@ class DatabaseController extends Controller
 
     public function configuration()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -29,7 +29,7 @@ class DatabaseController extends Controller
     public function executions()
     {
         $backup_uuid = request()->route('backup_uuid');
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -56,7 +56,7 @@ class DatabaseController extends Controller
 
     public function backups()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

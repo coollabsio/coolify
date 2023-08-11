@@ -64,7 +64,7 @@ class ByIp extends Component
                 'ip' => $this->ip,
                 'user' => $this->user,
                 'port' => $this->port,
-                'team_id' => session('currentTeam')->id,
+                'team_id' => auth()->user()->currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
             ]);
             $server->settings->is_part_of_swarm = $this->is_part_of_swarm;

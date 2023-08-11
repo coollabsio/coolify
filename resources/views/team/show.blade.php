@@ -1,6 +1,8 @@
 <x-layout>
-    <x-team.navbar :team="session('currentTeam')"/>
-    <livewire:team.form/>
+    <x-team.navbar :team="auth()
+        ->user()
+        ->currentTeam()" />
+    <livewire:team.form />
     @if (is_cloud())
         <div class="pb-8">
             <h3>Subscription</h3>
@@ -27,5 +29,5 @@
             </x-forms.button>
         </div>
     @endif
-    <livewire:team.delete/>
+    <livewire:team.delete />
 </x-layout>

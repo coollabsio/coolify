@@ -17,7 +17,7 @@ class S3Storage extends BaseModel
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
         $selectArray = collect($select)->concat(['id']);
-        return S3Storage::whereTeamId(session('currentTeam')->id)->select($selectArray->all())->orderBy('name');
+        return S3Storage::whereTeamId(auth()->user()->currentTeam()->id)->select($selectArray->all())->orderBy('name');
     }
 
     public function awsUrl()
