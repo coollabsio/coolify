@@ -47,6 +47,7 @@ class General extends Component
         'application.publish_directory' => 'nullable',
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
+        'application.dockerfile' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -64,6 +65,7 @@ class General extends Component
         'application.publish_directory' => 'Publish directory',
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
+        'application.dockerfile' => 'Dockerfile',
     ];
 
     public function instantSave()
@@ -140,6 +142,10 @@ class General extends Component
             $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 return Str::of($domain)->trim()->lower();
             });
+            $port = get_port_from_dockerfile($this->application->dockerfile);
+            if ($port) {
+                $this->application->ports_exposes = $port;
+            }
             if ($this->application->base_directory && $this->application->base_directory !== '/') {
                 $this->application->base_directory = rtrim($this->application->base_directory, '/');
             }

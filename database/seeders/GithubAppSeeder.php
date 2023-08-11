@@ -13,6 +13,7 @@ class GithubAppSeeder extends Seeder
     public function run(): void
     {
         GithubApp::create([
+            'id' => 0,
             'name' => 'Public GitHub',
             'api_url' => 'https://api.github.com',
             'html_url' => 'https://github.com',

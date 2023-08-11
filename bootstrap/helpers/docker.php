@@ -64,3 +64,13 @@ function generate_container_name(string $uuid, int $pull_request_id = 0)
         return $uuid;
     }
 }
+function get_port_from_dockerfile($dockerfile): int
+{
+    $port = preg_grep('/EXPOSE\s+(\d+)/', explode("\n", $dockerfile));
+    if (count($port) > 0 && preg_match('/EXPOSE\s+(\d+)/', $port[1], $matches)) {
+        $port = $matches[1];
+    } else {
+        $port = 80;
+    }
+    return $port;
+}

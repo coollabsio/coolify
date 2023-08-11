@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Application</h1>
-    <div class="pt-2">Deploy any public or private Git repositories through a Deploy Key.</div>
+    <div class="pb-4">Deploy any public or private Git repositories through a Deploy Key.</div>
     <div class="flex flex-col pt-10">
         @if ($current_step === 'private_keys')
             <ul class="pb-10 steps">

@@ -215,4 +215,18 @@ class Application extends BaseModel
         }
         throw new \Exception('No deployment type found');
     }
+    public function could_set_build_commands(): bool
+    {
+        if ($this->build_pack === 'nixpacks') {
+            return true;
+        }
+        return false;
+    }
+    public function git_based(): bool
+    {
+        if ($this->dockerfile || $this->build_pack === 'dockerfile') {
+            return false;
+        }
+        return true;
+    }
 }

@@ -28,6 +28,10 @@ class Show extends Component
         $this->parameters = get_route_parameters();
     }
 
+    public function instantSave()
+    {
+        $this->submit();
+    }
     public function submit()
     {
         $this->validate();

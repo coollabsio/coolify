@@ -117,10 +117,14 @@ class ApplicationDeploymentJob implements ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
         try {
-            if ($this->pull_request_id !== 0) {
-                $this->deploy_pull_request();
+            if ($this->application->dockerfile) {
+                $this->deploy_simple_dockerfile();
             } else {
-                $this->deploy();
+                if ($this->pull_request_id !== 0) {
+                    $this->deploy_pull_request();
+                } else {
+                    $this->deploy();
+                }
             }
             if ($this->application->fqdn) dispatch(new ProxyStartJob($this->server));
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
@@ -150,7 +154,74 @@ class ApplicationDeploymentJob implements ShouldQueue
             );
         }
     }
+    private function deploy_simple_dockerfile()
+    {
+        $dockerfile_base64 = base64_encode($this->application->dockerfile);
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->name}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->execute_remote_command(
+            [
+                $this->execute_in_builder("echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
+            ],
+        );
+        $this->build_image_name = "{$this->application->git_repository}:build";
+        $this->production_image_name = "{$this->application->uuid}:latest";
+        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->generate_compose_file();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
+        $this->build_image();
+        $this->stop_running_container();
+        $this->start_by_compose_file();
+    }
+    private function deploy()
+    {
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->clone_repository();
 
+        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
+        if (strlen($tag) > 128) {
+            $tag = $tag->substr(0, 128);
+        }
+
+        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
+        $this->production_image_name = "{$this->application->uuid}:{$tag}";
+        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+
+        if (!$this->force_rebuild) {
+            $this->execute_remote_command([
+                "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
+            ]);
+            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+                $this->execute_remote_command([
+                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
+                ]);
+                $this->generate_compose_file();
+                $this->stop_running_container();
+                $this->start_by_compose_file();
+                return;
+            }
+        }
+        $this->cleanup_git();
+        if ($this->application->build_pack === 'nixpacks') {
+            $this->generate_nixpacks_confs();
+        }
+        $this->generate_compose_file();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
+        $this->build_image();
+        $this->stop_running_container();
+        $this->start_by_compose_file();
+    }
     private function deploy_pull_request()
     {
         $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
@@ -162,7 +233,9 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->prepare_builder_image();
         $this->clone_repository();
         $this->cleanup_git();
-        $this->generate_buildpack();
+        if ($this->application->build_pack === 'nixpacks') {
+            $this->generate_nixpacks_confs();
+        }
         $this->generate_compose_file();
         // Needs separate preview variables
         // $this->generate_build_env_variables();
@@ -277,7 +350,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         );
     }
 
-    private function generate_buildpack()
+    private function generate_nixpacks_confs()
     {
         $this->execute_remote_command(
             [
@@ -589,49 +662,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         );
     }
 
-    private function deploy()
-    {
 
-        $this->execute_remote_command(
-            [
-                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
-            ],
-        );
-        $this->prepare_builder_image();
-        $this->clone_repository();
-
-        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
-        if (strlen($tag) > 128) {
-            $tag = $tag->substr(0, 128);
-        }
-
-        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
-        $this->production_image_name = "{$this->application->uuid}:{$tag}";
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
-
-        if (!$this->force_rebuild) {
-            $this->execute_remote_command([
-                "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
-            ]);
-            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
-                $this->execute_remote_command([
-                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
-                ]);
-                $this->generate_compose_file();
-                $this->stop_running_container();
-                $this->start_by_compose_file();
-                return;
-            }
-        }
-        $this->cleanup_git();
-        $this->generate_buildpack();
-        $this->generate_compose_file();
-        $this->generate_build_env_variables();
-        $this->add_build_env_variables_to_dockerfile();
-        $this->build_image();
-        $this->stop_running_container();
-        $this->start_by_compose_file();
-    }
 
     private function generate_build_env_variables()
     {

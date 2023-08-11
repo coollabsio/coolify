@@ -9,8 +9,10 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'source' && 'text-white'"
-                @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+            @if ($application->git_based())
+                <a :class="activeTab === 'source' && 'text-white'"
+                    @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+            @endif
             <a :class="activeTab === 'destination' && 'text-white'"
                 @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
                 href="#">Destination
@@ -18,10 +20,12 @@
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
-            <a :class="activeTab === 'previews' && 'text-white'"
-                @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
-                Deployments
-            </a>
+            @if ($application->git_based())
+                <a :class="activeTab === 'previews' && 'text-white'"
+                    @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
+                    Deployments
+                </a>
+            @endif
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
@@ -40,9 +44,11 @@
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$application" />
             </div>
-            <div x-cloak x-show="activeTab === 'source'">
-                <livewire:project.application.source :application="$application" />
-            </div>
+            @if ($application->git_based())
+                <div x-cloak x-show="activeTab === 'source'">
+                    <livewire:project.application.source :application="$application" />
+                </div>
+            @endif
             <div x-cloak x-show="activeTab === 'destination'">
                 <livewire:project.shared.destination :destination="$application->destination" />
             </div>

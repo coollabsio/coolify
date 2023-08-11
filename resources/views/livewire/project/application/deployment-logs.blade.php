@@ -18,7 +18,7 @@
             @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                 @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                     <div @class([
-                        'font-mono break-all whitespace-pre-wrap',
+                        'font-mono break-all',
                         'text-neutral-400' => $line['type'] == 'stdout',
                         'text-error' => $line['type'] == 'stderr',
                         'text-warning' => $line['hidden'],
