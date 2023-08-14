@@ -35,6 +35,11 @@
                 <x-use-magic-bar link="/server/new" />
             </div>
         @endforelse
+        @isset($error)
+            <div class="text-center text-error">
+                <span>{{ $error }}</span>
+            </div>
+        @endisset
         <script>
             function goto(uuid) {
                 window.location.href = '/server/' + uuid;

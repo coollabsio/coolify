@@ -8,6 +8,7 @@ use Livewire\Component;
 class ByIp extends Component
 {
     public $private_keys;
+    public $limit_reached;
     public int|null $private_key_id = null;
     public $new_private_key_name;
     public $new_private_key_description;

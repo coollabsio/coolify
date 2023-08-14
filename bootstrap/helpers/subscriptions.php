@@ -43,11 +43,36 @@ function getEndDate()
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
 
-function isSubscribed()
+function is_subscription_active()
 {
-    return
-        auth()->user()?->currentTeam()?->subscription?->lemon_status === 'active' ||
-        (auth()->user()?->currentTeam()?->subscription?->lemon_ends_at &&
-            Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at) > Carbon::now()
-        ) || auth()->user()->isInstanceAdmin();
+    $team = auth()->user()?->currentTeam();
+    if (!$team) {
+        return false;
+    }
+    $subscription = $team?->subscription;
+    if (!$subscription) {
+        return false;
+    }
+
+    $is_active = $subscription->lemon_status === 'active';
+    $is_instance_admin = auth()->user()->isInstanceAdmin();
+    ray($is_instance_admin);
+
+    return $is_active || $is_instance_admin;
+}
+function is_subscription_in_grace_period()
+{
+    $team = auth()->user()?->currentTeam();
+    if (!$team) {
+        return false;
+    }
+    $subscription = $team?->subscription;
+    if (!$subscription) {
+        return false;
+    }
+    $is_instance_admin = auth()->user()->isInstanceAdmin();
+    $is_still_grace_period = $subscription->lemon_ends_at &&
+        Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
+
+    return $is_still_grace_period || $is_instance_admin;
 }

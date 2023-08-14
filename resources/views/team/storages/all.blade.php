@@ -4,9 +4,8 @@
         ->currentTeam()" />
     <div class="flex items-start gap-2">
         <h2 class="pb-4">S3 Storages</h2>
-        <x-forms.button class="btn">
-            <a class="text-white hover:no-underline" href="/team/storages/new">+ Add</a>
-        </x-forms.button>
+        <a class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button class="btn">+ Add
+            </x-forms.button></a>
     </div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($s3 as $storage)

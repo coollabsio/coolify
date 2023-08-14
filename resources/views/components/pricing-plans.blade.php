@@ -111,7 +111,7 @@
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $6)</span>
 
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                        href="{{ getSubscriptionLink('monthly') }}">Subscribe</a>
+                        href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
@@ -185,7 +185,7 @@
                     </p>
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $29)</span>
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-essential" class="buyme"
-                        href="{{ getSubscriptionLink('monthly') }}">Subscribe</a>
+                        href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-essential" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
@@ -255,7 +255,7 @@
                     </p>
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $69)</span>
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-growth" class="buyme"
-                        href="{{ getSubscriptionLink('monthly') }}">Subscribe</a>
+                        href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-growth" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
