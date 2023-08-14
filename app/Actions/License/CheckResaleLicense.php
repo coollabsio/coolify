@@ -14,6 +14,9 @@ class CheckResaleLicense
             $settings->update([
                 'is_resale_license_active' => false,
             ]);
+            if (is_dev()) {
+                return;
+            }
             if (!$settings->resale_license) {
                 return;
             }

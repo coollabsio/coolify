@@ -3,7 +3,7 @@
         <div class="flex justify-center mx-10">
             <div>
                 <div class="flex gap-2">
-                    <h3>Subscription</h3>
+                    <h2>Subscription</h2>
                     <livewire:switch-team />
                 </div>
                 <div class="flex items-center pb-8">

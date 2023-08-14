@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new Server</h1>
-    <div class="pt-2 pb-10 ">Servers are the main blocks of your infrastructure.</div>
+    <div class="subtitle ">Servers are the main blocks of your infrastructure.</div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />

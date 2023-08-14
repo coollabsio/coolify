@@ -30,7 +30,7 @@
                 </x-forms.button>
             </div>
         </div>
-        <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>
+        <div class="subtitle ">Your Private GitHub App for private repositories.</div>
         @if ($github_app->app_id)
             <div class="w-48">
                 <x-forms.checkbox label="System Wide?"

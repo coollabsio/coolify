@@ -14,8 +14,8 @@ class Backup extends Component
 {
     public InstanceSettings $settings;
     public $s3s;
-    public StandalonePostgresql|null $database = null;
-    public ScheduledDatabaseBackup|null $backup = null;
+    public StandalonePostgresql|null|array $database = [];
+    public ScheduledDatabaseBackup|null|array $backup = [];
     public $executions = [];
 
     protected $rules = [
@@ -36,8 +36,8 @@ class Backup extends Component
 
     public function mount()
     {
-        $this->backup = $this->database->scheduledBackups->first();
-        $this->executions = $this->backup->executions;
+        $this->backup = $this->database?->scheduledBackups->first() ?? [];
+        $this->executions = $this->backup?->executions ?? [];
     }
     public function add_coolify_database()
     {

@@ -6,7 +6,7 @@
             <livewire:project.add-empty />
         @endif
     </div>
-    <div class="pt-2 pb-10 ">All Projects</div>
+    <div class="subtitle ">All Projects</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @if ($servers === 0)
             <div>

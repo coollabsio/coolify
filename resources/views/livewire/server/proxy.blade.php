@@ -44,7 +44,7 @@
             @else
                 <div>
                     <h2>Proxy</h2>
-                    <div class="pt-2 pb-10 ">Select a proxy you would like to use on this server.</div>
+                    <div class="subtitle ">Select a proxy you would like to use on this server.</div>
                     <div class="flex gap-2">
                         <x-forms.button class="w-32 box" wire:click="select_proxy('{{ ProxyTypes::TRAEFIK_V2 }}')">
                             Traefik

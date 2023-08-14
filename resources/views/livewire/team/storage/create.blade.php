@@ -1,6 +1,6 @@
 <div>
     <h1>Create a new S3 Storage</h1>
-    <div class="pt-2 pb-10 ">S3 Storage used to save backups / files</div>
+    <div class="subtitle ">S3 Storage used to save backups / files</div>
     <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="name" />

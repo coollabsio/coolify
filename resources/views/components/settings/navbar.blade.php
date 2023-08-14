@@ -1,6 +1,6 @@
 <div class="pb-5">
     <h1>Settings</h1>
-    <div class="pt-2 pb-10">Instance wide settings for Coolify.</div>
+    <div class="subtitle">Instance wide settings for Coolify.</div>
     <nav class="navbar-main">
         <a class="{{ request()->routeIs('settings.configuration') ? 'text-white' : '' }}"
             href="{{ route('settings.configuration') }}">

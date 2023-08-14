@@ -1,8 +1,10 @@
 <x-layout>
     <h1>Profile</h1>
-    <div class="pt-2 pb-10 ">Your user profile settings.</div>
+    <div class="subtitle ">Your user profile settings.</div>
     <livewire:profile.form :request="$request" />
-    <h3 class="py-4">Two-factor Authentication</h3>
+    <h2 class="py-4">Subscription</h2>
+    <a href="{{ route('team.show') }}">Check in Team Settings</a>
+    <h2 class="py-4">Two-factor Authentication</h2>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">
             Please finish configuring two factor authentication below. Read the QR code or enter the secret key
@@ -17,7 +19,8 @@
             <div>
                 <div>{!! $request->user()->twoFactorQrCodeSvg() !!}</div>
                 <div x-data="{ showCode: false }" class="py-2">
-                    <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually enter</x-forms.button>
+                    <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually
+                        enter</x-forms.button>
                     <template x-if="showCode">
                         <div class="py-2 ">{!! decrypt($request->user()->two_factor_secret) !!}</div>
                     </template>

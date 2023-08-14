@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Sources</h1>
-    <div class="pt-2 pb-10 ">All Sources</div>
+    <div class="subtitle ">All Sources</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')

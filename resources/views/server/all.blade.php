@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Servers</span></h1>
-    <div class="pt-2 pb-10 ">All Servers</div>
+    <div class="subtitle ">All Servers</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
             <div x-data x-on:click="goto('{{ $server->uuid }}')" @class([
