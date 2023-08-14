@@ -29,6 +29,11 @@ function generate_readme_file(string $name, string $updated_at): string
     return "Resource name: $name\nLatest Deployment Date: $updated_at";
 }
 
+function is_instance_admin()
+{
+    return auth()->user()?->isInstanceAdmin();
+}
+
 function general_error_handler(Throwable|null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
     try {

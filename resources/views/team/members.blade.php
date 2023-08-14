@@ -26,7 +26,7 @@
                 <h3 class="pb-4">Invite a new member</h3>
             @else
                 <h3>Invite a new member</h3>
-                @if (auth()->user()->isInstanceAdmin())
+                @if (is_instance_admin())
                     <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
                             class="underline text-warning">Transactional
                             Emails</a>

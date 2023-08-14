@@ -51,7 +51,7 @@
                 </a>
             </li>
             <div class="flex-1"></div>
-            @if (auth()->user()->isInstanceAdmin())
+            @if (is_instance_admin())
                 <livewire:upgrade />
             @endif
             <li title="Profile">
@@ -79,7 +79,7 @@
                     </svg>
                 </a>
             </li>
-            @if (auth()->user()->isInstanceAdmin())
+            @if (is_instance_admin())
                 <li title="Settings" class="mt-auto">
                     <a class="hover:bg-transparent" @if (!request()->is('settings')) href="/settings" @endif>
                         <svg xmlns="http://www.w3.org/2000/svg"

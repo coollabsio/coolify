@@ -16,7 +16,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if (auth()->user()->isInstanceAdmin())
+            @if (is_instance_admin())
                 <x-forms.button wire:click='copyFromInstanceSettings'>
                     Copy from Instance Settings
                 </x-forms.button>

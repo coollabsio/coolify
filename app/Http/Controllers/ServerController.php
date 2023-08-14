@@ -12,7 +12,7 @@ class ServerController extends Controller
 
     public function new_server()
     {
-        if (!is_cloud()) {
+        if (!is_cloud() || is_instance_admin()) {
             return view('server.create', [
                 'limit_reached' => false,
                 'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),

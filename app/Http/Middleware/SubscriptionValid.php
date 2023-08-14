@@ -10,16 +10,20 @@ class SubscriptionValid
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $is_instance_admin = auth()->user()?->isInstanceAdmin();
 
         if (!auth()->user() || !is_cloud()) {
-            if ($request->path() === 'subscription' &&  !$is_instance_admin) {
+            if ($request->path() === 'subscription') {
                 return redirect('/');
             } else {
                 return $next($request);
             }
         }
-        if (is_subscription_active() && $request->path() === 'subscription' && !$is_instance_admin) {
+        $is_instance_admin = is_instance_admin();
+        if ($is_instance_admin) {
+            return $next($request);
+        }
+
+        if (is_subscription_active() && $request->path() === 'subscription') {
             return redirect('/');
         }
         if (is_subscription_in_grace_period()) {

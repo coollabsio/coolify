@@ -59,7 +59,7 @@ class Controller extends BaseController
 
     public function settings()
     {
-        if (auth()->user()->isInstanceAdmin()) {
+        if (is_instance_admin()) {
             $settings = InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
             if ($database) {

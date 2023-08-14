@@ -46,19 +46,21 @@ function getEndDate()
 function is_subscription_active()
 {
     $team = auth()->user()?->currentTeam();
+
     if (!$team) {
         return false;
     }
+    if (is_instance_admin()) {
+        return true;
+    }
     $subscription = $team?->subscription;
+
     if (!$subscription) {
         return false;
     }
-
     $is_active = $subscription->lemon_status === 'active';
-    $is_instance_admin = auth()->user()->isInstanceAdmin();
-    ray($is_instance_admin);
 
-    return $is_active || $is_instance_admin;
+    return $is_active;
 }
 function is_subscription_in_grace_period()
 {
@@ -66,13 +68,15 @@ function is_subscription_in_grace_period()
     if (!$team) {
         return false;
     }
+    if (is_instance_admin()) {
+        return true;
+    }
     $subscription = $team?->subscription;
     if (!$subscription) {
         return false;
     }
-    $is_instance_admin = auth()->user()->isInstanceAdmin();
     $is_still_grace_period = $subscription->lemon_ends_at &&
         Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
 
-    return $is_still_grace_period || $is_instance_admin;
+    return $is_still_grace_period;
 }
