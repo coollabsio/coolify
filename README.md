@@ -24,6 +24,13 @@ curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 
 You can find the installation script [here](./scripts/install.sh).
 
+# Running on Docker
+
+```bash
+docker compose up
+```
+
+
 ## Support
 
 -   Twitter: [@heyandras](https://twitter.com/heyandras)
