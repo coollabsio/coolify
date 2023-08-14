@@ -56,23 +56,23 @@
 
 	async function rollback() {
 		if (rollbackVersion) {
-			const sure = confirm(`Are you sure you want rollback Coolify to ${rollbackVersion}?`);
+			const sure = confirm(`Are you sure you want upgrade Coolify to ${rollbackVersion}?`);
 			if (sure) {
 				try {
 					loading.rollback = true;
 					console.log('loading.rollback', loading.rollback);
 					if (dev) {
-						console.log('rolling back to', rollbackVersion);
+						console.log('Upgrading to ', rollbackVersion);
 						await asyncSleep(4000);
 						return window.location.reload();
 					} else {
 						addToast({
-							message: 'Rollback started...',
+							message: 'Upgrade started...',
 							type: 'success'
 						});
 						await post(`/update`, { type: 'update', latestVersion: rollbackVersion });
 						addToast({
-							message: 'Rollback completed.<br><br>Waiting for the new version to start...',
+							message: 'Upgrade completed.<br><br>Waiting for the new version to start...',
 							type: 'success'
 						});
 
@@ -381,12 +381,12 @@
 					/>
 				</div>
 
-				<div class="grid grid-cols-4 items-center">
+				<div class="grid grid-cols-4 items-center pb-12">
 					<div class="col-span-2">
-						Rollback Coolify to a specific version
+						Upgrade Coolify to a specific version
 						<Explainer
 							position="dropdown-bottom"
-							explanation="You can rollback to a specific version of Coolify. This will not affect your current running resources.<br><br><a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
+							explanation="You can upgrade to a specific version of Coolify. This will not affect your current running resources, but could cause issues if you downgrade to an older version where the database layout was different..<br><br><a href='https://github.com/coollabsio/coolify/releases' target='_blank'>See available versions</a>"
 						/>
 					</div>
 					<input
@@ -401,7 +401,7 @@
 						class:loading={loading.rollback}
 						class="btn btn-primary ml-2"
 						disabled={!rollbackVersion || loading.rollback}
-						on:click|preventDefault|stopPropagation={rollback}>Rollback</button
+						on:click|preventDefault|stopPropagation={rollback}>Upgrade</button
 					>
 				</div>
 				<div class="grid grid-cols-2 items-center">
