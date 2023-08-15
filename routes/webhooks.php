@@ -176,6 +176,9 @@ Route::post('/source/github/events', function () {
 });
 
 if (is_cloud()) {
+    Route::get('/test', function () {
+        return 'OK';
+    });
     Route::get('/waitlist/confirm', function () {
         $email = request()->get('email');
         $confirmation_code = request()->get('confirmation_code');

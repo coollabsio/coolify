@@ -49,6 +49,5 @@ class Waitlist extends Component
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }
-
     }
 }
