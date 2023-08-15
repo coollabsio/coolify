@@ -130,10 +130,16 @@ function set_transanctional_email_settings(InstanceSettings|null $settings = nul
 function base_ip(): string
 {
     if (is_dev()) {
-        return "http://localhost";
+        return "localhost";
     }
     $settings = InstanceSettings::get();
-    return "http://$settings->public_ipv4";
+    if ($settings->public_ipv4) {
+        return "$settings->public_ipv4";
+    }
+    if ($settings->public_ipv6) {
+        return "$settings->public_ipv6";
+    }
+    return "localhost";
 }
 
 /**
