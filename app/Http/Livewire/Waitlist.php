@@ -31,7 +31,6 @@ class Waitlist extends Component
                 return;
             }
             $found = ModelsWaitlist::where('email', $this->email)->first();
-            ray($found);
             if ($found) {
                 if (!$found->verified) {
                     $this->emit('error', 'You are already on the waitlist. <br>Please check your email to verify your email address.');
