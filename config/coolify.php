@@ -2,6 +2,7 @@
 
 return [
     'self_hosted' => env('SELF_HOSTED', true),
+    'waitlist' => env('WAITLIST', false),
     'license_url' => 'https://license.coolify.io',
     'lemon_squeezy_webhook_secret' => env('LEMON_SQUEEZY_WEBHOOK_SECRET', null),
     'lemon_squeezy_checkout_id_monthly_basic' => env('LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_BASIC', null),

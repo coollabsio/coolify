@@ -6,6 +6,7 @@ use App\Models\GithubApp;
 use App\Models\PrivateKey;
 use App\Models\Subscription;
 use App\Models\Team;
+use App\Models\Waitlist;
 use App\Models\Webhook;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -139,7 +140,7 @@ Route::post('/source/github/events', function () {
                             ApplicationPreview::create([
                                 'application_id' => $application->id,
                                 'pull_request_id' => $pull_request_id,
-                                'pull_request_html_url' => $pull_request_html_url
+                                'pull_request_html_url' => $pull_request_html_url,
                             ]);
                         }
                         queue_application_deployment(
@@ -175,6 +176,38 @@ Route::post('/source/github/events', function () {
 });
 
 if (is_cloud()) {
+    Route::get('/waitlist/confirm', function () {
+        $email = request()->get('email');
+        $confirmation_code = request()->get('confirmation_code');
+        ray($email, $confirmation_code);
+        try {
+            $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
+            if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.confirmation_valid_for_minutes'))) {
+                $found->verified = true;
+                $found->save();
+                return 'Thank you for confirming your email address. We will notify you when you are next in line.';
+            }
+            return redirect()->route('dashboard');
+        } catch (error) {
+            return redirect()->route('dashboard');
+        }
+
+    })->name('webhooks.waitlist.confirm');
+    Route::get('/waitlist/cancel', function () {
+        $email = request()->get('email');
+        $confirmation_code = request()->get('confirmation_code');
+        try {
+            $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
+            if ($found && !$found->verified) {
+                $found->delete();
+                return 'Your email address has been removed from the waitlist.';
+            }
+            return redirect()->route('dashboard');
+        } catch (error) {
+            return redirect()->route('dashboard');
+        }
+
+    })->name('webhooks.waitlist.cancel');
     Route::post('/payments/events', function () {
         try {
             $secret = config('coolify.lemon_squeezy_webhook_secret');
@@ -188,7 +221,7 @@ if (is_cloud()) {
 
             $webhook = Webhook::create([
                 'type' => 'lemonsqueezy',
-                'payload' => $payload
+                'payload' => $payload,
             ]);
             $event = data_get($payload, 'meta.event_name');
             ray('Subscription event: ' . $event);
@@ -256,7 +289,7 @@ if (is_cloud()) {
             ray($e->getMessage());
             $webhook->update([
                 'status' => 'failed',
-                'failure_reason' => $e->getMessage()
+                'failure_reason' => $e->getMessage(),
             ]);
         } finally {
             return response('OK');

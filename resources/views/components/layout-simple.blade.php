@@ -24,11 +24,25 @@
 
 <body>
     @livewireScripts
+    <x-toaster-hub />
     <main>
         {{ $slot }}
     </main>
     <x-version class="fixed left-2 bottom-1" />
     <script>
+        Livewire.on('info', (message) => {
+            if (message) Toaster.info(message)
+        })
+        Livewire.on('error', (message) => {
+            if (message) Toaster.error(message)
+        })
+        Livewire.on('warning', (message) => {
+            if (message) Toaster.warning(message)
+        })
+        Livewire.on('success', (message) => {
+            if (message) Toaster.success(message)
+        })
+
         function changePasswordFieldType(event) {
             let element = event.target
             for (let i = 0; i < 10; i++) {
@@ -47,6 +61,7 @@
             }
         }
     </script>
+
 </body>
 
 </html>

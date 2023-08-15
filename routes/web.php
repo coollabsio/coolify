@@ -38,6 +38,8 @@ Route::post('/forgot-password', function (Request $request) {
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
+Route::get('/waitlist', [Controller::class, 'waitlist'])->name('auth.waitlist');
+
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);
@@ -91,6 +93,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');

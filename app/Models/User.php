@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
 use App\Notifications\TrnsactionalEmails\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -14,18 +15,14 @@ class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
 
-    protected $fillable = [
-        'id',
-        'name',
-        'email',
-        'password',
-    ];
+    protected $guarded = [];
     protected $hidden = [
         'password',
         'remember_token',
     ];
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'force_password_reset' => 'boolean',
     ];
 
     protected static function boot()
@@ -57,7 +54,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function sendPasswordResetNotification($token): void
     {
-        $this->notify(new ResetPassword($token));
+        $this->notify(new TransactionalEmailsResetPassword($token));
     }
 
     public function isAdmin()

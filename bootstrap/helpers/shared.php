@@ -101,9 +101,11 @@ function is_transactional_emails_active(): bool
     return data_get(InstanceSettings::get(), 'smtp_enabled');
 }
 
-function set_transanctional_email_settings(): void
+function set_transanctional_email_settings(InstanceSettings|null $settings = null): void
 {
-    $settings = InstanceSettings::get();
+    if (!$settings) {
+        $settings = InstanceSettings::get();
+    }
     $password = data_get($settings, 'smtp_password');
     if (isset($password)) {
         $password = decrypt($password);

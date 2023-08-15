@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Jobs\CheckResaleLicenseJob;
 use App\Jobs\CheckResaleLicenseKeys;
+use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceApplicationsStatusJob;
@@ -22,12 +23,14 @@ class Kernel extends ConsoleKernel
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
 
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
             // $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
             $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
             $schedule->job(new CheckResaleLicenseJob)->hourly();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();

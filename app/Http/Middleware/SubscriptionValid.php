@@ -10,7 +10,6 @@ class SubscriptionValid
 {
     public function handle(Request $request, Closure $next): Response
     {
-
         if (!auth()->user() || !is_cloud()) {
             if ($request->path() === 'subscription') {
                 return redirect('/');
@@ -36,7 +35,10 @@ class SubscriptionValid
                 'subscription',
                 'login',
                 'register',
+                'waitlist',
+                'force-password-reset',
                 'logout',
+                'livewire/message/force-password-reset',
                 'livewire/message/check-license',
                 'livewire/message/switch-team',
             ];

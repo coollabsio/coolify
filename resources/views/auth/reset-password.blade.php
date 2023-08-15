@@ -1,14 +1,13 @@
 <x-layout-simple>
-    <div class="flex items-center justify-center h-screen mx-auto">
+    <div class="min-h-screen hero">
         <div>
             <div class="flex flex-col items-center pb-8">
                 <a href="{{ route('dashboard') }}">
                     <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 </a>
-                <x-version />
             </div>
-            <div class="flex items-center gap-2">
-                <h1>{{ __('auth.reset_password') }}</h1>
+            <div class="flex items-center justify-center pb-4 text-center">
+                <h2>{{ __('auth.reset_password') }}</h2>
             </div>
             <div>
                 <form action="/reset-password" method="POST" class="flex flex-col gap-2">
@@ -16,7 +15,7 @@
                     <input hidden id="token" name="token" value="{{ request()->route('token') }}">
                     <input hidden value="{{ request()->query('email') }}" type="email" name="email"
                         label="{{ __('input.email') }}" />
-                    <div class="flex gap-2">
+                    <div class="flex flex-col gap-2">
                         <x-forms.input required type="password" id="password" name="password"
                             label="{{ __('input.password') }}" autofocus />
                         <x-forms.input required type="password" id="password_confirmation" name="password_confirmation"
