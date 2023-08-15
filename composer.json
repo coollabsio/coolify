@@ -9,6 +9,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "danharrin/livewire-rate-limiting": "^1.1",
         "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^v1.16.0",

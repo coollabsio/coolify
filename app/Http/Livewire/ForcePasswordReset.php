@@ -3,10 +3,12 @@
 namespace App\Http\Livewire;
 
 use Illuminate\Support\Facades\Hash;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Livewire\Component;
 
 class ForcePasswordReset extends Component
 {
+    use WithRateLimiting;
     public string $email;
     public string $password;
     public string $password_confirmation;
@@ -21,6 +23,7 @@ class ForcePasswordReset extends Component
     }
     public function submit() {
         try {
+            $this->rateLimit(10);
             $this->validate();
             auth()->user()->forceFill([
                 'password' => Hash::make($this->password),

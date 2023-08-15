@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 
 function application_configuration_dir(): string
 {
@@ -46,7 +47,9 @@ function general_error_handler(Throwable|null $err = null, $that = null, $isJson
             } else {
                 throw new Exception($customErrorMessage ?? $err->errorInfo[2]);
             }
-        } else {
+        } elseif($err instanceof TooManyRequestsException){
+            throw new Exception($customErrorMessage ?? "Too many requests. Please try again in {$err->secondsUntilAvailable} seconds.");
+        }else {
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
     } catch (Throwable $error) {

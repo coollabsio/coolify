@@ -3,6 +3,7 @@
 namespace App\Http\Livewire;
 
 use App\Jobs\SendConfirmationForWaitlistJob;
+use App\Models\User;
 use App\Models\Waitlist as ModelsWaitlist;
 use Livewire\Component;
 
@@ -24,6 +25,11 @@ class Waitlist extends Component
     {
         $this->validate();
         try {
+            $already_registered = User::whereEmail($this->email)->first();
+            if ($already_registered) {
+                $this->emit('success', 'You are already registered (Thank you 💜).');
+                return;
+            }
             $found = ModelsWaitlist::where('email', $this->email)->first();
             ray($found);
             if ($found) {

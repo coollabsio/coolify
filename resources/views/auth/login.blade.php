@@ -3,7 +3,6 @@
         <div class="w-96 min-w-fit">
             <div class="flex flex-col items-center pb-8">
                 <div class="text-5xl font-extrabold tracking-tight text-center text-white">Coolify</div>
-                <x-version />
             </div>
             <div class="flex items-center gap-2">
                 <h1>{{ __('auth.login') }}</h1>

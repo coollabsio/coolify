@@ -1,7 +1,12 @@
 <div class="min-h-screen hero">
     <div class="w-96 min-w-fit">
+        <div class="flex flex-col items-center pb-8">
+            <a href="{{ route('dashboard') }}">
+                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+            </a>
+        </div>
         <div class="flex items-center justify-center pb-4 text-center">
-            <h2>Start self-hosting in the
+            <h2>Self-hosting in the cloud
                 <svg class="inline-block w-8 h-8 text-warning width="512" height="512" viewBox="0 0 20 20"
                     xmlns="http://www.w3.org/2000/svg">
                     <g fill="currentColor" fill-rule="evenodd" clip-rule="evenodd">
@@ -18,6 +23,6 @@
             <x-forms.input id="email" type="email" label="Email" placeholder="youareawesome@protonmail.com" />
             <x-forms.button type="submit">Join Waitlist</x-forms.button>
         </form>
-        Waiting: {{$waiting_in_line}}
+        Waiting in the line: {{$waiting_in_line}}
     </div>
 </div>
