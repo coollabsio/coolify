@@ -3,7 +3,6 @@
 namespace App\Traits;
 
 use App\Enums\ApplicationDeploymentStatus;
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -13,6 +12,7 @@ use Illuminate\Support\Str;
 trait ExecuteRemoteCommand
 {
     public string|null $save = null;
+
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;

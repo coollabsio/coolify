@@ -4,8 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\PendingRequest;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\Http;
 
 class SyncBunny extends Command
 {

@@ -3,8 +3,8 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Rollback extends Component
@@ -16,8 +16,9 @@ class Rollback extends Component
 
     public function mount()
     {
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
     }
+
     public function rollbackImage($commit)
     {
         $deployment_uuid = new Cuid2(7);
@@ -36,6 +37,7 @@ class Rollback extends Component
             'environment_name' => $this->parameters['environment_name'],
         ]);
     }
+
     public function loadImages()
     {
         try {

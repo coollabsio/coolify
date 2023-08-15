@@ -21,7 +21,7 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('instancesettings', function (Blueprint $table) {
+        Schema::table('instance_settings', function (Blueprint $table) {
             $table->string('wildcard_domain')->nullable();
         });
     }

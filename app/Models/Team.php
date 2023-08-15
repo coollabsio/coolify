@@ -2,74 +2,63 @@
 
 namespace App\Models;
 
-use App\Notifications\Channels\SendsEmail;
 use App\Notifications\Channels\SendsDiscord;
-use Illuminate\Database\Eloquent\Builder;
+use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
-use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
-use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class Team extends Model implements SendsDiscord, SendsEmail
 {
-    use Notifiable, SchemalessAttributesTrait;
+    use Notifiable;
 
-    protected $schemalessAttributes = [
-        'smtp',
-        'discord',
-        'smtp_notifications',
-        'discord_notifications',
-    ];
+    protected $guarded = [];
     protected $casts = [
-        'smtp' => SchemalessAttributes::class,
-        'discord' => SchemalessAttributes::class,
-        'smtp_notifications' => SchemalessAttributes::class,
-        'discord_notifications' => SchemalessAttributes::class,
         'personal_team' => 'boolean',
-    ];
-    public function scopeWithSmtp(): Builder
-    {
-        return $this->smtp->modelScope();
-    }
-    public function scopeWithDiscord(): Builder
-    {
-        return $this->discord->modelScope();
-    }
-    public function scopeWithSmtpNotifications(): Builder
-    {
-        return $this->smtp_notifications->modelScope();
-    }
-    public function scopeWithDiscordNotifications(): Builder
-    {
-        return $this->discord_notifications->modelScope();
-    }
-    protected $fillable = [
-        'id',
-        'name',
-        'description',
-        'personal_team',
-        'smtp',
-        'discord'
     ];
 
     public function routeNotificationForDiscord()
     {
-        return $this->discord->get('webhook_url');
+        return data_get($this, 'discord_webhook_url', null);
     }
-    public function routeNotificationForEmail(string $attribute = 'recipients')
+
+    public function getRecepients($notification)
     {
-        $recipients = $this->smtp->get($attribute, '');
-        if (is_null($recipients) || $recipients === '') {
-            return [];
+        $recipients = data_get($notification, 'emails', null);
+        if (is_null($recipients)) {
+            $recipients = $this->members()->pluck('email')->toArray();
+            return $recipients;
         }
         return explode(',', $recipients);
     }
 
+    public function members()
+    {
+        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
+    }
 
     public function subscription()
     {
         return $this->hasOne(Subscription::class);
     }
+
+    public function applications()
+    {
+        return $this->hasManyThrough(Application::class, Project::class);
+    }
+
+    public function invitations()
+    {
+        return $this->hasMany(TeamInvitation::class);
+    }
+
+    public function isEmpty()
+    {
+        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
+            return true;
+        }
+        return false;
+    }
+
     public function projects()
     {
         return $this->hasMany(Project::class);
@@ -80,23 +69,11 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return $this->hasMany(Server::class);
     }
 
-    public function applications()
-    {
-        return $this->hasManyThrough(Application::class, Project::class);
-    }
-
     public function privateKeys()
     {
         return $this->hasMany(PrivateKey::class);
     }
-    public function members()
-    {
-        return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');
-    }
-    public function invitations()
-    {
-        return $this->hasMany(TeamInvitation::class);
-    }
+
     public function sources()
     {
         $sources = collect([]);
@@ -106,11 +83,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
         return $sources;
     }
-    public function isEmpty()
+
+    public function s3s()
     {
-        if ($this->projects()->count() === 0 && $this->servers()->count() === 0 && $this->privateKeys()->count() === 0 && $this->sources()->count() === 0) {
-            return true;
-        }
-        return false;
+        return $this->hasMany(S3Storage::class);
     }
 }

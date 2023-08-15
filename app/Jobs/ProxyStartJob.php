@@ -17,6 +17,7 @@ class ProxyStartJob implements ShouldQueue
     public function __construct(protected Server $server)
     {
     }
+
     public function handle()
     {
         try {

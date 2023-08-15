@@ -1,7 +1,6 @@
-version: '3.8'
+version: "3.8"
 
-x-testing-host:
-  &testing-host-base
+x-testing-host: &testing-host-base
   build:
     dockerfile: Dockerfile
     context: ./docker/testing-host
@@ -34,14 +33,14 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - ./_data/_volumes/database/:/var/lib/postgresql/data
+      - /data/coolify/_volumes/database/:/var/lib/postgresql/data
   redis:
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"
     env_file:
       - .env
     volumes:
-      - ./_data/_volumes/redis/:/data
+      - /data/coolify/_volumes/redis/:/data
   vite:
     image: node:19
     working_dir: /var/www/html
@@ -55,26 +54,26 @@ services:
     container_name: coolify-testing-host
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/proxy/testing-host-1:/data/coolify/proxy"
-  testing-host-2:
-    <<: *testing-host-base
-    container_name: coolify-testing-host-2
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - "./_data/coolify/proxy/testing-host-2:/data/coolify/proxy"
+      - /data/coolify/:/data/coolify
   mailpit:
-    image: 'axllent/mailpit:latest'
+    image: "axllent/mailpit:latest"
     container_name: coolify-mail
     ports:
-      - '${FORWARD_MAILPIT_PORT:-1025}:1025'
-      - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
+      - "${FORWARD_MAILPIT_PORT:-1025}:1025"
+      - "${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025"
     networks:
       - coolify
-
-  buggregator:
-    image: ghcr.io/buggregator/server:latest
-    container_name: coolify-debug
+  minio:
+    image: minio/minio:latest
+    container_name: coolify-minio
+    command: server /data --console-address ":9001"
     ports:
-      - 8001:8000
+      - "${FORWARD_MINIO_PORT:-9000}:9000"
+      - "${FORWARD_MINIO_PORT_CONSOLE:-9001}:9001"
+    environment:
+      MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
+      MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
+    volumes:
+      - /data/coolify/_volumes/minio/:/data
     networks:
       - coolify

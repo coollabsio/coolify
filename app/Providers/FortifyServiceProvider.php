@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
+use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -41,13 +42,19 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
+            ray('asd');
             $settings = InstanceSettings::get();
             if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
-            return view('auth.register');
+            if (config('coolify.waitlist')) {
+                return view('auth.waitlist');
+            } else {
+                return view('auth.register');
+            }
         });
 
         Fortify::loginView(function () {
@@ -91,8 +98,16 @@ class FortifyServiceProvider extends ServiceProvider
             return view('auth.two-factor-challenge');
         });
 
+        RateLimiter::for('force-password-reset', function (Request $request) {
+            return Limit::perMinute(15)->by($request->user()->id);
+        });
+
+        RateLimiter::for('forgot-password', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
         RateLimiter::for('login', function (Request $request) {
-            $email = (string) $request->email;
+            $email = (string)$request->email;
 
             return Limit::perMinute(5)->by($email . $request->ip());
         });

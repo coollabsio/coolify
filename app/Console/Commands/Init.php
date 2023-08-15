@@ -10,10 +10,12 @@ class Init extends Command
 {
     protected $signature = 'app:init';
     protected $description = 'Cleanup instance related stuffs';
+
     public function handle()
     {
         $this->cleanup_in_progress_application_deployments();
     }
+
     private function cleanup_in_progress_application_deployments()
     {
         // Cleanup any failed deployments

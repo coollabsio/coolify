@@ -36,7 +36,7 @@ function queue {
 }
 
 function horizon {
-    bash spin exec -u webuser coolify php artisan horizon -vvv  
+    bash spin exec -u webuser coolify php artisan horizon -vvv
 }
 
 function schedule {
@@ -92,8 +92,8 @@ function tinker {
 }
 
 
-function build:builder {
-    act -W .github/workflows/coolify-builder.yml --secret-file .env.secrets
+function build:helper {
+    act -W .github/workflows/coolify-helper.yml --secret-file .env.secrets
 }
 function default {
     help

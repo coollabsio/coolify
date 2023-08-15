@@ -1,7 +1,6 @@
 <div class="w-full">
     @if ($label)
-        <label for="small-input"
-            class="flex items-center gap-1 mb-2 text-sm font-medium text-neutral-400">{{ $label }}
+        <label for="small-input" class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
             @if ($required)
                 <span class="text-warning">*</span>
             @endif
@@ -10,12 +9,7 @@
             @endif
         </label>
     @endif
-    @if ($type !== 'password')
-        <input {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
-            wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
-            wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-            @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
-    @elseif ($type === 'password')
+    @if ($type === 'password')
         <div class="relative" x-data>
             @if ($allowToPeak)
                 <div x-on:click="changePasswordFieldType"
@@ -30,11 +24,23 @@
             @endif
             <input {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }} @required($required)
                 wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
-                wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" type="{{ $type }}"
-                @disabled($disabled) id="{{ $id }}" name="{{ $name }}">
+                wire:dirty.class="input-warning" wire:loading.attr="disabled" type="{{ $type }}"
+                @readonly($readonly) @disabled($disabled) id="{{ $id }}" name="{{ $name }}"
+                placeholder="{{ $attributes->get('placeholder') }}">
+
         </div>
+    @else
+        <input {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
+            wire:model.defer={{ $id }} wire:dirty.class.remove='text-white' wire:dirty.class="input-warning"
+            wire:loading.attr="disabled" type="{{ $type }}" @disabled($disabled)
+            id="{{ $id }}" name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}">
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
     @endif
+    @error($id)
+        <label class="label">
+            <span class="text-red-500 label-text-alt">{{ $message }}</span>
+        </label>
+    @enderror
 </div>

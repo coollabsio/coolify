@@ -2,8 +2,8 @@
 
 use App\Actions\CoolifyTask\RunRemoteProcess;
 use App\Actions\CoolifyTask\TidyOutput;
-use App\Models\User;
 use App\Models\Server;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
 use Illuminate\Foundation\Testing\RefreshDatabase;

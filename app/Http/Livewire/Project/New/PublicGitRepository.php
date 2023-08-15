@@ -15,13 +15,10 @@ use Spatie\Url\Url;
 class PublicGitRepository extends Component
 {
     public string $repository_url;
-    private object $repository_url_parsed;
-
     public int $port = 3000;
     public string $type;
     public $parameters;
     public $query;
-
     public bool $branch_found = false;
     public string $selected_branch = 'main';
     public bool $is_static = false;
@@ -29,11 +26,6 @@ class PublicGitRepository extends Component
     public string $git_branch = 'main';
     public int $rate_limit_remaining = 0;
     public $rate_limit_reset = 0;
-
-    private GithubApp|GitlabApp $git_source;
-    private string $git_host;
-    private string $git_repository;
-
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
@@ -46,13 +38,18 @@ class PublicGitRepository extends Component
         'is_static' => 'static',
         'publish_directory' => 'publish directory',
     ];
+    private object $repository_url_parsed;
+    private GithubApp|GitlabApp $git_source;
+    private string $git_host;
+    private string $git_repository;
+
     public function mount()
     {
-        if (isDev()) {
+        if (is_dev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
             $this->port = 3000;
         }
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
         $this->query = request()->query();
     }
 
@@ -67,12 +64,7 @@ class PublicGitRepository extends Component
         }
         $this->emit('success', 'Application settings updated!');
     }
-    private function get_branch()
-    {
-        ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
-        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
-        $this->branch_found = true;
-    }
+
     public function load_branch()
     {
         $this->branch_found = false;
@@ -82,7 +74,9 @@ class PublicGitRepository extends Component
         $this->get_git_source();
         try {
             $this->get_branch();
+            $this->selected_branch = $this->git_branch;
         } catch (\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
         }
 
         if (!$this->branch_found && $this->git_branch == 'main') {
@@ -94,6 +88,7 @@ class PublicGitRepository extends Component
             }
         }
     }
+
     private function get_git_source()
     {
         $this->repository_url_parsed = Url::fromString($this->repository_url);
@@ -109,6 +104,14 @@ class PublicGitRepository extends Component
             // Not supported yet
         }
     }
+
+    private function get_branch()
+    {
+        ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
+        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
+        $this->branch_found = true;
+    }
+
     public function submit()
     {
         try {

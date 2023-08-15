@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class Create extends Component
 {
-    protected string|null $from = null;
+    public string|null $from = null;
     public string $name;
     public string|null $description = null;
     public string $value;
@@ -19,6 +19,7 @@ class Create extends Component
         'name' => 'name',
         'value' => 'private Key',
     ];
+
     public function createPrivateKey()
     {
         $this->validate();
@@ -31,7 +32,7 @@ class Create extends Component
                 'name' => $this->name,
                 'description' => $this->description,
                 'private_key' => $this->value,
-                'team_id' => session('currentTeam')->id
+                'team_id' => auth()->user()->currentTeam()->id
             ]);
             if ($this->from === 'server') {
                 return redirect()->route('server.create');

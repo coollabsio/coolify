@@ -4,8 +4,8 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\InstanceSettings;
-use Livewire\Component;
 use Illuminate\Support\Str;
+use Livewire\Component;
 use Spatie\Url\Url;
 
 class General extends Component
@@ -33,6 +33,7 @@ class General extends Component
 
     protected $rules = [
         'application.name' => 'required',
+        'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
         'application.git_repository' => 'required',
         'application.git_branch' => 'required',
@@ -46,9 +47,11 @@ class General extends Component
         'application.publish_directory' => 'nullable',
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
+        'application.dockerfile' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
+        'application.description' => 'description',
         'application.fqdn' => 'FQDN',
         'application.git_repository' => 'Git repository',
         'application.git_branch' => 'Git branch',
@@ -62,7 +65,9 @@ class General extends Component
         'application.publish_directory' => 'Publish directory',
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
+        'application.dockerfile' => 'Dockerfile',
     ];
+
     public function instantSave()
     {
         // @TODO: find another way - if possible
@@ -84,6 +89,7 @@ class General extends Component
         $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
     }
+
     protected function checkWildCardDomain()
     {
         $coolify_instance_settings = InstanceSettings::get();
@@ -91,6 +97,7 @@ class General extends Component
         $this->global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
         $this->wildcard_domain = $this->server_wildcard_domain ?? $this->global_wildcard_domain ?? null;
     }
+
     public function mount()
     {
         $this->is_static = $this->application->settings->is_static;
@@ -102,6 +109,7 @@ class General extends Component
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
     }
+
     public function generateGlobalRandomDomain()
     {
         // Set wildcard domain based on Global wildcard domain
@@ -113,6 +121,7 @@ class General extends Component
         $this->application->save();
         $this->emit('success', 'Application settings updated!');
     }
+
     public function generateServerRandomDomain()
     {
         // Set wildcard domain based on Server wildcard domain
@@ -124,6 +133,7 @@ class General extends Component
         $this->application->save();
         $this->emit('success', 'Application settings updated!');
     }
+
     public function submit()
     {
         try {
@@ -132,6 +142,10 @@ class General extends Component
             $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                 return Str::of($domain)->trim()->lower();
             });
+            $port = get_port_from_dockerfile($this->application->dockerfile);
+            if ($port) {
+                $this->application->ports_exposes = $port;
+            }
             if ($this->application->base_directory && $this->application->base_directory !== '/') {
                 $this->application->base_directory = rtrim($this->application->base_directory, '/');
             }

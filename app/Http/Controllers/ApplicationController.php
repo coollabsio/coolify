@@ -5,15 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\ApplicationDeploymentQueue;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
-use Illuminate\Http\Request;
-use Spatie\Activitylog\Models\Activity;
 
 class ApplicationController extends Controller
 {
     use AuthorizesRequests, ValidatesRequests;
+
     public function configuration()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -27,9 +26,10 @@ class ApplicationController extends Controller
         }
         return view('project.application.configuration', ['application' => $application]);
     }
+
     public function deployments()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -49,7 +49,7 @@ class ApplicationController extends Controller
     {
         $deploymentUuid = request()->route('deployment_uuid');
 
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

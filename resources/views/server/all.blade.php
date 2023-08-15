@@ -1,6 +1,6 @@
 <x-layout>
-    <h1>Servers</h1>
-    <div class="pt-2 pb-10 ">All Servers</div>
+    <h1>Servers</span></h1>
+    <div class="subtitle ">All Servers</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
             <div x-data x-on:click="goto('{{ $server->uuid }}')" @class([
@@ -11,7 +11,6 @@
                 <div class="flex flex-col mx-6">
                     <div class=" group-hover:text-white">
                         {{ $server->name }}
-
                     </div>
                     <div class="text-xs group-hover:text-white"
                         href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}">
@@ -33,9 +32,14 @@
         @empty
             <div>
                 <div>No servers found. Without a server, you won't be able to do much.</div>
-                <x-use-magic-bar />
+                <x-use-magic-bar link="/server/new" />
             </div>
         @endforelse
+        @isset($error)
+            <div class="text-center text-error">
+                <span>{{ $error }}</span>
+            </div>
+        @endisset
         <script>
             function goto(uuid) {
                 window.location.href = '/server/' + uuid;

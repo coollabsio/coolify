@@ -4,9 +4,9 @@ namespace App\View\Components\Forms;
 
 use Closure;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Str;
 use Illuminate\View\Component;
 use Visus\Cuid2\Cuid2;
-use Illuminate\Support\Str;
 
 class Select extends Component
 {
@@ -18,8 +18,8 @@ class Select extends Component
         public string|null $name = null,
         public string|null $label = null,
         public string|null $helper = null,
-        public bool $required = false,
-        public string $defaultClass = "select select-sm w-full rounded text-white text-sm bg-coolgray-200 font-normal disabled:bg-coolgray-200/50 disabled:border-none"
+        public bool        $required = false,
+        public string      $defaultClass = "select select-sm w-full rounded text-white text-sm bg-coolgray-200 font-normal disabled:bg-coolgray-200/50 disabled:border-none"
     ) {
         //
     }

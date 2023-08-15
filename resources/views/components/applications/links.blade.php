@@ -45,7 +45,8 @@
                                     <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
                                     <path
                                         d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
-                                </svg>PR{{ data_get($preview, 'pull_request_id') }} |
+                                </svg>
+                                PR{{ data_get($preview, 'pull_request_id') }} |
                                 {{ data_get($preview, 'fqdn') }}
                             </a>
                         </li>
@@ -54,7 +55,7 @@
             @endif
             @if (data_get($application, 'ports_mappings_array'))
                 @foreach ($application->ports_mappings_array as $port)
-                    @if (isDev())
+                    @if (is_dev())
                         <li>
                             <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
                                 target="_blank" href="http://localhost:{{ explode(':', $port)[0] }}">
@@ -66,7 +67,8 @@
                                     <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
                                     <path
                                         d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
-                                </svg>Port {{ $port }}
+                                </svg>
+                                Port {{ $port }}
                             </a>
                         </li>
                     @else
@@ -82,7 +84,8 @@
                                     <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
                                     <path
                                         d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
-                                </svg>Port {{ $port }}
+                                </svg>
+                                Port {{ $port }}
                             </a>
                         </li>
                     @endif

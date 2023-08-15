@@ -2,13 +2,13 @@
 
 namespace App\Http\Livewire\Server\New;
 
-use App\Models\PrivateKey;
 use App\Models\Server;
 use Livewire\Component;
 
 class ByIp extends Component
 {
     public $private_keys;
+    public $limit_reached;
     public int|null $private_key_id = null;
     public $new_private_key_name;
     public $new_private_key_description;
@@ -35,19 +35,23 @@ class ByIp extends Component
         'user' => 'user',
         'port' => 'port',
     ];
+
     public function mount()
     {
         $this->name = generate_random_name();
         $this->private_key_id = $this->private_keys->first()->id;
     }
+
     public function setPrivateKey(string $private_key_id)
     {
         $this->private_key_id = $private_key_id;
     }
+
     public function instantSave()
     {
         $this->emit('success', 'Application settings updated!');
     }
+
     public function submit()
     {
         $this->validate();
@@ -61,7 +65,7 @@ class ByIp extends Component
                 'ip' => $this->ip,
                 'user' => $this->user,
                 'port' => $this->port,
-                'team_id' => session('currentTeam')->id,
+                'team_id' => auth()->user()->currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
             ]);
             $server->settings->is_part_of_swarm = $this->is_part_of_swarm;

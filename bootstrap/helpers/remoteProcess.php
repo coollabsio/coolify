@@ -5,6 +5,7 @@ use App\Data\CoolifyTaskArgs;
 use App\Enums\ActivityTypes;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\PrivateKey;
 use App\Models\Server;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ use Spatie\Activitylog\Models\Activity;
 function remote_process(
     array   $command,
     Server  $server,
-    string $type = ActivityTypes::INLINE->value,
+    string  $type = ActivityTypes::INLINE->value,
     ?string $type_uuid = null,
     ?Model  $model = null,
     bool    $ignore_errors = false,
@@ -54,11 +55,13 @@ function remote_process(
         ),
     ])();
 }
+
 function get_private_key_for_server(Server $server)
 {
     $temp_file = "id.root@{$server->ip}";
     return '/var/www/html/storage/app/ssh/keys/' . $temp_file;
 }
+
 function save_private_key_for_server(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
@@ -147,4 +150,45 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
         });
 
     return $formatted;
+}
+
+function refreshPrivateKey(PrivateKey $private_key)
+{
+    foreach ($private_key->servers as $server) {
+        // Delete the old ssh mux file to force a new one to be created
+        Storage::disk('ssh-mux')->delete($server->muxFilename());
+        if (auth()->user()->currentTeam()->id) {
+            auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
+        }
+    }
+}
+
+function validateServer(Server $server)
+{
+    try {
+        refreshPrivateKey($server->privateKey);
+        $uptime = instant_remote_process(['uptime'], $server);
+        if (!$uptime) {
+            $uptime = 'Server not reachable.';
+            throw new \Exception('Server not reachable.');
+        }
+        $server->settings->is_reachable = true;
+
+        $dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $server, false);
+        if (!$dockerVersion) {
+            $dockerVersion = 'Not installed.';
+            throw new \Exception('Docker not installed.');
+        }
+        $server->settings->is_usable = true;
+        return [
+            "uptime" => $uptime,
+            "dockerVersion" => $dockerVersion,
+        ];
+    } catch (\Exception $e) {
+        $server->settings->is_reachable = false;
+        $server->settings->is_usable = false;
+        throw $e;
+    } finally {
+        $server->settings->save();
+    }
 }

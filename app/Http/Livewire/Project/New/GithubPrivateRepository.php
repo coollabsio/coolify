@@ -5,16 +5,14 @@ namespace App\Http\Livewire\Project\New;
 use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\Project;
-use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class GithubPrivateRepository extends Component
 {
+    public $current_step = 'github_apps';
     public $github_apps;
     public GithubApp $github_app;
     public $parameters;
@@ -29,52 +27,23 @@ class GithubPrivateRepository extends Component
     public string $selected_branch_name = 'main';
 
     public string $token;
-
-    protected int $page = 1;
-
     public $repositories;
     public int $total_repositories_count = 0;
-
     public $branches;
     public int $total_branches_count = 0;
-
     public int $port = 3000;
     public bool $is_static = false;
     public string|null $publish_directory = null;
+    protected int $page = 1;
 
     public function mount()
     {
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
     }
-    protected function loadRepositoryByPage()
-    {
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
-        $json = $response->json();
-        if ($response->status() !== 200) {
-            return $this->emit('error', $json['message']);
-        }
 
-        if ($json['total_count'] === 0) {
-            return;
-        }
-        $this->total_repositories_count = $json['total_count'];
-        $this->repositories = $this->repositories->concat(collect($json['repositories']));
-    }
-    protected function loadBranchByPage()
-    {
-        Log::info('Loading page ' . $this->page);
-        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
-        $json = $response->json();
-        if ($response->status() !== 200) {
-            return $this->emit('error', $json['message']);
-        }
-
-        $this->total_branches_count = count($json);
-        $this->branches = $this->branches->concat(collect($json));
-    }
     public function loadRepositories($github_app_id)
     {
         $this->repositories = collect();
@@ -90,7 +59,24 @@ class GithubPrivateRepository extends Component
             }
         }
         $this->selected_repository_id = $this->repositories[0]['id'];
+        $this->current_step = 'repository';
     }
+
+    protected function loadRepositoryByPage()
+    {
+        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100&page={$this->page}");
+        $json = $response->json();
+        if ($response->status() !== 200) {
+            return $this->emit('error', $json['message']);
+        }
+
+        if ($json['total_count'] === 0) {
+            return;
+        }
+        $this->total_repositories_count = $json['total_count'];
+        $this->repositories = $this->repositories->concat(collect($json['repositories']));
+    }
+
     public function loadBranches()
     {
         $this->selected_repository_owner = $this->repositories->where('id', $this->selected_repository_id)->first()['owner']['login'];
@@ -105,6 +91,20 @@ class GithubPrivateRepository extends Component
             }
         }
     }
+
+    protected function loadBranchByPage()
+    {
+        ray('Loading page ' . $this->page);
+        $response = Http::withToken($this->token)->get("{$this->github_app->api_url}/repos/{$this->selected_repository_owner}/{$this->selected_repository_repo}/branches?per_page=100&page={$this->page}");
+        $json = $response->json();
+        if ($response->status() !== 200) {
+            return $this->emit('error', $json['message']);
+        }
+
+        $this->total_branches_count = count($json);
+        $this->branches = $this->branches->concat(collect($json));
+    }
+
     public function submit()
     {
         try {
@@ -134,7 +134,7 @@ class GithubPrivateRepository extends Component
                 'destination_id' => $destination->id,
                 'destination_type' => $destination_class,
                 'source_id' => $this->github_app->id,
-                'source_type' =>  $this->github_app->getMorphClass()
+                'source_type' => $this->github_app->getMorphClass()
             ]);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
@@ -148,6 +148,7 @@ class GithubPrivateRepository extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function instantSave()
     {
         if ($this->is_static) {

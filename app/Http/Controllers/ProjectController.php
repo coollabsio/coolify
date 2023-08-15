@@ -3,46 +3,48 @@
 namespace App\Http\Controllers;
 
 use App\Models\Project;
+use App\Models\Server;
 
 class ProjectController extends Controller
 {
     public function all()
     {
-        $teamId = session('currentTeam')->id;
-
-        $projects = Project::where('team_id', $teamId)->get();
-        return view('projects', ['projects' => $projects]);
+        return view('projects', [
+            'projects' => Project::ownedByCurrentTeam()->get(),
+            'servers' => Server::ownedByCurrentTeam()->count(),
+        ]);
     }
 
     public function edit()
     {
         $projectUuid = request()->route('project_uuid');
-        $teamId = session('currentTeam')->id;
+        $teamId = auth()->user()->currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
         return view('project.edit', ['project' => $project]);
     }
+
     public function show()
     {
         $projectUuid = request()->route('project_uuid');
-        $teamId = session('currentTeam')->id;
+        $teamId = auth()->user()->currentTeam()->id;
 
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
         $project->load(['environments']);
-        if (count($project->environments) == 1) {
-            return redirect()->route('project.resources', ['project_uuid' => $project->uuid, 'environment_name' => $project->environments->first()->name]);
-        }
         return view('project.show', ['project' => $project]);
     }
 
     public function new()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $type = request()->query('type');
+        $destination_uuid = request()->query('destination');
+
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -50,16 +52,22 @@ class ProjectController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-
-        $type = request()->query('type');
-
+        if (in_array($type, DATABASE_TYPES)) {
+            $standalone_postgresql = create_standalone_postgresql($environment->id, $destination_uuid);
+            return redirect()->route('project.database.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'database_uuid' => $standalone_postgresql->uuid,
+            ]);
+        }
         return view('project.new', [
             'type' => $type
         ]);
     }
+
     public function resources()
     {
-        $project = session('currentTeam')->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

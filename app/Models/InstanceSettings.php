@@ -3,37 +3,29 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
-use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
-use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
-use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
 class InstanceSettings extends Model implements SendsEmail
 {
-    use Notifiable, SchemalessAttributesTrait;
+    use Notifiable;
+
     protected $guarded = [];
-    protected $schemalessAttributes = [
-        'smtp',
-    ];
     protected $casts = [
-        'smtp' => SchemalessAttributes::class,
         'resale_license' => 'encrypted',
     ];
-    public function scopeWithSmtp(): Builder
+
+    public static function get()
     {
-        return $this->smtp->modelScope();
+        return InstanceSettings::findOrFail(0);
     }
-    public function routeNotificationForEmail(string $attribute = 'test_recipients')
+
+    public function getRecepients($notification)
     {
-        $recipients = $this->smtp->get($attribute, '');
+        $recipients = data_get($notification, 'emails', null);
         if (is_null($recipients) || $recipients === '') {
             return [];
         }
         return explode(',', $recipients);
-    }
-    public static function get()
-    {
-        return InstanceSettings::findOrFail(0);
     }
 }

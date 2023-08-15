@@ -17,12 +17,14 @@ class Form extends Component
     protected $validationAttributes = [
         'name' => 'name',
     ];
+
     public function mount()
     {
         $this->userId = auth()->user()->id;
         $this->name = auth()->user()->name;
         $this->email = auth()->user()->email;
     }
+
     public function submit()
 
     {

@@ -8,7 +8,9 @@ services:
         target: /var/www/html/.env
         read_only: true
       - /data/coolify/ssh:/var/www/html/storage/app/ssh
-      - /data/coolify/deployments:/var/www/html/storage/app/deployments
+      - /data/coolify/applications:/var/www/html/storage/app/applications
+      - /data/coolify/databases:/var/www/html/storage/app/databases
+      - /data/coolify/backups:/var/www/html/storage/app/backups
     environment:
       - APP_ID
       - APP_ENV=production
@@ -32,8 +34,15 @@ services:
       - PHP_PM_MAX_SPARE_SERVERS=10
       - SELF_HOSTED
       - LEMON_SQUEEZY_WEBHOOK_SECRET
-      - LEMON_SQUEEZY_CHECKOUT_ID
-      - LEMON_SQUEEZY_PRODUCT_ID
+      - LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_BASIC
+      - LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_PRO
+      - LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_ULTIMATE
+      - LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_BASIC
+      - LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_PRO
+      - LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_ULTIMATE
+      - LEMON_SQUEEZY_BASIC_PLAN_IDS
+      - LEMON_SQUEEZY_PRO_PLAN_IDS
+      - LEMON_SQUEEZY_ULTIMATE_PLAN_IDS
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

@@ -3,9 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\Git;
-use App\Models\PrivateKey;
-use App\Models\Project;
-use App\Models\Team;
 use Illuminate\Database\Seeder;
 
 class GitSeeder extends Seeder

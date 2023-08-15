@@ -2,15 +2,17 @@
 
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
-use App\Models\InstanceSettings;
-use App\Models\PrivateKey;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
+use App\Http\Controllers\ServerController;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
+use App\Models\InstanceSettings;
+use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
@@ -36,6 +38,8 @@ Route::post('/forgot-password', function (Request $request) {
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
+Route::get('/waitlist', [Controller::class, 'waitlist'])->name('auth.waitlist');
+
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);
@@ -51,47 +55,57 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
     Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
+
+    // Applications
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ApplicationController::class, 'configuration'])->name('project.application.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment', [ApplicationController::class, 'deployments'])->name('project.application.deployments');
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
         [ApplicationController::class, 'deployment']
     )->name('project.application.deployment');
+
+    // Databases
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups.all');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups/{backup_uuid}', [DatabaseController::class, 'executions'])->name('project.database.backups.executions');
 });
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/servers', fn () => view('server.all', [
         'servers' => Server::ownedByCurrentTeam()->get()
     ]))->name('server.all');
-    Route::get('/server/new', fn () => view('server.create', [
-        'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
-    ]))->name('server.create');
+    Route::get('/server/new', [ServerController::class, 'new_server'])->name('server.create');
     Route::get('/server/{server_uuid}', fn () => view('server.show', [
-        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user'])->whereUuid(request()->server_uuid)->firstOrFail(),
+        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.show');
     Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.proxy');
     Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
-        'privateKeys' => PrivateKey::ownedByCurrentTeam()->where('id', '!=', 0)->get(),
+        'privateKeys' => PrivateKey::ownedByCurrentTeam()->get(),
     ]))->name('server.private-key');
     Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
-        'server' => Server::ownedByCurrentTeam(['name'])->whereUuid(request()->server_uuid)->firstOrFail()
+        'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail()
     ]))->name('server.destinations');
 });
 
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::middleware(['throttle:force-password-reset'])->group(function() {
+        Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
+    });
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
-    Route::get('/settings/emails', [Controller::class, 'emails'])->name('settings.emails');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
     Route::get('/team', [Controller::class, 'team'])->name('team.show');
     Route::get('/team/new', fn () => view('team.create'))->name('team.create');
     Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
+    Route::get('/team/storages', [Controller::class, 'storages'])->name('team.storages.all');
+    Route::get('/team/storages/new', fn () => view('team.storages.create'))->name('team.storages.new');
+    Route::get('/team/storages/{storage_uuid}', [Controller::class, 'storages_show'])->name('team.storages.show');
     Route::get('/team/members', [Controller::class, 'members'])->name('team.members');
     Route::get('/command-center', fn () => view('command-center', ['servers' => Server::isReachable()->get()]))->name('command-center');
     Route::get('/invitations/{uuid}', [Controller::class, 'acceptInvitation'])->name('team.invitation.accept');
@@ -112,7 +126,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
-        $sources = session('currentTeam')->sources();
+        $sources = auth()->user()->currentTeam()->sources();
         return view('source.all', [
             'sources' => $sources,
         ]);

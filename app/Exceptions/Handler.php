@@ -4,13 +4,12 @@ namespace App\Exceptions;
 
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Throwable;
 use Sentry\Laravel\Integration;
+use Throwable;
 
 class Handler extends ExceptionHandler
 {
 
-    private InstanceSettings $settings;
     /**
      * A list of exception types with their corresponding custom log levels.
      *
@@ -19,7 +18,6 @@ class Handler extends ExceptionHandler
     protected $levels = [
         //
     ];
-
     /**
      * A list of the exception types that are not reported.
      *
@@ -28,7 +26,6 @@ class Handler extends ExceptionHandler
     protected $dontReport = [
         //
     ];
-
     /**
      * A list of the inputs that are never flashed to the session on validation exceptions.
      *
@@ -39,6 +36,7 @@ class Handler extends ExceptionHandler
         'password',
         'password_confirmation',
     ];
+    private InstanceSettings $settings;
 
     /**
      * Register the exception handling callbacks for the application.
@@ -47,7 +45,7 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             $this->settings = InstanceSettings::get();
-            if ($this->settings->do_not_track || isDev()) {
+            if ($this->settings->do_not_track || is_dev()) {
                 return;
             }
             Integration::captureUnhandledException($e);

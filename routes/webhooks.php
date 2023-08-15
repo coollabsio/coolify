@@ -2,12 +2,12 @@
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Models\PrivateKey;
 use App\Models\GithubApp;
-use App\Models\Webhook;
-use App\Models\User;
-use App\Models\Team;
+use App\Models\PrivateKey;
 use App\Models\Subscription;
+use App\Models\Team;
+use App\Models\Waitlist;
+use App\Models\Webhook;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -40,7 +40,7 @@ Route::get('/source/github/redirect', function () {
         $github_app->private_key_id = $private_key->id;
         $github_app->save();
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return general_error_handler(err: $e);
     }
 });
@@ -56,7 +56,7 @@ Route::get('/source/github/install', function () {
             $github_app->save();
         }
         return redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return general_error_handler(err: $e);
     }
 });
@@ -140,7 +140,7 @@ Route::post('/source/github/events', function () {
                             ApplicationPreview::create([
                                 'application_id' => $application->id,
                                 'pull_request_id' => $pull_request_id,
-                                'pull_request_html_url' => $pull_request_html_url
+                                'pull_request_html_url' => $pull_request_html_url,
                             ]);
                         }
                         queue_application_deployment(
@@ -170,18 +170,49 @@ Route::post('/source/github/events', function () {
                 }
             }
         }
-    } catch (\Exception $e) {
+    } catch (Exception $e) {
         return general_error_handler(err: $e);
     }
 });
 
-if (isCloud()) {
+if (is_cloud()) {
+    Route::get('/waitlist/confirm', function () {
+        $email = request()->get('email');
+        $confirmation_code = request()->get('confirmation_code');
+        ray($email, $confirmation_code);
+        try {
+            $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
+            if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.confirmation_valid_for_minutes'))) {
+                $found->verified = true;
+                $found->save();
+                return 'Thank you for confirming your email address. We will notify you when you are next in line.';
+            }
+            return redirect()->route('dashboard');
+        } catch (error) {
+            return redirect()->route('dashboard');
+        }
+
+    })->name('webhooks.waitlist.confirm');
+    Route::get('/waitlist/cancel', function () {
+        $email = request()->get('email');
+        $confirmation_code = request()->get('confirmation_code');
+        try {
+            $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
+            if ($found && !$found->verified) {
+                $found->delete();
+                return 'Your email address has been removed from the waitlist.';
+            }
+            return redirect()->route('dashboard');
+        } catch (error) {
+            return redirect()->route('dashboard');
+        }
+
+    })->name('webhooks.waitlist.cancel');
     Route::post('/payments/events', function () {
         try {
-
-            $secret    = config('coolify.lemon_squeezy_webhook_secret');
-            $payload   = request()->collect();
-            $hash      = hash_hmac('sha256', $payload, $secret);
+            $secret = config('coolify.lemon_squeezy_webhook_secret');
+            $payload = request()->collect();
+            $hash = hash_hmac('sha256', $payload, $secret);
             $signature = request()->header('X-Signature');
 
             if (!hash_equals($hash, $signature)) {
@@ -190,14 +221,14 @@ if (isCloud()) {
 
             $webhook = Webhook::create([
                 'type' => 'lemonsqueezy',
-                'payload' => $payload
+                'payload' => $payload,
             ]);
             $event = data_get($payload, 'meta.event_name');
             ray('Subscription event: ' . $event);
             $email = data_get($payload, 'data.attributes.user_email');
             $team_id = data_get($payload, 'meta.custom_data.team_id');
             if (is_null($team_id) || empty($team_id)) {
-                throw new \Exception('No team_id found in webhook payload.');
+                throw new Exception('No team_id found in webhook payload.');
             }
             $subscription_id = data_get($payload, 'data.id');
             $order_id = data_get($payload, 'data.attributes.order_id');
@@ -213,7 +244,7 @@ if (isCloud()) {
             $team = Team::find($team_id);
             $found = $team->members->where('email', $email)->first();
             if (!$found->isAdmin()) {
-                throw new \Exception("User {$email} is not an admin or owner of team {$team->id}.");
+                throw new Exception("User {$email} is not an admin or owner of team {$team->id}.");
             }
             switch ($event) {
                 case 'subscription_created':
@@ -254,11 +285,11 @@ if (isCloud()) {
             $webhook->update([
                 'status' => 'success',
             ]);
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             ray($e->getMessage());
             $webhook->update([
                 'status' => 'failed',
-                'failure_reason' => $e->getMessage()
+                'failure_reason' => $e->getMessage(),
             ]);
         } finally {
             return response('OK');

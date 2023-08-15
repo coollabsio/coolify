@@ -19,11 +19,13 @@ class CheckLicense extends Component
         'instance_id' => 'Instance Id (Do not change this)',
         'settings.is_resale_license_active' => 'Is License Active',
     ];
+
     public function mount()
     {
         $this->instance_id = config('app.id');
         $this->settings = InstanceSettings::get();
     }
+
     public function submit()
     {
         $this->validate();

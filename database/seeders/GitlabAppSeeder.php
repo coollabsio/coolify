@@ -3,9 +3,6 @@
 namespace Database\Seeders;
 
 use App\Models\GitlabApp;
-use App\Models\PrivateKey;
-use App\Models\Team;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class GitlabAppSeeder extends Seeder
@@ -15,15 +12,13 @@ class GitlabAppSeeder extends Seeder
      */
     public function run(): void
     {
-        $root_team = Team::find(0);
-        $private_key_2 = PrivateKey::find(2);
         GitlabApp::create([
             'id' => 1,
             'name' => 'Public GitLab',
             'api_url' => 'https://gitlab.com/api/v4',
             'html_url' => 'https://gitlab.com',
             'is_public' => true,
-            'team_id' => $root_team->id,
+            'team_id' => 0,
         ]);
         GitlabApp::create([
             'id' => 2,
@@ -36,8 +31,8 @@ class GitlabAppSeeder extends Seeder
             'deploy_key_id' => '1234',
             'public_key' => 'dfjasiourj',
             'webhook_token' => '4u3928u4y392',
-            'private_key_id' => $private_key_2->id,
-            'team_id' => $root_team->id,
+            'private_key_id' => 2,
+            'team_id' => 0
         ]);
     }
 }

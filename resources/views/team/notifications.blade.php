@@ -1,5 +1,8 @@
 <x-layout>
-    <x-team.navbar :team="session('currentTeam')" />
+    <x-team.navbar :team="auth()
+        ->user()
+        ->currentTeam()" />
+    <h2 class="pb-4">Notifications</h2>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'email' }" class="flex h-full">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'email' && 'text-white'"
@@ -9,10 +12,14 @@
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'email'" class="h-full">
-                <livewire:notifications.email-settings :model="session('currentTeam')" />
+                <livewire:notifications.email-settings :model="auth()
+                    ->user()
+                    ->currentTeam()" />
             </div>
             <div x-cloak x-show="activeTab === 'discord'">
-                <livewire:notifications.discord-settings :model="session('currentTeam')" />
+                <livewire:notifications.discord-settings :model="auth()
+                    ->user()
+                    ->currentTeam()" />
             </div>
         </div>
 </x-layout>

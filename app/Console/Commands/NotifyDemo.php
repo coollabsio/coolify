@@ -43,15 +43,16 @@ class NotifyDemo extends Command
         style('coolify')->color('#9333EA');
         style('title-box')->apply('mt-1 px-2 py-1 bg-coolify');
 
-        render(<<<'HTML'
+        render(
+            <<<'HTML'
         <div>
             <div class="title-box">
                 Coolify
             </div>
-            <p class="ml-1 mt-1 ">
+            <p class="mt-1 ml-1 ">
               Demo Notify <strong class="text-coolify">=></strong> Send a demo notification to a given channel.
             </p>
-            <p class="ml-1 mt-1 bg-coolify px-1">
+            <p class="px-1 mt-1 ml-1 bg-coolify">
               php artisan app:demo-notify {channel}
             </p>
             <div class="my-1">
@@ -64,7 +65,8 @@ class NotifyDemo extends Command
                 </ul>
             </div>
         </div>
-        HTML);
+        HTML
+        );
 
         ask(<<<'HTML'
         <div class="mr-1">

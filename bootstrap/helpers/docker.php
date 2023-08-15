@@ -11,6 +11,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         ->reject(fn ($line) => empty($line))
         ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
 }
+
 function format_docker_labels_to_json($rawOutput): Collection
 {
     $outputLines = explode(PHP_EOL, $rawOutput);
@@ -27,6 +28,19 @@ function format_docker_labels_to_json($rawOutput): Collection
                     return [$outputLine[0] => $outputLine[1]];
                 });
         })[0];
+}
+
+function format_docker_envs_to_json($rawOutput)
+{
+    try {
+        $outputLines = json_decode($rawOutput, true, flags: JSON_THROW_ON_ERROR);
+        return collect(data_get($outputLines[0], 'Config.Env', []))->mapWithKeys(function ($env) {
+            $env = explode('=', $env);
+            return [$env[0] => $env[1]];
+        });
+    } catch (\Throwable $th) {
+        return collect([]);
+    }
 }
 
 function get_container_status(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
@@ -49,4 +63,14 @@ function generate_container_name(string $uuid, int $pull_request_id = 0)
     } else {
         return $uuid;
     }
+}
+function get_port_from_dockerfile($dockerfile): int
+{
+    $port = preg_grep('/EXPOSE\s+(\d+)/', explode("\n", $dockerfile));
+    if (count($port) > 0 && preg_match('/EXPOSE\s+(\d+)/', $port[1], $matches)) {
+        $port = $matches[1];
+    } else {
+        $port = 80;
+    }
+    return $port;
 }

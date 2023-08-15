@@ -8,13 +8,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class DockerCleanupJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
     public $timeout = 500;
+
     /**
      * Create a new job instance.
      */
@@ -31,7 +32,7 @@ class DockerCleanupJob implements ShouldQueue
         try {
             $servers = Server::all();
             foreach ($servers as $server) {
-                if (isDev()) {
+                if (is_dev()) {
                     $docker_root_filesystem = "/";
                 } else {
                     $docker_root_filesystem = instant_remote_process(['stat --printf=%m $(docker info --format "{{json .DockerRootDir}}" |sed \'s/"//g\')'], $server);
@@ -48,11 +49,12 @@ class DockerCleanupJob implements ShouldQueue
                 }
             }
         } catch (\Exception $e) {
-            Log::error($e->getMessage());
+            ray($e->getMessage());
         }
     }
-    
-    private function get_disk_usage(Server $server, string $docker_root_filesystem) {
+
+    private function get_disk_usage(Server $server, string $docker_root_filesystem)
+    {
         $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\"disks\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\"mount\":\""$6"\",\"size\":\""$2"\",\"used\":\""$3"\",\"avail\":\""$4"\",\"use%\":\""$5"\"}";a++;}END{print"]}";}\''], $server), true);
         $mount_point = collect(data_get($disk_usage, 'disks'))->where('mount', $docker_root_filesystem)->first();
         return Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value();

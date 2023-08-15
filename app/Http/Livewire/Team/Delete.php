@@ -9,7 +9,7 @@ class Delete extends Component
 {
     public function delete()
     {
-        $currentTeam = session('currentTeam');
+        $currentTeam = auth()->user()->currentTeam();
         $currentTeam->delete();
 
         $team = auth()->user()->teams()->first();

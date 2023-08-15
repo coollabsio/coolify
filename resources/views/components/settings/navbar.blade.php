@@ -1,15 +1,12 @@
-<div class="pb-6">
+<div class="pb-5">
     <h1>Settings</h1>
-    <div class="pt-2 pb-10 ">Instance wide settings for Coolify.</div>
-    <nav class="flex items-end gap-4 py-2 border-b-2 border-solid border-coolgray-200">
+    <div class="subtitle">Instance wide settings for Coolify.</div>
+    <nav class="navbar-main">
         <a class="{{ request()->routeIs('settings.configuration') ? 'text-white' : '' }}"
             href="{{ route('settings.configuration') }}">
             <button>Configuration</button>
         </a>
-        <a class="{{ request()->routeIs('settings.emails') ? 'text-white' : '' }}" href="{{ route('settings.emails') }}">
-            <button>SMTP</button>
-        </a>
-        @if (isCloud())
+        @if (is_cloud())
             <a class="{{ request()->routeIs('settings.license') ? 'text-white' : '' }}"
                 href="{{ route('settings.license') }}">
                 <button>Resale License</button>

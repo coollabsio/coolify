@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Destination\New;
 use App\Models\Server;
 use App\Models\StandaloneDocker as ModelsStandaloneDocker;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -27,6 +28,7 @@ class StandaloneDocker extends Component
         'network' => 'network',
         'server_id' => 'server'
     ];
+
     public function mount()
     {
         if (request()->query('server_id')) {
@@ -41,16 +43,17 @@ class StandaloneDocker extends Component
         } else {
             $this->network = new Cuid2(7);
         }
-        $this->name = generate_random_name();
+        $this->name = Str::kebab("{$this->servers->first()->name}-{$this->network}");
     }
-    private function createNetworkAndAttachToProxy()
+
+    public function generate_name()
     {
-        instant_remote_process(['docker network create --attachable ' . $this->network], $this->server, throwError: false);
-        instant_remote_process(["docker network connect $this->network coolify-proxy"], $this->server, throwError: false);
+        $this->server = Server::find($this->server_id);
+        $this->name = Str::kebab("{$this->server->name}-{$this->network}");
     }
+
     public function submit()
     {
-
         $this->validate();
         try {
             $this->server = Server::find($this->server_id);
@@ -64,7 +67,7 @@ class StandaloneDocker extends Component
                     'name' => $this->name,
                     'network' => $this->network,
                     'server_id' => $this->server_id,
-                    'team_id' => session('currentTeam')->id
+                    'team_id' => auth()->user()->currentTeam()->id
                 ]);
             }
             $this->createNetworkAndAttachToProxy();
@@ -72,5 +75,11 @@ class StandaloneDocker extends Component
         } catch (\Exception $e) {
             return general_error_handler(err: $e);
         }
+    }
+
+    private function createNetworkAndAttachToProxy()
+    {
+        instant_remote_process(['docker network create --attachable ' . $this->network], $this->server, throwError: false);
+        instant_remote_process(["docker network connect $this->network coolify-proxy"], $this->server, throwError: false);
     }
 }

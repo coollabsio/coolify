@@ -22,11 +22,12 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue
 
     public function __construct(
         public string $application_id,
-        public int $pull_request_id,
+        public int    $pull_request_id,
         public string $deployment_uuid,
         public string $status
     ) {
     }
+
     public function handle()
     {
         try {
@@ -61,6 +62,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue
             throw $e;
         }
     }
+
     private function update_comment()
     {
         ['data' => $data] = git_api(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
@@ -71,6 +73,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue
             $this->create_comment();
         }
     }
+
     private function create_comment()
     {
         ['data' => $data] = git_api(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->pull_request_id}/comments", method: 'post', data: [

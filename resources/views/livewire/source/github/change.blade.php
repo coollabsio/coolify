@@ -1,15 +1,16 @@
-<div x-data="{ deleteSource: false }">
-    <x-naked-modal show="deleteSource" title="Delete Source"
-        message='This source will be deleted. It is not reversible. <br>Please think again.' />
+<div>
+    <x-modal yesOrNo modalId="deleteSource" modalTitle="Delete Source">
+        <x-slot:modalBody>
+            <p>This source will be deleted. It is not reversible. <br>Please think again.</p>
+        </x-slot:modalBody>
+    </x-modal>
     <form wire:submit.prevent='submit'>
         <div class="flex items-center gap-2">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
                 @if ($github_app->app_id)
                     <x-forms.button type="submit">Save</x-forms.button>
-                    <x-forms.button x-on:click.prevent="deleteSource = true">
-                        Delete
-                    </x-forms.button>
+
                     <a href="{{ get_installation_path($github_app) }}">
                         <x-forms.button>
                             @if ($github_app->installation_id)
@@ -23,14 +24,13 @@
                     </a>
                 @else
                     <x-forms.button disabled type="submit">Save</x-forms.button>
-                    <x-forms.button x-on:click.prevent="deleteSource = true">
-                        Delete
-                    </x-forms.button>
-
                 @endif
+                <x-forms.button isError isModal modalId="deleteSource">
+                    Delete
+                </x-forms.button>
             </div>
         </div>
-        <div class="pt-2 pb-10 ">Your Private GitHub App for private repositories.</div>
+        <div class="subtitle ">Your Private GitHub App for private repositories.</div>
         @if ($github_app->app_id)
             <div class="w-48">
                 <x-forms.checkbox label="System Wide?"
@@ -130,7 +130,8 @@
                     } = @json($github_app);
                     let baseUrl = webhook_endpoint;
                     const name = @js($name);
-                    const isDev = @js(config('app.env')) === 'local';
+                    const isDev = @js(config('app.env')) ===
+                        'local';
                     const devWebhook = @js(config('coolify.dev_webhook'));
                     if (isDev && devWebhook) {
                         baseUrl = devWebhook;

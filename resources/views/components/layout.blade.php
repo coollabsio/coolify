@@ -32,7 +32,7 @@
         <div class="fixed top-3 left-4" id="vue">
             <magic-bar></magic-bar>
         </div>
-        <main class="main">
+        <main class="main max-w-screen-2xl">
             {{ $slot }}
         </main>
         <x-version class="fixed left-2 bottom-1" />
@@ -74,7 +74,7 @@
                                 console.log('Waiting for server to come back from dead...');
                             }
                         })
-                    return;
+
                 }, 2000);
             }
 
@@ -93,7 +93,7 @@
                                 revive();
                             }
                         })
-                    return;
+
                 }, 2000);
             }
 
@@ -101,6 +101,7 @@
                 navigator.clipboard.writeText(text);
                 Livewire.emit('message', 'Copied to clipboard.');
             }
+
             Livewire.on('reloadWindow', () => {
                 window.location.reload();
             })

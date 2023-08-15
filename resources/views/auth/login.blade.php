@@ -3,14 +3,21 @@
         <div class="w-96 min-w-fit">
             <div class="flex flex-col items-center pb-8">
                 <div class="text-5xl font-extrabold tracking-tight text-center text-white">Coolify</div>
-                <x-version />
             </div>
             <div class="flex items-center gap-2">
                 <h1>{{ __('auth.login') }}</h1>
                 @if ($is_registration_enabled)
-                    <a href="/register" class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
-                        {{ __('auth.register_now') }}
-                    </a>
+                    @if (config('coolify.waitlist'))
+                        <a href="/waitlist"
+                            class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
+                            Join the waitlist
+                        </a>
+                    @else
+                        <a href="/register"
+                            class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
+                            {{ __('auth.register_now') }}
+                        </a>
+                    @endif
                 @endif
             </div>
             <div>

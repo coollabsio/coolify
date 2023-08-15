@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Team;
 
 use App\Models\Team;
 use Livewire\Component;
-use Masmerise\Toaster\Toaster;
 
 class Form extends Component
 {
@@ -17,10 +16,12 @@ class Form extends Component
         'team.name' => 'name',
         'team.description' => 'description',
     ];
+
     public function mount()
     {
-        $this->team = session('currentTeam');
+        $this->team = auth()->user()->currentTeam();
     }
+
     public function submit()
     {
         $this->validate();

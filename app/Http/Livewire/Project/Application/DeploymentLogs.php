@@ -10,10 +10,12 @@ class DeploymentLogs extends Component
     public ApplicationDeploymentQueue $application_deployment_queue;
     public $isKeepAliveOn = true;
     protected $listeners = ['refreshQueue'];
+
     public function refreshQueue()
     {
         $this->application_deployment_queue->refresh();
     }
+
     public function polling()
     {
         $this->emit('deploymentFinished');

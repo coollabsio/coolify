@@ -22,7 +22,9 @@
                 @else
                     <div>Transactional emails are not active on this instance.</div>
                     <div>See how to set it in our <a class="text-white" target="_blank"
-                            href="https://docs.coollabs.io/coolify">docs</a>, or how to manually reset password.</div>
+                            href="https://docs.coollabs.io/coolify">docs</a>, or how to
+                        manually reset password.
+                    </div>
                 @endif
                 @if ($errors->any())
                     <div class="text-xs text-center text-error">

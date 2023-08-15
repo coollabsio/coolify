@@ -17,6 +17,7 @@ class Form extends Component
     protected $validationAttributes = [
         'application.preview_url_template' => 'preview url template',
     ];
+
     public function resetToDefault()
     {
         $this->application->preview_url_template = '{{pr_id}}.{{domain}}';
@@ -24,6 +25,7 @@ class Form extends Component
         $this->application->save();
         $this->generate_real_url();
     }
+
     public function generate_real_url()
     {
         if (data_get($this->application, 'fqdn')) {
@@ -32,10 +34,12 @@ class Form extends Component
             $this->preview_url_template = Str::of($this->application->preview_url_template)->replace('{{domain}}', $host);
         }
     }
+
     public function mount()
     {
         $this->generate_real_url();
     }
+
     public function submit()
     {
         $this->validate();

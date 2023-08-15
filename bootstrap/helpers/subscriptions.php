@@ -2,13 +2,16 @@
 
 use Illuminate\Support\Carbon;
 
-function getSubscriptionLink()
+function getSubscriptionLink($type)
 {
+    $checkout_id = config("coolify.lemon_squeezy_checkout_id_$type");
+    if (!$checkout_id) {
+        return null;
+    }
     $user_id = auth()->user()->id;
     $team_id = auth()->user()->currentTeam()->id ?? null;
     $email = auth()->user()->email ?? null;
     $name = auth()->user()->name ?? null;
-    $checkout_id = config('coolify.lemon_squeezy_checkout_id');
     $url = "https://store.coollabs.io/checkout/buy/$checkout_id?";
     if ($user_id) {
         $url .= "&checkout[custom][user_id]={$user_id}";
@@ -24,23 +27,56 @@ function getSubscriptionLink()
     }
     return $url;
 }
+
 function getPaymentLink()
 {
     return auth()->user()->currentTeam()->subscription->lemon_update_payment_menthod_url;
 }
+
 function getRenewDate()
 {
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
+
 function getEndDate()
 {
     return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
-function isSubscribed()
+
+function is_subscription_active()
 {
-    return
-        auth()->user()?->currentTeam()?->subscription?->lemon_status === 'active' ||
-        (auth()->user()?->currentTeam()?->subscription?->lemon_ends_at &&
-            Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_ends_at) > Carbon::now()
-        ) || auth()->user()->isInstanceAdmin();
+    $team = auth()->user()?->currentTeam();
+
+    if (!$team) {
+        return false;
+    }
+    if (is_instance_admin()) {
+        return true;
+    }
+    $subscription = $team?->subscription;
+
+    if (!$subscription) {
+        return false;
+    }
+    $is_active = $subscription->lemon_status === 'active';
+
+    return $is_active;
+}
+function is_subscription_in_grace_period()
+{
+    $team = auth()->user()?->currentTeam();
+    if (!$team) {
+        return false;
+    }
+    if (is_instance_admin()) {
+        return true;
+    }
+    $subscription = $team?->subscription;
+    if (!$subscription) {
+        return false;
+    }
+    $is_still_grace_period = $subscription->lemon_ends_at &&
+        Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
+
+    return $is_still_grace_period;
 }

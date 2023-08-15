@@ -8,30 +8,32 @@ use Illuminate\Support\Str;
 
 class LocalPersistentVolume extends Model
 {
-    protected $fillable = [
-        'name',
-        'mount_path',
-        'host_path',
-        'container_id',
-        'resource_id',
-        'resource_type',
-    ];
+    protected $guarded = [];
+
     public function application()
     {
         return $this->morphTo();
     }
+
+    public function standalone_postgresql()
+    {
+        return $this->morphTo();
+    }
+
     protected function name(): Attribute
     {
         return Attribute::make(
             set: fn (string $value) => Str::of($value)->trim()->value,
         );
     }
+
     protected function mountPath(): Attribute
     {
         return Attribute::make(
             set: fn (string $value) => Str::of($value)->trim()->start('/')->value
         );
     }
+
     protected function hostPath(): Attribute
     {
         return Attribute::make(

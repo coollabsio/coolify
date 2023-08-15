@@ -34,18 +34,19 @@
             <x-forms.input placeholder="HEAD" id="application.git_commit_sha" placeholder="HEAD" label="Commit SHA" />
 
         </div>
+        @isset($application->private_key_id)
+            <h3 class="pt-4">Deploy Key</h3>
+            <div class="py-2 pt-4">Currently attache Private Key: <span
+                    class="text-warning">{{ $application->private_key->name }}</span>
+            </div>
 
-        @if ($application->private_key_id)
-            <h4 class="py-2 pt-4">Current Deploy Key: <span
-                    class="text-warning">{{ $application->private_key->name }}</span></h4>
-
-            <div class="py-2 ">Select another Deploy Key</div>
+            <h4 class="py-2 ">Select another Private Key</h4>
             <div class="flex gap-2">
                 @foreach ($private_keys as $key)
                     <x-forms.button wire:click.defer="setPrivateKey('{{ $key->id }}')">{{ $key->name }}
                     </x-forms.button>
                 @endforeach
             </div>
-        @endif
+        @endisset
     </form>
 </div>

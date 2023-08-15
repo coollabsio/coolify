@@ -20,12 +20,13 @@ class Change extends Component
         'private_key.description' => 'description',
         'private_key.private_key' => 'private key'
     ];
+
     public function delete()
     {
         try {
             if ($this->private_key->isEmpty()) {
                 $this->private_key->delete();
-                session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+                auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
                 return redirect()->route('private-key.all');
             }
             $this->emit('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
@@ -33,6 +34,7 @@ class Change extends Component
             return general_error_handler(err: $e, that: $this);
         }
     }
+
     public function changePrivateKey()
     {
         try {
@@ -41,7 +43,7 @@ class Change extends Component
                 $this->private_key->private_key .= "\n";
             }
             $this->private_key->save();
-            session('currentTeam')->privateKeys = PrivateKey::where('team_id', session('currentTeam')->id)->get();
+            refreshPrivateKey($this->private_key);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

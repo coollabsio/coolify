@@ -4,7 +4,7 @@ namespace App\Http\Livewire\Team;
 
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Notifications\TransactionalEmails\InvitationLinkEmail;
+use App\Notifications\TransactionalEmails\InvitationLink;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -12,14 +12,17 @@ class InviteLink extends Component
 {
     public string $email;
     public string $role = 'member';
+
     public function mount()
     {
-        $this->email = isDev() ? 'test3@example.com' : '';
+        $this->email = is_dev() ? 'test3@example.com' : '';
     }
+
     public function viaEmail()
     {
         $this->generate_invite_link(isEmail: true);
     }
+
     private function generate_invite_link(bool $isEmail = false)
     {
         try {
@@ -32,9 +35,9 @@ class InviteLink extends Component
                 return general_error_handler(that: $this, customErrorMessage: "$this->email must be registered first (or activate transactional emails to invite via email).");
             }
 
-            $member_emails = session('currentTeam')->members()->get()->pluck('email');
+            $member_emails = auth()->user()->currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
-                return general_error_handler(that: $this, customErrorMessage: "$this->email is already a member of " . session('currentTeam')->name . ".");
+                return general_error_handler(that: $this, customErrorMessage: "$this->email is already a member of " . auth()->user()->currentTeam()->name . ".");
             }
 
             $invitation = TeamInvitation::whereEmail($this->email);
@@ -50,7 +53,7 @@ class InviteLink extends Component
             }
 
             TeamInvitation::firstOrCreate([
-                'team_id' => session('currentTeam')->id,
+                'team_id' => auth()->user()->currentTeam()->id,
                 'uuid' => $uuid,
                 'email' => $this->email,
                 'role' => $this->role,
@@ -58,7 +61,7 @@ class InviteLink extends Component
                 'via' => $isEmail ? 'email' : 'link',
             ]);
             if ($isEmail) {
-                $user->first()->notify(new InvitationLinkEmail());
+                $user->first()->notify(new InvitationLink);
                 $this->emit('success', 'Invitation sent via email successfully.');
             } else {
                 $this->emit('success', 'Invitation link generated.');
@@ -72,6 +75,7 @@ class InviteLink extends Component
             return general_error_handler(err: $e, that: $this, customErrorMessage: $error_message);
         }
     }
+
     public function viaLink()
     {
         $this->generate_invite_link();

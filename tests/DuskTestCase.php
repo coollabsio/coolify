@@ -2,10 +2,10 @@
 
 namespace Tests;
 
-use Illuminate\Support\Collection;
 use Facebook\WebDriver\Chrome\ChromeOptions;
 use Facebook\WebDriver\Remote\DesiredCapabilities;
 use Facebook\WebDriver\Remote\RemoteWebDriver;
+use Illuminate\Support\Collection;
 use Laravel\Dusk\TestCase as BaseTestCase;
 
 abstract class DuskTestCase extends BaseTestCase
@@ -19,7 +19,7 @@ abstract class DuskTestCase extends BaseTestCase
      */
     public static function prepare(): void
     {
-        if (! static::runningInSail()) {
+        if (!static::runningInSail()) {
             static::startChromeDriver();
         }
     }
@@ -41,23 +41,10 @@ abstract class DuskTestCase extends BaseTestCase
         return RemoteWebDriver::create(
             $_ENV['DUSK_DRIVER_URL'] ?? 'http://localhost:9515',
             DesiredCapabilities::chrome()->setCapability(
-                ChromeOptions::CAPABILITY, $options
+                ChromeOptions::CAPABILITY,
+                $options
             )
         );
-    }
-
-    protected function baseUrl()
-    {
-        return rtrim(config('app.url'), '/');
-    }
-
-    /**
-     * Determine whether the Dusk command has disabled headless mode.
-     */
-    protected function hasHeadlessDisabled(): bool
-    {
-        return isset($_SERVER['DUSK_HEADLESS_DISABLED']) ||
-               isset($_ENV['DUSK_HEADLESS_DISABLED']);
     }
 
     /**
@@ -66,6 +53,20 @@ abstract class DuskTestCase extends BaseTestCase
     protected function shouldStartMaximized(): bool
     {
         return isset($_SERVER['DUSK_START_MAXIMIZED']) ||
-               isset($_ENV['DUSK_START_MAXIMIZED']);
+            isset($_ENV['DUSK_START_MAXIMIZED']);
+    }
+
+    /**
+     * Determine whether the Dusk command has disabled headless mode.
+     */
+    protected function hasHeadlessDisabled(): bool
+    {
+        return isset($_SERVER['DUSK_HEADLESS_DISABLED']) ||
+            isset($_ENV['DUSK_HEADLESS_DISABLED']);
+    }
+
+    protected function baseUrl()
+    {
+        return rtrim(config('app.url'), '/');
     }
 }

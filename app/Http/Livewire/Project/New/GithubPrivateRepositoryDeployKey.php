@@ -14,6 +14,7 @@ use Spatie\Url\Url;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
+    public $current_step = 'private_keys';
     public $parameters;
     public $query;
     public $private_keys;
@@ -26,14 +27,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public null|string $publish_directory = null;
 
     public string $repository_url;
-    private object $repository_url_parsed;
     public string $branch;
-
-    private GithubApp|GitlabApp $git_source;
-    private string $git_host;
-    private string $git_repository;
-    private string $git_branch;
-
     protected $rules = [
         'repository_url' => 'required|url',
         'branch' => 'required|string',
@@ -48,15 +42,22 @@ class GithubPrivateRepositoryDeployKey extends Component
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
     ];
+    private object $repository_url_parsed;
+    private GithubApp|GitlabApp $git_source;
+    private string $git_host;
+    private string $git_repository;
+    private string $git_branch;
+
     public function mount()
     {
-        if (isDev()) {
+        if (is_dev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
-        $this->parameters = getRouteParameters();
+        $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        $this->private_keys = PrivateKey::where('team_id', session('currentTeam')->id)->where('id', '!=', 0)->get();
+        $this->private_keys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->where('id', '!=', 0)->get();
     }
+
     public function instantSave()
     {
         if ($this->is_static) {
@@ -67,29 +68,13 @@ class GithubPrivateRepositoryDeployKey extends Component
             $this->publish_directory = null;
         }
     }
+
     public function setPrivateKey($private_key_id)
     {
         $this->private_key_id = $private_key_id;
+        $this->current_step = 'repository';
     }
-    private function get_git_source()
-    {
-        $this->repository_url_parsed = Url::fromString($this->repository_url);
-        $this->git_host = $this->repository_url_parsed->getHost();
-        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
-        if ($this->branch) {
-            $this->git_branch = $this->branch;
-        } else {
-            $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
-        }
 
-        if ($this->git_host == 'github.com') {
-            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
-        } elseif ($this->git_host == 'gitlab.com') {
-            $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
-        } elseif ($this->git_host == 'bitbucket.org') {
-            // Not supported yet
-        }
-    }
     public function submit()
     {
         $this->validate();
@@ -121,7 +106,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'destination_type' => $destination_class,
                 'private_key_id' => $this->private_key_id,
                 'source_id' => $this->git_source->id,
-                'source_type' =>  $this->git_source->getMorphClass()
+                'source_type' => $this->git_source->getMorphClass()
             ];
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
@@ -134,6 +119,26 @@ class GithubPrivateRepositoryDeployKey extends Component
             ]);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
+        }
+    }
+
+    private function get_git_source()
+    {
+        $this->repository_url_parsed = Url::fromString($this->repository_url);
+        $this->git_host = $this->repository_url_parsed->getHost();
+        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+        if ($this->branch) {
+            $this->git_branch = $this->branch;
+        } else {
+            $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
+        }
+
+        if ($this->git_host == 'github.com') {
+            $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+        } elseif ($this->git_host == 'gitlab.com') {
+            $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
+        } elseif ($this->git_host == 'bitbucket.org') {
+            // Not supported yet
         }
     }
 }

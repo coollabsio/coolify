@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Configuration</h1>
-    <livewire:application.heading :application="$application" />
+    <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
@@ -9,8 +9,10 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'source' && 'text-white'"
-                @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+            @if ($application->git_based())
+                <a :class="activeTab === 'source' && 'text-white'"
+                    @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
+            @endif
             <a :class="activeTab === 'destination' && 'text-white'"
                 @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
                 href="#">Destination
@@ -18,10 +20,12 @@
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
-            <a :class="activeTab === 'previews' && 'text-white'"
-                @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
-                Deployments
-            </a>
+            @if ($application->git_based())
+                <a :class="activeTab === 'previews' && 'text-white'"
+                    @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
+                    Deployments
+                </a>
+            @endif
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
@@ -38,16 +42,18 @@
                 <livewire:project.application.general :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <livewire:project.application.environment-variable.all :application="$application" />
+                <livewire:project.shared.environment-variable.all :resource="$application" />
             </div>
-            <div x-cloak x-show="activeTab === 'source'">
-                <livewire:project.application.source :application="$application" />
-            </div>
+            @if ($application->git_based())
+                <div x-cloak x-show="activeTab === 'source'">
+                    <livewire:project.application.source :application="$application" />
+                </div>
+            @endif
             <div x-cloak x-show="activeTab === 'destination'">
-                <livewire:project.application.destination :destination="$application->destination" />
+                <livewire:project.shared.destination :destination="$application->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.application.storages.all :application="$application" />
+                <livewire:project.shared.storages.all :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
@@ -56,10 +62,10 @@
                 <livewire:project.application.rollback :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
-                <livewire:project.application.resource-limits :application="$application" />
+                <livewire:project.shared.resource-limits :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
-                <livewire:project.application.danger :application="$application" />
+                <livewire:project.shared.danger :resource="$application" />
             </div>
         </div>
     </div>

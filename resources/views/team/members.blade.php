@@ -1,6 +1,8 @@
 <x-layout>
-    <x-team.navbar :team="session('currentTeam')" />
-    <h3>Members</h3>
+    <x-team.navbar :team="auth()
+        ->user()
+        ->currentTeam()" />
+    <h2>Members</h2>
     <div class="pt-4 overflow-hidden">
         <table>
             <thead>
@@ -24,9 +26,10 @@
                 <h3 class="pb-4">Invite a new member</h3>
             @else
                 <h3>Invite a new member</h3>
-                @if (auth()->user()->isInstanceAdmin())
+                @if (is_instance_admin())
                     <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
-                            class="underline text-warning">Transactional Emails</a>
+                            class="underline text-warning">Transactional
+                            Emails</a>
                         before
                         you can invite a
                         new

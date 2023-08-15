@@ -23,7 +23,8 @@
                             </td>
                             <td>
                                 <x-forms.button wire:click.prevent='deleteInvitation({{ $invite->id }})'>Revoke
-                                    Invitation</x-forms.button>
+                                    Invitation
+                                </x-forms.button>
                             </td>
                         </tr>
                     @endforeach

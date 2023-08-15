@@ -26,6 +26,7 @@ class ApplicationSetting extends Model
         'is_git_submodules_enabled',
         'is_git_lfs_enabled',
     ];
+
     public function isStatic(): Attribute
     {
         return Attribute::make(
@@ -42,6 +43,7 @@ class ApplicationSetting extends Model
             }
         );
     }
+
     public function application()
     {
         return $this->belongsTo(Application::class);

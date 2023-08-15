@@ -14,6 +14,7 @@ class TeamInvitation extends Model
         'link',
         'via',
     ];
+
     public function team()
     {
         return $this->belongsTo(Team::class);

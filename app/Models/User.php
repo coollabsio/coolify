@@ -3,30 +3,28 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
+use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use App\Notifications\TrnsactionalEmails\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
-use Visus\Cuid2\Cuid2;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements SendsEmail
 {
     use HasApiTokens, HasFactory, Notifiable, TwoFactorAuthenticatable;
-    protected $fillable = [
-        'id',
-        'name',
-        'email',
-        'password',
-    ];
+
+    protected $guarded = [];
     protected $hidden = [
         'password',
         'remember_token',
     ];
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'force_password_reset' => 'boolean',
     ];
+
     protected static function boot()
     {
         parent::boot();
@@ -34,20 +32,6 @@ class User extends Authenticatable implements SendsEmail
             $team = [
                 'name' => $user->name . "'s Team",
                 'personal_team' => true,
-                'smtp' => [
-                    'enabled' => false,
-                ],
-                'smtp_notifications' => [
-                    'test' => true,
-                    'deployments' => false,
-                ],
-                'discord' => [
-                    'enabled' => false,
-                ],
-                'discord_notifications' => [
-                    'test' => true,
-                    'deployments' => false,
-                ],
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;
@@ -57,14 +41,27 @@ class User extends Authenticatable implements SendsEmail
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
-    public function routeNotificationForEmail()
+
+    public function teams()
+    {
+        return $this->belongsToMany(Team::class)->withPivot('role');
+    }
+
+    public function getRecepients($notification)
     {
         return $this->email;
     }
+
+    public function sendPasswordResetNotification($token): void
+    {
+        $this->notify(new TransactionalEmailsResetPassword($token));
+    }
+
     public function isAdmin()
     {
         return $this->pivot->role === 'admin' || $this->pivot->role === 'owner';
     }
+
     public function isAdminFromSession()
     {
         if (auth()->user()->id === 0) {
@@ -79,9 +76,10 @@ class User extends Authenticatable implements SendsEmail
         if ($is_part_of_root_team && $is_admin_of_root_team) {
             return true;
         }
-        $role = $teams->where('id', session('currentTeam')->id)->first()->pivot->role;
+        $role = $teams->where('id', auth()->user()->id)->first()->pivot->role;
         return $role === 'admin' || $role === 'owner';
     }
+
     public function isInstanceAdmin()
     {
         $found_root_team = auth()->user()->teams->filter(function ($team) {
@@ -92,35 +90,36 @@ class User extends Authenticatable implements SendsEmail
         });
         return $found_root_team->count() > 0;
     }
+
     public function personalTeam()
     {
         return $this->teams()->where('personal_team', true)->first();
     }
-    public function teams()
-    {
-        return $this->belongsToMany(Team::class)->withPivot('role');
-    }
+
     public function currentTeam()
     {
         return $this->teams()->where('team_id', session('currentTeam')->id)->first();
     }
+
     public function otherTeams()
     {
-        $team_id = session('currentTeam')->id;
+        $team_id = auth()->user()->currentTeam()->id;
         return auth()->user()->teams->filter(function ($team) use ($team_id) {
             return $team->id != $team_id;
         });
     }
+
     public function role()
     {
         if ($this->teams()->where('team_id', 0)->first()) {
             return 'admin';
         }
-        return $this->teams()->where('team_id', session('currentTeam')->id)->first()->pivot->role;
+        return $this->teams()->where('team_id', auth()->user()->currentTeam()->id)->first()->pivot->role;
     }
+
     public function resources()
     {
-        $team_id = session('currentTeam')->id;
+        $team_id = auth()->user()->currentTeam()->id;
         $data = Application::where('team_id', $team_id)->get();
         return $data;
     }

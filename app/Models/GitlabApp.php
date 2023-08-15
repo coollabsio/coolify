@@ -8,10 +8,12 @@ class GitlabApp extends BaseModel
         'webhook_token',
         'app_secret',
     ];
+
     public function applications()
     {
         return $this->morphMany(Application::class, 'source');
     }
+
     public function privateKey()
     {
         return $this->belongsTo(PrivateKey::class);

@@ -49,6 +49,28 @@ class RunRemoteProcess
         $this->ignore_errors = $ignore_errors;
     }
 
+    public static function decodeOutput(?Activity $activity = null): string
+    {
+        if (is_null($activity)) {
+            return '';
+        }
+
+        try {
+            $decoded = json_decode(
+                data_get($activity, 'description'),
+                associative: true,
+                flags: JSON_THROW_ON_ERROR
+            );
+        } catch (\JsonException $exception) {
+            return '';
+        }
+
+        return collect($decoded)
+            ->sortBy(fn ($i) => $i['order'])
+            ->map(fn ($i) => $i['output'])
+            ->implode("");
+    }
+
     public function __invoke(): ProcessResult
     {
         $this->time_start = hrtime(true);
@@ -83,15 +105,6 @@ class RunRemoteProcess
         return $processResult;
     }
 
-    protected function getLatestCounter(): int
-    {
-        $description = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
-        if ($description === null || count($description) === 0) {
-            return 1;
-        }
-        return end($description)['order'] + 1;
-    }
-
     protected function getCommand(): string
     {
         $user = $this->activity->getExtraProperty('user');
@@ -120,6 +133,13 @@ class RunRemoteProcess
         }
     }
 
+    protected function elapsedTime(): int
+    {
+        $timeMs = (hrtime(true) - $this->time_start) / 1_000_000;
+
+        return intval($timeMs);
+    }
+
     public function encodeOutput($type, $output)
     {
         $outputStack = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
@@ -135,26 +155,13 @@ class RunRemoteProcess
         return json_encode($outputStack, flags: JSON_THROW_ON_ERROR);
     }
 
-    public static function decodeOutput(?Activity $activity = null): string
+    protected function getLatestCounter(): int
     {
-        if (is_null($activity)) {
-            return '';
+        $description = json_decode($this->activity->description, associative: true, flags: JSON_THROW_ON_ERROR);
+        if ($description === null || count($description) === 0) {
+            return 1;
         }
-
-        try {
-            $decoded = json_decode(
-                data_get($activity, 'description'),
-                associative: true,
-                flags: JSON_THROW_ON_ERROR
-            );
-        } catch (\JsonException $exception) {
-            return '';
-        }
-
-        return collect($decoded)
-            ->sortBy(fn ($i) => $i['order'])
-            ->map(fn ($i) => $i['output'])
-            ->implode("");
+        return end($description)['order'] + 1;
     }
 
     /**
@@ -170,12 +177,5 @@ class RunRemoteProcess
         }
 
         return ($this->current_time - $this->throttle_interval_ms) > $this->last_write_at;
-    }
-
-    protected function elapsedTime(): int
-    {
-        $timeMs = (hrtime(true) - $this->time_start) / 1_000_000;
-
-        return intval($timeMs);
     }
 }

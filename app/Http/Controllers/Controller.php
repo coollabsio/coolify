@@ -2,77 +2,89 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Livewire\Team\Invitations;
 use App\Models\InstanceSettings;
 use App\Models\Project;
+use App\Models\S3Storage;
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\Waitlist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
-use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
+    public function waitlist() {
+        $waiting_in_line = Waitlist::whereVerified(true)->count();
+        return view('auth.waitlist', [
+            'waiting_in_line' => $waiting_in_line,
+        ]);
+    }
     public function subscription()
     {
-        if (!isCloud()) {
+        if (!is_cloud()) {
             abort(404);
         }
         return view('subscription', [
-            'settings' => InstanceSettings::get()
+            'settings' => InstanceSettings::get(),
         ]);
     }
+
     public function license()
     {
-        if (!isCloud()) {
+        if (!is_cloud()) {
             abort(404);
         }
         return view('settings.license', [
-            'settings' => InstanceSettings::get()
+            'settings' => InstanceSettings::get(),
         ]);
+    }
+
+    public function force_passoword_reset() {
+        return view('auth.force-password-reset');
     }
     public function dashboard()
     {
         $projects = Project::ownedByCurrentTeam()->get();
         $servers = Server::ownedByCurrentTeam()->get();
-
+        $s3s = S3Storage::ownedByCurrentTeam()->get();
         $resources = 0;
         foreach ($projects as $project) {
             $resources += $project->applications->count();
+            $resources += $project->postgresqls->count();
         }
 
         return view('dashboard', [
             'servers' => $servers->count(),
             'projects' => $projects->count(),
             'resources' => $resources,
+            's3s' => $s3s,
         ]);
     }
+
     public function settings()
     {
-        if (auth()->user()->isInstanceAdmin()) {
+        if (is_instance_admin()) {
             $settings = InstanceSettings::get();
+            $database = StandalonePostgresql::whereName('coolify-db')->first();
+            if ($database) {
+                $s3s = S3Storage::whereTeamId(0)->get();
+            }
             return view('settings.configuration', [
-                'settings' => $settings
+                'settings' => $settings,
+                'database' => $database,
+                's3s' => $s3s ?? [],
             ]);
         } else {
             return redirect()->route('dashboard');
         }
     }
-    public function emails()
-    {
-        if (auth()->user()->isInstanceAdmin()) {
-            $settings = InstanceSettings::get();
-            return view('settings.emails', [
-                'settings' => $settings
-            ]);
-        } else {
-            return redirect()->route('dashboard');
-        }
-    }
+
     public function team()
     {
         $invitations = [];
@@ -83,6 +95,23 @@ class Controller extends BaseController
             'invitations' => $invitations,
         ]);
     }
+
+    public function storages()
+    {
+        $s3 = S3Storage::ownedByCurrentTeam()->get();
+        return view('team.storages.all', [
+            's3' => $s3,
+        ]);
+    }
+
+    public function storages_show()
+    {
+        $storage = S3Storage::ownedByCurrentTeam()->whereUuid(request()->storage_uuid)->firstOrFail();
+        return view('team.storages.show', [
+            'storage' => $storage,
+        ]);
+    }
+
     public function members()
     {
         $invitations = [];
@@ -93,6 +122,7 @@ class Controller extends BaseController
             'invitations' => $invitations,
         ]);
     }
+
     public function acceptInvitation()
     {
         try {
@@ -115,10 +145,11 @@ class Controller extends BaseController
                 $invitation->delete();
                 abort(401);
             }
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
             throw $th;
         }
     }
+
     public function revokeInvitation()
     {
         try {
@@ -132,7 +163,7 @@ class Controller extends BaseController
             }
             $invitation->delete();
             return redirect()->route('team.show');
-        } catch (\Throwable $th) {
+        } catch (Throwable $th) {
             throw $th;
         }
     }

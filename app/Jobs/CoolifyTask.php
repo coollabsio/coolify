@@ -19,7 +19,7 @@ class CoolifyTask implements ShouldQueue
      */
     public function __construct(
         public Activity $activity,
-        public bool $ignore_errors = false,
+        public bool     $ignore_errors = false,
     ) {
     }
 

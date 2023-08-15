@@ -9,13 +9,15 @@ class Invitations extends Component
 {
     public $invitations;
     protected $listeners = ['refreshInvitations'];
-    public function refreshInvitations()
-    {
-        $this->invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
-    }
+
     public function deleteInvitation(int $invitation_id)
     {
         TeamInvitation::find($invitation_id)->delete();
         $this->refreshInvitations();
+    }
+
+    public function refreshInvitations()
+    {
+        $this->invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
     }
 }

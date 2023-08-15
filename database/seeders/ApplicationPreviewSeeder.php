@@ -2,11 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Application;
-use App\Models\ApplicationPreview;
-use App\Models\Environment;
-use App\Models\GithubApp;
-use App\Models\StandaloneDocker;
 use Illuminate\Database\Seeder;
 
 class ApplicationPreviewSeeder extends Seeder

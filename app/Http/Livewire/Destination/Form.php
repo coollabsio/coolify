@@ -18,11 +18,13 @@ class Form extends Component
         'destination.network' => 'network',
         'destination.server.ip' => 'IP Address',
     ];
+
     public function submit()
     {
         $this->validate();
         $this->destination->save();
     }
+
     public function delete()
     {
         try {

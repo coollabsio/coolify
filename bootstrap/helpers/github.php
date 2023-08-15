@@ -3,8 +3,8 @@
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use Carbon\Carbon;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Lcobucci\JWT\Encoding\ChainedFormatter;
 use Lcobucci\JWT\Encoding\JoseEncoder;
 use Lcobucci\JWT\Signer\Key\InMemory;
@@ -33,6 +33,7 @@ function generate_github_installation_token(GithubApp $source)
     }
     return $token->json()['token'];
 }
+
 function generate_github_jwt_token(GithubApp $source)
 {
     $signingKey = InMemory::plainText($source->privateKey->private_key);
@@ -65,7 +66,7 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
     }
     $json = $response->json();
     if ($response->failed() && $throwError) {
-        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message'] . "<br><br>Rate Limit resets at: " .  Carbon::parse((int)$response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s') . 'UTC');
+        throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message'] . "<br><br>Rate Limit resets at: " . Carbon::parse((int)$response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s') . 'UTC');
     }
     return [
         'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
@@ -73,6 +74,7 @@ function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method =
         'data' => collect($json)
     ];
 }
+
 function get_installation_path(GithubApp $source)
 {
     $github = GithubApp::where('uuid', $source->uuid)->first();

@@ -9,6 +9,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.2",
+        "danharrin/livewire-rate-limiting": "^1.1",
         "doctrine/dbal": "^3.6",
         "guzzlehttp/guzzle": "^7.5.0",
         "laravel/fortify": "^v1.16.0",
@@ -18,9 +19,11 @@
         "laravel/tinker": "^v2.8.1",
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "livewire/livewire": "^v2.12.3",
         "masmerise/livewire-toaster": "^1.2",
         "nubs/random-name-generator": "^2.2",
+        "poliander/cron": "^3.0",
         "sentry/sentry-laravel": "^3.4",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
@@ -41,8 +44,7 @@
         "phpunit/phpunit": "^10.0.19",
         "serversideup/spin": "^v1.1.0",
         "spatie/laravel-ignition": "^2.1.0",
-        "symfony/http-client": "^6.2",
-        "toshy/bunnynet-php": "^3.0"
+        "symfony/http-client": "^6.2"
     },
     "autoload": {
         "files": [

@@ -9,12 +9,47 @@ use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
-    protected $schemalessAttributes = [
-        'proxy',
-    ];
+
     public $casts = [
         'proxy' => SchemalessAttributes::class,
     ];
+    protected $schemalessAttributes = [
+        'proxy',
+    ];
+    protected $fillable = [
+        'name',
+        'ip',
+        'user',
+        'port',
+        'team_id',
+        'private_key_id',
+        'proxy',
+    ];
+
+    static public function isReachable()
+    {
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
+    }
+
+    static public function ownedByCurrentTeam(array $select = ['*'])
+    {
+        $selectArray = collect($select)->concat(['id']);
+        return Server::whereTeamId(auth()->user()->currentTeam()->id)->with('settings')->select($selectArray->all())->orderBy('name');
+    }
+
+    static public function isUsable()
+    {
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true);
+    }
+
+    static public function destinationsByServer(string $server_id)
+    {
+        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
+        $standaloneDocker = collect($server->standaloneDockers->all());
+        $swarmDocker = collect($server->swarmDockers->all());
+        return $standaloneDocker->concat($swarmDocker);
+    }
+
     protected static function booted()
     {
         static::created(function ($server) {
@@ -26,22 +61,17 @@ class Server extends BaseModel
             $server->settings()->delete();
         });
     }
-    protected $fillable = [
-        'name',
-        'ip',
-        'user',
-        'port',
-        'team_id',
-        'private_key_id',
-        'proxy',
-    ];
 
-
+    public function settings()
+    {
+        return $this->hasOne(ServerSetting::class);
+    }
 
     public function scopeWithProxy(): Builder
     {
         return $this->proxy->modelScope();
     }
+
     public function isEmpty()
     {
         if ($this->applications()->count() === 0) {
@@ -49,18 +79,21 @@ class Server extends BaseModel
         }
         return false;
     }
+
     public function applications()
     {
         return $this->destinations()->map(function ($standaloneDocker) {
             return $standaloneDocker->applications;
         })->flatten();
     }
+
     public function destinations()
     {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
         return $standalone_docker->concat($swarm_docker);
     }
+
     public function standaloneDockers()
     {
         return $this->hasMany(StandaloneDocker::class);
@@ -76,38 +109,13 @@ class Server extends BaseModel
         return $this->belongsTo(PrivateKey::class);
     }
 
-    public function settings()
-    {
-        return $this->hasOne(ServerSetting::class);
-    }
     public function muxFilename()
     {
         return "{$this->ip}_{$this->port}_{$this->user}";
     }
+
     public function team()
     {
         return $this->belongsTo(Team::class);
-    }
-    static public function ownedByCurrentTeam(array $select = ['*'])
-    {
-        $selectArray = collect($select)->concat(['id']);
-        return Server::whereTeamId(session('currentTeam')->id)->with('settings')->select($selectArray->all())->orderBy('name');
-    }
-
-    static public function isReachable()
-    {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true);
-    }
-    static public function isUsable()
-    {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true);
-    }
-
-    static public function destinationsByServer(string $server_id)
-    {
-        $server = Server::ownedByCurrentTeam()->get()->where('id', $server_id)->firstOrFail();
-        $standaloneDocker = collect($server->standaloneDockers->all());
-        $swarmDocker = collect($server->swarmDockers->all());
-        return $standaloneDocker->concat($swarmDocker);
     }
 }

@@ -4,5 +4,5 @@ namespace App\Notifications\Channels;
 
 interface SendsEmail
 {
-    public function routeNotificationForEmail();
+    public function getRecepients($notification);
 }

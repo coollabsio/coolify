@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Environment;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
@@ -27,10 +26,12 @@ class DatabaseSeeder extends Seeder
             ApplicationSeeder::class,
             ApplicationSettingsSeeder::class,
             ApplicationPreviewSeeder::class,
-            DBSeeder::class,
-            ServiceSeeder::class,
             EnvironmentVariableSeeder::class,
             LocalPersistentVolumeSeeder::class,
+            S3StorageSeeder::class,
+            StandalonePostgresqlSeeder::class,
+            ScheduledDatabaseBackupSeeder::class,
+            ScheduledDatabaseBackupExecutionSeeder::class,
         ]);
     }
 }

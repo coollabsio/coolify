@@ -5,7 +5,6 @@ namespace App\Http\Livewire\Server;
 use App\Actions\Server\InstallDocker;
 use App\Models\Server;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Form extends Component
 {
@@ -14,7 +13,6 @@ class Form extends Component
     public $dockerVersion;
     public string|null $wildcard_domain = null;
     public int $cleanup_after_percentage;
-    public string|null $modalId = null;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -35,43 +33,35 @@ class Form extends Component
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'
     ];
+
     public function mount()
     {
-        $this->modalId = new Cuid2(7);
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
+
     public function installDocker()
     {
-        $activity = resolve(InstallDocker::class)($this->server, session('currentTeam'));
+        $activity = resolve(InstallDocker::class)($this->server, auth()->user()->currentTeam());
         $this->emit('newMonitorActivity', $activity->id);
     }
+
     public function validateServer()
     {
         try {
-            $this->uptime = instant_remote_process(['uptime'], $this->server);
-            if ($this->uptime) {
-                $this->server->settings->is_reachable = true;
-                $this->server->settings->save();
-            } else {
-                $this->uptime = 'Server not reachable.';
-                throw new \Exception('Server not reachable.');
+            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server);
+            if ($uptime) {
+                $this->uptime = $uptime;
             }
-            $this->dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $this->server, false);
-            if (!$this->dockerVersion) {
-                $this->dockerVersion = 'Not installed.';
-            } else {
-                $this->server->settings->is_usable = true;
-                $this->server->settings->save();
+            if ($dockerVersion) {
+                $this->dockerVersion = $dockerVersion;
                 $this->emit('proxyStatusUpdated');
             }
         } catch (\Exception $e) {
-            $this->server->settings->is_reachable = false;
-            $this->server->settings->is_usable = false;
-            $this->server->settings->save();
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }
+
     public function delete()
     {
         if (!$this->server->isEmpty()) {
@@ -81,6 +71,7 @@ class Form extends Component
         $this->server->delete();
         redirect()->route('server.all');
     }
+
     public function submit()
     {
         $this->validate();

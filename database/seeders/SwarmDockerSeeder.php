@@ -3,10 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Destination;
-use App\Models\Server;
-use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
 class SwarmDockerSeeder extends Seeder
@@ -16,10 +13,9 @@ class SwarmDockerSeeder extends Seeder
      */
     public function run(): void
     {
-        $server_2 = Server::find(1);
         SwarmDocker::create([
             'name' => 'Swarm Docker 1',
-            'server_id' => $server_2->id,
+            'server_id' => 1,
         ]);
     }
 }

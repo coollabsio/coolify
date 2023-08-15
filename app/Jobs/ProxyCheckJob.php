@@ -3,7 +3,6 @@
 namespace App\Jobs;
 
 use App\Actions\Proxy\StartProxy;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -18,6 +17,7 @@ class ProxyCheckJob implements ShouldQueue
     public function __construct()
     {
     }
+
     public function handle()
     {
         try {
@@ -28,6 +28,7 @@ class ProxyCheckJob implements ShouldQueue
                 if ($status === 'running') {
                     continue;
                 }
+                // $server->team->notify(new ProxyStoppedNotification($server));
                 resolve(StartProxy::class)($server);
             }
         } catch (\Throwable $th) {

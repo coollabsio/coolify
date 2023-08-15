@@ -25,7 +25,7 @@
 <body>
     @livewireScripts
     <x-toaster-hub />
-    @if (auth()->user()->isInstanceAdmin())
+    @if (is_instance_admin() || is_subscription_in_grace_period())
         <div class="fixed top-3 left-4" id="vue">
             <magic-bar></magic-bar>
         </div>
@@ -34,7 +34,7 @@
         <x-navbar-subscription />
     @endif
 
-    <main class="main">
+    <main class="main max-w-screen-2xl">
         {{ $slot }}
     </main>
     <x-version class="fixed left-2 bottom-1" />
@@ -56,6 +56,7 @@
                 }
             }
         }
+
         Livewire.on('reloadWindow', () => {
             window.location.reload();
         })

@@ -15,6 +15,7 @@ class PrepareCoolifyTask
 {
     protected Activity $activity;
     protected CoolifyTaskArgs $remoteProcessArgs;
+
     public function __construct(CoolifyTaskArgs $remoteProcessArgs)
     {
         $this->remoteProcessArgs = $remoteProcessArgs;

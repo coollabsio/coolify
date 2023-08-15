@@ -2,7 +2,10 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
-            @if ($environment->applications->count() === 0)
+            <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+                class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
+                Add</a>
+            @if ($environment->can_delete_environment())
                 <livewire:project.delete-environment :environment_id="$environment->id" />
             @endif
         </div>
@@ -28,14 +31,26 @@
             </ol>
         </nav>
     </div>
-    @if ($environment->applications->count() === 0)
+    @if ($environment->can_delete_environment())
         <p>No resources found.</p>
     @endif
     <div class="grid gap-2 lg:grid-cols-2">
         @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
-                {{ $application->name }}
+                <div class="flex flex-col">
+                    <div>{{ $application->name }}</div>
+                    <div class="text-xs text-gray-400">{{ $application->description }}</div>
+                </div>
+            </a>
+        @endforeach
+        @foreach ($environment->databases->sortBy('name') as $databases)
+            <a class="box"
+                href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
+                <div class="flex flex-col">
+                    <div>{{ $databases->name }}</div>
+                    <div class="text-xs text-gray-400">{{ $databases->description }}</div>
+                </div>
             </a>
         @endforeach
     </div>
