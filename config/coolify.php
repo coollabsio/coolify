@@ -16,6 +16,6 @@ return [
     'lemon_squeezy_ultimate_plan_ids' => env('LEMON_SQUEEZY_ULTIMATE_PLAN_IDS', ""),
     'mux_enabled' => env('MUX_ENABLED', true),
     'dev_webhook' => env('SERVEO_URL'),
-    'base_config_path' => env('BASE_CONFIG_PATH', '/_data/coolify'),
+    'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
     'dev_config_path' => env('DEV_CONFIG_PATH', './_data/coolify'),
 ];
