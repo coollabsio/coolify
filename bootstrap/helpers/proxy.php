@@ -13,9 +13,6 @@ function get_proxy_path()
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();
-    if (is_dev()) {
-        $proxy_path = config('coolify.dev_config_path') . '/' . $server->name . '/proxy';
-    }
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
     })->unique();
