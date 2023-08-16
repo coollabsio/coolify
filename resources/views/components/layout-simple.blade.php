@@ -26,7 +26,7 @@
 <body>
     @livewireScripts
     <x-toaster-hub />
-    <main>
+    <main class="main max-w-screen-2xl">
         {{ $slot }}
     </main>
     <x-version class="fixed left-2 bottom-1" />

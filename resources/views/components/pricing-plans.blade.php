@@ -1,4 +1,7 @@
-<div x-data="{ selected: 'monthly' }" class="w-full">
+@props([
+    'showSubscribeButtons' => true,
+])
+<div x-data="{ selected: 'monthly' }" class="w-full pb-20">
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center mt-5">
             <fieldset
@@ -109,11 +112,12 @@
                         </span>
                     </p>
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $6)</span>
-
+                    @if(!$showSubscribeButtons)
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
                         href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
+                    @endif
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
                         the cloud
                         with a
@@ -128,7 +132,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            1 server
+                            1 server <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -184,10 +188,12 @@
                         </span>
                     </p>
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $29)</span>
+                    @if(!$showSubscribeButtons)
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-essential" class="buyme"
                         href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-essential" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
+                        @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
@@ -198,7 +204,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            5 servers
+                            1 server <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -254,10 +260,12 @@
                         </span>
                     </p>
                     <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $69)</span>
+                    @if(!$showSubscribeButtons)
                     <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-growth" class="buyme"
                         href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
                     <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-growth" class="buyme"
                         href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
+                    @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
                         manage them easily in one place.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
@@ -268,7 +276,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Unlimited servers
+                            Unlimited servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
