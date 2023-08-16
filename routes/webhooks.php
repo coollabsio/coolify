@@ -174,7 +174,6 @@ Route::post('/source/github/events', function () {
         return general_error_handler(err: $e);
     }
 });
-
 Route::get('/waitlist/confirm', function () {
     $email = request()->get('email');
     $confirmation_code = request()->get('confirmation_code');
@@ -184,6 +183,7 @@ Route::get('/waitlist/confirm', function () {
         if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.confirmation_valid_for_minutes'))) {
             $found->verified = true;
             $found->save();
+            send_internal_notification('Waitlist confirmed: ' . $email);
             return 'Thank you for confirming your email address. We will notify you when you are next in line.';
         }
         return redirect()->route('dashboard');
@@ -199,6 +199,7 @@ Route::get('/waitlist/cancel', function () {
         $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
         if ($found && !$found->verified) {
             $found->delete();
+            send_internal_notification('Waitlist cancelled: ' . $email);
             return 'Your email address has been removed from the waitlist.';
         }
         return redirect()->route('dashboard');
@@ -250,6 +251,7 @@ Route::post('/payments/events', function () {
             case 'subscription_updated':
             case 'subscription_resumed':
             case 'subscription_unpaused':
+                send_internal_notification('Subscription created or updated: ' . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
                 $subscription = Subscription::updateOrCreate([
                     'team_id' => $team_id,
                 ], [
@@ -271,6 +273,7 @@ Route::post('/payments/events', function () {
             case 'subscription_expired':
                 $subscription = Subscription::where('team_id', $team_id)->where('lemon_order_id', $order_id)->first();
                 if ($subscription) {
+                    send_internal_notification('Subscription cancelled or paused: ' . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
                     $subscription->update([
                         'lemon_status' => $status,
                         'lemon_trial_ends_at' => $trial_ends_at,
@@ -281,11 +284,13 @@ Route::post('/payments/events', function () {
                 }
                 break;
         }
+
         $webhook->update([
             'status' => 'success',
         ]);
     } catch (Exception $e) {
         ray($e->getMessage());
+        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
         $webhook->update([
             'status' => 'failed',
             'failure_reason' => $e->getMessage(),

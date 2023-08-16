@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\InstanceSettings;
+use App\Models\Team;
+use App\Notifications\Internal\GeneralNotification;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -8,7 +11,6 @@ use Illuminate\Support\Str;
 use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
-use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 
 function application_configuration_dir(): string
 {
@@ -35,7 +37,7 @@ function is_instance_admin()
     return auth()->user()?->isInstanceAdmin();
 }
 
-function general_error_handler(Throwable|null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
+function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
     try {
         ray('ERROR OCCURRED: ' . $err->getMessage());
@@ -47,9 +49,9 @@ function general_error_handler(Throwable|null $err = null, $that = null, $isJson
             } else {
                 throw new Exception($customErrorMessage ?? $err->errorInfo[2]);
             }
-        } elseif($err instanceof TooManyRequestsException){
+        } elseif ($err instanceof TooManyRequestsException) {
             throw new Exception($customErrorMessage ?? "Too many requests. Please try again in {$err->secondsUntilAvailable} seconds.");
-        }else {
+        } else {
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
     } catch (Throwable $error) {
@@ -104,7 +106,7 @@ function is_transactional_emails_active(): bool
     return data_get(InstanceSettings::get(), 'smtp_enabled');
 }
 
-function set_transanctional_email_settings(InstanceSettings|null $settings = null): void
+function set_transanctional_email_settings(InstanceSettings | null $settings = null): void
 {
     if (!$settings) {
         $settings = InstanceSettings::get();
@@ -193,4 +195,13 @@ function validate_cron_expression($expression_to_validate): bool
         $isValid = true;
     }
     return $isValid;
+}
+function send_internal_notification(string $message): void
+{
+    try {
+        $team = Team::find(0);
+        $team->notify(new GeneralNotification('👀 Internal notifications: ' . $message));
+    } catch (\Throwable $th) {
+        ray($th->getMessage());
+    }
 }

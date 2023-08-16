@@ -52,6 +52,7 @@ class SendConfirmationForWaitlistJob implements ShouldQueue
                     ->html((string) $mail->render())
             );
         } catch (\Throwable $th) {
+            send_internal_notification('SendConfirmationForWaitlistJob failed with error: ' . $th->getMessage());
             ray($th->getMessage());
             throw $th;
         }
