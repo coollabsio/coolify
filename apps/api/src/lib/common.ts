@@ -1762,7 +1762,7 @@ export function convertTolOldVolumeNames(type) {
 	}
 }
 
-export async function cleanupDockerStorage(dockerId) {
+export async function cleanupDockerStorage(dockerId, volumes = false) {
 	// Cleanup images that are not used by any container
 	try {
 		await executeCommand({ dockerId, command: `docker image prune -af` });
@@ -1780,6 +1780,11 @@ export async function cleanupDockerStorage(dockerId) {
 	try {
 		await executeCommand({ dockerId, command: `docker builder prune -af` });
 	} catch (error) { }
+	if (volumes) {
+		try {
+			await executeCommand({ dockerId, command: `docker volume prune -a` });
+		} catch (error) { }
+	}
 }
 
 export function persistentVolumes(id, persistentStorage, config) {
