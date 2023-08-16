@@ -17,7 +17,7 @@ class PrivateKey extends Component
         $this->server->update([
             'private_key_id' => $private_key_id
         ]);
-        refreshPrivateKey($this->server->privateKey);
+        refresh_server_connection($this->server->privateKey);
         $this->server->refresh();
         $this->checkConnection();
     }

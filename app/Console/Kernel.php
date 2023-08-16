@@ -3,13 +3,12 @@
 namespace App\Console;
 
 use App\Jobs\CheckResaleLicenseJob;
-use App\Jobs\CheckResaleLicenseKeys;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
-use App\Jobs\InstanceApplicationsStatusJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ProxyCheckJob;
+use App\Jobs\ResourceStatusJob;
 use App\Models\ScheduledDatabaseBackup;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -21,7 +20,7 @@ class Kernel extends ConsoleKernel
         //        $schedule->call(fn() => $this->check_scheduled_backups($schedule))->everyTenSeconds();
         if (is_dev()) {
             $schedule->command('horizon:snapshot')->everyMinute();
-            $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
+            $schedule->job(new ResourceStatusJob)->everyMinute();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
 
@@ -31,7 +30,7 @@ class Kernel extends ConsoleKernel
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
-            $schedule->job(new InstanceApplicationsStatusJob)->everyMinute();
+            $schedule->job(new ResourceStatusJob)->everyMinute();
             $schedule->job(new CheckResaleLicenseJob)->hourly();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
             $schedule->job(new DockerCleanupJob)->everyTenMinutes();
@@ -49,7 +48,10 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
-            if (!$scheduled_backup->enabled) continue;
+            if (!$scheduled_backup->enabled) {
+                continue;
+            }
+
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
             }

@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Notifications\Server\NotReachable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -109,8 +110,8 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
         if ($repeat > 1) {
+            ray("repeat: ", $repeat);
             Sleep::for(200)->milliseconds();
-            ray('executing again');
             return instant_remote_process($command, $server, $throwError, $repeat - 1);
         }
         // ray('ERROR OCCURED: ' . $process->errorOutput());
@@ -152,21 +153,22 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     return $formatted;
 }
 
-function refreshPrivateKey(PrivateKey $private_key)
+function refresh_server_connection(PrivateKey $private_key)
 {
     foreach ($private_key->servers as $server) {
         // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
-        if (auth()->user()->currentTeam()->id) {
-            auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
-        }
+        // check if user is authenticated
+            if (auth()?->user()?->currentTeam()->id) {
+                auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
+            }
     }
 }
 
 function validateServer(Server $server)
 {
     try {
-        refreshPrivateKey($server->privateKey);
+        refresh_server_connection($server->privateKey);
         $uptime = instant_remote_process(['uptime'], $server);
         if (!$uptime) {
             $uptime = 'Server not reachable.';
@@ -190,5 +192,27 @@ function validateServer(Server $server)
         throw $e;
     } finally {
         $server->settings->save();
+    }
+}
+
+function check_server_connection(Server $server) {
+    try {
+        refresh_server_connection($server->privateKey);
+        instant_remote_process(['uptime'], $server);
+        $server->unreachable_count = 0;
+        $server->settings->is_reachable = true;
+    } catch (\Exception $e) {
+        if ($server->unreachable_count == 2) {
+            $server->team->notify(new NotReachable($server));
+            $server->settings->is_reachable = false;
+            $server->settings->save();
+        } else {
+            $server->unreachable_count += 1;
+        }
+
+        throw $e;
+    } finally {
+        $server->settings->save();
+        $server->save();
     }
 }
