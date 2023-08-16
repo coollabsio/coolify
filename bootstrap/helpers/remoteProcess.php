@@ -159,9 +159,9 @@ function refresh_server_connection(PrivateKey $private_key)
         // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
         // check if user is authenticated
-            if (auth()?->user()?->currentTeam()->id) {
-                auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
-            }
+        if (auth()?->user()?->currentTeam()->id) {
+            auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
+        }
     }
 }
 
@@ -195,7 +195,8 @@ function validateServer(Server $server)
     }
 }
 
-function check_server_connection(Server $server) {
+function check_server_connection(Server $server)
+{
     try {
         refresh_server_connection($server->privateKey);
         instant_remote_process(['uptime'], $server);
