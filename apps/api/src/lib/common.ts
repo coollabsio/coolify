@@ -1782,7 +1782,7 @@ export async function cleanupDockerStorage(dockerId, volumes = false) {
 	} catch (error) { }
 	if (volumes) {
 		try {
-			await executeCommand({ dockerId, command: `docker volume prune -a` });
+			await executeCommand({ dockerId, command: `docker volume prune -af` });
 		} catch (error) { }
 	}
 }
