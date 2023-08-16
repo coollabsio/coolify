@@ -24,6 +24,6 @@
             <x-forms.button type="submit">Join Waitlist</x-forms.button>
         </form>
         Waiting in the line: <span class="font-bold text-warning">{{ $waiting_in_line }}</span>
-        <x-pricing-plans showSubscribeButtons="false" />
+        {{-- <x-pricing-plans showSubscribeButtons="false" /> --}}
     </div>
 </div>
