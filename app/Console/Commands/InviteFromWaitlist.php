@@ -39,7 +39,7 @@ class InviteFromWaitlist extends Command
             $this->remove_from_waitlist();
             $this->send_email();
         } else {
-            $this->info('No one in the waitlist who is verified. 👀');
+            $this->info('No verified user found in the waitlist. 👀');
         }
     }
     private function register_user()

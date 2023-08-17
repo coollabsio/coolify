@@ -1,6 +1,6 @@
 Congratulations!<br>
 <br>
-You have been invited to join the Coolify Cloud: <a href="{{base_url()}}/login">Login here</a>
+You have been invited to join the Coolify Cloud. <a href="{{base_url()}}/login">Login here</a>
 <br>
 <br>
 Credentials:
