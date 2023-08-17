@@ -58,8 +58,15 @@
             }
         }
 
-        Livewire.on('reloadWindow', () => {
-            window.location.reload();
+        Livewire.on('reloadWindow', (timeout) => {
+            if (timeout) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, timeout);
+                return;
+            } else {
+                window.location.reload();
+            }
         })
     </script>
 </body>

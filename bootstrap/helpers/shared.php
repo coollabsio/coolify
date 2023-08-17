@@ -5,7 +5,10 @@ use App\Models\Team;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
+use Illuminate\Mail\Message;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Nubs\RandomNameGenerator\All;
@@ -204,4 +207,21 @@ function send_internal_notification(string $message): void
     } catch (\Throwable $th) {
         ray($th->getMessage());
     }
+}
+function send_user_an_email(MailMessage $mail, string $email): void
+{
+    $settings = InstanceSettings::get();
+    set_transanctional_email_settings($settings);
+    Mail::send(
+        [],
+        [],
+        fn (Message $message) => $message
+            ->from(
+                data_get($settings, 'smtp_from_address'),
+                data_get($settings, 'smtp_from_name')
+            )
+            ->to($email)
+            ->subject($mail->subject)
+            ->html((string) $mail->render())
+    );
 }

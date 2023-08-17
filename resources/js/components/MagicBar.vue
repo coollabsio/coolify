@@ -129,6 +129,15 @@
                                                     <path d="M10 16l0 .01" />
                                                 </template>
                                                 <template
+                                                    v-if="action.icon === 'storage' || sequenceState.sequence[sequenceState.currentActionIndex] === 'storage'">
+                                                    <g fill="none" stroke="currentColor" stroke-linecap="round"
+                                                        stroke-linejoin="round" stroke-width="2">
+                                                        <path d="M4 6a8 3 0 1 0 16 0A8 3 0 1 0 4 6" />
+                                                        <path d="M4 6v6a8 3 0 0 0 16 0V6" />
+                                                        <path d="M4 12v6a8 3 0 0 0 16 0v-6" />
+                                                    </g>
+                                                </template>
+                                                <template
                                                     v-if="action.icon === 'project' || sequenceState.sequence[sequenceState.currentActionIndex] === 'project'">
                                                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                                                     <path
@@ -273,6 +282,14 @@ const magicActions = [{
 },
 {
     id: 4,
+    name: 'Deploy: Dockerfile',
+    tags: 'dockerfile,deploy',
+    icon: 'destination',
+    new: true,
+    sequence: ['main', 'server', 'destination', 'project', 'environment', 'redirect']
+},
+{
+    id: 5,
     name: 'Create: Server',
     tags: 'server,ssh,new,create',
     icon: 'server',
@@ -280,7 +297,7 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
-    id: 5,
+    id: 6,
     name: 'Create: Source',
     tags: 'source,git,gitlab,github,bitbucket,gitea,new,create',
     icon: 'git',
@@ -288,7 +305,7 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
-    id: 6,
+    id: 7,
     name: 'Create: Private Key',
     tags: 'private,key,ssh,new,create',
     icon: 'key',
@@ -296,16 +313,15 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
-    id: 7,
+    id: 8,
     name: 'Create: Destination',
     tags: 'destination,docker,network,new,create',
     icon: 'destination',
     new: true,
     sequence: ['main', 'server', 'redirect']
 },
-
 {
-    id: 8,
+    id: 9,
     name: 'Create: Team',
     tags: 'team,member,new,create',
     icon: 'team',
@@ -313,74 +329,82 @@ const magicActions = [{
     sequence: ['main', 'redirect']
 },
 {
-    id: 9,
+    id: 10,
+    name: 'Create: S3 Storage',
+    tags: 's3,storage,new,create',
+    icon: 'storage',
+    new: true,
+    sequence: ['main', 'redirect']
+},
+{
+    id: 11,
     name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 10,
+    id: 12,
     name: 'Goto: Servers',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 11,
+    id: 13,
     name: 'Goto: Private Keys',
     tags: 'destination,docker,network,new,create,ssh,private,key',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 12,
+    id: 14,
     name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 13,
+    id: 15,
     name: 'Goto: Sources',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 14,
+    id: 16,
     name: 'Goto: Destinations',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 15,
+    id: 17,
     name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 16,
+    id: 18,
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 17,
+    id: 19,
     name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 18,
+    id: 20,
     name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 19,
+    id: 21,
     name: 'Goto: Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 20,
+    id: 22,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
@@ -552,55 +576,63 @@ async function redirect() {
             targetUrl.searchParams.append('destination', destination)
             break;
         case 4:
-            targetUrl.pathname = `/server/new`
+            targetUrl.pathname = `/project/${project}/${environment}/new`
+            targetUrl.searchParams.append('type', 'dockerfile')
+            targetUrl.searchParams.append('destination', destination)
             break;
         case 5:
-            targetUrl.pathname = `/source/new`
+            targetUrl.pathname = `/server/new`
             break;
         case 6:
-            targetUrl.pathname = `/private-key/new`
+            targetUrl.pathname = `/source/new`
             break;
         case 7:
+            targetUrl.pathname = `/private-key/new`
+            break;
+        case 8:
             targetUrl.pathname = `/destination/new`
             targetUrl.searchParams.append('server', server)
             break;
-        case 8:
+        case 9:
             targetUrl.pathname = `/team/new`
             break;
-        case 9:
-            targetUrl.pathname = `/`
-            break;
         case 10:
-            targetUrl.pathname = `/servers`
+            targetUrl.pathname = `/team/storages/new`
             break;
         case 11:
-            targetUrl.pathname = `/private-keys`
+            targetUrl.pathname = `/`
             break;
         case 12:
-            targetUrl.pathname = `/projects`
+            targetUrl.pathname = `/servers`
             break;
         case 13:
-            targetUrl.pathname = `/sources`
+            targetUrl.pathname = `/private-keys`
             break;
         case 14:
-            targetUrl.pathname = `/destinations`
+            targetUrl.pathname = `/projects`
             break;
         case 15:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/sources`
             break;
         case 16:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/destinations`
             break;
         case 17:
-            targetUrl.pathname = `/team/notifications`
+            targetUrl.pathname = `/settings`
             break;
         case 18:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/command-center`
             break;
         case 19:
-            targetUrl.pathname = `/team`
+            targetUrl.pathname = `/team/notifications`
             break;
         case 20:
+            targetUrl.pathname = `/profile`
+            break;
+        case 21:
+            targetUrl.pathname = `/team`
+            break;
+        case 22:
             targetUrl.pathname = `/team`
             break;
     }

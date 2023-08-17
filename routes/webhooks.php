@@ -190,7 +190,6 @@ Route::get('/waitlist/confirm', function () {
     } catch (error) {
         return redirect()->route('dashboard');
     }
-
 })->name('webhooks.waitlist.confirm');
 Route::get('/waitlist/cancel', function () {
     $email = request()->get('email');
@@ -206,7 +205,6 @@ Route::get('/waitlist/cancel', function () {
     } catch (error) {
         return redirect()->route('dashboard');
     }
-
 })->name('webhooks.waitlist.cancel');
 Route::post('/payments/events', function () {
     try {
@@ -251,7 +249,7 @@ Route::post('/payments/events', function () {
             case 'subscription_updated':
             case 'subscription_resumed':
             case 'subscription_unpaused':
-                send_internal_notification('Subscription created or updated: ' . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
+                send_internal_notification("LemonSqueezy Event (`$event`): `" . $email  . '` with status `' . $status . '`, tier: `' . $variant_name . '`');
                 $subscription = Subscription::updateOrCreate([
                     'team_id' => $team_id,
                 ], [
@@ -273,7 +271,7 @@ Route::post('/payments/events', function () {
             case 'subscription_expired':
                 $subscription = Subscription::where('team_id', $team_id)->where('lemon_order_id', $order_id)->first();
                 if ($subscription) {
-                    send_internal_notification('Subscription cancelled or paused: ' . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
+                    send_internal_notification("LemonSqueezy Event (`$event`): " . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
                     $subscription->update([
                         'lemon_status' => $status,
                         'lemon_trial_ends_at' => $trial_ends_at,

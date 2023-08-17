@@ -1,7 +1,7 @@
 @props([
     'showSubscribeButtons' => true,
 ])
-<div x-data="{ selected: 'monthly' }" class="w-full pb-20">
+<div x-data="{ selected: 'yearly' }" class="w-full pb-20">
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center mt-5">
             <fieldset
@@ -17,7 +17,7 @@
                     :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
-                    <span>Annually</span>
+                    <span>Annually <span class="text-xs text-warning">(save ~1 month)<span></span>
                 </label>
             </fieldset>
         </div>
@@ -42,7 +42,12 @@
                             <span class="text-4xl font-bold tracking-tight text-white">Still Free </span>
                         </span>
                     </p>
-                    <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $?)</span>
+                    <span x-show="selected === 'monthly'" x-cloak>
+                        <span>billed monthly</span>
+                    </span>
+                    <span x-show="selected === 'yearly'" x-cloak>
+                        <span>billed annually</span>
+                    </span>
                     <a href="https://github.com/coollabsio/coolify" aria-describedby="tier-trial" class="buyme">Get
                         Started</a>
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting without limits with our
@@ -56,25 +61,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Same features as the paid version
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Managed by you
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            If you brave enough
+                            You manage everything
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -104,19 +91,24 @@
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight text-white">$5</span>
-                            <span class="text-sm font-semibold leading-6 ">/monthly</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$54</span>
-                            <span class="text-sm font-semibold leading-6 ">/yearly</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">$4</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                     </p>
-                    <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $6)</span>
-                    @if(!$showSubscribeButtons)
-                    <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                        href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
-                    <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                        href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
+                    <span x-show="selected === 'monthly'" x-cloak>
+                        <span>billed monthly</span>
+                    </span>
+                    <span x-show="selected === 'yearly'" x-cloak>
+                        <span>billed annually</span>
+                    </span>
+                    @if ($showSubscribeButtons)
+                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
+                            href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
+                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
+                            href="{{ getSubscriptionLink('yearly_basic') }}">Subscribe</a>
                     @endif
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
                         the cloud
@@ -141,24 +133,6 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Unlimited Deployments
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Bring your own S3
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
                             Basic Support
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
@@ -176,24 +150,29 @@
                     </ul>
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-essential" class="text-base font-semibold leading-7 text-white">Essential</h3>
+                    <h3 id="tier-pro" class="text-base font-semibold leading-7 text-white">Pro</h3>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight text-white">$29</span>
-                            <span class="text-sm font-semibold leading-6 ">/monthly</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$319</span>
-                            <span class="text-sm font-semibold leading-6 ">/yearly</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">$26</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                     </p>
-                    <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $29)</span>
-                    @if(!$showSubscribeButtons)
-                    <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-essential" class="buyme"
-                        href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
-                    <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-essential" class="buyme"
-                        href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
-                        @endif
+                    <span x-show="selected === 'monthly'" x-cloak>
+                        <span>billed monthly</span>
+                    </span>
+                    <span x-show="selected === 'yearly'" x-cloak>
+                        <span>billed annually</span>
+                    </span>
+                    @if ($showSubscribeButtons)
+                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro" class="buyme"
+                            href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
+                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-pro" class="buyme"
+                            href="{{ getSubscriptionLink('yearly_pro') }}">Subscribe</a>
+                    @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
@@ -204,25 +183,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            1 server <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Unlimited Deployments
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Provided (optional) S3
+                            5 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -248,23 +209,28 @@
                     </ul>
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
-                    <h3 id="tier-growth" class="text-base font-semibold leading-7 text-white">Growth</h3>
+                    <h3 id="tier-ultimate" class="text-base font-semibold leading-7 text-white">Ultimate</h3>
                     <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$49</span>
-                            <span class="text-sm font-semibold leading-6 ">/monthly</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">$69</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$539</span>
-                            <span class="text-sm font-semibold leading-6 ">/yearly</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">$63</span>
+                            <span class="text-sm font-semibold leading-6 ">/month</span>
                         </span>
                     </p>
-                    <span x-show="selected === 'yearly'" x-cloak class="text-warning">(save $69)</span>
-                    @if(!$showSubscribeButtons)
-                    <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-growth" class="buyme"
-                        href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
-                    <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-growth" class="buyme"
-                        href="{{ getSubscriptionLink('yearly') }}">Subscribe</a>
+                    <span x-show="selected === 'monthly'" x-cloak>
+                        <span>billed monthly</span>
+                    </span>
+                    <span x-show="selected === 'yearly'" x-cloak>
+                        <span>billed annually</span>
+                    </span>
+                    @if ($showSubscribeButtons)
+                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
+                            href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
+                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
+                            href="{{ getSubscriptionLink('yearly_ultimate') }}">Subscribe</a>
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
                         manage them easily in one place.</p>
@@ -276,25 +242,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Unlimited servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Unlimited deployments
-                        </li>
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
-                                aria-hidden="true">
-                                <path fill-rule="evenodd"
-                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
-                                    clip-rule="evenodd" />
-                            </svg>
-                            Provided (optional) S3
+                            15 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -319,6 +267,9 @@
                         </li>
                     </ul>
                 </div>
+            </div>
+            <div class="pt-10">Need unlimited servers or official support for your Coolify instance? <a
+                    href="https://docs.coollabs.io/contact" class='text-warning'>Contact us.</a>
             </div>
         </div>
     </div>
