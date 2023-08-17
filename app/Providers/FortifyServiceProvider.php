@@ -8,6 +8,7 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\InstanceSettings;
 use App\Models\User;
+use App\Models\Waitlist;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -45,15 +46,19 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
-            ray('asd');
             $settings = InstanceSettings::get();
+            $waiting_in_line = Waitlist::whereVerified(true)->count();
             if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
             if (config('coolify.waitlist')) {
-                return view('auth.waitlist');
+                return view('auth.waitlist',[
+                    'waiting_in_line' => $waiting_in_line,
+                ]);
             } else {
-                return view('auth.register');
+                return view('auth.register',[
+                    'waiting_in_line' => $waiting_in_line,
+                ]);
             }
         });
 
@@ -75,6 +80,8 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                $user->updated_at = now();
+                $user->save();
                 session(['currentTeam' => $user->currentTeam = $user->teams->firstWhere('personal_team', true)]);
                 return $user;
             }

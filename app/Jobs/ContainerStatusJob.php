@@ -35,7 +35,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             $status = get_container_status(server: $this->resource->destination->server, container_id: $this->container_name, throwError: false);
-            if ($this->resource->status === 'running' && $status === 'stopped') {
+            if ($this->resource->status === 'running' && $status !== 'running') {
                 $this->resource->environment->project->team->notify(new StatusChanged($this->resource));
             }
 

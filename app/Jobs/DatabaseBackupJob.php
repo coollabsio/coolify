@@ -18,6 +18,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Throwable;
+use Illuminate\Support\Str;
 
 class DatabaseBackupJob implements ShouldQueue
 {
@@ -68,11 +69,13 @@ class DatabaseBackupJob implements ShouldQueue
             return;
         }
         $this->container_name = $this->database->uuid;
+        $this->backup_dir = backup_dir() . "/databases/" . Str::of($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->container_name;
+
         if ($this->database->name === 'coolify-db') {
             $this->container_name = "coolify-db";
+            $ip = Str::slug($this->server->ip);
+            $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
         }
-
-        $this->backup_dir = backup_dir() . "/" . $this->container_name;
         $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".sql";
         $this->backup_location = $this->backup_dir . $this->backup_file;
 
@@ -95,6 +98,7 @@ class DatabaseBackupJob implements ShouldQueue
     private function backup_standalone_postgresql(): void
     {
         try {
+            ray($this->backup_dir);
             $commands[] = "mkdir -p " . $this->backup_dir;
             $commands[] = "docker exec $this->container_name pg_dumpall -U {$this->database->postgres_user} > $this->backup_location";
 

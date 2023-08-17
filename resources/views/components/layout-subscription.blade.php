@@ -8,9 +8,10 @@
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     @env('local')
     <title>Coolify - localhost</title>
-    @endenv
-    @env('production')
+    <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
+    @else
     <title>{{ $title ?? 'Coolify' }}</title>
+    <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
     @endenv
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @vite(['resources/js/app.js', 'resources/css/app.css'])
@@ -57,8 +58,15 @@
             }
         }
 
-        Livewire.on('reloadWindow', () => {
-            window.location.reload();
+        Livewire.on('reloadWindow', (timeout) => {
+            if (timeout) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, timeout);
+                return;
+            } else {
+                window.location.reload();
+            }
         })
     </script>
 </body>

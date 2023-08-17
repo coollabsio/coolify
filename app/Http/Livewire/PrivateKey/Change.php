@@ -43,7 +43,7 @@ class Change extends Component
                 $this->private_key->private_key .= "\n";
             }
             $this->private_key->save();
-            refreshPrivateKey($this->private_key);
+            refresh_server_connection($this->private_key);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

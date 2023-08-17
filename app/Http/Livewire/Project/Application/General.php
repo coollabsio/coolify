@@ -152,7 +152,7 @@ class General extends Component
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
-            $this->application->fqdn = $domains->implode(',');
+            $this->application->fqdn = data_get($domains->implode(','), '', null);
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
         } catch (\Exception $e) {

@@ -2,6 +2,7 @@
 
 use App\Models\Server;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 
 function format_docker_command_output_to_json($rawOutput): Collection
 {
@@ -45,6 +46,7 @@ function format_docker_envs_to_json($rawOutput)
 
 function get_container_status(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
+    check_server_connection($server);
     $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
     if (!$container) {
         return 'exited';
@@ -53,7 +55,7 @@ function get_container_status(Server $server, string $container_id, bool $all_da
     if ($all_data) {
         return $container[0];
     }
-    return $container[0]['State']['Status'];
+    return data_get($container[0], 'State.Status', 'exited');
 }
 
 function generate_container_name(string $uuid, int $pull_request_id = 0)
@@ -66,11 +68,17 @@ function generate_container_name(string $uuid, int $pull_request_id = 0)
 }
 function get_port_from_dockerfile($dockerfile): int
 {
-    $port = preg_grep('/EXPOSE\s+(\d+)/', explode("\n", $dockerfile));
-    if (count($port) > 0 && preg_match('/EXPOSE\s+(\d+)/', $port[1], $matches)) {
-        $port = $matches[1];
-    } else {
-        $port = 80;
+    $dockerfile_array = explode("\n", $dockerfile);
+    $found_exposed_port = null;
+    foreach ($dockerfile_array as $line) {
+        $line_str = Str::of($line)->trim();
+        if ($line_str->startsWith('EXPOSE')) {
+            $found_exposed_port = $line_str->replace('EXPOSE', '')->trim();
+            break;
+        }
     }
-    return $port;
+    if ($found_exposed_port) {
+        return (int)$found_exposed_port->value();
+    }
+    return 80;
 }

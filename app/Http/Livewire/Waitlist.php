@@ -18,7 +18,7 @@ class Waitlist extends Component
     public function mount()
     {
         if (is_dev()) {
-            $this->email = 'test@example.com';
+            $this->email = 'waitlist@example.com';
         }
     }
     public function submit()
@@ -27,8 +27,7 @@ class Waitlist extends Component
         try {
             $already_registered = User::whereEmail($this->email)->first();
             if ($already_registered) {
-                $this->emit('success', 'You are already registered (Thank you 💜).');
-                return;
+                throw new \Exception('You are already on the waitlist or registered. <br>Please check your email to verify your email address or contact support.');
             }
             $found = ModelsWaitlist::where('email', $this->email)->first();
             if ($found) {
@@ -36,7 +35,7 @@ class Waitlist extends Component
                     $this->emit('error', 'You are already on the waitlist. <br>Please check your email to verify your email address.');
                     return;
                 }
-                $this->emit('error', 'You are already on the waitlist.');
+                $this->emit('error', 'You are already on the waitlist. <br>You will be notified when your turn comes. <br>Thank you.');
                 return;
             }
             $waitlist = ModelsWaitlist::create([
@@ -44,11 +43,10 @@ class Waitlist extends Component
                 'type' => 'registration',
             ]);
 
-            $this->emit('success', 'You have been added to the waitlist.');
+            $this->emit('success', 'Check your email to verify your email address.');
             dispatch(new SendConfirmationForWaitlistJob($this->email, $waitlist->uuid));
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }
-
     }
 }

@@ -24,10 +24,6 @@ class SendConfirmationForWaitlistJob implements ShouldQueue
     public function handle()
     {
         try {
-            $settings = InstanceSettings::get();
-
-
-            set_transanctional_email_settings($settings);
             $mail = new MailMessage();
 
             $confirmation_url = base_url() . '/webhooks/waitlist/confirm?email=' . $this->email . '&confirmation_code=' . $this->uuid;
@@ -39,19 +35,9 @@ class SendConfirmationForWaitlistJob implements ShouldQueue
                     'cancel_url' => $cancel_url,
                 ]);
             $mail->subject('You are on the waitlist!');
-            Mail::send(
-                [],
-                [],
-                fn(Message $message) => $message
-                    ->from(
-                        data_get($settings, 'smtp_from_address'),
-                        data_get($settings, 'smtp_from_name')
-                    )
-                    ->to($this->email)
-                    ->subject($mail->subject)
-                    ->html((string) $mail->render())
-            );
+            send_user_an_email($mail, $this->email);
         } catch (\Throwable $th) {
+            send_internal_notification('SendConfirmationForWaitlistJob failed with error: ' . $th->getMessage());
             ray($th->getMessage());
             throw $th;
         }

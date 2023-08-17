@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
-use App\Notifications\TrnsactionalEmails\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
