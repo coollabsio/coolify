@@ -69,12 +69,12 @@ class DatabaseBackupJob implements ShouldQueue
             return;
         }
         $this->container_name = $this->database->uuid;
-        $this->backup_dir = backup_dir() . "/" . $this->container_name;
+        $this->backup_dir = backup_dir() . "/" . Str::of($this->team->name)->slug() . '-' .$this->team->id . '/' . $this->container_name;
 
         if ($this->database->name === 'coolify-db') {
             $this->container_name = "coolify-db";
             $ip = Str::slug($this->server->ip);
-            $this->backup_dir = backup_dir() . "/coolify-db-$ip";
+            $this->backup_dir = backup_dir() . "/" . Str::of($this->team->name)->slug() . '-' .$this->team->id . "/coolify-db-$ip";
         }
         $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".sql";
         $this->backup_location = $this->backup_dir . $this->backup_file;
