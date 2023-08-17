@@ -80,6 +80,8 @@ class FortifyServiceProvider extends ServiceProvider
                 $user &&
                 Hash::check($request->password, $user->password)
             ) {
+                $user->updated_at = now();
+                $user->save();
                 session(['currentTeam' => $user->currentTeam = $user->teams->firstWhere('personal_team', true)]);
                 return $user;
             }
