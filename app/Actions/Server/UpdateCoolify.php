@@ -42,10 +42,12 @@ class UpdateCoolify
                 }
                 $this->update();
             }
+            send_internal_notification('InstanceAutoUpdateJob done on: ' . $this->server->ip . "(fqdn:{$this->server->fqdn})" . ' to version: ' . $this->latest_version . ' from version: ' . $this->current_version);
             return;
-        } catch (\Exception $e) {
+        } catch (\Exception $th) {
             ray('InstanceAutoUpdateJob failed');
-            ray($e->getMessage());
+            ray($th->getMessage());
+            send_internal_notification('InstanceAutoUpdateJob failed: ' . $th->getMessage());
             return;
         }
     }
