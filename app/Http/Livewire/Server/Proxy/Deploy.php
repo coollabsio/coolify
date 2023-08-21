@@ -17,7 +17,7 @@ class Deploy extends Component
             $this->server->proxy->last_applied_settings &&
             $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
         ) {
-            $this->emit('saveConfiguration', $server);
+            $this->emit('saveConfiguration', $this->server);
         }
         $activity = resolve(StartProxy::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);

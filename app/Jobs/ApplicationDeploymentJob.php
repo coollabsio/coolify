@@ -50,6 +50,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private ApplicationPreview|null $preview = null;
 
     private string $container_name;
+    private string|null $currently_running_container_name = null;
     private string $workdir;
     private string $configuration_dir;
     private string $build_workdir;
@@ -86,7 +87,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generate_container_name($this->application->uuid, $this->pull_request_id);
+        $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
         $this->private_key_location = save_private_key_for_server($this->server);
         $this->saved_outputs = collect();
 
@@ -113,6 +114,10 @@ class ApplicationDeploymentJob implements ShouldQueue
     public function handle(): void
     {
         // ray()->measure();
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id);
+        if ($containers->count() > 0) {
+            $this->currently_running_container_name = data_get($containers[0], 'Names');
+        }
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -175,9 +180,9 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->stop_running_container();
-        $this->start_by_compose_file();
+        $this->rolling_update();
     }
+
     private function deploy()
     {
         $this->execute_remote_command(
@@ -206,8 +211,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                     "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
                 ]);
                 $this->generate_compose_file();
-                $this->stop_running_container();
-                $this->start_by_compose_file();
+                $this->rolling_update();
                 return;
             }
         }
@@ -219,8 +223,54 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->stop_running_container();
+        $this->rolling_update();
+    }
+
+    private function rolling_update()
+    {
         $this->start_by_compose_file();
+        $this->health_check();
+        $this->stop_running_container();
+    }
+    private function health_check()
+    {
+        ray('New container name: ',$this->container_name);
+        if ($this->container_name) {
+            $counter = 0;
+            $this->execute_remote_command(
+                [
+                    "echo 'Waiting for health check to pass on the new version of your application.'"
+                ],
+            );
+            while ($counter < $this->application->health_check_retries) {
+                $this->execute_remote_command(
+                    [
+                        "echo 'Attempt {$counter} of {$this->application->health_check_retries}'"
+                    ],
+                    [
+                        "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
+                        "hidden" => true,
+                        "save" => "health_check"
+                    ],
+
+                );
+                $this->execute_remote_command(
+                    [
+                        "echo 'New application version health check status: {$this->saved_outputs->get('health_check')}'"
+                    ],
+                );
+                if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
+                    $this->execute_remote_command(
+                        [
+                            "echo 'Rolling update completed.'"
+                        ],
+                    );
+                    break;
+                }
+                $counter++;
+                sleep($this->application->health_check_interval);
+            }
+        }
     }
     private function deploy_pull_request()
     {
@@ -241,8 +291,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->stop_running_container();
-        $this->start_by_compose_file();
+        $this->rolling_update();
     }
 
     private function prepare_builder_image()
@@ -409,7 +458,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->container_name => [
                     'image' => $this->production_image_name,
                     'container_name' => $this->container_name,
-                    'restart' => 'always',
+                    'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
                     'labels' => $this->set_labels_for_applications(),
                     'expose' => $ports,
@@ -539,8 +588,8 @@ class ApplicationDeploymentJob implements ShouldQueue
                     $schema = $url->getScheme();
                     $slug = Str::slug($host . $path);
 
-                    $http_label = "{$this->application->uuid}-{$slug}-http";
-                    $https_label = "{$this->application->uuid}-{$slug}-https";
+                    $http_label = "{$this->container_name}-{$slug}-http";
+                    $https_label = "{$this->container_name}-{$slug}-https";
 
                     if ($schema === 'https') {
                         // Set labels for https
@@ -647,22 +696,21 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function stop_running_container()
     {
-        $this->execute_remote_command(
-            ["echo -n 'Removing old running application.'"],
-            [$this->execute_in_builder("docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
-        );
+        if ($this->currently_running_container_name) {
+            $this->execute_remote_command(
+                ["echo -n 'Removing old application version.'"],
+                [$this->execute_in_builder("docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
+            );
+        }
     }
 
     private function start_by_compose_file()
     {
         $this->execute_remote_command(
-            ["echo -n 'Starting new application... '"],
+            ["echo -n 'Rolling update started.'"],
             [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
-            ["echo 'Done. 🎉'"],
         );
     }
-
-
 
     private function generate_build_env_variables()
     {

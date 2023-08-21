@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Application;
+use App\Models\StandalonePostgresql;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,19 +16,25 @@ class ResourceStatusJob implements ShouldQueue, ShouldBeUnique
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public $applications;
+    public $postgresqls;
 
     public function __construct()
     {
         $this->applications = Application::all();
+        $this->postgresqls = StandalonePostgresql::all();
     }
 
     public function handle(): void
     {
         try {
             foreach ($this->applications as $application) {
-                dispatch(new ContainerStatusJob(
-                    resource: $application,
-                    container_name: generate_container_name($application->uuid),
+                dispatch(new ApplicationContainerStatusJob(
+                    application: $application,
+                ));
+            }
+            foreach ($this->postgresqls as $postgresql) {
+                dispatch(new DatabaseContainerStatusJob(
+                    database: $postgresql,
                 ));
             }
         } catch (\Exception $e) {

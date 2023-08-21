@@ -9,3 +9,4 @@ const VALID_CRON_STRINGS = [
     'monthly' => '0 0 1 * *',
     'yearly' => '0 0 1 1 *',
 ];
+const RESTART_MODE = 'unless-stopped';

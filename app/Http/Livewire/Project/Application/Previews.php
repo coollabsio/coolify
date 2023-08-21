@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\ContainerStatusJob;
+use App\Jobs\ApplicationContainerStatusJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Illuminate\Support\Collection;
@@ -25,10 +25,9 @@ class Previews extends Component
 
     public function loadStatus($pull_request_id)
     {
-        dispatch(new ContainerStatusJob(
-            resource: $this->application,
-            container_name: generate_container_name($this->application->uuid, $pull_request_id),
-            pull_request_id: $pull_request_id
+        dispatch(new ApplicationContainerStatusJob(
+            application: $this->application,
+            pullRequestId: $pull_request_id
         ));
     }
 
@@ -82,7 +81,7 @@ class Previews extends Component
     public function stop(int $pull_request_id)
     {
         try {
-            $container_name = generate_container_name($this->application->uuid, $pull_request_id);
+            $container_name = generateApplicationContainerName($this->application->uuid, $pull_request_id);
             ray('Stopping container: ' . $container_name);
 
             instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);

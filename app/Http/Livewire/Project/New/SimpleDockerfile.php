@@ -59,6 +59,10 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_id' => 0,
             'source_type' => GithubApp::class
         ]);
+        $application->update([
+            'name' => 'dockerfile-' . $application->id
+        ]);
+
         redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,

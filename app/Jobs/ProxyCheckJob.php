@@ -24,7 +24,7 @@ class ProxyCheckJob implements ShouldQueue
             $container_name = 'coolify-proxy';
             $servers = Server::isUsable()->whereNotNull('proxy')->get();
             foreach ($servers as $server) {
-                $status = get_container_status(server: $server, container_id: $container_name);
+                $status = getContainerStatus(server: $server, container_id: $container_name);
                 if ($status === 'running') {
                     continue;
                 }
