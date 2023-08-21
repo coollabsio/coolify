@@ -6,13 +6,13 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class EmailChannel
 {
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
-        ray($notification);
         $recepients = $notifiable->getRecepients($notification);
 
         if (count($recepients) === 0) {
@@ -39,16 +39,21 @@ class EmailChannel
         $password = data_get($notifiable, 'smtp_password');
         if ($password) $password = decrypt($password);
 
-        config()->set('mail.default', 'smtp');
-        config()->set('mail.mailers.smtp', [
-            "transport" => "smtp",
-            "host" => data_get($notifiable, 'smtp_host'),
-            "port" => data_get($notifiable, 'smtp_port'),
-            "encryption" => data_get($notifiable, 'smtp_encryption'),
-            "username" => data_get($notifiable, 'smtp_username'),
-            "password" => $password,
-            "timeout" => data_get($notifiable, 'smtp_timeout'),
-            "local_domain" => null,
-        ]);
+        if (Str::contains(data_get($notifiable, 'smtp_host'),'resend.com')) {
+            config()->set('mail.default', 'resend');
+            config()->set('resend.api_key', $password);
+        } else {
+            config()->set('mail.default', 'smtp');
+            config()->set('mail.mailers.smtp', [
+                "transport" => "smtp",
+                "host" => data_get($notifiable, 'smtp_host'),
+                "port" => data_get($notifiable, 'smtp_port'),
+                "encryption" => data_get($notifiable, 'smtp_encryption'),
+                "username" => data_get($notifiable, 'smtp_username'),
+                "password" => $password,
+                "timeout" => data_get($notifiable, 'smtp_timeout'),
+                "local_domain" => null,
+            ]);
+        }
     }
 }

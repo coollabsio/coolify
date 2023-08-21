@@ -24,6 +24,7 @@
         "masmerise/livewire-toaster": "^1.2",
         "nubs/random-name-generator": "^2.2",
         "poliander/cron": "^3.0",
+        "resend/resend-laravel": "^0.5.0",
         "sentry/sentry-laravel": "^3.4",
         "spatie/laravel-activitylog": "^4.7.3",
         "spatie/laravel-data": "^3.4.3",
