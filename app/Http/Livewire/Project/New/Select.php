@@ -46,6 +46,6 @@ class Select extends Component
 
     public function load_servers()
     {
-        $this->servers = Server::ownedByCurrentTeam()->get();
+        $this->servers = Server::isUsable()->get();
     }
 }

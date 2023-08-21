@@ -80,7 +80,7 @@
                 <li class="step">Select a Destination</li>
             </ul>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
-                @foreach ($servers as $server)
+                @forelse($servers as $server)
                     <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                         wire:click="set_server({{ $server }})">
                         <div class="flex flex-col mx-6">
@@ -91,7 +91,15 @@
                                 {{ $server->description }}</div>
                         </div>
                     </div>
-                @endforeach
+                @empty
+                    <div>
+                        <div>No validated & reachable servers found.  <a class="text-white underline" href="/servers">
+                            Go to servers page
+                        </a></div>
+
+                        <x-use-magic-bar link="/server/new" />
+                    </div>
+                @endforelse
             </div>
         @endif
         @if ($current_step === 'destinations')

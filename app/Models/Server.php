@@ -33,8 +33,9 @@ class Server extends BaseModel
 
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
+        $teamId = auth()->user()->currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
-        return Server::whereTeamId(auth()->user()->currentTeam()->id)->with('settings')->select($selectArray->all())->orderBy('name');
+        return Server::whereTeamId($teamId)->with('settings')->select($selectArray->all())->orderBy('name');
     }
 
     static public function isUsable()

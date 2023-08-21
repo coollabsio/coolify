@@ -20,8 +20,8 @@ class ServerController extends Controller
         }
         $servers = auth()->user()->currentTeam()->servers->count();
         $subscription = auth()->user()->currentTeam()?->subscription->type();
-        $limits = config('constants.limits.server')[strtolower($subscription)];
-        $limit_reached = true ?? $servers >= $limits[$subscription];
+        $your_limit = config('constants.limits.server')[strtolower($subscription)];
+        $limit_reached = $servers >= $your_limit;
 
         return view('server.create', [
             'limit_reached' => $limit_reached,

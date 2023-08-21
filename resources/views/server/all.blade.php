@@ -1,5 +1,9 @@
 <x-layout>
-    <h1>Servers</span></h1>
+    <div class="flex items-start gap-2">
+        <h1>Servers</h1>
+        <a class="text-white hover:no-underline" href="/server/new"> <x-forms.button class="btn">+ Add
+            </x-forms.button></a>
+    </div>
     <div class="subtitle ">All Servers</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
