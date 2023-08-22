@@ -17,8 +17,7 @@ class SubscriptionValid
                 return $next($request);
             }
         }
-        $is_instance_admin = is_instance_admin();
-        if ($is_instance_admin) {
+        if (isInstanceAdmin()) {
             return $next($request);
         }
 

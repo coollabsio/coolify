@@ -25,7 +25,7 @@ class AddEmpty extends Component
             $project = Project::create([
                 'name' => $this->name,
                 'description' => $this->description,
-                'team_id' => auth()->user()->currentTeam()->id,
+                'team_id' => currentTeam()->id,
             ]);
             return redirect()->route('project.show', $project->uuid);
         } catch (\Exception $e) {

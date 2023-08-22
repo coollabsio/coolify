@@ -59,7 +59,7 @@ class EmailSettings extends Component
     {
         $settings = InstanceSettings::get();
         if ($settings->smtp_enabled) {
-            $team = auth()->user()->currentTeam();
+            $team = currentTeam();
             $team->update([
                 'smtp_enabled' => $settings->smtp_enabled,
                 'smtp_from_address' => $settings->smtp_from_address,
@@ -74,7 +74,7 @@ class EmailSettings extends Component
             ]);
             $this->decrypt();
             if (is_a($team, Team::class)) {
-                session(['currentTeam' => $team]);
+                refreshSession();
             }
             $this->model = $team;
             $this->emit('success', 'Settings saved.');
@@ -119,7 +119,7 @@ class EmailSettings extends Component
         $this->model->save();
         $this->decrypt();
         if (is_a($this->model, Team::class)) {
-            session(['currentTeam' => $this->model]);
+            refreshSession();
         }
         $this->emit('success', 'Settings saved.');
     }

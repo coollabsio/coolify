@@ -93,6 +93,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::get('/boarding', [Controller::class, 'boarding'])->name('boarding');
     Route::middleware(['throttle:force-password-reset'])->group(function() {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
@@ -126,7 +127,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
-        $sources = auth()->user()->currentTeam()->sources();
+        $sources = currentTeam()->sources();
         return view('source.all', [
             'sources' => $sources,
         ]);

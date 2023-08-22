@@ -14,7 +14,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (auth()->user()->currentTeam()->members->sortBy('name') as $member)
+                @foreach (currentTeam()->members->sortBy('name') as $member)
                     <livewire:team.member :member="$member" :wire:key="$member->id" />
                 @endforeach
             </tbody>
@@ -26,7 +26,7 @@
                 <h3 class="pb-4">Invite a new member</h3>
             @else
                 <h3>Invite a new member</h3>
-                @if (is_instance_admin())
+                @if (isInstanceAdmin())
                     <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
                             class="underline text-warning">Transactional
                             Emails</a>

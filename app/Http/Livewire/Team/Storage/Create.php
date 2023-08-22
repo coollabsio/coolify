@@ -62,7 +62,7 @@ class Create extends Component
             } else {
                 $this->storage->endpoint = $this->endpoint;
             }
-            $this->storage->team_id = auth()->user()->currentTeam()->id;
+            $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
             $this->storage->save();

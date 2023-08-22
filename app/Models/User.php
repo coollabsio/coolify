@@ -22,6 +22,7 @@ class User extends Authenticatable implements SendsEmail
     protected $casts = [
         'email_verified_at' => 'datetime',
         'force_password_reset' => 'boolean',
+        'show_boarding' => 'boolean',
     ];
 
     protected static function boot()
@@ -31,6 +32,7 @@ class User extends Authenticatable implements SendsEmail
             $team = [
                 'name' => $user->name . "'s Team",
                 'personal_team' => true,
+                'show_boarding' => true,
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;
@@ -102,7 +104,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function otherTeams()
     {
-        $team_id = auth()->user()->currentTeam()->id;
+        $team_id = currentTeam()->id;
         return auth()->user()->teams->filter(function ($team) use ($team_id) {
             return $team->id != $team_id;
         });
@@ -113,13 +115,6 @@ class User extends Authenticatable implements SendsEmail
         if ($this->teams()->where('team_id', 0)->first()) {
             return 'admin';
         }
-        return $this->teams()->where('team_id', auth()->user()->currentTeam()->id)->first()->pivot->role;
-    }
-
-    public function resources()
-    {
-        $team_id = auth()->user()->currentTeam()->id;
-        $data = Application::where('team_id', $team_id)->get();
-        return $data;
+        return $this->teams()->where('team_id', currentTeam()->id)->first()->pivot->role;
     }
 }

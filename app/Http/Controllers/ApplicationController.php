@@ -12,7 +12,7 @@ class ApplicationController extends Controller
 
     public function configuration()
     {
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -29,7 +29,7 @@ class ApplicationController extends Controller
 
     public function deployments()
     {
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -49,7 +49,7 @@ class ApplicationController extends Controller
     {
         $deploymentUuid = request()->route('deployment_uuid');
 
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

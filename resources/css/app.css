@@ -53,7 +53,7 @@ a {
     @apply text-white;
 }
 .box {
-    @apply flex items-center justify-center p-2 transition-colors rounded min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white hover:no-underline;
+    @apply flex items-center justify-center p-2 transition-colors rounded cursor-pointer min-h-12 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white hover:no-underline;
 }
 
 .lds-heart {

@@ -9,7 +9,7 @@ function getSubscriptionLink($type)
         return null;
     }
     $user_id = auth()->user()->id;
-    $team_id = auth()->user()->currentTeam()->id ?? null;
+    $team_id = currentTeam()->id ?? null;
     $email = auth()->user()->email ?? null;
     $name = auth()->user()->name ?? null;
     $url = "https://store.coollabs.io/checkout/buy/$checkout_id?";
@@ -30,27 +30,27 @@ function getSubscriptionLink($type)
 
 function getPaymentLink()
 {
-    return auth()->user()->currentTeam()->subscription->lemon_update_payment_menthod_url;
+    return currentTeam()->subscription->lemon_update_payment_menthod_url;
 }
 
 function getRenewDate()
 {
-    return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
+    return Carbon::parse(currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
 
 function getEndDate()
 {
-    return Carbon::parse(auth()->user()->currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
+    return Carbon::parse(currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
 
 function is_subscription_active()
 {
-    $team = auth()->user()?->currentTeam();
+    $team = currentTeam();
 
     if (!$team) {
         return false;
     }
-    if (is_instance_admin()) {
+    if (isInstanceAdmin()) {
         return true;
     }
     $subscription = $team?->subscription;
@@ -64,11 +64,11 @@ function is_subscription_active()
 }
 function is_subscription_in_grace_period()
 {
-    $team = auth()->user()?->currentTeam();
+    $team = currentTeam();
     if (!$team) {
         return false;
     }
-    if (is_instance_admin()) {
+    if (isInstanceAdmin()) {
         return true;
     }
     $subscription = $team?->subscription;

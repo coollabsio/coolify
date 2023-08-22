@@ -6,7 +6,7 @@
     @if (is_cloud())
         <div class="pb-8">
             <h2>Subscription</h2>
-            @if (data_get(auth()->user()->currentTeam(),
+            @if (data_get(currentTeam(),
                     'subscription'))
                 <livewire:subscription.actions />
             @else

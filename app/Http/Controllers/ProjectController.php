@@ -18,7 +18,7 @@ class ProjectController extends Controller
     public function edit()
     {
         $projectUuid = request()->route('project_uuid');
-        $teamId = auth()->user()->currentTeam()->id;
+        $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (!$project) {
             return redirect()->route('dashboard');
@@ -29,7 +29,7 @@ class ProjectController extends Controller
     public function show()
     {
         $projectUuid = request()->route('project_uuid');
-        $teamId = auth()->user()->currentTeam()->id;
+        $teamId = currentTeam()->id;
 
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
         if (!$project) {
@@ -44,7 +44,7 @@ class ProjectController extends Controller
         $type = request()->query('type');
         $destination_uuid = request()->query('destination');
 
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -67,7 +67,7 @@ class ProjectController extends Controller
 
     public function resources()
     {
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }

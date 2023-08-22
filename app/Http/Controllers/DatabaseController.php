@@ -11,7 +11,7 @@ class DatabaseController extends Controller
 
     public function configuration()
     {
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -29,7 +29,7 @@ class DatabaseController extends Controller
     public function executions()
     {
         $backup_uuid = request()->route('backup_uuid');
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -50,13 +50,13 @@ class DatabaseController extends Controller
             'database' => $database,
             'backup' => $backup,
             'executions' => $executions,
-            's3s' => auth()->user()->currentTeam()->s3s,
+            's3s' => currentTeam()->s3s,
         ]);
     }
 
     public function backups()
     {
-        $project = auth()->user()->currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
+        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
             return redirect()->route('dashboard');
         }
@@ -70,7 +70,7 @@ class DatabaseController extends Controller
         }
         return view('project.database.backups.all', [
             'database' => $database,
-            's3s' => auth()->user()->currentTeam()->s3s,
+            's3s' => currentTeam()->s3s,
         ]);
     }
 }

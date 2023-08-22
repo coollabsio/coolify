@@ -58,7 +58,6 @@ class Controller extends BaseController
             $resources += $project->applications->count();
             $resources += $project->postgresqls->count();
         }
-
         return view('dashboard', [
             'servers' => $servers->count(),
             'projects' => $projects->count(),
@@ -66,10 +65,17 @@ class Controller extends BaseController
             's3s' => $s3s,
         ]);
     }
+    public function boarding() {
+        if (currentTeam()->boarding || is_dev()) {
+            return view('boarding');
+        } else {
+            return redirect()->route('dashboard');
+        }
+    }
 
     public function settings()
     {
-        if (is_instance_admin()) {
+        if (isInstanceAdmin()) {
             $settings = InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
             if ($database) {
@@ -89,7 +95,7 @@ class Controller extends BaseController
     {
         $invitations = [];
         if (auth()->user()->isAdminFromSession()) {
-            $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
+            $invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
         return view('team.show', [
             'invitations' => $invitations,
@@ -116,7 +122,7 @@ class Controller extends BaseController
     {
         $invitations = [];
         if (auth()->user()->isAdminFromSession()) {
-            $invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
+            $invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
         return view('team.members', [
             'invitations' => $invitations,

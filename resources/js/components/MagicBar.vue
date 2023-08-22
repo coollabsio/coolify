@@ -53,12 +53,12 @@
                                             <span v-if="search"><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="text-warning">{{ search
-                                                }}</span></span>
+                                                <x-highlighted text="{{ search }}" />
+                                                </span>
                                             <span v-else><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="text-warning">randomly generated (type to change)</span>
+                                                <x-highlighted text="randomly generated (type to change)" />
                                             </span>
                                         </span>
                                     </li>

@@ -67,7 +67,7 @@ class StandaloneDocker extends Component
                     'name' => $this->name,
                     'network' => $this->network,
                     'server_id' => $this->server_id,
-                    'team_id' => auth()->user()->currentTeam()->id
+                    'team_id' => currentTeam()->id
                 ]);
             }
             $this->createNetworkAndAttachToProxy();

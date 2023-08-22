@@ -10,7 +10,7 @@ class Actions extends Component
     public function cancel()
     {
         try {
-            $subscription_id = auth()->user()->currentTeam()->subscription->lemon_subscription_id;
+            $subscription_id = currentTeam()->subscription->lemon_subscription_id;
             if (!$subscription_id) {
                 throw new \Exception('No subscription found');
             }
@@ -37,7 +37,7 @@ class Actions extends Component
     public function resume()
     {
         try {
-            $subscription_id = auth()->user()->currentTeam()->subscription->lemon_subscription_id;
+            $subscription_id = currentTeam()->subscription->lemon_subscription_id;
             if (!$subscription_id) {
                 throw new \Exception('No subscription found');
             }

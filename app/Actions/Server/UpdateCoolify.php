@@ -17,9 +17,6 @@ class UpdateCoolify
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $localhost_name = 'localhost';
-            if (is_dev()) {
-                $localhost_name = 'testing-local-docker-container';
-            }
             $this->server = Server::where('name', $localhost_name)->firstOrFail();
             $this->latest_version = get_latest_version_of_coolify();
             $this->current_version = config('version');

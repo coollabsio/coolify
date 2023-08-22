@@ -9,9 +9,8 @@
     </x-modal>
     <x-modal yesOrNo modalId="startProxy" modalTitle="Start Proxy" action="start_proxy">
         <x-slot:modalBody>
-            <p>This will start the proxy on this server and <span class="text-warning">stop any running process that is
-                    using port 80 and
-                    443</span>.
+            <p>This will start the proxy on this server and
+                <x-highlighted text="stop any running process that is using port 80 and 443" />.
                 <br>Please think
                 again.
             </p>

@@ -1,14 +1,14 @@
 <div class="form-control">
     @if ($label)
-        <label class="label">
-            <span class="label-text">
+        <label class="flex items-center gap-1 mb-1 text-sm font-medium">
+            <span>
                 @if ($label)
                     {{ $label }}
                 @else
                     {{ $id }}
                 @endif
                 @if ($required)
-                    <span class="text-warning">*</span>
+                    <x-highlighted text="*" />
                 @endif
                 @if ($helper)
                     <div class="group">

@@ -12,14 +12,14 @@ class ServerController extends Controller
 
     public function new_server()
     {
-        if (!is_cloud() || is_instance_admin()) {
+        if (!is_cloud() || isInstanceAdmin()) {
             return view('server.create', [
                 'limit_reached' => false,
                 'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
             ]);
         }
-        $servers = auth()->user()->currentTeam()->servers->count();
-        $subscription = auth()->user()->currentTeam()?->subscription->type();
+        $servers = currentTeam()->servers->count();
+        $subscription = currentTeam()?->subscription->type();
         $your_limit = config('constants.limits.server')[strtolower($subscription)];
         $limit_reached = $servers >= $your_limit;
 

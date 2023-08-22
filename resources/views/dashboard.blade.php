@@ -1,6 +1,6 @@
 <x-layout>
     <h1>Dashboard</h1>
-    <div class="subtitle">Something <span class="text-warning">(more)</span> useful will be here.</div>
+    <div class="subtitle">Something <x-highlighted text="(more)"/> useful will be here.</div>
     <div class="w-full rounded stats stats-vertical lg:stats-horizontal">
         <div class="stat">
             <div class="stat-title">Servers</div>

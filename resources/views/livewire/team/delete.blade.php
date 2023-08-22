@@ -11,11 +11,11 @@
         <div>This is the default team. You can't delete it.</div>
     @elseif(auth()->user()->teams()->get()->count() === 1)
         <div>You can't delete your last team.</div>
-    @elseif(auth()->user()->currentTeam()->subscription &&
-            auth()->user()->currentTeam()->subscription?->lemon_status !== 'cancelled')
+    @elseif(currentTeam()->subscription &&
+            currentTeam()->subscription?->lemon_status !== 'cancelled')
         <div>Please cancel your subscription before delete this team (Manage My Subscription button).</div>
     @else
-        @if (auth()->user()->currentTeam()->isEmpty())
+        @if (currentTeam()->isEmpty())
             <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
             <x-forms.button isError isModal modalId="deleteTeam">
                 Delete
@@ -25,25 +25,25 @@
                 <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>
                 <h4 class="pb-4">Projects:</h4>
                 <ul class="pl-8 list-disc">
-                    @foreach (auth()->user()->currentTeam()->projects as $resource)
+                    @foreach (currentTeam()->projects as $resource)
                         <li>{{ $resource->name }}</li>
                     @endforeach
                 </ul>
                 <h4 class="py-4">Servers:</h4>
                 <ul class="pl-8 list-disc">
-                    @foreach (auth()->user()->currentTeam()->servers as $resource)
+                    @foreach (currentTeam()->servers as $resource)
                         <li>{{ $resource->name }}</li>
                     @endforeach
                 </ul>
                 <h4 class="py-4">Private Keys:</h4>
                 <ul class="pl-8 list-disc">
-                    @foreach (auth()->user()->currentTeam()->privateKeys as $resource)
+                    @foreach (currentTeam()->privateKeys as $resource)
                         <li>{{ $resource->name }}</li>
                     @endforeach
                 </ul>
                 <h4 class="py-4">Sources:</h4>
                 <ul class="pl-8 list-disc">
-                    @foreach (auth()->user()->currentTeam()->sources() as $resource)
+                    @foreach (currentTeam()->sources() as $resource)
                         <li>{{ $resource->name }}</li>
                     @endforeach
                 </ul>

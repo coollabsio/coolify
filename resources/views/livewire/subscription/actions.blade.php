@@ -1,7 +1,7 @@
 <div>
-    <div>Status: {{ auth()->user()->currentTeam()->subscription->lemon_status }}</div>
-    <div>Type: {{ auth()->user()->currentTeam()->subscription->lemon_variant_name }}</div>
-    @if (auth()->user()->currentTeam()->subscription->lemon_status === 'cancelled')
+    <div>Status: {{ currentTeam()->subscription->lemon_status }}</div>
+    <div>Type: {{ currentTeam()->subscription->lemon_variant_name }}</div>
+    @if (currentTeam()->subscription->lemon_status === 'cancelled')
         <div class="pb-4">Subscriptions ends at: {{ getRenewDate() }}</div>
         <div class="py-4">If you would like to change the subscription to a lower/higher plan, <a
                 class="text-white underline" href="https://docs.coollabs.io/contact" target="_blank">please
@@ -12,7 +12,7 @@
     @endif
     <div class="flex flex-col gap-2">
         <div class="flex gap-2">
-            @if (auth()->user()->currentTeam()->subscription->lemon_status === 'cancelled')
+            @if (currentTeam()->subscription->lemon_status === 'cancelled')
                 <x-forms.button class="bg-coollabs-gradient" wire:click='resume'>Resume Subscription
                 </x-forms.button>
             @else

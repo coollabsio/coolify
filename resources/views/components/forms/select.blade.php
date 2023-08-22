@@ -2,7 +2,7 @@
     @if ($label)
         <label for="small-input" class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
             @if ($required)
-                <span class="text-warning">*</span>
+                <x-highlighted text="*" />
             @endif
             @if ($helper)
                 <x-helper :helper="$helper" />

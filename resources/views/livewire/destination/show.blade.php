@@ -25,7 +25,7 @@
             @foreach ($networks as $network)
                 <a
                     href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
-                    <x-forms.button>Add<span class="text-warning">{{ data_get($network, 'Name') }}</span>
+                    <x-forms.button>+<x-highlighted text="{{ data_get($network, 'Name') }}" />
                     </x-forms.button>
                 </a>
             @endforeach

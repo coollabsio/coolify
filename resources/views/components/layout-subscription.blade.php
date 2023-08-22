@@ -26,7 +26,7 @@
 <body>
     @livewireScripts
     <x-toaster-hub />
-    @if (is_instance_admin() || is_subscription_in_grace_period())
+    @if (isInstanceAdmin() || is_subscription_in_grace_period())
         <div class="fixed top-3 left-4" id="vue">
             <magic-bar></magic-bar>
         </div>

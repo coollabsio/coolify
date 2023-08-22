@@ -41,7 +41,7 @@ class EnvironmentVariable extends Model
 
     private function get_environment_variables(string $environment_variable): string|null
     {
-        // $team_id = auth()->user()->currentTeam()->id;
+        // $team_id = currentTeam()->id;
         if (str_contains(trim($environment_variable), '{{') && str_contains(trim($environment_variable), '}}')) {
             $environment_variable = preg_replace('/\s+/', '', $environment_variable);
             $environment_variable = str_replace('{{', '', $environment_variable);

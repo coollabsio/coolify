@@ -19,12 +19,12 @@ class GithubApp extends BaseModel
 
     static public function public()
     {
-        return GithubApp::whereTeamId(auth()->user()->currentTeam()->id)->whereisPublic(true)->whereNotNull('app_id')->get();
+        return GithubApp::whereTeamId(currentTeam()->id)->whereisPublic(true)->whereNotNull('app_id')->get();
     }
 
     static public function private()
     {
-        return GithubApp::whereTeamId(auth()->user()->currentTeam()->id)->whereisPublic(false)->whereNotNull('app_id')->get();
+        return GithubApp::whereTeamId(currentTeam()->id)->whereisPublic(false)->whereNotNull('app_id')->get();
     }
 
     protected static function booted(): void
