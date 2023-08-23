@@ -60,20 +60,19 @@ class StandaloneDocker extends Component
             $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
             if ($found) {
                 $this->createNetworkAndAttachToProxy();
-                $this->addError('network', 'Network already added to this server.');
+                $this->emit('error', 'Network already added to this server.');
                 return;
             } else {
                 $docker = ModelsStandaloneDocker::create([
                     'name' => $this->name,
                     'network' => $this->network,
                     'server_id' => $this->server_id,
-                    'team_id' => currentTeam()->id
                 ]);
             }
             $this->createNetworkAndAttachToProxy();
             return redirect()->route('destination.show', $docker->uuid);
         } catch (\Exception $e) {
-            return general_error_handler(err: $e);
+            return general_error_handler(err: $e, that: $this);
         }
     }
 

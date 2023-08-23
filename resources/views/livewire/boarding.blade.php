@@ -1,3 +1,4 @@
+@php use App\Enums\ProxyTypes; @endphp
 <div class="min-h-screen hero">
     <div class="hero-content">
         <div>
@@ -5,7 +6,7 @@
                 <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
                 <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
                 <div class="flex justify-center ">
-                    <div class="w-72 box" wire:click="$set('currentState', 'select-server')">Get Started
+                    <div class="justify-center box" wire:click="$set('currentState', 'select-server')">Get Started
                     </div>
                 </div>
             @endif
@@ -16,9 +17,9 @@
                         or on a <x-highlighted text="Remote Server" />?
                     </x-slot:question>
                     <x-slot:actions>
-                        <div class="md:w-72 box" wire:click="setServer('localhost')">Localhost
+                        <div class="justify-center box" wire:click="setServer('localhost')">Localhost
                         </div>
-                        <div class="md:w-72 box" wire:click="setServer('remote')">Remote Server
+                        <div class="justify-center box" wire:click="setServer('remote')">Remote Server
                         </div>
                     </x-slot:actions>
                     <x-slot:explanation>
@@ -33,21 +34,21 @@
                 </x-boarding-step>
             @endif
             @if ($currentState === 'private-key')
-                <x-boarding-step title="Private Key">
+                <x-boarding-step title="SSH Key">
                     <x-slot:question>
-                        Do you have your own Private Key?
+                        Do you have your own SSH Private Key?
                     </x-slot:question>
                     <x-slot:actions>
-                        <div class="md:w-72 box" wire:click="setPrivateKey('own')">Yes
+                        <div class="justify-center box" wire:click="setPrivateKey('own')">Yes
                         </div>
-                        <div class="md:w-72 box" wire:click="setPrivateKey('create')">No (create one for me)
+                        <div class="justify-center box" wire:click="setPrivateKey('create')">No (create one for me)
                         </div>
                     </x-slot:actions>
                     <x-slot:explanation>
-                        <p>Private Keys are used to connect to a remote server through a secure shell, called SSH.</p>
-                        <p>You can use your own private key, or you can let Coolify to create one for you.</p>
-                        <p>In both ways, you need to add the public version of your private key to the remote server's
-                            <code>~/.ssh/authorized_keys</code> file.
+                        <p>SSH Keys are used to connect to a remote server through a secure shell, called SSH.</p>
+                        <p>You can use your own ssh private key, or you can let Coolify to create one for you.</p>
+                        <p>In both ways, you need to add the public version of your ssh private key to the remote server's
+                            <code class="text-warning">~/.ssh/authorized_keys</code> file.
                         </p>
                     </x-slot:explanation>
                 </x-boarding-step>
@@ -109,31 +110,73 @@
                 </x-boarding-step>
             @endif
             @if ($currentState === 'install-docker')
-            <x-boarding-step title="Install Docker">
-                <x-slot:question>
-                    Could not find Docker Engine on your server. Do you want me to install it for you?
-                </x-slot:question>
-                <x-slot:actions>
-                    <div class="w-72 box" wire:click="installDocker">Let's do it!</div>
-                </x-slot:actions>
-                <x-slot:explanation>
-                    <p>This will install the latest Docker Engine on your server, configure a few things to be able to run optimal.</p>
-                </x-slot:explanation>
-            </x-boarding-step>
-        @endif
+                <x-boarding-step title="Install Docker">
+                    <x-slot:question>
+                        Could not find Docker Engine on your server. Do you want me to install it for you?
+                    </x-slot:question>
+                    <x-slot:actions>
+                        <div class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">Let's do
+                            it!</div>
+                    </x-slot:actions>
+                    <x-slot:explanation>
+                        <p>This will install the latest Docker Engine on your server, configure a few things to be able
+                            to run optimal.</p>
+                    </x-slot:explanation>
+                </x-boarding-step>
+            @endif
+            @if ($currentState === 'select-proxy')
+                <x-boarding-step title="Select a Proxy">
+                    <x-slot:question>
+                        If you would like to attach any kind of domain to your resources, you need a proxy.
+                    </x-slot:question>
+                    <x-slot:actions>
+                        <x-forms.button wire:click="selectProxy" class="w-64 box">
+                            Decide later
+                        </x-forms.button>
+                        <x-forms.button class="w-32 box" wire:click="selectProxy('{{ ProxyTypes::TRAEFIK_V2 }}')">
+                            Traefik
+                            v2
+                        </x-forms.button>
+                        <x-forms.button disabled class="w-32 box">
+                            Nginx
+                        </x-forms.button>
+                        <x-forms.button disabled class="w-32 box">
+                            Caddy
+                        </x-forms.button>
+                    </x-slot:actions>
+                    <x-slot:explanation>
+                        <p>This will install the latest Docker Engine on your server, configure a few things to be able
+                            to run optimal.</p>
+                    </x-slot:explanation>
+                </x-boarding-step>
+            @endif
             @if ($currentState === 'create-project')
                 <x-boarding-step title="Project">
                     <x-slot:question>
                         I will create an initial project for you. You can change all the details later on.
                     </x-slot:question>
                     <x-slot:actions>
-                        <div class="w-72 box" wire:click="createNewProject">Let's do it!</div>
+                        <div class="justify-center box" wire:click="createNewProject">Let's do it!</div>
                     </x-slot:actions>
                     <x-slot:explanation>
                         <p>Projects are bound together several resources into one virtual group. There are no
                             limitations on the number of projects you could have.</p>
                         <p>Each project should have at least one environment. This helps you to create a production &
                             staging version of the same application, but grouped separately.</p>
+                    </x-slot:explanation>
+                </x-boarding-step>
+            @endif
+            @if ($currentState === 'create-resource')
+                <x-boarding-step title="Resources">
+                    <x-slot:question>
+                        I will redirect you to the new resource page, where you can create your first resource.
+                    </x-slot:question>
+                    <x-slot:actions>
+                        <div class="justify-center box" wire:click="showNewResource">Let's do
+                            it!</div>
+                    </x-slot:actions>
+                    <x-slot:explanation>
+                        <p>A resource could be an application, a database or a service (like WordPress).</p>
                     </x-slot:explanation>
                 </x-boarding-step>
             @endif

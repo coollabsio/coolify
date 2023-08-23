@@ -20,3 +20,4 @@ yarn-error.log
 /.npm
 /.bash_history
 /_data
+.rnd

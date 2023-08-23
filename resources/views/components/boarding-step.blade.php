@@ -1,5 +1,5 @@
 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-    <div class="box-border col-span-2 min-w-[24rem]">
+    <div class="box-border col-span-2 min-w-[24rem] min-h-[21rem]">
         <h1 class="text-5xl font-bold">{{$title}}</h1>
         <div class="py-6 ">
             @isset($question)
@@ -9,7 +9,7 @@
             @endisset
         </div>
         @if($actions)
-        <div class="flex flex-col gap-4 md:flex-row">
+        <div class="flex flex-col flex-wrap gap-4 md:flex-row">
             {{$actions}}
         </div>
         @endif

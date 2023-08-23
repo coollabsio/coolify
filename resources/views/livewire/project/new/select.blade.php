@@ -10,7 +10,7 @@
             </ul>
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
-                <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 min-w-[24rem]"
+                <div class="box group"
                     wire:click="set_type('public')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
@@ -21,7 +21,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 min-w-[24rem]"
+                <div class="box group"
                     wire:click="set_type('private-gh-app')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
@@ -32,7 +32,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 min-w-[24rem]"
+                <div class="box group"
                     wire:click="set_type('private-deploy-key')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
@@ -45,7 +45,7 @@
                 </div>
             </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
-                <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200 min-w-[24rem]"
+                <div class="box group"
                     wire:click="set_type('dockerfile')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
@@ -59,7 +59,7 @@
             </div>
             <h2 class="py-4">Databases</h2>
             <div class="flex flex-col justify-start gap-2 text-left xl:flex-row">
-                <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                <div class="box group"
                     wire:click="set_type('postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
@@ -79,9 +79,9 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
-            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
+            <div class="grid grid-cols-3 gap-2 text-left ">
                 @forelse($servers as $server)
-                    <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                    <div class="box group"
                         wire:click="set_server({{ $server }})">
                         <div class="flex flex-col mx-6">
                             <div class="group-hover:text-white">
@@ -108,9 +108,9 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
-            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
+            <div class="grid grid-cols-3 gap-2 text-left ">
                 @foreach ($destinations as $destination)
-                    <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                    <div class="box group"
                         wire:click="set_destination('{{ $destination->uuid }}')">
                         <div class="flex flex-col mx-6">
                             <div class="group-hover:text-white">

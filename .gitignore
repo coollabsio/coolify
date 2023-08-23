@@ -29,3 +29,4 @@ _ide_helper.php
 .gitignore
 .phpstorm.meta.php
 _ide_helper_models.php
+.rnd

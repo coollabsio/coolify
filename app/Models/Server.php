@@ -10,21 +10,30 @@ class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
 
+    protected static function booted()
+    {
+        static::created(function ($server) {
+            ServerSetting::create([
+                'server_id' => $server->id,
+            ]);
+            StandaloneDocker::create([
+                'name' => 'coolify',
+                'network' => 'coolify',
+                'server_id' => $server->id,
+            ]);
+        });
+        static::deleting(function ($server) {
+            $server->settings()->delete();
+        });
+    }
+
     public $casts = [
         'proxy' => SchemalessAttributes::class,
     ];
     protected $schemalessAttributes = [
         'proxy',
     ];
-    protected $fillable = [
-        'name',
-        'ip',
-        'user',
-        'port',
-        'team_id',
-        'private_key_id',
-        'proxy',
-    ];
+    protected $guarded = [];
 
     static public function isReachable()
     {
@@ -51,17 +60,7 @@ class Server extends BaseModel
         return $standaloneDocker->concat($swarmDocker);
     }
 
-    protected static function booted()
-    {
-        static::created(function ($server) {
-            ServerSetting::create([
-                'server_id' => $server->id,
-            ]);
-        });
-        static::deleting(function ($server) {
-            $server->settings()->delete();
-        });
-    }
+
 
     public function settings()
     {

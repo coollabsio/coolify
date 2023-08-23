@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire;
 
+use App\Actions\Server\InstallDocker;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -9,9 +10,7 @@ use Livewire\Component;
 
 class Boarding extends Component
 {
-
-    public string $currentState = 'create-private-key';
-    // public ?string $serverType = null;
+    public string $currentState = 'welcome';
 
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
@@ -25,6 +24,8 @@ class Boarding extends Component
     public ?int    $remoteServerPort = 22;
     public ?string $remoteServerUser = 'root';
     public ?Server $createdServer = null;
+
+    public ?Project $createdProject = null;
 
     public function mount()
     {
@@ -64,7 +65,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function setServer(string $type)
     {
         if ($type === 'localhost') {
-            $this->currentState = 'create-project';
+            $this->createdServer = Server::find(0);
+            if (!$this->createdServer) {
+                return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
+            }
+            $this->currentState = 'select-proxy';
         } elseif ($type === 'remote') {
             $this->currentState = 'private-key';
         }
@@ -126,22 +131,50 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 $this->currentState = 'install-docker';
                 return;
             }
-            ray($uptime, $dockerVersion);
         } catch (\Exception $e) {
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
+    }
+    public function installDocker()
+    {
+        $activity = resolve(InstallDocker::class)($this->createdServer, currentTeam());
+        $this->emit('newMonitorActivity', $activity->id);
+        $this->currentState = 'select-proxy';
+    }
+    public function selectProxy(string|null $proxyType = null)
+    {
+        if (!$proxyType) {
+            return $this->currentState = 'create-project';
+        }
+        $this->createdServer->proxy->type = $proxyType;
+        $this->createdServer->proxy->status = 'exited';
+        $this->createdServer->save();
+        $this->currentState = 'create-project';
+    }
+    public function createNewProject()
+    {
+        $this->createdProject = Project::create([
+            'name' => generate_random_name(),
+            'team_id' => currentTeam()->id
+        ]);
+        $this->currentState = 'create-resource';
+    }
+    public function showNewResource()
+    {
+        $this->skipBoarding();
+        return redirect()->route(
+            'project.resources.new',
+            [
+                'project_uuid' => $this->createdProject->uuid,
+                'environment_name' => 'production',
+
+            ]
+        );
     }
     private function createNewPrivateKey()
     {
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
-        $this->privateKey = generateSSHKey();
-    }
-    public function createNewProject()
-    {
-        Project::create([
-            'name' => generate_random_name(),
-            'team_id' => currentTeam()->id
-        ]);
+        ['private' => $this->privateKey] = generateSSHKey();
     }
 }
