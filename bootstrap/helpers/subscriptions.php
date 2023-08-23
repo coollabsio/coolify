@@ -4,7 +4,7 @@ use Illuminate\Support\Carbon;
 
 function getSubscriptionLink($type)
 {
-    $checkout_id = config("coolify.lemon_squeezy_checkout_id_$type");
+    $checkout_id = config("subscription.lemon_squeezy_checkout_id_$type");
     if (!$checkout_id) {
         return null;
     }

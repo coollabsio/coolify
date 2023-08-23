@@ -16,11 +16,21 @@ class Server extends BaseModel
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
-            StandaloneDocker::create([
-                'name' => 'coolify',
-                'network' => 'coolify',
-                'server_id' => $server->id,
-            ]);
+            if ($server->id === 0) {
+                StandaloneDocker::create([
+                    'id' => 0,
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
+            } else {
+                StandaloneDocker::create([
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
+            }
+
         });
         static::deleting(function ($server) {
             $server->settings()->delete();

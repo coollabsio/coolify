@@ -17,7 +17,7 @@ class Actions extends Component
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('coolify.lemon_squeezy_api_key'),
+                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
             ])->delete('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id);
             $json = $response->json();
             if ($response->failed()) {
@@ -44,7 +44,7 @@ class Actions extends Component
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('coolify.lemon_squeezy_api_key'),
+                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
             ])->patch('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id, [
                 'data' => [
                     'type' => 'subscriptions',

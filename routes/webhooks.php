@@ -208,7 +208,7 @@ Route::get('/waitlist/cancel', function () {
 })->name('webhooks.waitlist.cancel');
 Route::post('/payments/events', function () {
     try {
-        $secret = config('coolify.lemon_squeezy_webhook_secret');
+        $secret = config('subscription.lemon_squeezy_webhook_secret');
         $payload = request()->collect();
         $hash = hash_hmac('sha256', $payload, $secret);
         $signature = request()->header('X-Signature');
