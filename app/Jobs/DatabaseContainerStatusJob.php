@@ -39,7 +39,9 @@ class DatabaseContainerStatusJob implements ShouldQueue, ShouldBeUnique
             );
 
             if ($this->database->status === 'running' && $status !== 'running') {
-                $this->database->environment->project->team->notify(new StatusChanged($this->database));
+                if (data_get($this->database, 'environment.project.team')) {
+                    $this->database->environment->project->team->notify(new StatusChanged($this->database));
+                }
             }
             if ($this->database->status !== $status) {
                 $this->database->status = $status;
