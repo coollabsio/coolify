@@ -77,7 +77,7 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
     }
     $container = format_docker_command_output_to_json($container);
     if ($all_data) {
-        return $container;
+        return $container[0];
     }
     return data_get($container[0], 'State.Status', 'exited');
 }
