@@ -69,4 +69,8 @@ class Actions extends Component
             return general_error_handler($e, $this);
         }
     }
+    public function stripeCustomerPortal() {
+        $session = getStripeCustomerPortalSession(currentTeam());
+        redirect($session->url);
+    }
 }

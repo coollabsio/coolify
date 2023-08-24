@@ -1,0 +1,41 @@
+<?php
+
+namespace App\Jobs;
+
+use App\Models\Team;
+use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\SerializesModels;
+use Stripe\Stripe;
+
+class SubscriptionInvoiceFailedJob implements ShouldQueue
+{
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public function __construct(protected Team $team)
+    {
+    }
+
+    public function handle()
+    {
+        try {
+            $session = getStripeCustomerPortalSession($this->team);
+            $mail = new MailMessage();
+            $mail->view('emails.subscription-invoice-failed', [
+                'stripeCustomerPortal' => $session->url,
+            ]);
+            $mail->subject('Your last payment was failed for Coolify Cloud.');
+            $this->team->members()->each(function ($member) use ($mail) {
+                ray($member);
+                if ($member->isAdmin()) {
+                    send_user_an_email($mail, $member->email);
+                }
+            });
+        } catch (\Throwable $th) {
+            send_internal_notification('SubscriptionInvoiceFailedJob failed with: ' . $th->getMessage());
+        }
+    }
+}

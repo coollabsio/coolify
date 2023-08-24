@@ -64,35 +64,42 @@ class DatabaseBackupJob implements ShouldQueue
 
     public function handle(): void
     {
-        if ($this->database_status !== 'running') {
-            ray('database not running');
-            return;
-        }
-        $this->container_name = $this->database->uuid;
-        $this->backup_dir = backup_dir() . "/databases/" . Str::of($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->container_name;
+        try {
+            if ($this->database_status !== 'running') {
+                ray('database not running');
+                return;
+            }
+            $this->container_name = $this->database->uuid;
+            $this->backup_dir = backup_dir() . "/databases/" . Str::of($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->container_name;
 
-        if ($this->database->name === 'coolify-db') {
-            $this->container_name = "coolify-db";
-            $ip = Str::slug($this->server->ip);
-            $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
-        }
-        $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".sql";
-        $this->backup_location = $this->backup_dir . $this->backup_file;
+            if ($this->database->name === 'coolify-db') {
+                $this->container_name = "coolify-db";
+                $ip = Str::slug($this->server->ip);
+                $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
+            }
+            $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".sql";
+            $this->backup_location = $this->backup_dir . $this->backup_file;
 
-        $this->backup_log = ScheduledDatabaseBackupExecution::create([
-            'filename' => $this->backup_location,
-            'scheduled_database_backup_id' => $this->backup->id,
-        ]);
-        if ($this->database_type === 'standalone-postgresql') {
-            $this->backup_standalone_postgresql();
+            $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                'filename' => $this->backup_location,
+                'scheduled_database_backup_id' => $this->backup->id,
+            ]);
+            if ($this->database_type === 'standalone-postgresql') {
+                $this->backup_standalone_postgresql();
+            }
+            $this->calculate_size();
+            $this->remove_old_backups();
+            if ($this->backup->save_s3) {
+                $this->upload_to_s3();
+            }
+            $this->save_backup_logs();
+            // TODO: Notify user
+        } catch (\Throwable $th) {
+            ray($th->getMessage());
+            send_internal_notification('DatabaseBackupJob failed with: ' . $th->getMessage());
+            //throw $th;
         }
-        $this->calculate_size();
-        $this->remove_old_backups();
-        if ($this->backup->save_s3) {
-            $this->upload_to_s3();
-        }
-        $this->save_backup_logs();
-        // TODO: Notify user
+
     }
 
     private function backup_standalone_postgresql(): void

@@ -1,6 +1,8 @@
 <?php
 
+use App\Models\Team;
 use Illuminate\Support\Carbon;
+use Stripe\Stripe;
 
 function getSubscriptionLink($type)
 {
@@ -43,40 +45,79 @@ function getEndDate()
     return Carbon::parse(currentTeam()->subscription->lemon_renews_at)->format('Y-M-d H:i:s');
 }
 
-function is_subscription_active()
+function isSubscriptionActive()
 {
     $team = currentTeam();
-
     if (!$team) {
         return false;
-    }
-    if (isInstanceAdmin()) {
-        return true;
     }
     $subscription = $team?->subscription;
 
     if (!$subscription) {
         return false;
     }
-    $is_active = $subscription->lemon_status === 'active';
+    if (config('subscription.provider') === 'lemon') {
+        return $subscription->lemon_status === 'active';
+    }
+    if (config('subscription.provider') === 'stripe') {
+        return $subscription->stripe_invoice_paid === true && $subscription->stripe_cancel_at_period_end === false;
+    }
+    return false;
+    // if (config('subscription.provider') === 'paddle') {
+    //     return $subscription->paddle_status === 'active';
+    // }
 
-    return $is_active;
 }
-function is_subscription_in_grace_period()
+function isSubscriptionOnGracePeriod()
 {
+
     $team = currentTeam();
     if (!$team) {
         return false;
-    }
-    if (isInstanceAdmin()) {
-        return true;
     }
     $subscription = $team?->subscription;
     if (!$subscription) {
         return false;
     }
-    $is_still_grace_period = $subscription->lemon_ends_at &&
-        Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
-
-    return $is_still_grace_period;
+    if (config('subscription.provider') === 'lemon') {
+        $is_still_grace_period = $subscription->lemon_ends_at &&
+            Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
+        return $is_still_grace_period;
+    }
+    if (config('subscription.provider') === 'stripe') {
+        return $subscription->stripe_cancel_at_period_end;
+    }
+    return false;
+}
+function subscriptionProvider()
+{
+    return config('subscription.provider');
+}
+function getStripeCustomerPortalSession(Team $team)
+{
+    Stripe::setApiKey(config('subscription.stripe_api_key'));
+    $return_url = route('team.show');
+    $stripe_customer_id = $team->subscription->stripe_customer_id;
+    $session = \Stripe\BillingPortal\Session::create([
+        'customer' => $stripe_customer_id,
+        'return_url' => $return_url,
+    ]);
+    return $session;
+}
+function allowedPaths()
+{
+    return [
+        'subscription',
+        'login',
+        'register',
+        'waitlist',
+        'force-password-reset',
+        'logout',
+        'boarding',
+        'livewire/message/boarding',
+        'livewire/message/force-password-reset',
+        'livewire/message/check-license',
+        'livewire/message/switch-team',
+        'livewire/message/subscription.pricing-plans'
+    ];
 }

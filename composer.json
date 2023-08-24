@@ -32,6 +32,7 @@
         "spatie/laravel-ray": "^1.32.4",
         "spatie/laravel-schemaless-attributes": "^2.4",
         "spatie/url": "^2.2",
+        "stripe/stripe-php": "^12.0",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0"
     },

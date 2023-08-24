@@ -57,6 +57,7 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 $this->server->proxy->status = 'exited';
                 $this->server->save();
             }
+            send_internal_notification('ProxyContainerStatusJob failed with: ' . $e->getMessage());
         }
     }
 }

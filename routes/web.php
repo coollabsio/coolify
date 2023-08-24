@@ -97,7 +97,9 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function() {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
-    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription');
+    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.show');
+    Route::get('/subscription/success', fn () => view('subscription.success'))->name('subscription.success');
+    Route::get('/subscription/cancel', fn () => view('profile'))->name('subscription.cancel');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');

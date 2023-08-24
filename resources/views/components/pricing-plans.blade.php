@@ -105,10 +105,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_basic') }}">Subscribe</a>
+                        @isset($basic)
+                            {{ $basic }}
+                        @endisset
                     @endif
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
                         the cloud
@@ -168,10 +167,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-pro" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_pro') }}">Subscribe</a>
+                    @isset($pro)
+                    {{ $pro }}
+                @endisset
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
                     </p>
@@ -227,10 +225,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_ultimate') }}">Subscribe</a>
+                        @isset($ultimate)
+                            {{ $ultimate }}
+                        @endisset
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
                         manage them easily in one place.</p>
@@ -274,3 +271,6 @@
         </div>
     </div>
 </div>
+@isset($other)
+    {{ $other }}
+@endisset

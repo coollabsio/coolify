@@ -15,12 +15,8 @@ class IsBoardingFlow
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $allowed_paths = [
-            'subscription',
-            'boarding',
-            'livewire/message/boarding'
-        ];
-        if (showBoarding() && !in_array($request->path(), $allowed_paths)) {
+        ray('IsBoardingFlow Middleware');
+        if (showBoarding() && !in_array($request->path(), allowedPaths())) {
             return redirect('boarding');
         }
         return $next($request);

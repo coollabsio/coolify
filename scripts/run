@@ -47,9 +47,6 @@ function schedule:run {
     bash spin exec -u webuser coolify php artisan schedule:run
 }
 
-function db:reset {
-    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
-}
 
 function db {
     bash spin exec -u webuser coolify php artisan db
@@ -59,6 +56,9 @@ function db:migrate {
     bash spin exec -u webuser coolify php artisan migrate
 }
 
+function db:reset {
+    bash spin exec -u webuser coolify php artisan migrate:fresh --seed
+}
 function db:reset-prod {
     bash spin exec -u webuser coolify php artisan migrate:fresh --force --seed --seeder=ProductionSeeder ||
         php artisan migrate:fresh --force --seed --seeder=ProductionSeeder

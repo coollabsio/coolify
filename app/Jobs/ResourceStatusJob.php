@@ -37,8 +37,8 @@ class ResourceStatusJob implements ShouldQueue, ShouldBeUnique
                     database: $postgresql,
                 ));
             }
-        } catch (\Exception $e) {
-            ray($e->getMessage());
+        } catch (\Exception $th) {
+            send_internal_notification('ResourceStatusJob failed with: ' . $th->getMessage());
         }
     }
 }

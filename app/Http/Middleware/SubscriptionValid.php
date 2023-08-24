@@ -17,31 +17,17 @@ class SubscriptionValid
                 return $next($request);
             }
         }
-        if (isInstanceAdmin()) {
-            return $next($request);
-        }
-
-        if (is_subscription_active() && $request->path() === 'subscription') {
+        if (isSubscriptionActive() && $request->path() === 'subscription') {
+            // ray('active subscription Middleware');
             return redirect('/');
         }
-        if (is_subscription_in_grace_period()) {
+        if (isSubscriptionOnGracePeriod()) {
+            // ray('is_subscription_in_grace_period Middleware');
             return $next($request);
         }
-        if (!is_subscription_active() && !is_subscription_in_grace_period()) {
-            ray('SubscriptionValid Middleware');
-
-            $allowed_paths = [
-                'subscription',
-                'login',
-                'register',
-                'waitlist',
-                'force-password-reset',
-                'logout',
-                'livewire/message/force-password-reset',
-                'livewire/message/check-license',
-                'livewire/message/switch-team',
-            ];
-            if (!in_array($request->path(), $allowed_paths)) {
+        if (!isSubscriptionActive() && !isSubscriptionOnGracePeriod()) {
+            // ray('SubscriptionValid Middleware');
+            if (!in_array($request->path(), allowedPaths())) {
                 return redirect('subscription');
             } else {
                 return $next($request);

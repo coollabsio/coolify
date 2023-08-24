@@ -9,7 +9,7 @@
     @env('local')
     <title>Coolify - localhost</title>
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
-    @else
+@else
     <title>{{ $title ?? 'Coolify' }}</title>
     <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
     @endenv
@@ -26,7 +26,7 @@
 <body>
     @livewireScripts
     <x-toaster-hub />
-    @if (isInstanceAdmin() || is_subscription_in_grace_period())
+    @if (isSubscriptionOnGracePeriod())
         <div class="fixed top-3 left-4" id="vue">
             <magic-bar></magic-bar>
         </div>
@@ -67,6 +67,18 @@
             } else {
                 window.location.reload();
             }
+        })
+        Livewire.on('info', (message) => {
+            if (message) Toaster.info(message)
+        })
+        Livewire.on('error', (message) => {
+            if (message) Toaster.error(message)
+        })
+        Livewire.on('warning', (message) => {
+            if (message) Toaster.warning(message)
+        })
+        Livewire.on('success', (message) => {
+            if (message) Toaster.success(message)
         })
     </script>
 </body>

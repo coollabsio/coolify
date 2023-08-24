@@ -30,7 +30,7 @@ class Controller extends BaseController
         if (!is_cloud()) {
             abort(404);
         }
-        return view('subscription', [
+        return view('subscription.show', [
             'settings' => InstanceSettings::get(),
         ]);
     }
