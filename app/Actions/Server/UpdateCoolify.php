@@ -44,6 +44,7 @@ class UpdateCoolify
             ray('InstanceAutoUpdateJob failed');
             ray($th->getMessage());
             send_internal_notification('InstanceAutoUpdateJob failed: ' . $th->getMessage());
+            throw $th;
         }
     }
 

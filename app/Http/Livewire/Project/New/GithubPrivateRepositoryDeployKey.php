@@ -43,7 +43,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'Publish directory',
     ];
     private object $repository_url_parsed;
-    private GithubApp|GitlabApp $git_source;
+    private GithubApp|GitlabApp|null $git_source = null;
     private string $git_host;
     private string $git_repository;
     private string $git_branch;

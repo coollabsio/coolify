@@ -39,6 +39,8 @@ class ResourceStatusJob implements ShouldQueue, ShouldBeUnique
             }
         } catch (\Exception $th) {
             send_internal_notification('ResourceStatusJob failed with: ' . $th->getMessage());
+            ray($th);
+            throw $th;
         }
     }
 }

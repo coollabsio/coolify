@@ -51,6 +51,7 @@ class DockerCleanupJob implements ShouldQueue
         } catch (\Exception $e) {
             send_internal_notification('DockerCleanupJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
+            throw $e;
         }
     }
 

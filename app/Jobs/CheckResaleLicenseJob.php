@@ -24,6 +24,7 @@ class CheckResaleLicenseJob implements ShouldQueue
         } catch (\Throwable $th) {
             send_internal_notification('CheckResaleLicenseJob failed with: ' . $th->getMessage());
             ray($th);
+            throw $th;
         }
     }
 }

@@ -97,7 +97,7 @@ class DatabaseBackupJob implements ShouldQueue
         } catch (\Throwable $th) {
             ray($th->getMessage());
             send_internal_notification('DatabaseBackupJob failed with: ' . $th->getMessage());
-            //throw $th;
+            throw $th;
         }
 
     }

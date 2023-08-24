@@ -136,6 +136,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         } catch (Exception $e) {
             ray($e);
             $this->fail($e);
+            throw $e;
         } finally {
             if (isset($this->docker_compose_base64)) {
                 $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
