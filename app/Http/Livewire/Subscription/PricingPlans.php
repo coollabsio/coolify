@@ -44,9 +44,6 @@ class PricingPlans extends Component
                 'price' => $priceId,
                 'quantity' => 1,
             ]],
-            'customer_update' =>[
-                'name' => 'auto'
-            ],
             'tax_id_collection' => [
                 'enabled' => true,
             ],
@@ -57,6 +54,9 @@ class PricingPlans extends Component
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;
         if ($customer) {
             $payload['customer'] = $customer;
+            $payload['customer_update'] = [
+                'name' => 'auto'
+            ];
         } else {
             $payload['customer_email'] = auth()->user()->email;
         }

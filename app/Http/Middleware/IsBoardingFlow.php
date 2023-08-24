@@ -15,8 +15,8 @@ class IsBoardingFlow
      */
     public function handle(Request $request, Closure $next): Response
     {
-        ray('IsBoardingFlow Middleware');
-        if (showBoarding() && !in_array($request->path(), allowedPaths())) {
+        // ray('IsBoardingFlow Middleware');
+        if (showBoarding() && !in_array($request->path(), allowedPathsForBoardingAccounts())) {
             return redirect('boarding');
         }
         return $next($request);

@@ -104,7 +104,7 @@ function getStripeCustomerPortalSession(Team $team)
     ]);
     return $session;
 }
-function allowedPaths()
+function allowedPathsForUnsubscribedAccounts()
 {
     return [
         'subscription',
@@ -113,11 +113,17 @@ function allowedPaths()
         'waitlist',
         'force-password-reset',
         'logout',
-        'boarding',
-        'livewire/message/boarding',
         'livewire/message/force-password-reset',
         'livewire/message/check-license',
         'livewire/message/switch-team',
         'livewire/message/subscription.pricing-plans'
+    ];
+}
+function allowedPathsForBoardingAccounts()
+{
+    return [
+        ...allowedPathsForUnsubscribedAccounts(),
+        'boarding',
+        'livewire/message/boarding',
     ];
 }

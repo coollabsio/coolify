@@ -27,7 +27,7 @@ class SubscriptionValid
         }
         if (!isSubscriptionActive() && !isSubscriptionOnGracePeriod()) {
             // ray('SubscriptionValid Middleware');
-            if (!in_array($request->path(), allowedPaths())) {
+            if (!in_array($request->path(), allowedPathsForUnsubscribedAccounts())) {
                 return redirect('subscription');
             } else {
                 return $next($request);
