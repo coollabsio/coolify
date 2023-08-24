@@ -1,7 +1,6 @@
 <x-layout-subscription>
     @if ($settings->is_resale_license_active)
         <div class="flex justify-center mx-10">
-
             <div x-data>
                 <div class="flex gap-2">
                     <h2>Subscription</h2>

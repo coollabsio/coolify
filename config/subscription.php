@@ -4,7 +4,6 @@ return [
     'provider'=> env('SUBSCRIPTION_PROVIDER', null), // stripe, paddle, lemon
     // Stripe
     'stripe_api_key' => env('STRIPE_API_KEY', null),
-    'stripe_secret' => env('STRIPE_SECRET', null),
     'stripe_webhook_secret' => env('STRIPE_WEBHOOK_SECRET', null),
     'stripe_price_id_basic_monthly' => env('STRIPE_PRICE_ID_BASIC_MONTHLY', null),
     'stripe_price_id_basic_yearly' => env('STRIPE_PRICE_ID_BASIC_YEARLY', null),
@@ -17,6 +16,7 @@ return [
     // Paddle
     'paddle_vendor_id' => env('PADDLE_VENDOR_ID', null),
     'paddle_vendor_auth_code' => env('PADDLE_VENDOR_AUTH_CODE', null),
+    'paddle_webhook_secret' => env('PADDLE_WEBHOOK_SECRET', null),
     'paddle_public_key' => env('PADDLE_PUBLIC_KEY', null),
     'paddle_price_id_basic_monthly' => env('PADDLE_PRICE_ID_BASIC_MONTHLY', null),
     'paddle_price_id_basic_yearly' => env('PADDLE_PRICE_ID_BASIC_YEARLY', null),
@@ -24,18 +24,18 @@ return [
     'paddle_price_id_pro_yearly' => env('PADDLE_PRICE_ID_PRO_YEARLY', null),
     'paddle_price_id_ultimate_monthly' => env('PADDLE_PRICE_ID_ULTIMATE_MONTHLY', null),
     'paddle_price_id_ultimate_yearly' => env('PADDLE_PRICE_ID_ULTIMATE_YEARLY', null),
-    'paddle_webhook_secret' => env('PADDLE_WEBHOOK_SECRET', null),
+
 
 
     // Lemon
     'lemon_squeezy_api_key' => env('LEMON_SQUEEZY_API_KEY', null),
     'lemon_squeezy_webhook_secret' => env('LEMON_SQUEEZY_WEBHOOK_SECRET', null),
-    'lemon_squeezy_checkout_id_monthly_basic' => env('LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_BASIC', null),
-    'lemon_squeezy_checkout_id_monthly_pro' => env('LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_PRO', null),
-    'lemon_squeezy_checkout_id_monthly_ultimate' => env('LEMON_SQUEEZY_CHECKOUT_ID_MONTHLY_ULTIMATE', null),
-    'lemon_squeezy_checkout_id_yearly_basic' => env('LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_BASIC', null),
-    'lemon_squeezy_checkout_id_yearly_pro' => env('LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_PRO', null),
-    'lemon_squeezy_checkout_id_yearly_ultimate' => env('LEMON_SQUEEZY_CHECKOUT_ID_YEARLY_ULTIMATE', null),
+    'lemon_squeezy_checkout_id_basic_monthly' => env('LEMON_SQUEEZY_CHECKOUT_ID_BASIC_MONTHLY', null),
+    'lemon_squeezy_checkout_id_basic_yearly' => env('LEMON_SQUEEZY_CHECKOUT_ID_BASIC_YEARLY', null),
+    'lemon_squeezy_checkout_id_pro_monthly' => env('LEMON_SQUEEZY_CHECKOUT_ID_PRO_MONTHLY', null),
+    'lemon_squeezy_checkout_id_pro_yearly' => env('LEMON_SQUEEZY_CHECKOUT_ID_PRO_YEARLY', null),
+    'lemon_squeezy_checkout_id_ultimate_monthly' => env('LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_MONTHLY', null),
+    'lemon_squeezy_checkout_id_ultimate_yearly' => env('LEMON_SQUEEZY_CHECKOUT_ID_ULTIMATE_YEARLY', null),
     'lemon_squeezy_basic_plan_ids' => env('LEMON_SQUEEZY_BASIC_PLAN_IDS', ""),
     'lemon_squeezy_pro_plan_ids' => env('LEMON_SQUEEZY_PRO_PLAN_IDS', ""),
     'lemon_squeezy_ultimate_plan_ids' => env('LEMON_SQUEEZY_ULTIMATE_PLAN_IDS', ""),
