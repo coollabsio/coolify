@@ -40,8 +40,8 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             $container = getContainerStatus(server: $this->server, all_data: true, container_id: 'coolify-proxy', throwError: true);
-            $status = $container['State']['Status'];
-            if ($this->server->proxy->status !== $status) {
+            $status = data_get($container, 'State.Status');
+            if (data_get($this->server,'proxy.status') !== $status) {
                 $this->server->proxy->status = $status;
                 if ($this->server->proxy->status === 'running') {
                     $traefik = $container['Config']['Labels']['org.opencontainers.image.title'];
