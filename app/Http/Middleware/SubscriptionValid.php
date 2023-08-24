@@ -10,6 +10,9 @@ class SubscriptionValid
 {
     public function handle(Request $request, Closure $next): Response
     {
+        if (isInstanceAdmin()) {
+            return $next($request);
+        }
         if (!auth()->user() || !is_cloud()) {
             if ($request->path() === 'subscription') {
                 return redirect('/');
