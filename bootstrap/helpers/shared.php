@@ -231,8 +231,9 @@ function validate_cron_expression($expression_to_validate): bool
 function send_internal_notification(string $message): void
 {
     try {
+        $baseUrl = base_url(false);
         $team = Team::find(0);
-        $team->notify(new GeneralNotification('👀 Internal notifications: ' . $message));
+        $team->notify(new GeneralNotification("👀 Internal notifications from {$baseUrl}: " . $message));
     } catch (\Throwable $th) {
         ray($th->getMessage());
     }
