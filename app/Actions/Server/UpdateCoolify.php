@@ -39,7 +39,7 @@ class UpdateCoolify
                 }
                 $this->update();
             }
-            send_internal_notification('InstanceAutoUpdateJob done on: ' . $this->server->ip . "(fqdn:{$this->server->fqdn})" . ' to version: ' . $this->latest_version . ' from version: ' . $this->current_version);
+            send_internal_notification('InstanceAutoUpdateJob done to version: ' . $this->latest_version . ' from version: ' . $this->current_version);
         } catch (\Exception $th) {
             ray('InstanceAutoUpdateJob failed');
             ray($th->getMessage());
