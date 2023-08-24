@@ -254,7 +254,7 @@ Route::post('/payments/stripe/events', function () {
                 }
                 break;
             case 'invoice.paid':
-                $subscriptionId = data_get($data, 'items.data.0.subscription');
+                $subscriptionId = data_get($data, 'lines.data.0.subscription');
                 $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
                 $subscription->update([
                     'stripe_invoice_paid' => true,
