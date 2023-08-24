@@ -29,23 +29,21 @@ class UpdateCoolify
                 $this->update();
             } else {
                 if (!$settings->is_auto_update_enabled) {
-                    throw new \Exception('Auto update is disabled');
+                    return 'Auto update is disabled';
                 }
                 if ($this->latest_version === $this->current_version) {
-                    throw new \Exception('Already on latest version');
+                    return 'Already on latest version';
                 }
                 if (version_compare($this->latest_version, $this->current_version, '<')) {
-                    throw new \Exception('Latest version is lower than current version?!');
+                    return 'Latest version is lower than current version?!';
                 }
                 $this->update();
             }
             send_internal_notification('InstanceAutoUpdateJob done on: ' . $this->server->ip . "(fqdn:{$this->server->fqdn})" . ' to version: ' . $this->latest_version . ' from version: ' . $this->current_version);
-            return;
         } catch (\Exception $th) {
             ray('InstanceAutoUpdateJob failed');
             ray($th->getMessage());
             send_internal_notification('InstanceAutoUpdateJob failed: ' . $th->getMessage());
-            return;
         }
     }
 
