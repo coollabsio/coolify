@@ -36,20 +36,20 @@
     @endif
     <div class="grid gap-2 lg:grid-cols-2">
         @foreach ($environment->applications->sortBy('name') as $application)
-            <a class="box"
+            <a class="box group"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
-                <div class="flex flex-col">
-                    <div>{{ $application->name }}</div>
-                    <div class="text-xs text-gray-400">{{ $application->description }}</div>
+                <div class="flex flex-col mx-6">
+                    <div class=" group-hover:text-white">{{ $application->name }}</div>
+                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $application->description }}</div>
                 </div>
             </a>
         @endforeach
         @foreach ($environment->databases->sortBy('name') as $databases)
-            <a class="box"
+            <a class="box group"
                 href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
-                <div class="flex flex-col">
-                    <div>{{ $databases->name }}</div>
-                    <div class="text-xs text-gray-400">{{ $databases->description }}</div>
+                <div class="flex flex-col mx-6">
+                    <div class=" group-hover:text-white">{{ $databases->name }}</div>
+                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $databases->description }}</div>
                 </div>
             </a>
         @endforeach
