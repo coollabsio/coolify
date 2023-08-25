@@ -11,7 +11,7 @@
                 <livewire:subscription.actions />
             @else
                 <x-forms.button class="mt-4"><a class="text-white hover:no-underline"
-                        href="{{ route('subscription') }}">Subscribe Now</a>
+                        href="{{ route('subscription.show') }}">Subscribe Now</a>
                 </x-forms.button>
             @endif
 

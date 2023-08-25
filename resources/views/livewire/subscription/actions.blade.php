@@ -8,7 +8,7 @@
         @endif
 
         @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-            <a class="hover:no-underline" href="{{ route('subscription') }}"><x-forms.button>Subscribe
+            <a class="hover:no-underline" href="{{ route('subscription.show') }}"><x-forms.button>Subscribe
                     again</x-forms.button></a>
         @endif
         <x-forms.button wire:click='stripeCustomerPortal'>Manage My Subscription</x-forms.button>
