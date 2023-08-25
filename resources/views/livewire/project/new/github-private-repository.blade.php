@@ -1,8 +1,14 @@
 <div>
-    <h1>Create a new Application</h1>
+    <div class="flex items-end gap-2">
+        <h1>Create a new Application</h1>
+        <a href="{{ route('source.new') }}"><x-forms.button class="group-hover:text-white">
+                + Add New GitHub App
+            </x-forms.button>
+        </a>
+    </div>
     <div class="pb-4 ">Deploy any public or private git repositories through a GitHub App.</div>
     @if ($github_apps->count() > 0)
-        <div class="flex flex-col pt-10">
+        <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
                 <ul class="pb-10 steps">
                     <li class="step step-secondary">Select a GitHub App</li>
@@ -12,11 +18,13 @@
                     @foreach ($github_apps as $ghapp)
                         @if ($selected_github_app_id == $ghapp->id)
                             <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                                wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
+                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
+                                wire:key="{{ $ghapp->id }}">
                                 <div class="flex gap-4 mx-6">
                                     <div class="group-hover:text-white">
                                         {{ $ghapp->name }}
                                     </div>
+                                    <div>{{ $ghapp->http_url }}</div>
                                     <span wire:target="loadRepositories" wire:loading.delay
                                         class="loading loading-xs text-warning loading-spinner"></span>
                                 </div>
@@ -25,12 +33,14 @@
                             <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                                 wire:click.prevent="loadRepositories({{ $ghapp->id }})"
                                 wire:key="{{ $ghapp->id }}">
-                                <div class="flex gap-4 mx-6">
+                                <div class="flex flex-col mx-6">
                                     <div class="group-hover:text-white">
-                                        {{ $ghapp->name }}
+                                        {{ data_get($ghapp, 'name') }}
                                     </div>
+                                    <div class="text-xs text-gray-400 group-hover:text-white">
+                                        {{ data_get($ghapp, 'html_url') }}</div>
                                     <span wire:target="loadRepositories" wire:loading.delay
-                                        class="loading loading-xs text-warning loading-spinner"></span>
+                                        class="">Loading...</span>
                                 </div>
                             </div>
                         @endif
@@ -65,7 +75,6 @@
                     <div>No repositories found. Check your GitHub App configuration.</div>
                 @endif
                 @if ($branches->count() > 0)
-                    <h3 class="pt-8 pb-2">Details</h3>
                     <div class="flex flex-col gap-2 pb-6">
                         <form class="flex flex-col" wire:submit.prevent='submit'>
                             <div class="flex flex-col gap-2 pb-6">
