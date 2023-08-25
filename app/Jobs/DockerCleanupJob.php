@@ -57,8 +57,9 @@ class DockerCleanupJob implements ShouldQueue
 
     private function get_disk_usage(Server $server, string $docker_root_filesystem)
     {
-        $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\"disks\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\"mount\":\""$6"\",\"size\":\""$2"\",\"used\":\""$3"\",\"avail\":\""$4"\",\"use%\":\""$5"\"}";a++;}END{print"]}";}\''], $server), true);
+        $disk_usage = json_decode(instant_remote_process(['df -hP | awk \'BEGIN {printf"{\\"disks\\":["}{if($1=="Filesystem")next;if(a)printf",";printf"{\\"mount\\":\\""$6"\\",\\"size\\":\\""$2"\\",\\"used\\":\\""$3"\\",\\"avail\\":\\""$4"\\",\\"use%\\":\\""$5"\\"}";a++;}END{print"]}";}\''], $server), true);
         $mount_point = collect(data_get($disk_usage, 'disks'))->where('mount', $docker_root_filesystem)->first();
+        ray($mount_point);
         return Str::of(data_get($mount_point, 'use%'))->trim()->replace('%', '')->value();
     }
 }
