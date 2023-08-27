@@ -44,7 +44,7 @@ class Heading extends Component
         );
         $this->database->status = 'stopped';
         $this->database->save();
-        $this->database->environment->project->team->notify(new StatusChanged($this->database));
+        // $this->database->environment->project->team->notify(new StatusChanged($this->database));
     }
 
     public function start()

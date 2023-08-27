@@ -35,7 +35,7 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
         try {
             $status = getApplicationContainerStatus(application: $this->application);
             if ($this->application->status === 'running' && $status !== 'running') {
-                $this->application->environment->project->team->notify(new StatusChanged($this->application));
+                // $this->application->environment->project->team->notify(new StatusChanged($this->application));
             }
 
             if ($this->pullRequestId !== 0) {

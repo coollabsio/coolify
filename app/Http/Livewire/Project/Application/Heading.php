@@ -70,7 +70,7 @@ class Heading extends Component
                 );
                 $this->application->status = 'stopped';
                 $this->application->save();
-                $this->application->environment->project->team->notify(new StatusChanged($this->application));
+                // $this->application->environment->project->team->notify(new StatusChanged($this->application));
             }
         }
     }
