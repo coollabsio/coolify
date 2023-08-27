@@ -41,6 +41,7 @@ trait ExecuteRemoteCommand
 
             $remote_command = generate_ssh_command($private_key_location, $ip, $user, $port, $command);
             $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
+                $output = Str::of($output)->trim();
                 $new_log_entry = [
                     'command' => $command,
                     'output' => $output,

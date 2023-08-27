@@ -18,12 +18,12 @@
             @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                 @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                     <div @class([
-                        'font-mono break-all',
+                        'font-mono whitespace-pre-line',
                         'text-neutral-400' => $line['type'] == 'stdout',
                         'text-error' => $line['type'] == 'stderr',
                         'text-warning' => $line['hidden'],
                     ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
-                            <br>Command: {{ $line['command'] }} <br>Output:
+                            <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
                             @endif{{ $line['output'] }}@if ($line['hidden'])
                             @endif
                     </div>
