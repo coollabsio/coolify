@@ -33,7 +33,7 @@ class Kernel extends ConsoleKernel
             $schedule->job(new ResourceStatusJob)->everyMinute();
             $schedule->job(new CheckResaleLicenseJob)->hourly();
             $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
-            $schedule->job(new DockerCleanupJob)->everyTenMinutes();
+            // $schedule->job(new DockerCleanupJob)->everyTenMinutes();
             $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }
         $this->check_scheduled_backups($schedule);
