@@ -48,7 +48,8 @@ function currentTeam()
 
 function showBoarding(): bool
 {
-    return currentTeam()->show_boarding ?? false;
+    return false;
+    // return currentTeam()->show_boarding ?? false;
 }
 function refreshSession(): void
 {
