@@ -32,6 +32,11 @@ class DockerCleanupJob implements ShouldQueue
         try {
             $servers = Server::all();
             foreach ($servers as $server) {
+                if (
+                    !$server->settings->is_reachable && !$server->settings->is_usable
+                ) {
+                    continue;
+                }
                 if (isDev()) {
                     $docker_root_filesystem = "/";
                 } else {
