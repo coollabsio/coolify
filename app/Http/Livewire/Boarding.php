@@ -14,6 +14,7 @@ class Boarding extends Component
 
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
+    public ?string $publicKey = null;
     public ?string $privateKeyName = null;
     public ?string $privateKeyDescription = null;
     public ?PrivateKey $createdPrivateKey = null;
@@ -31,7 +32,7 @@ class Boarding extends Component
     {
         $this->privateKeyName = generate_random_name();
         $this->remoteServerName = generate_random_name();
-        if (is_dev()) {
+        if (isDev()) {
             $this->privateKey = '-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACBbhpqHhqv6aI67Mj9abM3DVbmcfYhZAhC7ca4d9UCevAAAAJi/QySHv0Mk
@@ -77,6 +78,9 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function setPrivateKey(string $type)
     {
         $this->privateKeyType = $type;
+        if ($type === 'create' && !isDev()) {
+            $this->createNewPrivateKey();
+        }
         $this->currentState = 'create-private-key';
     }
     public function savePrivateKey()
@@ -95,9 +99,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'remoteServerPort' => 'required',
             'remoteServerUser' => 'required',
         ]);
-        if ($this->privateKeyType === 'create') {
-            $this->createNewPrivateKey();
-        }
         $this->privateKey = formatPrivateKey($this->privateKey);
         $this->createdPrivateKey = PrivateKey::create([
             'name' => $this->privateKeyName,
@@ -175,6 +176,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
-        ['private' => $this->privateKey] = generateSSHKey();
+        ['private' => $this->privateKey, 'public'=> $this->publicKey] = generateSSHKey();
     }
 }

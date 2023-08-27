@@ -47,7 +47,8 @@
                     <x-slot:explanation>
                         <p>SSH Keys are used to connect to a remote server through a secure shell, called SSH.</p>
                         <p>You can use your own ssh private key, or you can let Coolify to create one for you.</p>
-                        <p>In both ways, you need to add the public version of your ssh private key to the remote server's
+                        <p>In both ways, you need to add the public version of your ssh private key to the remote
+                            server's
                             <code class="text-warning">~/.ssh/authorized_keys</code> file.
                         </p>
                     </x-slot:explanation>
@@ -66,6 +67,10 @@
                                 label="Description" id="privateKeyDescription" />
                             <x-forms.textarea required placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
                                 label="Private Key" id="privateKey" />
+                            @if ($privateKeyType === 'create' && !isDev())
+                            <span class="font-bold text-warning">Copy this to your server's ~/.ssh/authorized_keys file.</span>
+                                <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
+                            @endif
                             <x-forms.button type="submit">Save</x-forms.button>
                         </form>
                     </x-slot:actions>
@@ -115,7 +120,8 @@
                         Could not find Docker Engine on your server. Do you want me to install it for you?
                     </x-slot:question>
                     <x-slot:actions>
-                        <div class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">Let's do
+                        <div class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">
+                            Let's do
                             it!</div>
                     </x-slot:actions>
                     <x-slot:explanation>

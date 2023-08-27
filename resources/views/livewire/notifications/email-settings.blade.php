@@ -59,7 +59,7 @@
     @if (data_get($model, 'smtp_enabled'))
         <h4 class="mt-4">Subscribe to events</h4>
         <div class="w-64">
-            @if (is_dev())
+            @if (isDev())
                 <x-forms.checkbox instantSave="saveModel" id="model.smtp_notifications_test" label="Test" />
             @endif
             <h4 class="mt-4">General</h4>

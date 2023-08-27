@@ -66,7 +66,7 @@ class Controller extends BaseController
         ]);
     }
     public function boarding() {
-        if (currentTeam()->boarding || is_dev()) {
+        if (currentTeam()->boarding || isDev()) {
             return view('boarding');
         } else {
             return redirect()->route('dashboard');

@@ -12,7 +12,7 @@ class InstallDocker
     {
         $dockerVersion = '23.0';
         $config = base64_encode('{ "live-restore": true }');
-        if (is_dev()) {
+        if (isDev()) {
             $activity = remote_process([
                 "echo ####### Installing Prerequisites...",
                 "echo ####### Installing/updating Docker Engine...",

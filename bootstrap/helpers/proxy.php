@@ -82,7 +82,7 @@ function generate_default_proxy_configuration(Server $server)
             ],
         ],
     ];
-    if (is_dev()) {
+    if (isDev()) {
         $config['services']['traefik']['command'][] = "--log.level=debug";
     }
     return Yaml::dump($config, 4, 2);

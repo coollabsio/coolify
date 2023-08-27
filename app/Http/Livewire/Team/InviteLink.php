@@ -15,7 +15,7 @@ class InviteLink extends Component
 
     public function mount()
     {
-        $this->email = is_dev() ? 'test3@example.com' : '';
+        $this->email = isDev() ? 'test3@example.com' : '';
     }
 
     public function viaEmail()

@@ -50,7 +50,7 @@ class UpdateCoolify
 
     private function update()
     {
-        if (is_dev()) {
+        if (isDev()) {
             ray("Running update on local docker container. Updating to $this->latest_version");
             remote_process([
                 "sleep 10"

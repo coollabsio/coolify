@@ -45,7 +45,7 @@ class PublicGitRepository extends Component
 
     public function mount()
     {
-        if (is_dev()) {
+        if (isDev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
             $this->port = 3000;
         }

@@ -163,7 +163,7 @@ function set_transanctional_email_settings(InstanceSettings | null $settings = n
 
 function base_ip(): string
 {
-    if (is_dev()) {
+    if (isDev()) {
         return "localhost";
     }
     $settings = InstanceSettings::get();
@@ -188,12 +188,12 @@ function base_url(bool $withPort = true): string
     $port = config('app.port');
     if ($settings->public_ipv4) {
         if ($withPort) {
-            if (is_dev()) {
+            if (isDev()) {
                 return "http://localhost:$port";
             }
             return "http://$settings->public_ipv4:$port";
         }
-        if (is_dev()) {
+        if (isDev()) {
             return "http://localhost";
         }
         return "http://$settings->public_ipv4";
@@ -207,7 +207,7 @@ function base_url(bool $withPort = true): string
     return url('/');
 }
 
-function is_dev(): bool
+function isDev(): bool
 {
     return config('app.env') === 'local';
 }

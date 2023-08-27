@@ -19,7 +19,7 @@ class SimpleDockerfile extends Component
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        if (is_dev()) {
+        if (isDev()) {
             $this->dockerfile = 'FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]

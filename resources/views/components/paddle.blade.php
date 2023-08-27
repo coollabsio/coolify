@@ -28,7 +28,7 @@
 <x-slot:other>
     <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
     <script type="text/javascript">
-        Paddle.Environment.set("{{ is_dev() ? 'sandbox' : 'production' }}");
+        Paddle.Environment.set("{{ isDev() ? 'sandbox' : 'production' }}");
         Paddle.Setup({
             seller: {{ config('subscription.paddle_vendor_id') }},
             checkout: {

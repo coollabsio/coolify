@@ -45,7 +45,7 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             $this->settings = InstanceSettings::get();
-            if ($this->settings->do_not_track || is_dev()) {
+            if ($this->settings->do_not_track || isDev()) {
                 return;
             }
             Integration::captureUnhandledException($e);
