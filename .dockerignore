@@ -21,3 +21,4 @@ yarn-error.log
 /.bash_history
 /_data
 .rnd
+/.ssh
