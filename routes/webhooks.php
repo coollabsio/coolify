@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -161,7 +162,7 @@ Route::post('/source/github/events', function () {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
-                        $container_name = generate_container_name($application->uuid, $pull_request_id);
+                        $container_name = generateApplicationContainerName($application->uuid, $pull_request_id);
                         ray('Stopping container: ' . $container_name);
                         remote_process(["docker rm -f $container_name"], $application->destination->server);
                         return response('Preview Deployment closed.');
@@ -206,9 +207,133 @@ Route::get('/waitlist/cancel', function () {
         return redirect()->route('dashboard');
     }
 })->name('webhooks.waitlist.cancel');
-Route::post('/payments/events', function () {
+
+
+Route::post('/payments/stripe/events', function () {
     try {
-        $secret = config('coolify.lemon_squeezy_webhook_secret');
+        $webhookSecret = config('subscription.stripe_webhook_secret');
+        $signature = request()->header('Stripe-Signature');
+
+        $event = \Stripe\Webhook::constructEvent(
+            request()->getContent(),
+            $signature,
+            $webhookSecret
+        );
+        $webhook = Webhook::create([
+            'type' => 'stripe',
+            'payload' => request()->getContent()
+        ]);
+        $type = data_get($event, 'type');
+        $data = data_get($event, 'data.object');
+        switch ($type) {
+            case 'checkout.session.completed':
+                $clientReferenceId = data_get($data, 'client_reference_id');
+                $userId = Str::before($clientReferenceId, ':');
+                $teamId = Str::after($clientReferenceId, ':');
+                $subscriptionId = data_get($data, 'subscription');
+                $customerId = data_get($data, 'customer');
+                $team = Team::find($teamId);
+                $found = $team->members->where('id', $userId)->first();
+                if (!$found->isAdmin()) {
+                    throw new Exception("User {$userId} is not an admin or owner of team {$team->id}.");
+                }
+                $subscription = Subscription::where('team_id', $teamId)->first();
+                if ($subscription) {
+                    $subscription->update([
+                        'stripe_subscription_id' => $subscriptionId,
+                        'stripe_customer_id' => $customerId,
+                        'stripe_invoice_paid' => true,
+                    ]);
+                } else {
+                    Subscription::create([
+                        'team_id' => $teamId,
+                        'stripe_subscription_id' => $subscriptionId,
+                        'stripe_customer_id' => $customerId,
+                        'stripe_invoice_paid' => true,
+                    ]);
+                }
+                break;
+            case 'invoice.paid':
+                $subscriptionId = data_get($data, 'lines.data.0.subscription');
+                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $subscription->update([
+                    'stripe_invoice_paid' => true,
+                ]);
+                break;
+            case 'invoice.payment_failed':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                SubscriptionInvoiceFailedJob::dispatch($subscription->team);
+                break;
+            case 'customer.subscription.updated':
+                $subscriptionId = data_get($data, 'items.data.0.subscription');
+                $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
+                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $subscription->update([
+                    'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
+                ]);
+                break;
+            case 'customer.subscription.deleted':
+                $subscriptionId = data_get($data, 'items.data.0.subscription');
+                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $subscription->update([
+                    'stripe_cancel_at_period_end' => false,
+                    'stripe_invoice_paid' => false,
+                ]);
+                break;
+            default:
+                // Unhandled event type
+        }
+    } catch (Exception $e) {
+        ray($e->getMessage());
+        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
+        $webhook->update([
+            'status' => 'failed',
+            'failure_reason' => $e->getMessage(),
+        ]);
+        return response($e->getMessage(), 400);
+    }
+});
+Route::post('/payments/paddle/events', function () {
+    try {
+        $payload = request()->all();
+        $signature = request()->header('Paddle-Signature');
+        $ts = Str::of($signature)->after('ts=')->before(';');
+        $h1 = Str::of($signature)->after('h1=');
+        $signedPayload = $ts->value . ':' . request()->getContent();
+        $verify = hash_hmac('sha256', $signedPayload, config('subscription.paddle_webhook_secret'));
+        ray($verify, $h1->value, hash_equals($verify, $h1->value));
+        if (!hash_equals($verify, $h1->value)) {
+            return response('Invalid signature.', 400);
+        }
+        $eventType = data_get($payload, 'event_type');
+        ray($eventType);
+        $webhook = Webhook::create([
+            'type' => 'paddle',
+            'payload' => $payload,
+        ]);
+        // TODO - Handle events
+        switch ($eventType) {
+            case 'subscription.activated':
+        }
+        ray('Subscription event: ' . $eventType);
+        $webhook->update([
+            'status' => 'success',
+        ]);
+    } catch (Exception $e) {
+        ray($e->getMessage());
+        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
+        $webhook->update([
+            'status' => 'failed',
+            'failure_reason' => $e->getMessage(),
+        ]);
+    } finally {
+        return response('OK');
+    }
+});
+Route::post('/payments/lemon/events', function () {
+    try {
+        $secret = config('subscription.lemon_squeezy_webhook_secret');
         $payload = request()->collect();
         $hash = hash_hmac('sha256', $payload, $secret);
         $signature = request()->header('X-Signature');

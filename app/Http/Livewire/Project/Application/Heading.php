@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\ContainerStatusJob;
+use App\Jobs\ApplicationContainerStatusJob;
 use App\Models\Application;
 use App\Notifications\Application\StatusChanged;
 use Livewire\Component;
@@ -22,9 +22,8 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new ContainerStatusJob(
-            resource: $this->application,
-            container_name: generate_container_name($this->application->uuid),
+        dispatch_sync(new ApplicationContainerStatusJob(
+            application: $this->application,
         ));
         $this->application->refresh();
     }
@@ -58,12 +57,21 @@ class Heading extends Component
 
     public function stop()
     {
-        remote_process(
-            ["docker rm -f {$this->application->uuid}"],
-            $this->application->destination->server
-        );
-        $this->application->status = 'stopped';
-        $this->application->save();
-        $this->application->environment->project->team->notify(new StatusChanged($this->application));
+        $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id);
+        if ($containers->count() === 0) {
+            return;
+        }
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Names');
+            if ($containerName) {
+                remote_process(
+                    ["docker rm -f {$containerName}"],
+                    $this->application->destination->server
+                );
+                $this->application->status = 'stopped';
+                $this->application->save();
+                // $this->application->environment->project->team->notify(new StatusChanged($this->application));
+            }
+        }
     }
 }

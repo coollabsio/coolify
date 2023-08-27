@@ -5,15 +5,15 @@
     <div class="px-6 mx-auto lg:px-8">
         <div class="flex justify-center mt-5">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-full gap-x-1 ring-1 ring-inset ring-coolgray-500">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-full gap-x-1 ">
                 <legend class="sr-only">Payment frequency</legend>
-                <label class="cursor-pointer rounded-full px-2.5 py-1"
+                <label class="cursor-pointer  rounded px-2.5 py-1"
                     :class="selected === 'monthly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
-                <label class="cursor-pointer rounded-full px-2.5 py-1"
+                <label class="cursor-pointer rounded  px-2.5 py-1"
                     :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
@@ -22,11 +22,11 @@
             </fieldset>
         </div>
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Save <span class="font-bold text-warning">10% </span> annually with the yearly plan.
+            <div>Save <span class="font-bold text-warning">1 month</span> annually with the yearly plans.
             </div>
         </div>
         <div x-show="selected === 'yearly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Congratulations! 🎉 You are saving money with this choice!
+            <div>
             </div>
         </div>
         <div class="flow-root mt-12">
@@ -105,10 +105,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_basic') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_basic') }}">Subscribe</a>
+                        @isset($basic)
+                            {{ $basic }}
+                        @endisset
                     @endif
                     <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
                         the cloud
@@ -168,10 +167,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_pro') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-pro" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_pro') }}">Subscribe</a>
+                    @isset($pro)
+                    {{ $pro }}
+                @endisset
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
                     </p>
@@ -227,10 +225,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                        <a x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
-                            href="{{ getSubscriptionLink('monthly_ultimate') }}">Subscribe</a>
-                        <a x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate" class="buyme"
-                            href="{{ getSubscriptionLink('yearly_ultimate') }}">Subscribe</a>
+                        @isset($ultimate)
+                            {{ $ultimate }}
+                        @endisset
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
                         manage them easily in one place.</p>
@@ -274,3 +271,6 @@
         </div>
     </div>
 </div>
+@isset($other)
+    {{ $other }}
+@endisset

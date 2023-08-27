@@ -1,7 +1,7 @@
 <x-layout-subscription>
     @if ($settings->is_resale_license_active)
         <div class="flex justify-center mx-10">
-            <div>
+            <div x-data>
                 <div class="flex gap-2">
                     <h2>Subscription</h2>
                     <livewire:switch-team />
@@ -10,7 +10,12 @@
                     <span>Currently active team: <span
                             class="text-warning">{{ session('currentTeam.name') }}</span></span>
                 </div>
-                <x-pricing-plans />
+                @if(request()->query->get('cancelled'))
+                <div class="text-xl text-center text-red-500">Something went wrong. Please try again.</div>
+            @endif
+                @if (config('subscription.provider') !== null)
+                    <livewire:subscription.pricing-plans />
+                @endif
             </div>
         </div>
     @else

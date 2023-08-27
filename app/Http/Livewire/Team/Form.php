@@ -19,7 +19,7 @@ class Form extends Component
 
     public function mount()
     {
-        $this->team = auth()->user()->currentTeam();
+        $this->team = currentTeam();
     }
 
     public function submit()
@@ -27,7 +27,7 @@ class Form extends Component
         $this->validate();
         try {
             $this->team->save();
-            session(['currentTeam' => $this->team]);
+            refreshSession();
             $this->emit('reloadWindow');
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);

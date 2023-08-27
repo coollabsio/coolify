@@ -32,7 +32,7 @@ function generate_default_proxy_configuration(Server $server)
             "traefik" => [
                 "container_name" => "coolify-proxy",
                 "image" => "traefik:v2.10",
-                "restart" => "always",
+                "restart" => RESTART_MODE,
                 "extra_hosts" => [
                     "host.docker.internal:host-gateway",
                 ],
@@ -82,7 +82,7 @@ function generate_default_proxy_configuration(Server $server)
             ],
         ],
     ];
-    if (is_dev()) {
+    if (isDev()) {
         $config['services']['traefik']['command'][] = "--log.level=debug";
     }
     return Yaml::dump($config, 4, 2);

@@ -18,6 +18,6 @@ class Invitations extends Component
 
     public function refreshInvitations()
     {
-        $this->invitations = TeamInvitation::whereTeamId(auth()->user()->currentTeam()->id)->get();
+        $this->invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
     }
 }

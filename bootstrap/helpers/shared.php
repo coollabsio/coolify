@@ -14,6 +14,7 @@ use Illuminate\Support\Str;
 use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
+use phpseclib3\Crypt\RSA;
 
 function application_configuration_dir(): string
 {
@@ -35,11 +36,25 @@ function generate_readme_file(string $name, string $updated_at): string
     return "Resource name: $name\nLatest Deployment Date: $updated_at";
 }
 
-function is_instance_admin()
+function isInstanceAdmin()
 {
-    return auth()->user()?->isInstanceAdmin();
+    return auth()?->user()?->isInstanceAdmin() ?? false;
 }
 
+function currentTeam()
+{
+    return auth()?->user()?->currentTeam() ?? null;
+}
+
+function showBoarding(): bool
+{
+    return currentTeam()->show_boarding ?? false;
+}
+function refreshSession(): void
+{
+    $team = currentTeam();
+    session(['currentTeam' => $team]);
+}
 function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
     try {
@@ -97,7 +112,21 @@ function generate_random_name(): string
     $cuid = new Cuid2(7);
     return Str::kebab("{$generator->getName()}-$cuid");
 }
-
+function generateSSHKey()
+{
+    $key = RSA::createKey();
+    return [
+        'private' => $key->toString('PKCS1'),
+        'public' => $key->getPublicKey()->toString('OpenSSH',['comment' => 'coolify-generated-ssh-key'])
+    ];
+}
+function formatPrivateKey(string $privateKey) {
+    $privateKey = trim($privateKey);
+    if (!str_ends_with($privateKey, "\n")) {
+        $privateKey .= "\n";
+    }
+    return $privateKey;
+}
 function generate_application_name(string $git_repository, string $git_branch): string
 {
     $cuid = new Cuid2(7);
@@ -134,7 +163,7 @@ function set_transanctional_email_settings(InstanceSettings | null $settings = n
 
 function base_ip(): string
 {
-    if (is_dev()) {
+    if (isDev()) {
         return "localhost";
     }
     $settings = InstanceSettings::get();
@@ -159,12 +188,12 @@ function base_url(bool $withPort = true): string
     $port = config('app.port');
     if ($settings->public_ipv4) {
         if ($withPort) {
-            if (is_dev()) {
+            if (isDev()) {
                 return "http://localhost:$port";
             }
             return "http://$settings->public_ipv4:$port";
         }
-        if (is_dev()) {
+        if (isDev()) {
             return "http://localhost";
         }
         return "http://$settings->public_ipv4";
@@ -178,7 +207,7 @@ function base_url(bool $withPort = true): string
     return url('/');
 }
 
-function is_dev(): bool
+function isDev(): bool
 {
     return config('app.env') === 'local';
 }
@@ -202,8 +231,9 @@ function validate_cron_expression($expression_to_validate): bool
 function send_internal_notification(string $message): void
 {
     try {
+        $baseUrl = base_url(false);
         $team = Team::find(0);
-        $team->notify(new GeneralNotification('👀 Internal notifications: ' . $message));
+        $team->notify(new GeneralNotification("👀 Internal notifications from {$baseUrl}: " . $message));
     } catch (\Throwable $th) {
         ray($th->getMessage());
     }

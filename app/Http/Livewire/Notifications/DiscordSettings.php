@@ -41,10 +41,9 @@ class DiscordSettings extends Component
 
     public function saveModel()
     {
-        ray($this->model);
         $this->model->save();
         if (is_a($this->model, Team::class)) {
-            session(['currentTeam' => $this->model]);
+            refreshSession();
         }
         $this->emit('success', 'Settings saved.');
     }

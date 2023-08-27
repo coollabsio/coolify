@@ -36,7 +36,7 @@ class Create extends Component
 
     public function mount()
     {
-        if (is_dev()) {
+        if (isDev()) {
             $this->name = 'Local MinIO';
             $this->description = 'Local MinIO';
             $this->key = 'minioadmin';
@@ -62,7 +62,7 @@ class Create extends Component
             } else {
                 $this->storage->endpoint = $this->endpoint;
             }
-            $this->storage->team_id = auth()->user()->currentTeam()->id;
+            $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
             $this->storage->save();

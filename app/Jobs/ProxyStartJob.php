@@ -23,14 +23,15 @@ class ProxyStartJob implements ShouldQueue
         try {
             $container_name = 'coolify-proxy';
             ray('Starting proxy for server: ' . $this->server->name);
-            $status = get_container_status(server: $this->server, container_id: $container_name);
+            $status = getContainerStatus(server: $this->server, container_id: $container_name);
             if ($status === 'running') {
                 return;
             }
             resolve(StartProxy::class)($this->server);
         } catch (\Throwable $th) {
+            send_internal_notification('ProxyStartJob failed with: ' . $th->getMessage());
             ray($th->getMessage());
-            //throw $th;
+            throw $th;
         }
     }
 }

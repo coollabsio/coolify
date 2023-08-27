@@ -19,7 +19,7 @@ class SimpleDockerfile extends Component
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        if (is_dev()) {
+        if (isDev()) {
             $this->dockerfile = 'FROM nginx
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
@@ -59,6 +59,10 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_id' => 0,
             'source_type' => GithubApp::class
         ]);
+        $application->update([
+            'name' => 'dockerfile-' . $application->id
+        ]);
+
         redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,

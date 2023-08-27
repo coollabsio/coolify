@@ -22,9 +22,14 @@ class ProxyCheckJob implements ShouldQueue
     {
         try {
             $container_name = 'coolify-proxy';
-            $servers = Server::isUsable()->whereNotNull('proxy')->get();
+            $servers = Server::all();
             foreach ($servers as $server) {
-                $status = get_container_status(server: $server, container_id: $container_name);
+                if (
+                    $server->settings->is_reachable === false || $server->settings->is_usable === false
+                ) {
+                    continue;
+                }
+                $status = getContainerStatus(server: $server, container_id: $container_name);
                 if ($status === 'running') {
                     continue;
                 }
@@ -33,7 +38,8 @@ class ProxyCheckJob implements ShouldQueue
             }
         } catch (\Throwable $th) {
             ray($th->getMessage());
-            //throw $th;
+            send_internal_notification('ProxyCheckJob failed with: ' . $th->getMessage());
+            throw $th;
         }
     }
 }

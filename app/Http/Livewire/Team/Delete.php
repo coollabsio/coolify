@@ -9,7 +9,7 @@ class Delete extends Component
 {
     public function delete()
     {
-        $currentTeam = auth()->user()->currentTeam();
+        $currentTeam = currentTeam();
         $currentTeam->delete();
 
         $team = auth()->user()->teams()->first();
@@ -24,7 +24,7 @@ class Delete extends Component
             }
         });
 
-        session(['currentTeam' => $team]);
+        refreshSession();
         return redirect()->route('team.show');
     }
 }

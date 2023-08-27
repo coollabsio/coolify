@@ -39,9 +39,9 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
     public function handle(): void
     {
         try {
-            $container = get_container_status(server: $this->server, all_data: true, container_id: 'coolify-proxy', throwError: true);
-            $status = $container['State']['Status'];
-            if ($this->server->proxy->status !== $status) {
+            $container = getContainerStatus(server: $this->server, all_data: true, container_id: 'coolify-proxy', throwError: true);
+            $status = data_get($container, 'State.Status');
+            if (data_get($this->server,'proxy.status') !== $status) {
                 $this->server->proxy->status = $status;
                 if ($this->server->proxy->status === 'running') {
                     $traefik = $container['Config']['Labels']['org.opencontainers.image.title'];
@@ -57,6 +57,9 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 $this->server->proxy->status = 'exited';
                 $this->server->save();
             }
+            send_internal_notification('ProxyContainerStatusJob failed with: ' . $e->getMessage());
+            ray($e->getMessage());
+            throw $e;
         }
     }
 }

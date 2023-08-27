@@ -65,7 +65,7 @@ class Backup extends Component
             'frequency' => '0 0 * * *',
             'database_id' => $this->database->id,
             'database_type' => 'App\Models\StandalonePostgresql',
-            'team_id' => auth()->user()->currentTeam()->id,
+            'team_id' => currentTeam()->id,
         ]);
         $this->database->refresh();
         $this->backup->refresh();

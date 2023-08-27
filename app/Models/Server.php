@@ -10,21 +10,40 @@ class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
 
+    protected static function booted()
+    {
+        static::created(function ($server) {
+            ServerSetting::create([
+                'server_id' => $server->id,
+            ]);
+            if ($server->id === 0) {
+                StandaloneDocker::create([
+                    'id' => 0,
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
+            } else {
+                StandaloneDocker::create([
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
+            }
+
+        });
+        static::deleting(function ($server) {
+            $server->settings()->delete();
+        });
+    }
+
     public $casts = [
         'proxy' => SchemalessAttributes::class,
     ];
     protected $schemalessAttributes = [
         'proxy',
     ];
-    protected $fillable = [
-        'name',
-        'ip',
-        'user',
-        'port',
-        'team_id',
-        'private_key_id',
-        'proxy',
-    ];
+    protected $guarded = [];
 
     static public function isReachable()
     {
@@ -33,8 +52,9 @@ class Server extends BaseModel
 
     static public function ownedByCurrentTeam(array $select = ['*'])
     {
+        $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
-        return Server::whereTeamId(auth()->user()->currentTeam()->id)->with('settings')->select($selectArray->all())->orderBy('name');
+        return Server::whereTeamId($teamId)->with('settings')->select($selectArray->all())->orderBy('name');
     }
 
     static public function isUsable()
@@ -50,17 +70,7 @@ class Server extends BaseModel
         return $standaloneDocker->concat($swarmDocker);
     }
 
-    protected static function booted()
-    {
-        static::created(function ($server) {
-            ServerSetting::create([
-                'server_id' => $server->id,
-            ]);
-        });
-        static::deleting(function ($server) {
-            $server->settings()->delete();
-        });
-    }
+
 
     public function settings()
     {

@@ -14,6 +14,9 @@ class DiscordChannel
     {
         $message = $notification->toDiscord($notifiable);
         $webhookUrl = $notifiable->routeNotificationForDiscord();
+        if (!$webhookUrl) {
+            return;
+        }
         dispatch(new SendMessageToDiscordJob($message, $webhookUrl));
     }
 }

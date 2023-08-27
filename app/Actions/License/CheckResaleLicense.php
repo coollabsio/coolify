@@ -14,14 +14,14 @@ class CheckResaleLicense
             $settings->update([
                 'is_resale_license_active' => false,
             ]);
-            if (is_dev()) {
+            if (isDev()) {
                 return;
             }
             if (!$settings->resale_license) {
                 return;
             }
             $base_url = config('coolify.license_url');
-            if (is_dev()) {
+            if (isDev()) {
                 $base_url = 'http://host.docker.internal:8787';
             }
             $instance_id = config('app.id');

@@ -29,7 +29,7 @@ class Source extends Component
 
     private function get_private_keys()
     {
-        $this->private_keys = PrivateKey::whereTeamId(auth()->user()->currentTeam()->id)->get()->reject(function ($key) {
+        $this->private_keys = PrivateKey::whereTeamId(currentTeam()->id)->get()->reject(function ($key) {
             return $key->id == $this->application->private_key_id;
         });
     }

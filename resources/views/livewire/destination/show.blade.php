@@ -18,17 +18,22 @@
                 <div class="">N/A</div>
             @endforelse
         </div>
-        <div class="grid gap-2 pt-2">
+        <div class="pt-2">
             @if (count($networks) > 0)
-                <h4>Found Destinations</h4>
+                <h3 class="pb-4">Found Destinations</h3>
             @endif
+            <div class="flex flex-wrap gap-2 ">
             @foreach ($networks as $network)
+            <div >
                 <a
+
                     href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
-                    <x-forms.button>Add<span class="text-warning">{{ data_get($network, 'Name') }}</span>
+                    <x-forms.button >+<x-highlighted text="{{ data_get($network, 'Name') }}" />
                     </x-forms.button>
                 </a>
+            </div>
             @endforeach
+        </div>
         </div>
     @else
         <div>Server is not validated. Validate first.</div>

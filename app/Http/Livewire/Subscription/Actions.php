@@ -10,14 +10,14 @@ class Actions extends Component
     public function cancel()
     {
         try {
-            $subscription_id = auth()->user()->currentTeam()->subscription->lemon_subscription_id;
+            $subscription_id = currentTeam()->subscription->lemon_subscription_id;
             if (!$subscription_id) {
                 throw new \Exception('No subscription found');
             }
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('coolify.lemon_squeezy_api_key'),
+                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
             ])->delete('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id);
             $json = $response->json();
             if ($response->failed()) {
@@ -37,14 +37,14 @@ class Actions extends Component
     public function resume()
     {
         try {
-            $subscription_id = auth()->user()->currentTeam()->subscription->lemon_subscription_id;
+            $subscription_id = currentTeam()->subscription->lemon_subscription_id;
             if (!$subscription_id) {
                 throw new \Exception('No subscription found');
             }
             $response = Http::withHeaders([
                 'Accept' => 'application/vnd.api+json',
                 'Content-Type' => 'application/vnd.api+json',
-                'Authorization' => 'Bearer ' . config('coolify.lemon_squeezy_api_key'),
+                'Authorization' => 'Bearer ' . config('subscription.lemon_squeezy_api_key'),
             ])->patch('https://api.lemonsqueezy.com/v1/subscriptions/' . $subscription_id, [
                 'data' => [
                     'type' => 'subscriptions',
@@ -68,5 +68,9 @@ class Actions extends Component
         } catch (\Exception $e) {
             return general_error_handler($e, $this);
         }
+    }
+    public function stripeCustomerPortal() {
+        $session = getStripeCustomerPortalSession(currentTeam());
+        redirect($session->url);
     }
 }

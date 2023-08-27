@@ -136,15 +136,20 @@ class General extends Component
 
     public function submit()
     {
+        ray($this->application);
         try {
             $this->validate();
-
-            $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-                return Str::of($domain)->trim()->lower();
-            });
-            $port = get_port_from_dockerfile($this->application->dockerfile);
-            if ($port) {
-                $this->application->ports_exposes = $port;
+            if (data_get($this->application,'fqdn')) {
+                $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                    return Str::of($domain)->trim()->lower();
+                });
+                $this->application->fqdn = $domains->implode(',');
+            }
+            if ($this->application->dockerfile) {
+                $port = get_port_from_dockerfile($this->application->dockerfile);
+                if ($port) {
+                    $this->application->ports_exposes = $port;
+                }
             }
             if ($this->application->base_directory && $this->application->base_directory !== '/') {
                 $this->application->base_directory = rtrim($this->application->base_directory, '/');
@@ -152,7 +157,6 @@ class General extends Component
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
-            $this->application->fqdn = data_get($domains->implode(','), '', null);
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
         } catch (\Exception $e) {

@@ -41,7 +41,7 @@ class MagicController extends Controller
     {
         $project = Project::firstOrCreate(
             ['name' => request()->query('name') ?? generate_random_name()],
-            ['team_id' => auth()->user()->currentTeam()->id]
+            ['team_id' => currentTeam()->id]
         );
         return response()->json([
             'project_uuid' => $project->uuid
@@ -68,7 +68,7 @@ class MagicController extends Controller
             ],
         );
         auth()->user()->teams()->attach($team, ['role' => 'admin']);
-        session(['currentTeam' => $team]);
+        refreshSession();
         return redirect(request()->header('Referer'));
     }
 }

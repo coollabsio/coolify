@@ -39,7 +39,7 @@ class CreateScheduledBackup extends Component
                 's3_storage_id' => $this->s3_storage_id,
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
-                'team_id' => auth()->user()->currentTeam()->id,
+                'team_id' => currentTeam()->id,
             ]);
             $this->emit('refreshScheduledBackups');
         } catch (\Exception $e) {

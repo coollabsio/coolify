@@ -17,7 +17,7 @@ class StartPostgresql
     public function __invoke(Server $server, StandalonePostgresql $database)
     {
         $this->database = $database;
-        $container_name = generate_container_name($this->database->uuid);
+        $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
@@ -36,7 +36,7 @@ class StartPostgresql
                     'image' => $this->database->image,
                     'container_name' => $container_name,
                     'environment' => $environment_variables,
-                    'restart' => 'always',
+                    'restart' => RESTART_MODE,
                     'networks' => [
                         $this->database->destination->network,
                     ],

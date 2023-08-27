@@ -17,9 +17,6 @@ class UpdateCoolify
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $localhost_name = 'localhost';
-            if (is_dev()) {
-                $localhost_name = 'testing-local-docker-container';
-            }
             $this->server = Server::where('name', $localhost_name)->firstOrFail();
             $this->latest_version = get_latest_version_of_coolify();
             $this->current_version = config('version');
@@ -32,27 +29,28 @@ class UpdateCoolify
                 $this->update();
             } else {
                 if (!$settings->is_auto_update_enabled) {
-                    throw new \Exception('Auto update is disabled');
+                    return 'Auto update is disabled';
                 }
                 if ($this->latest_version === $this->current_version) {
-                    throw new \Exception('Already on latest version');
+                    return 'Already on latest version';
                 }
                 if (version_compare($this->latest_version, $this->current_version, '<')) {
-                    throw new \Exception('Latest version is lower than current version?!');
+                    return 'Latest version is lower than current version?!';
                 }
                 $this->update();
             }
-            return;
-        } catch (\Exception $e) {
+            send_internal_notification('InstanceAutoUpdateJob done to version: ' . $this->latest_version . ' from version: ' . $this->current_version);
+        } catch (\Exception $th) {
             ray('InstanceAutoUpdateJob failed');
-            ray($e->getMessage());
-            return;
+            ray($th->getMessage());
+            send_internal_notification('InstanceAutoUpdateJob failed: ' . $th->getMessage());
+            throw $th;
         }
     }
 
     private function update()
     {
-        if (is_dev()) {
+        if (isDev()) {
             ray("Running update on local docker container. Updating to $this->latest_version");
             remote_process([
                 "sleep 10"

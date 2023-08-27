@@ -29,7 +29,7 @@ class Create extends Component
                 'personal_team' => false,
             ]);
             auth()->user()->teams()->attach($team, ['role' => 'admin']);
-            session(['currentTeam' => $team]);
+            refreshSession();
             return redirect()->route('team.show');
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);

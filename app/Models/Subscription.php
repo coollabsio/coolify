@@ -14,9 +14,9 @@ class Subscription extends Model
     }
     public function type()
     {
-        $basic = explode(',', config('coolify.lemon_squeezy_basic_plan_ids'));
-        $pro = explode(',', config('coolify.lemon_squeezy_pro_plan_ids'));
-        $ultimate = explode(',', config('coolify.lemon_squeezy_ultimate_plan_ids'));
+        $basic = explode(',', config('subscription.lemon_squeezy_basic_plan_ids'));
+        $pro = explode(',', config('subscription.lemon_squeezy_pro_plan_ids'));
+        $ultimate = explode(',', config('subscription.lemon_squeezy_ultimate_plan_ids'));
 
         $subscription = $this->lemon_variant_id;
         if (in_array($subscription, $basic)) {

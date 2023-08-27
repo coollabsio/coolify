@@ -11,19 +11,19 @@ class Member extends Component
 
     public function makeAdmin()
     {
-        $this->member->teams()->updateExistingPivot(auth()->user()->currentTeam()->id, ['role' => 'admin']);
+        $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'admin']);
         $this->emit('reloadWindow');
     }
 
     public function makeReadonly()
     {
-        $this->member->teams()->updateExistingPivot(auth()->user()->currentTeam()->id, ['role' => 'member']);
+        $this->member->teams()->updateExistingPivot(currentTeam()->id, ['role' => 'member']);
         $this->emit('reloadWindow');
     }
 
     public function remove()
     {
-        $this->member->teams()->detach(auth()->user()->currentTeam());
+        $this->member->teams()->detach(currentTeam());
         $this->emit('reloadWindow');
     }
 }

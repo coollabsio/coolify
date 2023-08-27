@@ -17,7 +17,7 @@ class Waitlist extends Component
     ];
     public function mount()
     {
-        if (is_dev()) {
+        if (isDev()) {
             $this->email = 'waitlist@example.com';
         }
     }

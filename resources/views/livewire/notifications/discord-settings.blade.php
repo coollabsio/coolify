@@ -22,7 +22,7 @@
     @if (data_get($model, 'discord_enabled'))
         <h3 class="mt-4">Subscribe to events</h3>
         <div class="w-64">
-            @if (is_dev())
+            @if (isDev())
                 <x-forms.checkbox instantSave="saveModel" id="model.discord_notifications_test" label="Test" />
             @endif
             <h4 class="mt-4">General</h4>

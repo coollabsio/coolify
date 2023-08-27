@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Server;
+use Countable;
 use Livewire\Component;
 
 class Select extends Component
@@ -11,7 +12,7 @@ class Select extends Component
     public string $type;
     public string $server_id;
     public string $destination_uuid;
-    public $servers = [];
+    public Countable|array|Server $servers;
     public $destinations = [];
     public array $parameters;
 
@@ -23,6 +24,13 @@ class Select extends Component
     public function set_type(string $type)
     {
         $this->type = $type;
+        if (count($this->servers) === 1) {
+            $server = $this->servers->first();
+            $this->set_server($server);
+            if (count($server->destinations()) === 1) {
+                $this->set_destination($server->destinations()->first()->uuid);
+            }
+        }
         $this->current_step = 'servers';
     }
 
@@ -46,6 +54,6 @@ class Select extends Component
 
     public function load_servers()
     {
-        $this->servers = Server::ownedByCurrentTeam()->get();
+        $this->servers = Server::isUsable()->get();
     }
 }

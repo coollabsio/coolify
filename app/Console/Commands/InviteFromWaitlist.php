@@ -19,21 +19,29 @@ class InviteFromWaitlist extends Command
      *
      * @var string
      */
-    protected $signature = 'app:invite-from-waitlist';
+    protected $signature = 'app:invite-from-waitlist {email?}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send invitation to the next user in the waitlist';
+    protected $description = 'Send invitation to the next user (or by email) in the waitlist';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $this->next_patient = Waitlist::orderBy('created_at', 'asc')->where('verified', true)->first();
+        if ($this->argument('email')) {
+            $this->next_patient = Waitlist::where('email', $this->argument('email'))->first();
+            if (!$this->next_patient) {
+                $this->error("{$this->argument('email')} not found in the waitlist.");
+                return;
+            }
+        } else {
+            $this->next_patient = Waitlist::orderBy('created_at', 'asc')->where('verified', true)->first();
+        }
         if ($this->next_patient) {
             $this->register_user();
             $this->remove_from_waitlist();

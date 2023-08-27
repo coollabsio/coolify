@@ -66,8 +66,6 @@ function get_private_key_for_server(Server $server)
 function save_private_key_for_server(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
-        $server->settings->is_reachable = false;
-        $server->settings->save();
         throw new \Exception("Server {$server->name} does not have a private key");
     }
     $temp_file = "id.root@{$server->ip}";
@@ -159,8 +157,8 @@ function refresh_server_connection(PrivateKey $private_key)
         // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
         // check if user is authenticated
-        if (auth()?->user()?->currentTeam()->id) {
-            auth()->user()->currentTeam()->privateKeys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->get();
+        if (currentTeam()->id) {
+            currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
         }
     }
 }

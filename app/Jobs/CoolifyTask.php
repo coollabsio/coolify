@@ -28,7 +28,6 @@ class CoolifyTask implements ShouldQueue
      */
     public function handle(): void
     {
-
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'ignore_errors' => $this->ignore_errors,

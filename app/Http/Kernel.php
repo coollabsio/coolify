@@ -39,6 +39,7 @@ class Kernel extends HttpKernel
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\CheckForcePasswordReset::class,
             \App\Http\Middleware\SubscriptionValid::class,
+            \App\Http\Middleware\IsBoardingFlow::class,
 
         ],
 

@@ -43,19 +43,19 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'Publish directory',
     ];
     private object $repository_url_parsed;
-    private GithubApp|GitlabApp $git_source;
+    private GithubApp|GitlabApp|null $git_source = null;
     private string $git_host;
     private string $git_repository;
     private string $git_branch;
 
     public function mount()
     {
-        if (is_dev()) {
+        if (isDev()) {
             $this->repository_url = 'https://github.com/coollabsio/coolify-examples';
         }
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        $this->private_keys = PrivateKey::where('team_id', auth()->user()->currentTeam()->id)->where('id', '!=', 0)->get();
+        $this->private_keys = PrivateKey::where('team_id', currentTeam()->id)->where('id', '!=', 0)->get();
     }
 
     public function instantSave()

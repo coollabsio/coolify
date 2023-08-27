@@ -4,16 +4,11 @@ namespace App\Models;
 
 class Project extends BaseModel
 {
-    protected $fillable = [
-        'name',
-        'description',
-        'team_id',
-        'project_id'
-    ];
+    protected $guarded = [];
 
     static public function ownedByCurrentTeam()
     {
-        return Project::whereTeamId(auth()->user()->currentTeam()->id)->orderBy('name');
+        return Project::whereTeamId(currentTeam()->id)->orderBy('name');
     }
 
     protected static function booted()
