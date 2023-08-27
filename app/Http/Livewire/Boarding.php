@@ -154,7 +154,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function createNewProject()
     {
         $this->createdProject = Project::create([
-            'name' => generate_random_name(),
+            'name' => "My first project",
             'team_id' => currentTeam()->id
         ]);
         $this->currentState = 'create-resource';

@@ -7,7 +7,7 @@
         </a>
     </div>
     <div class="pb-4 ">Deploy any public or private git repositories through a GitHub App.</div>
-    @if ($github_apps->count() > 0)
+    @if ($github_apps->count() == 0)
         <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
                 <ul class="pb-10 steps">
@@ -113,11 +113,8 @@
             @endif
         </div>
     @else
-        <div>
-            <div>No Git App found.</div>
-            <a href="/source/new">
-                <x-forms.button>Add</x-forms.button>
-            </a>
+        <div class="hero">
+            No GitHub Application found. Please create a new GitHub Application.
         </div>
     @endif
 </div>
