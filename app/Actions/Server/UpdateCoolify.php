@@ -17,7 +17,11 @@ class UpdateCoolify
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
             $localhost_name = 'localhost';
-            $this->server = Server::where('name', $localhost_name)->firstOrFail();
+            $this->server = Server::where('name', $localhost_name)->first();
+            if (!$this->server) {
+                // No server found, so we are running on local docker container
+                return;
+            }
             $this->latest_version = get_latest_version_of_coolify();
             $this->current_version = config('version');
             ray('latest version:' . $this->latest_version . " current version: " . $this->current_version . ' force: ' . $force);
