@@ -16,11 +16,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Spatie\Activitylog\Models\Activity;
 
-/**
- * Run a Remote Process, which SSH's asynchronously into a machine to run the command(s).
- * @TODO Change 'root' to 'coolify' when it's able to run Docker commands without sudo
- *
- */
 function remote_process(
     array   $command,
     Server  $server,
@@ -167,17 +162,23 @@ function validateServer(Server $server)
 {
     try {
         refresh_server_connection($server->privateKey);
-        $uptime = instant_remote_process(['uptime'], $server);
+        $uptime = instant_remote_process(['uptime'], $server, false);
         if (!$uptime) {
-            $uptime = 'Server not reachable.';
-            throw new \Exception('Server not reachable.');
+            $server->settings->is_reachable = false;
+            return [
+                "uptime" => null,
+                "dockerVersion" => null,
+            ];
         }
         $server->settings->is_reachable = true;
 
         $dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $server, false);
         if (!$dockerVersion) {
-            $dockerVersion = 'Not installed.';
-            throw new \Exception('Docker not installed.');
+            $dockerVersion = null;
+            return [
+                "uptime" => $uptime,
+                "dockerVersion" => null,
+            ];
         }
         $server->settings->is_usable = true;
         return [

@@ -12,10 +12,12 @@ class Status extends Component
 
     public function get_status()
     {
-        dispatch_sync(new ProxyContainerStatusJob(
-            server: $this->server
-        ));
-        $this->server->refresh();
-        $this->emit('proxyStatusUpdated');
+        if (data_get($this->server,'settings.is_usable')) {
+            dispatch_sync(new ProxyContainerStatusJob(
+                server: $this->server
+            ));
+            $this->server->refresh();
+            $this->emit('proxyStatusUpdated');
+        }
     }
 }
