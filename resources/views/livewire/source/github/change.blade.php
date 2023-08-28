@@ -77,20 +77,22 @@
                 </div>
                 <div class="pt-1 pb-2 ">You need to register a GitHub App before using this source.</div>
                 <div class="pt-2 pb-10">
-                    <div class="flex items-end gap-2">
-                        <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
-                            helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
-                            @if ($ipv4)
-                                <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
-                            @endif
-                            @if ($ipv6)
-                                <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
-                            @endif
-                            @if ($fqdn)
-                                <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
-                            @endif
-                        </x-forms.select>
-                    </div>
+                    @if (!is_cloud())
+                        <div class="flex items-end gap-2">
+                            <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
+                                helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
+                                @if ($ipv4)
+                                    <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
+                                @endif
+                                @if ($ipv6)
+                                    <option value="{{ $ipv6 }}">Use {{ $ipv6 }}</option>
+                                @endif
+                                @if ($fqdn)
+                                    <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
+                                @endif
+                            </x-forms.select>
+                        </div>
+                    @endif
                     <div class="flex flex-col gap-2 pt-4">
                         <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"
                             helper="Contents: read<br>Metadata: read<br>Email: read" />
@@ -118,9 +120,11 @@
                     <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
                 @endif
             </div>
-            <x-forms.checkbox
-                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                label="System Wide?" disabled id="is_system_wide" />
+            @if (!is_cloud())
+                <x-forms.checkbox
+                    helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                    label="System Wide?" disabled id="is_system_wide" />
+            @endif
             <script>
                 function createGithubApp(webhook_endpoint, preview_deployment_permissions) {
                     const {
