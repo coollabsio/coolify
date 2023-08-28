@@ -1,7 +1,14 @@
-version: '3.8'
+version: "3.8"
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.20}"
+    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-next}"
+    container_name: coolify
+    restart: always
+    working_dir: /var/www/html
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - coolify
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -65,50 +72,13 @@ services:
       - LEMON_SQUEEZY_PRO_PLAN_IDS
       - LEMON_SQUEEZY_ULTIMATE_PLAN_IDS
     ports:
-      - "${APP_PORT:-8000}:80"
-    expose:
-      - "${APP_PORT:-8000}"
+      - "<privateIP>:8000:80"
     healthcheck:
       test: curl --fail http://localhost:80/api/health || exit 1
       interval: 4s
       retries: 5
       timeout: 2s
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-  postgres:
-    volumes:
-      - coolify-db:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify}"
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-coolify}",
-          "-d",
-          "${DB_DATABASE:-coolify}"
-        ]
-      interval: 2s
-      retries: 5
-      timeout: 2s
-  redis:
-    command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
-    environment:
-      REDIS_PASSWORD: "${REDIS_PASSWORD}"
-    volumes:
-      - coolify-redis:/data
-    healthcheck:
-      test: redis-cli ping
-      interval: 2s
-      retries: 5
-      timeout: 2s
-volumes:
-  coolify-db:
-    name: coolify-db
-  coolify-redis:
-    name: coolify-redis
+networks:
+    coolify:
+        name: coolify
+        driver: bridge
