@@ -37,8 +37,9 @@ class Change extends Component
 
     public function mount()
     {
-        if (is_cloud()) {
+        if (is_cloud() && !isDev()) {
             $this->webhook_endpoint = config('app.url');
+            ray($this->webhook_endpoint);
         } else {
             $this->webhook_endpoint = $this->ipv4;
             $this->is_system_wide = $this->github_app->is_system_wide;

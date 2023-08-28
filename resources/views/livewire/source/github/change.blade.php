@@ -4,7 +4,7 @@
             <p>This source will be deleted. It is not reversible. <br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    <form wire:submit.prevent='submit'>
+    <form wire:submit.prevent='submit' x-data>
         <div class="flex items-center gap-2">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
@@ -77,7 +77,7 @@
                 </div>
                 <div class="pt-1 pb-2 ">You need to register a GitHub App before using this source.</div>
                 <div class="pt-2 pb-10">
-                    @if (!is_cloud())
+                    @if (!is_cloud() || isDev())
                         <div class="flex items-end gap-2">
                             <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
                                 helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
@@ -120,7 +120,7 @@
                     <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
                 @endif
             </div>
-            @if (!is_cloud())
+            @if (!is_cloud() || isDev())
                 <x-forms.checkbox
                     helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
                     label="System Wide?" disabled id="is_system_wide" />
