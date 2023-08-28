@@ -11,7 +11,7 @@
         <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
                 <ul class="pb-10 steps">
-                    <li class="step step-success">Select a GitHub App</li>
+                    <li class="step step-warning">Select a GitHub App</li>
                     <li class="step">Select a Repository, Branch & Save</li>
                 </ul>
                 <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
@@ -49,8 +49,8 @@
             @endif
             @if ($current_step === 'repository')
                 <ul class="pb-10 steps">
-                    <li class="step step-success">Select a GitHub App</li>
-                    <li class="step step-success">Select a Repository, Branch & Save</li>
+                    <li class="step step-warning">Select a GitHub App</li>
+                    <li class="step step-warning">Select a Repository, Branch & Save</li>
                 </ul>
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
