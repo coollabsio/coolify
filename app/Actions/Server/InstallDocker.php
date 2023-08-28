@@ -37,11 +37,14 @@ class InstallDocker
                 "docker network create --attachable coolify",
                 "echo ####### Done!"
             ], $server);
-            StandaloneDocker::create([
-                'name' => 'coolify',
-                'network' => 'coolify',
-                'server_id' => $server->id,
-            ]);
+            $found = StandaloneDocker::where('server_id', $server->id);
+            if ($found->count() == 0) {
+                StandaloneDocker::create([
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $server->id,
+                ]);
+            }
         }
 
 
