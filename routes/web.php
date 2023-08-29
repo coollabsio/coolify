@@ -6,6 +6,8 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
+use App\Http\Livewire\Boarding\Index;
+use App\Http\Livewire\Boarding\Server as BoardingServer;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
@@ -92,7 +94,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/boarding', [Controller::class, 'boarding'])->name('boarding');
+    Route::get('/boarding', Index::class)->name('boarding');
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });

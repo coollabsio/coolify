@@ -48,23 +48,6 @@ class Controller extends BaseController
     public function force_passoword_reset() {
         return view('auth.force-password-reset');
     }
-    // public function dashboard()
-    // {
-    //     $projects = Project::ownedByCurrentTeam()->get();
-    //     $servers = Server::ownedByCurrentTeam()->get();
-    //     $s3s = S3Storage::ownedByCurrentTeam()->get();
-    //     $resources = 0;
-    //     foreach ($projects as $project) {
-    //         $resources += $project->applications->count();
-    //         $resources += $project->postgresqls->count();
-    //     }
-    //     return view('dashboard', [
-    //         'servers' => $servers->count(),
-    //         'projects' => $projects->count(),
-    //         'resources' => $resources,
-    //         's3s' => $s3s,
-    //     ]);
-    // }
     public function boarding() {
         if (currentTeam()->boarding || isDev()) {
             return view('boarding');
