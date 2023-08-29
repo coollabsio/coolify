@@ -33,6 +33,9 @@ class Server extends BaseModel
 
         });
         static::deleting(function ($server) {
+            $server->destinations()->each(function ($destination) {
+                $destination->delete();
+            });
             $server->settings()->delete();
         });
     }
@@ -70,8 +73,6 @@ class Server extends BaseModel
         return $standaloneDocker->concat($swarmDocker);
     }
 
-
-
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
@@ -84,12 +85,20 @@ class Server extends BaseModel
 
     public function isEmpty()
     {
-        if ($this->applications()->count() === 0) {
+        $applications = $this->applications()->count() === 0;
+        $databases = $this->databases()->count() === 0;
+        if ($applications && $databases) {
             return true;
         }
         return false;
     }
 
+    public function databases() {
+        return $this->destinations()->map(function ($standaloneDocker) {
+            $postgresqls = $standaloneDocker->postgresqls;
+            return $postgresqls?->concat([]) ?? collect([]);
+        })->flatten();
+    }
     public function applications()
     {
         return $this->destinations()->map(function ($standaloneDocker) {

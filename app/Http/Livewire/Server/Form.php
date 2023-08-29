@@ -4,10 +4,12 @@ namespace App\Http\Livewire\Server;
 
 use App\Actions\Server\InstallDocker;
 use App\Models\Server;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
 
 class Form extends Component
 {
+    use AuthorizesRequests;
     public Server $server;
     public $uptime;
     public $dockerVersion;
@@ -64,14 +66,20 @@ class Form extends Component
 
     public function delete()
     {
-        if (!$this->server->isEmpty()) {
-            $this->emit('error', 'Server has defined resources. Please delete them first.');
-            return;
+        try {
+            $this->authorize('delete', $this->server);
+            if (!$this->server->isEmpty()) {
+                $this->emit('error', 'Server has defined resources. Please delete them first.');
+                return;
+            }
+            $this->server->delete();
+            return redirect()->route('server.all');
+        } catch (\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
         }
-        $this->server->delete();
-        redirect()->route('server.all');
-    }
 
+
+    }
     public function submit()
     {
         $this->validate();

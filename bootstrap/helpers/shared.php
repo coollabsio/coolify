@@ -58,6 +58,7 @@ function refreshSession(): void
 function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
     try {
+        ray($err);
         ray('ERROR OCCURRED: ' . $err->getMessage());
         if ($err instanceof QueryException) {
             if ($err->errorInfo[0] === '23505') {
@@ -70,6 +71,9 @@ function general_error_handler(Throwable | null $err = null, $that = null, $isJs
         } elseif ($err instanceof TooManyRequestsException) {
             throw new Exception($customErrorMessage ?? "Too many requests. Please try again in {$err->secondsUntilAvailable} seconds.");
         } else {
+            if ($err->getMessage() === 'This action is unauthorized.') {
+               return redirect()->route('dashboard')->with('error', $customErrorMessage ?? $err->getMessage());
+            }
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
     } catch (Throwable $error) {
