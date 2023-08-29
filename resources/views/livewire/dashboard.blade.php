@@ -1,4 +1,4 @@
-<x-layout>
+<div>
     <h1>Dashboard</h1>
     <div class="subtitle">Something <x-highlighted text="(more)"/> useful will be here.</div>
     <div class="w-full rounded stats stats-vertical lg:stats-horizontal">
@@ -19,10 +19,7 @@
         </div>
         <div class="stat">
             <div class="stat-title">S3 Storages</div>
-            <div class="stat-value">{{ $s3s->count() }}</div>
+            <div class="stat-value">{{ $s3s }}</div>
         </div>
     </div>
-    @if (isDev())
-        {{-- <livewire:dev.s3-test /> --}}
-    @endif
-</x-layout>
+</div>

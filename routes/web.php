@@ -6,6 +6,9 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
+use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Server\All;
+use App\Http\Livewire\Server\Show;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -71,13 +74,9 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/servers', fn () => view('server.all', [
-        'servers' => Server::ownedByCurrentTeam()->get()
-    ]))->name('server.all');
+    Route::get('/servers', All::class)->name('server.all');
     Route::get('/server/new', [ServerController::class, 'new_server'])->name('server.create');
-    Route::get('/server/{server_uuid}', fn () => view('server.show', [
-        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
-    ]))->name('server.show');
+    Route::get('/server/{server_uuid}', Show::class)->name('server.show');
     Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.proxy');
@@ -92,9 +91,9 @@ Route::middleware(['auth'])->group(function () {
 
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
+    Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/boarding', [Controller::class, 'boarding'])->name('boarding');
-    Route::middleware(['throttle:force-password-reset'])->group(function() {
+    Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.show');

@@ -1,5 +1,5 @@
 <?php
 
 test('globals')
-    ->expect(['dd', 'dump', 'ray'])
+    ->expect(['dd', 'dump'])
     ->not->toBeUsed();
