@@ -10,6 +10,7 @@ class SubscriptionValid
 {
     public function handle(Request $request, Closure $next): Response
     {
+        ray()->showQueries()->color('orange');
         if (isInstanceAdmin()) {
             return $next($request);
         }
