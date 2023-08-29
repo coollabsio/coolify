@@ -41,6 +41,14 @@
                 </div>
                 <div class="justify-center box" wire:click="setPrivateKey('create')">No (create one for me)
                 </div>
+                <form wire:submit.prevent='selectExistingPrivateKey'>
+                    <x-forms.select wire:model.defer='selectedExistingPrivateKey'>
+                        @foreach ($privateKeys as $privateKey)
+                            <option value="{{ $privateKey->id }}">{{ $privateKey->name }}</option>
+                        @endforeach
+                    </x-forms.select>
+                    <x-forms.button type="submit">Select this</x-forms.button>
+                </form>
             </x-slot:actions>
             <x-slot:explanation>
                 <p>SSH Keys are used to connect to a remote server through a secure shell, called SSH.</p>

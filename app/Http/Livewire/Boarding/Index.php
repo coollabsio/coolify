@@ -1,15 +1,20 @@
 <?php
 
 namespace App\Http\Livewire\Boarding;
+
 use App\Actions\Server\InstallDocker;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 
 class Index extends Component
-{  public string $currentState = 'welcome';
+{
+    public string $currentState = 'welcome';
 
+    public ?Collection $privateKeys = null;
+    public ?int $selectedExistingPrivateKey = null;
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
     public ?string $publicKey = null;
@@ -70,8 +75,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             }
             $this->currentState = 'select-proxy';
         } elseif ($type === 'remote') {
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
             $this->currentState = 'private-key';
         }
+    }
+    public function selectExistingPrivateKey()
+    {
+        ray($this->selectedExistingPrivateKey);
     }
     public function setPrivateKey(string $type)
     {
@@ -174,7 +184,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->privateKeyName = generate_random_name();
         $this->privateKeyDescription = 'Created by Coolify';
-        ['private' => $this->privateKey, 'public'=> $this->publicKey] = generateSSHKey();
+        ['private' => $this->privateKey, 'public' => $this->publicKey] = generateSSHKey();
     }
     public function render()
     {
