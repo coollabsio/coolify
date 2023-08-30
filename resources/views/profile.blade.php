@@ -3,7 +3,7 @@
     <div class="subtitle ">Your user profile settings.</div>
     <livewire:profile.form :request="$request" />
     <h2 class="py-4">Subscription</h2>
-    <a href="{{ route('team.show') }}">Check in Team Settings</a>
+    <a href="{{ route('team.index') }}">Check in Team Settings</a>
     <h2 class="py-4">Two-factor Authentication</h2>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">

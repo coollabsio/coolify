@@ -53,7 +53,8 @@ function showBoarding(): bool
 }
 function refreshSession(): void
 {
-    session(['currentTeam' => currentTeam()]);
+    $team = Team::find(currentTeam()->id);
+    session(['currentTeam' => $team]);
 }
 function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {

@@ -21,7 +21,7 @@
         </ol>
     </nav>
     <nav class="navbar-main">
-        <a class="{{ request()->routeIs('team.show') ? 'text-white' : '' }}" href="{{ route('team.show') }}">
+        <a class="{{ request()->routeIs('team.index') ? 'text-white' : '' }}" href="{{ route('team.index') }}">
             <button>General</button>
         </a>
         <a class="{{ request()->routeIs('team.members') ? 'text-white' : '' }}" href="{{ route('team.members') }}">

@@ -28,7 +28,6 @@ class Form extends Component
         try {
             $this->team->save();
             refreshSession();
-            $this->emit('reloadWindow');
         } catch (\Throwable $th) {
             return general_error_handler($th, $this);
         }

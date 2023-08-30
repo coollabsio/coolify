@@ -70,7 +70,6 @@ function isSubscriptionActive()
 }
 function isSubscriptionOnGracePeriod()
 {
-
     $team = currentTeam();
     if (!$team) {
         return false;
@@ -96,7 +95,7 @@ function subscriptionProvider()
 function getStripeCustomerPortalSession(Team $team)
 {
     Stripe::setApiKey(config('subscription.stripe_api_key'));
-    $return_url = route('team.show');
+    $return_url = route('team.index');
     $stripe_customer_id = $team->subscription->stripe_customer_id;
     $session = \Stripe\BillingPortal\Session::create([
         'customer' => $stripe_customer_id,

@@ -30,7 +30,7 @@ class Controller extends BaseController
         if (!is_cloud()) {
             abort(404);
         }
-        return view('subscription.show', [
+        return view('subscription.index', [
             'settings' => InstanceSettings::get(),
         ]);
     }
@@ -80,7 +80,7 @@ class Controller extends BaseController
         if (auth()->user()->isAdminFromSession()) {
             $invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
-        return view('team.show', [
+        return view('team.index', [
             'invitations' => $invitations,
         ]);
     }
@@ -129,7 +129,7 @@ class Controller extends BaseController
             if ($diff <= config('constants.invitation.link.expiration')) {
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
                 $invitation->delete();
-                return redirect()->route('team.show');
+                return redirect()->route('team.index');
             } else {
                 $invitation->delete();
                 abort(401);
@@ -151,7 +151,7 @@ class Controller extends BaseController
                 abort(401);
             }
             $invitation->delete();
-            return redirect()->route('team.show');
+            return redirect()->route('team.index');
         } catch (Throwable $th) {
             throw $th;
         }

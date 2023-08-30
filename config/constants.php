@@ -12,8 +12,8 @@ return [
     'limits' => [
         'server' => [
             'basic' => 1,
-            'pro' => 3,
-            'ultimate' => 9999999999999999999,
+            'pro' => 10,
+            'ultimate' => 25,
         ],
     ],
 ];
