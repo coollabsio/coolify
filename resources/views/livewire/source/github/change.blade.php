@@ -11,17 +11,15 @@
                 @if ($github_app->app_id)
                     <x-forms.button type="submit">Save</x-forms.button>
 
-                    <a href="{{ get_installation_path($github_app) }}">
-                        <x-forms.button>
-                            @if ($github_app->installation_id)
+                    @if (data_get($github_app, 'installation_id'))
+                        <a href="{{ get_installation_path($github_app) }}">
+                            <x-forms.button>
+
                                 Update Repositories
                                 <x-external-link />
-                            @else
-                                Install Repositories
-                                <x-external-link />
-                            @endif
-                        </x-forms.button>
-                    </a>
+                            </x-forms.button>
+                        </a>
+                    @endif
                 @else
                     <x-forms.button disabled type="submit">Save</x-forms.button>
                 @endif
@@ -30,8 +28,21 @@
                 </x-forms.button>
             </div>
         </div>
-        <div class="subtitle ">Your Private GitHub App for private repositories.</div>
-        @if ($github_app->app_id)
+        <div class="subtitle">Your Private GitHub App for private repositories.</div>
+        @if (data_get($github_app, 'app_id'))
+            @if (!data_get($github_app, 'installation_id'))
+                <div class="mb-10 rounded alert alert-warning">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span>You must complete this step before you can use this source!</span>
+                </div>
+                <a class="justify-center box" href="{{ get_installation_path($github_app) }}">
+                    Install Repositories on GitHub
+                </a>
+            @else
             <div class="w-48">
                 <x-forms.checkbox label="System Wide?"
                     helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
@@ -64,17 +75,19 @@
                 <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
                 <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
             </div>
+            @endif
+
         @else
+            <div class="mb-10 rounded alert alert-warning">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>You must complete this step before you can use this source!</span>
+            </div>
             <form class="flex gap-4">
-                <div class="flex items-end gap-2">
-                    <h3>Register a GitHub App</h3>
-                    <x-forms.button
-                        x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
-                        Register a
-                        GitHub
-                        Application
-                    </x-forms.button>
-                </div>
+                <h2>Register a GitHub App</h2>
                 <div class="pt-1 pb-2 ">You need to register a GitHub App before using this source.</div>
                 <div class="pt-2 pb-10">
                     @if (!is_cloud() || isDev())
@@ -90,8 +103,20 @@
                                 @if ($fqdn)
                                     <option value="{{ $fqdn }}">Use {{ $fqdn }}</option>
                                 @endif
+                                @if (config('app.url'))
+                                    <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
+                                @endif
                             </x-forms.select>
+                            <x-forms.button
+                                x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
+                                Register
+                            </x-forms.button>
                         </div>
+                    @else
+                        <x-forms.button
+                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
+                            Register Now
+                        </x-forms.button>
                     @endif
                     <div class="flex flex-col gap-2 pt-4">
                         <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"
@@ -102,29 +127,6 @@
                     </div>
                 </div>
             </form>
-            <div class="flex gap-2">
-                <x-forms.input id="github_app.name" label="App Name" disabled />
-                <x-forms.input id="github_app.organization" label="Organization"
-                    placeholder="If empty, personal user will be used" disabled />
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-                <x-forms.input id="github_app.api_url" label="API Url" disabled />
-            </div>
-            <div class="flex gap-2">
-                @if ($github_app->html_url === 'https://github.com')
-                    <x-forms.input id="github_app.custom_user" label="User" disabled />
-                    <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-                @else
-                    <x-forms.input id="github_app.custom_user" label="User" required />
-                    <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
-                @endif
-            </div>
-            @if (!is_cloud() || isDev())
-                <x-forms.checkbox
-                    helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                    label="System Wide?" disabled id="is_system_wide" />
-            @endif
             <script>
                 function createGithubApp(webhook_endpoint, preview_deployment_permissions) {
                     const {

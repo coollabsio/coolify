@@ -5,8 +5,8 @@
             <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
             <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
             <div class="flex justify-center ">
-                <div class="justify-center box" wire:click="$set('currentState', 'select-server-type')">Get Started
-                </div>
+                <x-forms.button class="justify-center box" wire:click="$set('currentState', 'select-server-type')">Get Started
+                </x-forms.button>
             </div>
         @endif
     </div>
@@ -18,10 +18,10 @@
                     or on a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="setServerType('localhost')">Localhost
-                    </div>
-                    <div class="justify-center box" wire:click="setServerType('remote')">Remote Server
-                    </div>
+                    <x-forms.button class="justify-center box" wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">Localhost
+                    </x-forms.button>
+                    <x-forms.button class="justify-center box" wire:target="setServerType('remote')" wire:click="setServerType('remote')">Remote Server
+                    </x-forms.button>
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>Servers are the main building blocks, as they will host your applications, databases,
@@ -42,10 +42,10 @@
                     Do you have your own SSH Private Key?
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="setPrivateKey('own')">Yes
-                    </div>
-                    <div class="justify-center box" wire:click="setPrivateKey('create')">No (create one for me)
-                    </div>
+                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('own')" wire:click="setPrivateKey('own')">Yes
+                    </x-forms.button>
+                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('create')" wire:click="setPrivateKey('create')">No (create one for me)
+                    </x-forms.button>
                     @if (count($privateKeys) > 0)
                         <form wire:submit.prevent='selectExistingPrivateKey' class="flex flex-col w-full gap-4 pr-10">
                             <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
@@ -76,8 +76,8 @@
                     There are already servers available for your Team. Do you want to use one of them?
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="createNewServer">No (create a new one)
-                    </div>
+                    <x-forms.button class="justify-center box" wire:click="createNewServer">No (create one for me)
+                    </x-forms.button>
                     <div>
                         <form wire:submit.prevent='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
                             <x-forms.select label="Existing servers" class="w-96" id='selectedExistingServer'>
@@ -182,9 +182,9 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">
+                    <x-forms.button class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">
                         Let's do
-                        it!</div>
+                        it!</x-forms.button>
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
@@ -233,7 +233,7 @@
                     @endif
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="createNewProject">Let's create a new one!</div>
+                    <x-forms.button class="justify-center box" wire:click="createNewProject">Let's create a new one!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
                             <form wire:submit.prevent='selectExistingProject'

@@ -7,6 +7,7 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -52,8 +53,7 @@ function showBoarding(): bool
 }
 function refreshSession(): void
 {
-    $team = currentTeam();
-    session(['currentTeam' => $team]);
+    session(['currentTeam' => currentTeam()]);
 }
 function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
@@ -259,3 +259,4 @@ function send_user_an_email(MailMessage $mail, string $email): void
             ->html((string) $mail->render())
     );
 }
+

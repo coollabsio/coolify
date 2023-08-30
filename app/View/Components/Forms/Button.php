@@ -15,7 +15,7 @@ class Button extends Component
         public bool        $disabled = false,
         public bool        $isModal = false,
         public bool        $noStyle = false,
-        public string|null $modalId = null,
+        public ?string     $modalId = null,
         public string      $defaultClass = "btn btn-primary btn-sm font-normal text-white normal-case no-animation rounded border-none"
     ) {
         if ($this->noStyle) {
@@ -23,9 +23,6 @@ class Button extends Component
         }
     }
 
-    /**
-     * Get the view / contents that represent the component.
-     */
     public function render(): View|Closure|string
     {
         return view('components.forms.button');

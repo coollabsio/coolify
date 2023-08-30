@@ -408,6 +408,12 @@ const magicActions = [{
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
+},
+{
+    id: 23,
+    name: 'Goto: Boarding process',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
 }
 ]
 const initialState = {
@@ -634,6 +640,9 @@ async function redirect() {
             break;
         case 22:
             targetUrl.pathname = `/team`
+            break;
+        case 23:
+            targetUrl.pathname = `/boarding`
             break;
     }
     window.location.href = targetUrl;

@@ -70,7 +70,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         @endif
         @if ($current_step === 'servers')
@@ -79,7 +78,7 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
-            <div class="grid grid-cols-3 gap-2 text-left ">
+            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @forelse($servers as $server)
                     <div class="box group"
                         wire:click="set_server({{ $server }})">
@@ -108,7 +107,7 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
-            <div class="grid grid-cols-3 gap-2 text-left ">
+            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @foreach ($standaloneDockers as $standaloneDocker)
                     <div class="box group"
                         wire:click="set_destination('{{ $standaloneDocker->uuid }}')">

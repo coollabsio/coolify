@@ -7,15 +7,19 @@ use App\Models\GithubApp;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
 use Livewire\Component;
+use Route;
 
 class GithubPrivateRepository extends Component
 {
+    use SaveFromRedirect;
     public $current_step = 'github_apps';
     public $github_apps;
     public GithubApp $github_app;
     public $parameters;
+    public $currentRoute;
     public $query;
     public $type;
 
@@ -36,14 +40,30 @@ class GithubPrivateRepository extends Component
     public string|null $publish_directory = null;
     protected int $page = 1;
 
+    // public function saveFromRedirect(string $route, ?Collection $parameters = null){
+    //     session()->forget('from');
+    //     if (!$parameters || $parameters->count() === 0) {
+    //         $parameters = $this->parameters;
+    //     }
+    //     $parameters = collect($parameters) ?? collect([]);
+    //     $queries = collect($this->query) ?? collect([]);
+    //     $parameters = $parameters->merge($queries);
+    //     session(['from'=> [
+    //         'back'=> $this->currentRoute,
+    //         'route' => $route,
+    //         'parameters' => $parameters
+    //     ]]);
+    //     return redirect()->route($route);
+    // }
+
     public function mount()
     {
+        $this->currentRoute = Route::currentRouteName();
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
     }
-
     public function loadRepositories($github_app_id)
     {
         $this->repositories = collect();

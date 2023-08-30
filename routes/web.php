@@ -145,6 +145,26 @@ Route::middleware(['auth'])->group(function () {
         if ($settings->public_ipv6) {
             $ipv6 = 'http://' . $settings->public_ipv6 . ':' . config('app.port');
         }
+        if ($github_app->installation_id && session('from')) {
+            $source_id = data_get(session('from'), 'source_id');
+            if (!$source_id || $github_app->id !== $source_id) {
+                session()->forget('from');
+            } else {
+                $parameters = data_get(session('from'), 'parameters');
+                $back = data_get(session('from'), 'back');
+                $environment_name = data_get($parameters, 'environment_name');
+                $project_uuid = data_get($parameters, 'project_uuid');
+                $type = data_get($parameters, 'type');
+                $destination = data_get($parameters, 'destination');
+                session()->forget('from');
+                return redirect()->route($back, [
+                    'environment_name' => $environment_name,
+                    'project_uuid' => $project_uuid,
+                    'type' => $type,
+                    'destination' => $destination,
+                ]);
+            }
+        }
         return view('source.github.show', [
             'github_app' => $github_app,
             'name' => $name,
