@@ -132,7 +132,6 @@ function allowedPathsForBoardingAccounts()
     return [
         ...allowedPathsForUnsubscribedAccounts(),
         'boarding',
-        'livewire/message/boarding',
         'livewire/message/boarding.index',
     ];
 }
