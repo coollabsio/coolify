@@ -43,6 +43,7 @@ class ProjectController extends Controller
     {
         $type = request()->query('type');
         $destination_uuid = request()->query('destination');
+        $server = requesT()->query('server');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -59,6 +60,9 @@ class ProjectController extends Controller
                 'environment_name' => $environment->name,
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
+        }
+        if ($server) {
+
         }
         return view('project.new', [
             'type' => $type

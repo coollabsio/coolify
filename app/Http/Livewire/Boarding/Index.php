@@ -6,7 +6,7 @@ use App\Actions\Server\InstallDocker;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Index extends Component
@@ -22,6 +22,8 @@ class Index extends Component
     public ?string $privateKeyDescription = null;
     public ?PrivateKey $createdPrivateKey = null;
 
+    public ?Collection $servers = null;
+    public ?int $selectedExistingServer = null;
     public ?string $remoteServerName = null;
     public ?string $remoteServerDescription = null;
     public ?string $remoteServerHost = null;
@@ -29,6 +31,8 @@ class Index extends Component
     public ?string $remoteServerUser = 'root';
     public ?Server $createdServer = null;
 
+    public Collection|array $projects = [];
+    public ?int $selectedExistingProject = null;
     public ?Project $createdProject = null;
 
     public function mount()
@@ -66,25 +70,62 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         refreshSession();
         return redirect()->route('dashboard');
     }
-    public function setServer(string $type)
+
+    public function setServerType(string $type)
     {
         if ($type === 'localhost') {
             $this->createdServer = Server::find(0);
             if (!$this->createdServer) {
                 return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            $this->currentState = 'select-proxy';
+            return $this->validateServer();
         } elseif ($type === 'remote') {
-            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
+            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            if ($this->privateKeys->count() > 0) {
+                $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
+            }
+            $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            if ($this->servers->count() > 0) {
+                $this->selectedExistingServer = $this->servers->first()->id;
+                $this->currentState = 'select-existing-server';
+                return;
+            }
             $this->currentState = 'private-key';
         }
     }
+    public function selectExistingServer()
+    {
+        $this->createdServer = Server::find($this->selectedExistingServer);
+        if (!$this->createdServer) {
+            $this->emit('error', 'Server is not found.');
+            $this->currentState = 'private-key';
+            return;
+        }
+        $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
+        $this->validateServer();
+        $this->getProxyType();
+        $this->getProjects();
+    }
+    public function getProxyType() {
+        $proxyTypeSet = $this->createdServer->proxy->type;
+        if (!$proxyTypeSet) {
+            $this->currentState = 'select-proxy';
+            return;
+        }
+        $this->getProjects();
+    }
     public function selectExistingPrivateKey()
     {
-        ray($this->selectedExistingPrivateKey);
+        $this->currentState = 'create-server';
+    }
+    public function createNewServer()
+    {
+        $this->selectedExistingServer = null;
+        $this->currentState = 'private-key';
     }
     public function setPrivateKey(string $type)
     {
+        $this->selectedExistingPrivateKey = null;
         $this->privateKeyType = $type;
         if ($type === 'create' && !isDev()) {
             $this->createNewPrivateKey();
@@ -123,11 +164,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'private_key_id' => $this->createdPrivateKey->id,
             'team_id' => currentTeam()->id
         ]);
+        $this->validateServer();
+    }
+    public function validateServer() {
         try {
             ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->createdServer);
             if (!$uptime) {
-                $this->createdServer->delete();
-                $this->createdPrivateKey->delete();
                 throw new \Exception('Server is not reachable.');
             } else {
                 $this->createdServer->settings->update([
@@ -135,11 +177,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 ]);
                 $this->emit('success', 'Server is reachable.');
             }
-            if ($dockerVersion) {
+            ray($dockerVersion, $uptime);
+            if (!$dockerVersion) {
                 $this->emit('error', 'Docker is not installed on the server.');
                 $this->currentState = 'install-docker';
                 return;
             }
+            $this->getProxyType();
+
         } catch (\Exception $e) {
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
@@ -153,12 +198,24 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function selectProxy(string|null $proxyType = null)
     {
         if (!$proxyType) {
-            return $this->currentState = 'create-project';
+            return $this->getProjects();
         }
         $this->createdServer->proxy->type = $proxyType;
         $this->createdServer->proxy->status = 'exited';
         $this->createdServer->save();
+        $this->getProjects();
+    }
+
+    public function getProjects() {
+        $this->projects = Project::ownedByCurrentTeam(['name'])->get();
+        if ($this->projects->count() > 0) {
+            $this->selectedExistingProject = $this->projects->first()->id;
+        }
         $this->currentState = 'create-project';
+    }
+    public function selectExistingProject() {
+        $this->createdProject = Project::find($this->selectedExistingProject);
+        $this->currentState = 'create-resource';
     }
     public function createNewProject()
     {

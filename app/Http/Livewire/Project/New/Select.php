@@ -5,10 +5,12 @@ namespace App\Http\Livewire\Project\New;
 use App\Models\Server;
 use Countable;
 use Livewire\Component;
+use Route;
 
 class Select extends Component
 {
     public $current_step = 'type';
+    public ?int $server = null;
     public string $type;
     public string $server_id;
     public string $destination_uuid;
@@ -16,6 +18,9 @@ class Select extends Component
     public $destinations = [];
     public array $parameters;
 
+    protected $queryString = [
+        'server',
+    ];
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -29,6 +34,12 @@ class Select extends Component
             $this->set_server($server);
             if (count($server->destinations()) === 1) {
                 $this->set_destination($server->destinations()->first()->uuid);
+            }
+        }
+        if (!is_null($this->server )) {
+            $foundServer = $this->servers->where('id', $this->server)->first();
+            if ($foundServer) {
+                return $this->set_server($foundServer);
             }
         }
         $this->current_step = 'servers';
