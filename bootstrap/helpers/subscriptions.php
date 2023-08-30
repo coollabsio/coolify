@@ -56,16 +56,16 @@ function isSubscriptionActive()
     if (!$subscription) {
         return false;
     }
-    if (config('subscription.provider') === 'lemon') {
+    if (isLemon()) {
         return $subscription->lemon_status === 'active';
     }
-    if (config('subscription.provider') === 'stripe') {
+    // if (isPaddle()) {
+    //     return $subscription->paddle_status === 'active';
+    // }
+    if (isStripe()) {
         return $subscription->stripe_invoice_paid === true && $subscription->stripe_cancel_at_period_end === false;
     }
     return false;
-    // if (config('subscription.provider') === 'paddle') {
-    //     return $subscription->paddle_status === 'active';
-    // }
 
 }
 function isSubscriptionOnGracePeriod()
@@ -78,12 +78,12 @@ function isSubscriptionOnGracePeriod()
     if (!$subscription) {
         return false;
     }
-    if (config('subscription.provider') === 'lemon') {
+    if (isLemon()) {
         $is_still_grace_period = $subscription->lemon_ends_at &&
             Carbon::parse($subscription->lemon_ends_at) > Carbon::now();
         return $is_still_grace_period;
     }
-    if (config('subscription.provider') === 'stripe') {
+    if (isStripe()) {
         return $subscription->stripe_cancel_at_period_end;
     }
     return false;
@@ -91,6 +91,15 @@ function isSubscriptionOnGracePeriod()
 function subscriptionProvider()
 {
     return config('subscription.provider');
+}
+function isLemon () {
+    return config('subscription.provider') === 'lemon';
+}
+function isStripe() {
+    return config('subscription.provider') === 'stripe';
+}
+function isPaddle() {
+    return config('subscription.provider') === 'paddle';
 }
 function getStripeCustomerPortalSession(Team $team)
 {
@@ -124,5 +133,6 @@ function allowedPathsForBoardingAccounts()
         ...allowedPathsForUnsubscribedAccounts(),
         'boarding',
         'livewire/message/boarding',
+        'livewire/message/boarding.index',
     ];
 }

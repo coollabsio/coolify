@@ -1,7 +1,7 @@
 <?php
 return [
     'waitlist' => [
-        'confirmation_valid_for_minutes' => 10,
+        'expiration' => 10,
     ],
     'invitation' => [
         'link' => [
@@ -14,6 +14,11 @@ return [
             'basic' => 1,
             'pro' => 10,
             'ultimate' => 25,
+        ],
+        'smtp' => [
+            'basic' => false,
+            'pro' => true,
+            'ultimate' => true,
         ],
     ],
 ];

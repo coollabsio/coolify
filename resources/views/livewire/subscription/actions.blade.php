@@ -1,17 +1,23 @@
 <div>
     @if (subscriptionProvider() === 'stripe')
-        @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-            <div>Subscription is active but on cancel period.</div>
-        @else
-            <div>Subscription is active. Last invoice is
-                {{ currentTeam()->subscription->stripe_invoice_paid ? 'paid' : 'not paid' }}.</div>
-        @endif
-
-        @if (currentTeam()->subscription->stripe_cancel_at_period_end)
-            <a class="hover:no-underline" href="{{ route('subscription.index') }}"><x-forms.button>Subscribe
-                    again</x-forms.button></a>
-        @endif
         <x-forms.button wire:click='stripeCustomerPortal'>Manage My Subscription</x-forms.button>
+        <div class="pt-4">
+            <div>Current Plan: <span class="text-warning">{{ data_get(currentTeam(), 'subscription')->type() }}<span>
+            </div>
+            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                <div>Subscription is active but on cancel period.</div>
+            @else
+                <div>Subscription is active. Last invoice is
+                    {{ currentTeam()->subscription->stripe_invoice_paid ? 'paid' : 'not paid' }}.</div>
+            @endif
+
+            @if (currentTeam()->subscription->stripe_cancel_at_period_end)
+                <a class="hover:no-underline" href="{{ route('subscription.index') }}"><x-forms.button>Subscribe
+                        again</x-forms.button></a>
+            @endif
+            <div>To update your subscription (upgrade / downgrade), please <a class="text-white underline"
+                    href="https://docs.coollabs.io/contact" target="_blank">contact us.</a></div>
+        </div>
     @endif
     @if (subscriptionProvider() === 'lemon')
         <div>Status: {{ currentTeam()->subscription->lemon_status }}</div>
