@@ -5,7 +5,7 @@
             <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
             <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
             <div class="flex justify-center ">
-                <x-forms.button class="justify-center box" wire:click="$set('currentState', 'select-server-type')">Get Started
+                <x-forms.button class="justify-center box" wire:click="welcome">Get Started
                 </x-forms.button>
             </div>
         @endif
