@@ -233,7 +233,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             [
                 'project_uuid' => $this->createdProject->uuid,
                 'environment_name' => 'production',
-
+                'server'=> $this->createdServer->id,
             ]
         );
     }

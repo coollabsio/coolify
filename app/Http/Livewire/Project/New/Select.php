@@ -3,7 +3,10 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Models\SwarmDocker;
 use Countable;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Route;
 
@@ -15,7 +18,8 @@ class Select extends Component
     public string $server_id;
     public string $destination_uuid;
     public Countable|array|Server $servers;
-    public $destinations = [];
+    public Collection|array $standaloneDockers = [];
+    public Collection|array $swarmDockers = [];
     public array $parameters;
 
     protected $queryString = [
@@ -36,7 +40,7 @@ class Select extends Component
                 $this->set_destination($server->destinations()->first()->uuid);
             }
         }
-        if (!is_null($this->server )) {
+        if (!is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server)->first();
             if ($foundServer) {
                 return $this->set_server($foundServer);
@@ -48,7 +52,8 @@ class Select extends Component
     public function set_server(Server $server)
     {
         $this->server_id = $server->id;
-        $this->destinations = $server->destinations();
+        $this->standaloneDockers = $server->standaloneDockers;
+        $this->swarmDockers = $server->swarmDockers;
         $this->current_step = 'destinations';
     }
 
