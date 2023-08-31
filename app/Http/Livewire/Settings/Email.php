@@ -20,6 +20,9 @@ class Email extends Component
         'settings.smtp_timeout' => 'nullable',
         'settings.smtp_from_address' => 'required|email',
         'settings.smtp_from_name' => 'required',
+        'settings.resend_enabled' => 'nullable|boolean',
+        'settings.resend_api_key' => 'nullable'
+
     ];
     protected $validationAttributes = [
         'settings.smtp_from_address' => 'From Address',
@@ -30,48 +33,76 @@ class Email extends Component
         'settings.smtp_encryption' => 'Encryption',
         'settings.smtp_username' => 'Username',
         'settings.smtp_password' => 'Password',
+        'settings.smtp_timeout' => 'Timeout',
+        'settings.resend_api_key' => 'Resend API Key'
     ];
-
     public function mount()
     {
-        $this->decrypt();
         $this->emails = auth()->user()->email;
     }
 
-    private function decrypt()
-    {
-        if (data_get($this->settings, 'smtp_password')) {
-            try {
-                $this->settings->smtp_password = decrypt($this->settings->smtp_password);
-            } catch (\Exception $e) {
-            }
+    public function submitFromFields() {
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'settings.smtp_from_address' => 'required|email',
+                'settings.smtp_from_name' => 'required',
+            ]);
+            $this->settings->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
         }
     }
-
+    public function instantSaveResend()
+    {
+        try {
+            $this->submitResend();
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
+        }
+    }
+    public function submitResend() {
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'settings.resend_api_key' => 'required'
+            ]);
+            $this->settings->smtp_enabled = false;
+            $this->settings->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            $this->settings->resend_enabled = false;
+            return general_error_handler($e, $this);
+        }
+    }
     public function instantSave()
     {
         try {
             $this->submit();
-            $this->emit('success', 'Settings saved successfully.');
         } catch (\Exception $e) {
-            $this->settings->smtp_enabled = false;
-            $this->validate();
+            return general_error_handler($e, $this);
         }
     }
 
     public function submit()
     {
-        $this->resetErrorBag();
-        $this->validate();
-        if ($this->settings->smtp_password) {
-            $this->settings->smtp_password = encrypt($this->settings->smtp_password);
-        } else {
-            $this->settings->smtp_password = null;
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'settings.smtp_host' => 'required',
+                'settings.smtp_port' => 'required|numeric',
+                'settings.smtp_encryption' => 'nullable',
+                'settings.smtp_username' => 'nullable',
+                'settings.smtp_password' => 'nullable',
+                'settings.smtp_timeout' => 'nullable',
+            ]);
+            $this->settings->resend_enabled = false;
+            $this->settings->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
         }
-
-        $this->settings->save();
-        $this->emit('success', 'Transaction email settings updated successfully.');
-        $this->decrypt();
     }
 
     public function sendTestNotification()
