@@ -25,60 +25,58 @@
 
     <body>
         @livewireScripts
-        @auth
-            <x-toaster-hub />
-            <x-version class="fixed left-2 bottom-1" />
-            <script>
-                let checkHealthInterval = null;
-                let checkIfIamDeadInterval = null;
+        <x-toaster-hub />
+        <x-version class="fixed left-2 bottom-1" />
+        <script>
+            let checkHealthInterval = null;
+            let checkIfIamDeadInterval = null;
 
-                function changePasswordFieldType(event) {
-                    let element = event.target
-                    for (let i = 0; i < 10; i++) {
-                        if (element.className === "relative") {
-                            break;
-                        }
-                        element = element.parentElement;
+            function changePasswordFieldType(event) {
+                let element = event.target
+                for (let i = 0; i < 10; i++) {
+                    if (element.className === "relative") {
+                        break;
                     }
-                    element = element.children[1];
-                    if (element.nodeName === 'INPUT') {
-                        if (element.type === 'password') {
-                            element.type = 'text';
-                        } else {
-                            element.type = 'password';
-                        }
-                    }
+                    element = element.parentElement;
                 }
-
-                function copyToClipboard(text) {
-                    navigator.clipboard.writeText(text);
-                    Livewire.emit('success', 'Copied to clipboard.');
-                }
-
-                Livewire.on('reloadWindow', (timeout) => {
-                    if (timeout) {
-                        setTimeout(() => {
-                            window.location.reload();
-                        }, timeout);
-                        return;
+                element = element.children[1];
+                if (element.nodeName === 'INPUT') {
+                    if (element.type === 'password') {
+                        element.type = 'text';
                     } else {
-                        window.location.reload();
+                        element.type = 'password';
                     }
-                })
-                Livewire.on('info', (message) => {
-                    if (message) Toaster.info(message)
-                })
-                Livewire.on('error', (message) => {
-                    if (message) Toaster.error(message)
-                })
-                Livewire.on('warning', (message) => {
-                    if (message) Toaster.warning(message)
-                })
-                Livewire.on('success', (message) => {
-                    if (message) Toaster.success(message)
-                })
-            </script>
-        @endauth
+                }
+            }
+
+            function copyToClipboard(text) {
+                navigator.clipboard.writeText(text);
+                Livewire.emit('success', 'Copied to clipboard.');
+            }
+
+            Livewire.on('reloadWindow', (timeout) => {
+                if (timeout) {
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, timeout);
+                    return;
+                } else {
+                    window.location.reload();
+                }
+            })
+            Livewire.on('info', (message) => {
+                if (message) Toaster.info(message)
+            })
+            Livewire.on('error', (message) => {
+                if (message) Toaster.error(message)
+            })
+            Livewire.on('warning', (message) => {
+                if (message) Toaster.warning(message)
+            })
+            Livewire.on('success', (message) => {
+                if (message) Toaster.success(message)
+            })
+        </script>
     </body>
 @show
 
