@@ -66,7 +66,6 @@ function isSubscriptionActive()
         return $subscription->stripe_invoice_paid === true && $subscription->stripe_cancel_at_period_end === false;
     }
     return false;
-
 }
 function isSubscriptionOnGracePeriod()
 {
@@ -92,13 +91,16 @@ function subscriptionProvider()
 {
     return config('subscription.provider');
 }
-function isLemon () {
+function isLemon()
+{
     return config('subscription.provider') === 'lemon';
 }
-function isStripe() {
+function isStripe()
+{
     return config('subscription.provider') === 'stripe';
 }
-function isPaddle() {
+function isPaddle()
+{
     return config('subscription.provider') === 'paddle';
 }
 function getStripeCustomerPortalSession(Team $team)

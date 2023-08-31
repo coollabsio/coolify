@@ -1,14 +1,13 @@
-Congratulations!<br>
-Congratulations!<br>
-<br>
 You have been invited to join the Coolify Cloud. <a href="{{base_url()}}/login">Login here</a>
 <br>
 <br>
-Credentials:
+Here is your initial login information.
 <br>
-Email: {{ $email }}
-<br>
-Password: {{ $password }}
-<br>
+Email: <br>
+{{ $email }}
+<br><br>
+Password:<br>
+{{ $password }}
+<br><br>
 (You will forced to change it on first login.)
 

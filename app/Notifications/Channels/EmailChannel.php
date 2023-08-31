@@ -21,7 +21,7 @@ class EmailChannel
 
         $mailMessage = $notification->toMail($notifiable);
         if ($this->isResend) {
-            foreach($recepients as $receipient) {
+            foreach ($recepients as $receipient) {
                 Mail::send(
                     [],
                     [],
@@ -35,7 +35,6 @@ class EmailChannel
                         ->html((string)$mailMessage->render())
                 );
             }
-
         } else {
             Mail::send(
                 [],
@@ -50,22 +49,26 @@ class EmailChannel
                     ->html((string)$mailMessage->render())
             );
         }
-
     }
 
     private function bootConfigs($notifiable): void
     {
-        if (data_get($notifiable, 'resend_enabled')) {
-            $resendAPIKey = data_get($notifiable, 'resend_api_key');
-            if ($resendAPIKey) {
-                $this->isResend = true;
-                config()->set('mail.default', 'resend');
-                config()->set('resend.api_key', $resendAPIKey);
+        if (data_get($notifiable, 'use_instance_email_settings')) {
+            $type = set_transanctional_email_settings();
+            if (!$type) {
+                throw new Exception('No email settings found.');
             }
+            if ($type === 'resend') {
+                $this->isResend = true;
+            }
+            return;
+        }
+        if (data_get($notifiable, 'resend_enabled')) {
+            $this->isResend = true;
+            config()->set('mail.default', 'resend');
+            config()->set('resend.api_key', data_get($notifiable, 'resend_api_key'));
         }
         if (data_get($notifiable, 'smtp_enabled')) {
-            $password = data_get($notifiable, 'smtp_password');
-            if ($password) $password = decrypt($password);
             config()->set('mail.default', 'smtp');
             config()->set('mail.mailers.smtp', [
                 "transport" => "smtp",
@@ -73,7 +76,7 @@ class EmailChannel
                 "port" => data_get($notifiable, 'smtp_port'),
                 "encryption" => data_get($notifiable, 'smtp_encryption'),
                 "username" => data_get($notifiable, 'smtp_username'),
-                "password" => $password,
+                "password" => data_get($notifiable, 'smtp_password'),
                 "timeout" => data_get($notifiable, 'smtp_timeout'),
                 "local_domain" => null,
             ]);

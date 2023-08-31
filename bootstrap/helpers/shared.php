@@ -73,7 +73,7 @@ function general_error_handler(Throwable | null $err = null, $that = null, $isJs
             throw new Exception($customErrorMessage ?? "Too many requests. Please try again in {$err->secondsUntilAvailable} seconds.");
         } else {
             if ($err->getMessage() === 'This action is unauthorized.') {
-               return redirect()->route('dashboard')->with('error', $customErrorMessage ?? $err->getMessage());
+                return redirect()->route('dashboard')->with('error', $customErrorMessage ?? $err->getMessage());
             }
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
@@ -122,10 +122,11 @@ function generateSSHKey()
     $key = RSA::createKey();
     return [
         'private' => $key->toString('PKCS1'),
-        'public' => $key->getPublicKey()->toString('OpenSSH',['comment' => 'coolify-generated-ssh-key'])
+        'public' => $key->getPublicKey()->toString('OpenSSH', ['comment' => 'coolify-generated-ssh-key'])
     ];
 }
-function formatPrivateKey(string $privateKey) {
+function formatPrivateKey(string $privateKey)
+{
     $privateKey = trim($privateKey);
     if (!str_ends_with($privateKey, "\n")) {
         $privateKey .= "\n";
@@ -140,30 +141,34 @@ function generate_application_name(string $git_repository, string $git_branch): 
 
 function is_transactional_emails_active(): bool
 {
-    return data_get(InstanceSettings::get(), 'smtp_enabled');
+    return isEmailEnabled(InstanceSettings::get());
 }
 
-function set_transanctional_email_settings(InstanceSettings | null $settings = null): void
+function set_transanctional_email_settings(InstanceSettings | null $settings = null): string|null
 {
     if (!$settings) {
         $settings = InstanceSettings::get();
     }
-    $password = data_get($settings, 'smtp_password');
-    if (isset($password)) {
-        $password = decrypt($password);
+    if (data_get($settings, 'resend_enabled')) {
+        config()->set('mail.default', 'resend');
+        config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
+        return 'resend';
     }
-
-    config()->set('mail.default', 'smtp');
-    config()->set('mail.mailers.smtp', [
-        "transport" => "smtp",
-        "host" => data_get($settings, 'smtp_host'),
-        "port" => data_get($settings, 'smtp_port'),
-        "encryption" => data_get($settings, 'smtp_encryption'),
-        "username" => data_get($settings, 'smtp_username'),
-        "password" => $password,
-        "timeout" => data_get($settings, 'smtp_timeout'),
-        "local_domain" => null,
-    ]);
+    if (data_get($settings, 'smtp_enabled')) {
+        config()->set('mail.default', 'smtp');
+        config()->set('mail.mailers.smtp', [
+            "transport" => "smtp",
+            "host" => data_get($settings, 'smtp_host'),
+            "port" => data_get($settings, 'smtp_port'),
+            "encryption" => data_get($settings, 'smtp_encryption'),
+            "username" => data_get($settings, 'smtp_username'),
+            "password" => data_get($settings, 'smtp_password'),
+            "timeout" => data_get($settings, 'smtp_timeout'),
+            "local_domain" => null,
+        ]);
+        return 'smtp';
+    }
+    return null;
 }
 
 function base_ip(): string
@@ -246,7 +251,10 @@ function send_internal_notification(string $message): void
 function send_user_an_email(MailMessage $mail, string $email): void
 {
     $settings = InstanceSettings::get();
-    set_transanctional_email_settings($settings);
+    $type = set_transanctional_email_settings($settings);
+    if (!$type) {
+        throw new Exception('No email settings found.');
+    }
     Mail::send(
         [],
         [],
@@ -259,5 +267,9 @@ function send_user_an_email(MailMessage $mail, string $email): void
             ->subject($mail->subject)
             ->html((string) $mail->render())
     );
-}
 
+}
+function isEmailEnabled($notifiable)
+{
+    return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
+}

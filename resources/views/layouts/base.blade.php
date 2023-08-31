@@ -52,7 +52,7 @@
 
                 function copyToClipboard(text) {
                     navigator.clipboard.writeText(text);
-                    Livewire.emit('message', 'Copied to clipboard.');
+                    Livewire.emit('success', 'Copied to clipboard.');
                 }
 
                 Livewire.on('reloadWindow', (timeout) => {

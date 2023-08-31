@@ -54,14 +54,6 @@ class Email extends Component
             return general_error_handler($e, $this);
         }
     }
-    public function instantSaveResend()
-    {
-        try {
-            $this->submitResend();
-        } catch (\Exception $e) {
-            return general_error_handler($e, $this);
-        }
-    }
     public function submitResend() {
         try {
             $this->resetErrorBag();

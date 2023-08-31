@@ -12,20 +12,21 @@ class ServerController extends Controller
 
     public function new_server()
     {
+        $privateKeys = PrivateKey::ownedByCurrentTeam()->get();
         if (!isCloud()) {
             return view('server.create', [
                 'limit_reached' => false,
-                'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
+                'private_keys' => $privateKeys,
             ]);
         }
-        $servers = currentTeam()->servers->count();
-        $subscription = currentTeam()?->subscription->type();
-        $your_limit = config('constants.limits.server')[strtolower($subscription)];
-        $limit_reached = $servers >= $your_limit;
+        $team = currentTeam();
+        $servers = $team->servers->count();
+        ['serverLimit' => $serverLimit] = $team->limits;
+        $limit_reached = $servers >= $serverLimit;
 
         return view('server.create', [
             'limit_reached' => $limit_reached,
-            'private_keys' => PrivateKey::ownedByCurrentTeam()->get(),
+            'private_keys' => $privateKeys,
         ]);
     }
 }

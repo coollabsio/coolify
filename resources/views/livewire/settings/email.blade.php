@@ -11,9 +11,9 @@
         </form>
     </dialog>
     <div class="flex items-center gap-2">
-        <h2>Transactional Emails</h2>
+        <h2>Transactional/Shared Email</h2>
     </div>
-    <div class="pb-4 ">SMTP settings for password resets, invitations, etc.</div>
+    <div class="pb-4 ">Email settings for password resets, invitations, shared with Pro+ subscribers etc.</div>
     <form wire:submit.prevent='submitFromFields' class="pb-4">
         <div class="flex flex-col items-end w-full gap-2 xl:flex-row">
             <x-forms.input required id="settings.smtp_from_name" helper="Name used in emails." label="From Name" />
@@ -63,11 +63,11 @@
                 </form>
             </div>
         </details>
-        <details class="border rounded collapse border-coolgray-500 collapse-arrow ">
+        <details class="border rounded collapse border-coolgray-500 collapse-arrow">
             <summary class="text-xl collapse-title">
                 <div>Resend</div>
                 <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSaveResend' id="settings.resend_enabled" label="Enabled" />
+                    <x-forms.checkbox instantSave='submitResend' id="settings.resend_enabled" label="Enabled" />
                 </div>
             </summary>
             <div class="collapse-content">

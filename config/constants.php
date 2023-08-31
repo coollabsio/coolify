@@ -11,11 +11,15 @@ return [
     ],
     'limits' => [
         'server' => [
+            'zero' => 0,
+            'self-hosted' => 999999999999,
             'basic' => 1,
             'pro' => 10,
             'ultimate' => 25,
         ],
-        'smtp' => [
+        'email' => [
+            'zero' => false,
+            'self-hosted' => true,
             'basic' => false,
             'pro' => true,
             'ultimate' => true,

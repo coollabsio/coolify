@@ -14,6 +14,7 @@ class Invitations extends Component
     {
         TeamInvitation::find($invitation_id)->delete();
         $this->refreshInvitations();
+        $this->emit('success', 'Invitation revoked.');
     }
 
     public function refreshInvitations()
