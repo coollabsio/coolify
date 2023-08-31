@@ -3,7 +3,7 @@
         ->user()
         ->currentTeam()" />
     <livewire:team.form />
-    @if (is_cloud())
+    @if (isCloud())
         <div class="pb-8">
             <h2>Subscription</h2>
             @if (data_get(currentTeam(),

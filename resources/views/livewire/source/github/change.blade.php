@@ -90,7 +90,7 @@
                 <h2>Register a GitHub App</h2>
                 <div class="pt-1 pb-2 ">You need to register a GitHub App before using this source.</div>
                 <div class="pt-2 pb-10">
-                    @if (!is_cloud() || isDev())
+                    @if (!isCloud() || isDev())
                         <div class="flex items-end gap-2">
                             <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
                                 helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">

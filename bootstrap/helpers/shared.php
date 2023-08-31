@@ -217,7 +217,7 @@ function isDev(): bool
     return config('app.env') === 'local';
 }
 
-function is_cloud(): bool
+function isCloud(): bool
 {
     return !config('coolify.self_hosted');
 }

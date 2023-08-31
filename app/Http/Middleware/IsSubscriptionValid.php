@@ -13,7 +13,7 @@ class IsSubscriptionValid
         if (isInstanceAdmin()) {
             return $next($request);
         }
-        if (!auth()->user() || !is_cloud()) {
+        if (!auth()->user() || !isCloud()) {
             if ($request->path() === 'subscription') {
                 return redirect('/');
             } else {

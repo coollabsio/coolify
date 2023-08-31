@@ -11,7 +11,7 @@
             manually.
         </div>
         <div class="flex flex-col gap-2">
-            <form action="/user/confirmed-two-factor-authentication" method="POST" class="flex items-end w-32 gap-2">
+            <form action="/user/confirmed-two-factor-authentication" method="POST" class="flex items-end gap-2">
                 @csrf
                 <x-forms.input type="number" id="code" label="One-time code" required />
                 <x-forms.button type="submit">Validate 2FA</x-forms.button>
@@ -19,11 +19,11 @@
             <div>
                 <div>{!! $request->user()->twoFactorQrCodeSvg() !!}</div>
                 <div x-data="{ showCode: false }" class="py-2">
-                    <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually
-                        enter</x-forms.button>
                     <template x-if="showCode">
                         <div class="py-2 ">{!! decrypt($request->user()->two_factor_secret) !!}</div>
                     </template>
+                    <x-forms.button x-on:click="showCode = !showCode">Show secret key to manually
+                        enter</x-forms.button>
                 </div>
             </div>
         </div>
@@ -43,7 +43,7 @@
         </div>
     @else
         @if ($request->user()->two_factor_confirmed_at)
-            <div class=""> Two factor authentication is <span class="text-helper">enabled</span>.</div>
+            <div class="pb-4 "> Two factor authentication is <span class="text-helper">enabled</span>.</div>
             <div class="flex gap-2">
                 <form action="/user/two-factor-authentication" method="POST">
                     @csrf
@@ -69,11 +69,15 @@
                 </div>
             @endif
         @else
-            <div class="pb-2 ">Two factor authentication is <span class="text-helper">disabled</span>.</div>
             <form action="/user/two-factor-authentication" method="POST">
                 @csrf
                 <x-forms.button type="submit">Configure 2FA</x-forms.button>
             </form>
         @endif
+    @endif
+    @if (session()->has('errors'))
+        <div class="text-error">
+            Something went wrong. Please try again.
+        </div>
     @endif
 </x-layout>

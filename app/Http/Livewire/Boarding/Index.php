@@ -53,7 +53,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
     }
     public function welcome() {
-        if (is_cloud()) {
+        if (isCloud()) {
             return $this->setServerType('remote');
         }
         $this->currentState = 'select-server-type';

@@ -27,7 +27,7 @@ class Controller extends BaseController
     }
     public function subscription()
     {
-        if (!is_cloud()) {
+        if (!isCloud()) {
             abort(404);
         }
         return view('subscription.index', [
@@ -37,7 +37,7 @@ class Controller extends BaseController
 
     public function license()
     {
-        if (!is_cloud()) {
+        if (!isCloud()) {
             abort(404);
         }
         return view('settings.license', [
