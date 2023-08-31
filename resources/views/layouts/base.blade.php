@@ -79,9 +79,6 @@
                 })
             </script>
         @endauth
-        @guest
-            {{ $slot }}
-        @endguest
     </body>
 @show
 
