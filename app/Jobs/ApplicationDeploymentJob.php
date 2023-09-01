@@ -20,6 +20,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -65,6 +66,12 @@ class ApplicationDeploymentJob implements ShouldQueue
     private $log_model;
     private Collection $saved_outputs;
 
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping("dockerimagejobs"))->shared(),
+        ];
+    }
     public function __construct(int $application_deployment_queue_id)
     {
         ray()->clearScreen();

@@ -7,6 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 
@@ -17,6 +18,13 @@ class DockerCleanupJob implements ShouldQueue
     public $timeout = 500;
     public ?string $dockerRootFilesystem = null;
     public ?int $usageBefore = null;
+
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping("dockerimagejobs"))->shared(),
+        ];
+    }
     public function __construct()
     {
     }
