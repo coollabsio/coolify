@@ -37,7 +37,7 @@ class SendConfirmationForWaitlistJob implements ShouldQueue
             $mail->subject('You are on the waitlist!');
             send_user_an_email($mail, $this->email);
         } catch (\Throwable $th) {
-            send_internal_notification('SendConfirmationForWaitlistJob failed with error: ' . $th->getMessage());
+            send_internal_notification("SendConfirmationForWaitlistJob failed for {$mail} with error: " . $th->getMessage());
             ray($th->getMessage());
             throw $th;
         }

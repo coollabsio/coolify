@@ -12,7 +12,7 @@
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'email'" class="h-full">
-                <livewire:notifications.email-settings :model="auth()
+                <livewire:notifications.email-settings :team="auth()
                     ->user()
                     ->currentTeam()" />
             </div>

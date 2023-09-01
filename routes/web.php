@@ -6,6 +6,12 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
+use App\Http\Livewire\Boarding\Index;
+use App\Http\Livewire\Boarding\Server as BoardingServer;
+use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Server\All;
+use App\Http\Livewire\Server\Show;
+use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -23,7 +29,10 @@ use Laravel\Fortify\Fortify;
 
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
-        set_transanctional_email_settings();
+        $type = set_transanctional_email_settings();
+        if (!$type) {
+            return response()->json(['message' => 'Transactional emails are not active'], 400);
+        }
         $request->validate([Fortify::email() => 'required|email']);
         $status = Password::broker(config('fortify.passwords'))->sendResetLink(
             $request->only(Fortify::email())
@@ -38,7 +47,7 @@ Route::post('/forgot-password', function (Request $request) {
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
-Route::get('/waitlist', [Controller::class, 'waitlist'])->name('auth.waitlist');
+Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
@@ -71,13 +80,9 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/servers', fn () => view('server.all', [
-        'servers' => Server::ownedByCurrentTeam()->get()
-    ]))->name('server.all');
+    Route::get('/servers', All::class)->name('server.all');
     Route::get('/server/new', [ServerController::class, 'new_server'])->name('server.create');
-    Route::get('/server/{server_uuid}', fn () => view('server.show', [
-        'server' => Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
-    ]))->name('server.show');
+    Route::get('/server/{server_uuid}', Show::class)->name('server.show');
     Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
     ]))->name('server.proxy');
@@ -92,18 +97,16 @@ Route::middleware(['auth'])->group(function () {
 
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/', [Controller::class, 'dashboard'])->name('dashboard');
-    Route::get('/boarding', [Controller::class, 'boarding'])->name('boarding');
-    Route::middleware(['throttle:force-password-reset'])->group(function() {
+    Route::get('/', Dashboard::class)->name('dashboard');
+    Route::get('/boarding', Index::class)->name('boarding');
+    Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
-    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.show');
-    Route::get('/subscription/success', fn () => view('subscription.success'))->name('subscription.success');
-    Route::get('/subscription/cancel', fn () => view('profile'))->name('subscription.cancel');
+    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.index');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
-    Route::get('/team', [Controller::class, 'team'])->name('team.show');
+    Route::get('/team', [Controller::class, 'team'])->name('team.index');
     Route::get('/team/new', fn () => view('team.create'))->name('team.create');
     Route::get('/team/notifications', fn () => view('team.notifications'))->name('team.notifications');
     Route::get('/team/storages', [Controller::class, 'storages'])->name('team.storages.all');
@@ -143,6 +146,26 @@ Route::middleware(['auth'])->group(function () {
         }
         if ($settings->public_ipv6) {
             $ipv6 = 'http://' . $settings->public_ipv6 . ':' . config('app.port');
+        }
+        if ($github_app->installation_id && session('from')) {
+            $source_id = data_get(session('from'), 'source_id');
+            if (!$source_id || $github_app->id !== $source_id) {
+                session()->forget('from');
+            } else {
+                $parameters = data_get(session('from'), 'parameters');
+                $back = data_get(session('from'), 'back');
+                $environment_name = data_get($parameters, 'environment_name');
+                $project_uuid = data_get($parameters, 'project_uuid');
+                $type = data_get($parameters, 'type');
+                $destination = data_get($parameters, 'destination');
+                session()->forget('from');
+                return redirect()->route($back, [
+                    'environment_name' => $environment_name,
+                    'project_uuid' => $project_uuid,
+                    'type' => $type,
+                    'destination' => $destination,
+                ]);
+            }
         }
         return view('source.github.show', [
             'github_app' => $github_app,

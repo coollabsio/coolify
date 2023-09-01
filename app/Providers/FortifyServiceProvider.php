@@ -43,22 +43,16 @@ class FortifyServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-
         Fortify::createUsersUsing(CreateNewUser::class);
         Fortify::registerView(function () {
             $settings = InstanceSettings::get();
-            $waiting_in_line = Waitlist::whereVerified(true)->count();
             if (!$settings->is_registration_enabled) {
                 return redirect()->route('login');
             }
             if (config('coolify.waitlist')) {
-                return view('auth.waitlist',[
-                    'waiting_in_line' => $waiting_in_line,
-                ]);
+                return redirect()->route('waitlist.index');
             } else {
-                return view('auth.register',[
-                    'waiting_in_line' => $waiting_in_line,
-                ]);
+                return view('auth.register');
             }
         });
 

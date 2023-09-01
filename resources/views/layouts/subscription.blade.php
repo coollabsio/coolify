@@ -1,0 +1,16 @@
+@extends('layouts.base')
+@section('body')
+    @parent
+    @if (isSubscriptionOnGracePeriod())
+        <div class="fixed top-3 left-4" id="vue">
+            <magic-bar></magic-bar>
+        </div>
+        <x-navbar />
+    @else
+        <x-navbar-subscription />
+    @endif
+
+    <main class="main max-w-screen-2xl">
+        {{ $slot }}
+    </main>
+@endsection

@@ -6,55 +6,143 @@ use App\Models\InstanceSettings;
 use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Component;
+use Log;
 
 class EmailSettings extends Component
 {
-    public Team $model;
+    public Team $team;
     public string $emails;
+    public bool $sharedEmailEnabled = false;
 
     protected $rules = [
-        'model.smtp_enabled' => 'nullable|boolean',
-        'model.smtp_from_address' => 'required|email',
-        'model.smtp_from_name' => 'required',
-        'model.smtp_recipients' => 'nullable',
-        'model.smtp_host' => 'required',
-        'model.smtp_port' => 'required',
-        'model.smtp_encryption' => 'nullable',
-        'model.smtp_username' => 'nullable',
-        'model.smtp_password' => 'nullable',
-        'model.smtp_timeout' => 'nullable',
-        'model.smtp_notifications_test' => 'nullable|boolean',
-        'model.smtp_notifications_deployments' => 'nullable|boolean',
-        'model.smtp_notifications_status_changes' => 'nullable|boolean',
-        'model.smtp_notifications_database_backups' => 'nullable|boolean',
+        'team.smtp_enabled' => 'nullable|boolean',
+        'team.smtp_from_address' => 'required|email',
+        'team.smtp_from_name' => 'required',
+        'team.smtp_recipients' => 'nullable',
+        'team.smtp_host' => 'required',
+        'team.smtp_port' => 'required',
+        'team.smtp_encryption' => 'nullable',
+        'team.smtp_username' => 'nullable',
+        'team.smtp_password' => 'nullable',
+        'team.smtp_timeout' => 'nullable',
+        'team.smtp_notifications_test' => 'nullable|boolean',
+        'team.smtp_notifications_deployments' => 'nullable|boolean',
+        'team.smtp_notifications_status_changes' => 'nullable|boolean',
+        'team.smtp_notifications_database_backups' => 'nullable|boolean',
+        'team.use_instance_email_settings' => 'boolean',
+        'team.resend_enabled' => 'nullable|boolean',
+        'team.resend_api_key' => 'nullable',
     ];
     protected $validationAttributes = [
-        'model.smtp_from_address' => 'From Address',
-        'model.smtp_from_name' => 'From Name',
-        'model.smtp_recipients' => 'Recipients',
-        'model.smtp_host' => 'Host',
-        'model.smtp_port' => 'Port',
-        'model.smtp_encryption' => 'Encryption',
-        'model.smtp_username' => 'Username',
-        'model.smtp_password' => 'Password',
+        'team.smtp_from_address' => 'From Address',
+        'team.smtp_from_name' => 'From Name',
+        'team.smtp_recipients' => 'Recipients',
+        'team.smtp_host' => 'Host',
+        'team.smtp_port' => 'Port',
+        'team.smtp_encryption' => 'Encryption',
+        'team.smtp_username' => 'Username',
+        'team.smtp_password' => 'Password',
+        'team.smtp_timeout' => 'Timeout',
+        'team.resend_enabled' => 'Resend Enabled',
+        'team.resend_api_key' => 'Resend API Key',
     ];
 
     public function mount()
     {
-        $this->decrypt();
+        ['sharedEmailEnabled' => $this->sharedEmailEnabled] = $this->team->limits;
         $this->emails = auth()->user()->email;
     }
-
-    private function decrypt()
+    public function submitFromFields()
     {
-        if (data_get($this->model, 'smtp_password')) {
-            try {
-                $this->model->smtp_password = decrypt($this->model->smtp_password);
-            } catch (\Exception $e) {
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'team.smtp_from_address' => 'required|email',
+                'team.smtp_from_name' => 'required',
+            ]);
+            $this->team->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
+        }
+    }
+    public function sendTestNotification()
+    {
+        $this->team->notify(new Test($this->emails));
+        $this->emit('success', 'Test Email sent successfully.');
+    }
+    public function instantSaveInstance()
+    {
+        try {
+            if (!$this->sharedEmailEnabled) {
+                throw new \Exception('Not allowed to change settings. Please upgrade your subscription.');
             }
+            $this->team->smtp_enabled = false;
+            $this->team->resend_enabled = false;
+            $this->team->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
         }
     }
 
+    public function instantSaveResend()
+    {
+        try {
+            $this->team->smtp_enabled = false;
+            $this->submitResend();
+        } catch (\Exception $e) {
+            $this->team->smtp_enabled = false;
+            return general_error_handler($e, $this);
+        }
+    }
+    public function instantSave()
+    {
+        try {
+            $this->team->resend_enabled = false;
+            $this->submit();
+        } catch (\Exception $e) {
+            $this->team->smtp_enabled = false;
+            return general_error_handler($e, $this);
+        }
+    }
+
+    public function submit()
+    {
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'team.smtp_from_address' => 'required|email',
+                'team.smtp_from_name' => 'required',
+                'team.smtp_host' => 'required',
+                'team.smtp_port' => 'required|numeric',
+                'team.smtp_encryption' => 'nullable',
+                'team.smtp_username' => 'nullable',
+                'team.smtp_password' => 'nullable',
+                'team.smtp_timeout' => 'nullable',
+            ]);
+            $this->team->save();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            $this->team->smtp_enabled = false;
+            return general_error_handler($e, $this);
+        }
+    }
+    public function submitResend()
+    {
+        try {
+            $this->resetErrorBag();
+            $this->validate([
+                'team.resend_api_key' => 'required'
+            ]);
+            $this->team->save();
+            refreshSession();
+            $this->emit('success', 'Settings saved successfully.');
+        } catch (\Exception $e) {
+            $this->team->resend_enabled = false;
+            return general_error_handler($e, $this);
+        }
+    }
     public function copyFromInstanceSettings()
     {
         $settings = InstanceSettings::get();
@@ -72,55 +160,22 @@ class EmailSettings extends Component
                 'smtp_password' => $settings->smtp_password,
                 'smtp_timeout' => $settings->smtp_timeout,
             ]);
-            $this->decrypt();
-            if (is_a($team, Team::class)) {
-                refreshSession();
-            }
-            $this->model = $team;
-            $this->emit('success', 'Settings saved.');
-        } else {
-            $this->emit('error', 'Instance SMTP settings are not enabled.');
-        }
-    }
-
-    public function sendTestNotification()
-    {
-        $this->model->notify(new Test($this->emails));
-        $this->emit('success', 'Test Email sent successfully.');
-    }
-
-    public function instantSave()
-    {
-        try {
-            $this->submit();
-        } catch (\Exception $e) {
-            $this->model->smtp_enabled = false;
-            $this->validate();
-        }
-    }
-
-    public function submit()
-    {
-        $this->resetErrorBag();
-        $this->validate();
-
-        if ($this->model->smtp_password) {
-            $this->model->smtp_password = encrypt($this->model->smtp_password);
-        } else {
-            $this->model->smtp_password = null;
-        }
-
-        $this->model->smtp_recipients = str_replace(' ', '', $this->model->smtp_recipients);
-        $this->saveModel();
-    }
-
-    public function saveModel()
-    {
-        $this->model->save();
-        $this->decrypt();
-        if (is_a($this->model, Team::class)) {
             refreshSession();
+            $this->team = $team;
+            $this->emit('success', 'Settings saved.');
+            return;
         }
-        $this->emit('success', 'Settings saved.');
+        if ($settings->resend_enabled) {
+            $team = currentTeam();
+            $team->update([
+                'resend_enabled' => $settings->resend_enabled,
+                'resend_api_key' => $settings->resend_api_key,
+            ]);
+            refreshSession();
+            $this->team = $team;
+            $this->emit('success', 'Settings saved.');
+            return;
+        }
+        $this->emit('error', 'Instance SMTP/Resend settings are not enabled.');
     }
 }

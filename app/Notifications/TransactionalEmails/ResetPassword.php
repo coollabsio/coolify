@@ -31,24 +31,11 @@ class ResetPassword extends Notification
 
     public function via($notifiable)
     {
-        if ($this->settings->smtp_enabled) {
-            $password = data_get($this->settings, 'smtp_password');
-            if ($password) $password = decrypt($password);
-
-            config()->set('mail.default', 'smtp');
-            config()->set('mail.mailers.smtp', [
-                "transport" => "smtp",
-                "host" => data_get($this->settings, 'smtp_host'),
-                "port" => data_get($this->settings, 'smtp_port'),
-                "encryption" => data_get($this->settings, 'smtp_encryption'),
-                "username" => data_get($this->settings, 'smtp_username'),
-                "password" => $password,
-                "timeout" => data_get($this->settings, 'smtp_timeout'),
-                "local_domain" => null,
-            ]);
-            return ['mail'];
+        $type = set_transanctional_email_settings();
+        if (!$type) {
+            throw new \Exception('No email settings found.');
         }
-        throw new \Exception('SMTP is not enabled');
+        return ['mail'];
     }
 
     public function toMail($notifiable)

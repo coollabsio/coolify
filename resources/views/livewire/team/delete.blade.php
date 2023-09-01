@@ -13,7 +13,7 @@
         <div>You can't delete your last team.</div>
     @elseif(currentTeam()->subscription &&
             currentTeam()->subscription?->lemon_status !== 'cancelled')
-        <div>Please cancel your subscription before delete this team (Manage My Subscription button).</div>
+        <div>Please cancel your subscription before delete this team (Manage My Subscription).</div>
     @else
         @if (currentTeam()->isEmpty())
             <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>

@@ -6,10 +6,10 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class EmailChannel
 {
+    private bool $isResend = false;
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
@@ -20,29 +20,55 @@ class EmailChannel
         }
 
         $mailMessage = $notification->toMail($notifiable);
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->from(
-                    data_get($notifiable, 'smtp_from_address'),
-                    data_get($notifiable, 'smtp_from_name'),
-                )
-                ->bcc($recepients)
-                ->subject($mailMessage->subject)
-                ->html((string)$mailMessage->render())
-        );
+        if ($this->isResend) {
+            foreach ($recepients as $receipient) {
+                Mail::send(
+                    [],
+                    [],
+                    fn (Message $message) => $message
+                        ->from(
+                            data_get($notifiable, 'smtp_from_address'),
+                            data_get($notifiable, 'smtp_from_name'),
+                        )
+                        ->to($receipient)
+                        ->subject($mailMessage->subject)
+                        ->html((string)$mailMessage->render())
+                );
+            }
+        } else {
+            Mail::send(
+                [],
+                [],
+                fn (Message $message) => $message
+                    ->from(
+                        data_get($notifiable, 'smtp_from_address'),
+                        data_get($notifiable, 'smtp_from_name'),
+                    )
+                    ->bcc($recepients)
+                    ->subject($mailMessage->subject)
+                    ->html((string)$mailMessage->render())
+            );
+        }
     }
 
     private function bootConfigs($notifiable): void
     {
-        $password = data_get($notifiable, 'smtp_password');
-        if ($password) $password = decrypt($password);
-
-        if (Str::contains(data_get($notifiable, 'smtp_host'),'resend.com')) {
+        if (data_get($notifiable, 'use_instance_email_settings')) {
+            $type = set_transanctional_email_settings();
+            if (!$type) {
+                throw new Exception('No email settings found.');
+            }
+            if ($type === 'resend') {
+                $this->isResend = true;
+            }
+            return;
+        }
+        if (data_get($notifiable, 'resend_enabled')) {
+            $this->isResend = true;
             config()->set('mail.default', 'resend');
-            config()->set('resend.api_key', $password);
-        } else {
+            config()->set('resend.api_key', data_get($notifiable, 'resend_api_key'));
+        }
+        if (data_get($notifiable, 'smtp_enabled')) {
             config()->set('mail.default', 'smtp');
             config()->set('mail.mailers.smtp', [
                 "transport" => "smtp",
@@ -50,7 +76,7 @@ class EmailChannel
                 "port" => data_get($notifiable, 'smtp_port'),
                 "encryption" => data_get($notifiable, 'smtp_encryption'),
                 "username" => data_get($notifiable, 'smtp_username'),
-                "password" => $password,
+                "password" => data_get($notifiable, 'smtp_password'),
                 "timeout" => data_get($notifiable, 'smtp_timeout'),
                 "local_domain" => null,
             ]);

@@ -25,15 +25,15 @@ class Kernel extends ConsoleKernel
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
 
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
-            // $schedule->job(new DockerCleanupJob)->everyOddHour();
+            $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $schedule->job(new InstanceAutoUpdateJob(true))->everyMinute();
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
-            $schedule->job(new ResourceStatusJob)->everyMinute();
-            $schedule->job(new CheckResaleLicenseJob)->hourly();
-            $schedule->job(new ProxyCheckJob)->everyFiveMinutes();
-            $schedule->job(new DockerCleanupJob)->everyTenMinutes();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
+            $schedule->job(new ResourceStatusJob)->everyMinute()->onOneServer();
+            $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
+            $schedule->job(new ProxyCheckJob)->everyFiveMinutes()->onOneServer();
+            $schedule->job(new DockerCleanupJob)->everyTenMinutes()->onOneServer();
             $schedule->job(new InstanceAutoUpdateJob)->everyTenMinutes();
         }
         $this->check_scheduled_backups($schedule);

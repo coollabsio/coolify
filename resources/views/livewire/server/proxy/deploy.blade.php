@@ -20,7 +20,7 @@
         @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
                 <button>
-                    <a target="_blank" href="{{ base_ip() }}:8080">
+                    <a target="_blank" href="{{ base_url(false) }}:8080">
                         Traefik Dashboard
                         <x-external-link />
                     </a>

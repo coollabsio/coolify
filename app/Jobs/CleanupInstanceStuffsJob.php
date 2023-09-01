@@ -37,7 +37,7 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique
 
     private function cleanup_waitlist()
     {
-        $waitlist = Waitlist::whereVerified(false)->where('created_at', '<', now()->subMinutes(config('constants.waitlist.confirmation_valid_for_minutes')))->get();
+        $waitlist = Waitlist::whereVerified(false)->where('created_at', '<', now()->subMinutes(config('constants.waitlist.expiration')))->get();
         foreach ($waitlist as $item) {
             $item->delete();
         }

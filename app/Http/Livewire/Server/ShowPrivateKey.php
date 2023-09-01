@@ -6,7 +6,7 @@ use App\Models\Server;
 use Livewire\Component;
 use Masmerise\Toaster\Toaster;
 
-class PrivateKey extends Component
+class ShowPrivateKey extends Component
 {
     public Server $server;
     public $privateKeys;

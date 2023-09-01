@@ -23,7 +23,7 @@ class NotReachable extends Notification implements ShouldQueue
     public function via(object $notifiable): array
     {
         $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
+        $isEmailEnabled = isEmailEnabled($notifiable);
         $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
         $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_status_changes');
         $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_status_changes');

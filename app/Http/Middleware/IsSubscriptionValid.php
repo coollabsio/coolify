@@ -6,14 +6,14 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class SubscriptionValid
+class IsSubscriptionValid
 {
     public function handle(Request $request, Closure $next): Response
     {
         if (isInstanceAdmin()) {
             return $next($request);
         }
-        if (!auth()->user() || !is_cloud()) {
+        if (!auth()->user() || !isCloud()) {
             if ($request->path() === 'subscription') {
                 return redirect('/');
             } else {

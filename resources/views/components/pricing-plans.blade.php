@@ -3,21 +3,21 @@
 ])
 <div x-data="{ selected: 'yearly' }" class="w-full pb-20">
     <div class="px-6 mx-auto lg:px-8">
-        <div class="flex justify-center mt-5">
+        <div class="flex justify-center">
             <fieldset
-                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded-full gap-x-1 ">
+                class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center text-white rounded gap-x-1 bg-white/5">
                 <legend class="sr-only">Payment frequency</legend>
-                <label class="cursor-pointer  rounded px-2.5 py-1"
+                <label class="cursor-pointer rounded px-2.5 py-1"
                     :class="selected === 'monthly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
-                <label class="cursor-pointer rounded  px-2.5 py-1"
+                <label class="cursor-pointer rounded px-2.5 py-1"
                     :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
-                    <span>Annually <span class="text-xs text-warning">(save ~1 month)<span></span>
+                    <span>Annually</span>
                 </label>
             </fieldset>
         </div>
@@ -167,9 +167,9 @@
                         <span>billed annually</span>
                     </span>
                     @if ($showSubscribeButtons)
-                    @isset($pro)
-                    {{ $pro }}
-                @endisset
+                        @isset($pro)
+                            {{ $pro }}
+                        @endisset
                     @endif
                     <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
                     </p>
@@ -181,7 +181,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            5 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
+                            10 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -191,6 +191,15 @@
                                     clip-rule="evenodd" />
                             </svg>
                             Basic Support
+                        </li>
+                        <li class="flex gap-x-3">
+                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                                aria-hidden="true">
+                                <path fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Included Email System
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"
@@ -229,7 +238,7 @@
                             {{ $ultimate }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastuctures and
+                    <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastructures and
                         manage them easily in one place.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
                         <li class="flex gap-x-3">
@@ -239,7 +248,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            15 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
+                            25 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -249,6 +258,15 @@
                                     clip-rule="evenodd" />
                             </svg>
                             Priority Support
+                        </li>
+                        <li class="flex gap-x-3">
+                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                                aria-hidden="true">
+                                <path fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Included Email System
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"

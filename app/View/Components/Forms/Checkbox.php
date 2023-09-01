@@ -17,7 +17,7 @@ class Checkbox extends Component
         public string|null $value = null,
         public string|null $label = null,
         public string|null $helper = null,
-        public bool        $instantSave = false,
+        public string|bool        $instantSave = false,
         public bool        $disabled = false,
         public string      $defaultClass = "toggle toggle-xs toggle-warning rounded disabled:bg-coolgray-200 disabled:opacity-50 placeholder:text-neutral-700"
     ) {

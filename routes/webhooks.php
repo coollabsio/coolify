@@ -181,7 +181,7 @@ Route::get('/waitlist/confirm', function () {
     ray($email, $confirmation_code);
     try {
         $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
-        if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.confirmation_valid_for_minutes'))) {
+        if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.expiration'))) {
             $found->verified = true;
             $found->save();
             send_internal_notification('Waitlist confirmed: ' . $email);
@@ -267,9 +267,11 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'customer.subscription.updated':
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
+                $planId = data_get($data, 'items.data.0.plan.id');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
                 $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
                 $subscription->update([
+                    'stripe_plan_id' => $planId,
                     'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                 ]);
                 break;
@@ -277,6 +279,8 @@ Route::post('/payments/stripe/events', function () {
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
                 $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
                 $subscription->update([
+                    'stripe_subscription_id' => null,
+                    'stripe_plan_id'=> null,
                     'stripe_cancel_at_period_end' => false,
                     'stripe_invoice_paid' => false,
                 ]);

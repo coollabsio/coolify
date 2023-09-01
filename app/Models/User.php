@@ -32,6 +32,7 @@ class User extends Authenticatable implements SendsEmail
             $team = [
                 'name' => $user->name . "'s Team",
                 'personal_team' => true,
+                'show_boarding' => true
             ];
             if ($user->id === 0) {
                 $team['id'] = 0;
@@ -91,29 +92,20 @@ class User extends Authenticatable implements SendsEmail
         return $found_root_team->count() > 0;
     }
 
-    public function personalTeam()
-    {
-        return $this->teams()->where('personal_team', true)->first();
-    }
-
     public function currentTeam()
     {
-        return $this->teams()->where('team_id', session('currentTeam')->id)->first();
+        return Team::find(session('currentTeam')->id);
     }
 
     public function otherTeams()
     {
-        $team_id = currentTeam()->id;
-        return auth()->user()->teams->filter(function ($team) use ($team_id) {
-            return $team->id != $team_id;
+        return auth()->user()->teams->filter(function ($team) {
+            return $team->id != currentTeam()->id;
         });
     }
 
     public function role()
     {
-        if ($this->teams()->where('team_id', 0)->first()) {
-            return 'admin';
-        }
-        return $this->teams()->where('team_id', currentTeam()->id)->first()->pivot->role;
+        return session('currentTeam')->pivot->role;
     }
 }

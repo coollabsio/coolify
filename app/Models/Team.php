@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsDiscord;
 use App\Notifications\Channels\SendsEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
 
@@ -14,6 +15,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
     protected $guarded = [];
     protected $casts = [
         'personal_team' => 'boolean',
+        'smtp_password' => 'encrypted',
+        'resend_api_key' => 'encrypted',
     ];
 
     public function routeNotificationForDiscord()
@@ -29,6 +32,27 @@ class Team extends Model implements SendsDiscord, SendsEmail
             return $recipients;
         }
         return explode(',', $recipients);
+    }
+    public function limits(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (config('coolify.self_hosted') || $this->id === 0) {
+                    $subscription = 'self-hosted';
+                } else {
+                    $subscription = data_get($this, 'subscription');
+                    if (is_null($subscription)) {
+                        $subscription = 'zero';
+                    } else {
+                        $subscription = $subscription->type();
+                    }
+                }
+                $serverLimit = config('constants.limits.server')[strtolower($subscription)];
+                $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
+                return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
+            }
+
+        );
     }
 
     public function members()

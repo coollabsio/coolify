@@ -3,7 +3,7 @@
         ->user()
         ->currentTeam()" />
     <livewire:team.form />
-    @if (is_cloud())
+    @if (isCloud())
         <div class="pb-8">
             <h2>Subscription</h2>
             @if (data_get(currentTeam(),
@@ -11,7 +11,7 @@
                 <livewire:subscription.actions />
             @else
                 <x-forms.button class="mt-4"><a class="text-white hover:no-underline"
-                        href="{{ route('subscription.show') }}">Subscribe Now</a>
+                        href="{{ route('subscription.index') }}">Subscribe Now</a>
                 </x-forms.button>
             @endif
 

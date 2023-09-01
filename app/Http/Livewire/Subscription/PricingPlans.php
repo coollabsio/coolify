@@ -48,8 +48,8 @@ class PricingPlans extends Component
                 'enabled' => true,
             ],
             'mode' => 'subscription',
-            'success_url' => route('subscription.success'),
-            'cancel_url' => route('subscription.show',['cancelled' => true]),
+            'success_url' => route('dashboard', ['success' => true]),
+            'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ];
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;
         if ($customer) {

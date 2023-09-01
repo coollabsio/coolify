@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\S3Storage;
-use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Models\Waitlist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
@@ -19,25 +17,19 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
-    public function waitlist() {
-        $waiting_in_line = Waitlist::whereVerified(true)->count();
-        return view('auth.waitlist', [
-            'waiting_in_line' => $waiting_in_line,
-        ]);
-    }
     public function subscription()
     {
-        if (!is_cloud()) {
+        if (!isCloud()) {
             abort(404);
         }
-        return view('subscription.show', [
+        return view('subscription.index', [
             'settings' => InstanceSettings::get(),
         ]);
     }
 
     public function license()
     {
-        if (!is_cloud()) {
+        if (!isCloud()) {
             abort(404);
         }
         return view('settings.license', [
@@ -47,23 +39,6 @@ class Controller extends BaseController
 
     public function force_passoword_reset() {
         return view('auth.force-password-reset');
-    }
-    public function dashboard()
-    {
-        $projects = Project::ownedByCurrentTeam()->get();
-        $servers = Server::ownedByCurrentTeam()->get();
-        $s3s = S3Storage::ownedByCurrentTeam()->get();
-        $resources = 0;
-        foreach ($projects as $project) {
-            $resources += $project->applications->count();
-            $resources += $project->postgresqls->count();
-        }
-        return view('dashboard', [
-            'servers' => $servers->count(),
-            'projects' => $projects->count(),
-            'resources' => $resources,
-            's3s' => $s3s,
-        ]);
     }
     public function boarding() {
         if (currentTeam()->boarding || isDev()) {
@@ -97,7 +72,7 @@ class Controller extends BaseController
         if (auth()->user()->isAdminFromSession()) {
             $invitations = TeamInvitation::whereTeamId(currentTeam()->id)->get();
         }
-        return view('team.show', [
+        return view('team.index', [
             'invitations' => $invitations,
         ]);
     }
@@ -146,7 +121,7 @@ class Controller extends BaseController
             if ($diff <= config('constants.invitation.link.expiration')) {
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
                 $invitation->delete();
-                return redirect()->route('team.show');
+                return redirect()->route('team.index');
             } else {
                 $invitation->delete();
                 abort(401);
@@ -168,7 +143,7 @@ class Controller extends BaseController
                 abort(401);
             }
             $invitation->delete();
-            return redirect()->route('team.show');
+            return redirect()->route('team.index');
         } catch (Throwable $th) {
             throw $th;
         }

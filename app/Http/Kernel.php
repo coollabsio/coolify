@@ -38,7 +38,7 @@ class Kernel extends HttpKernel
             \App\Http\Middleware\VerifyCsrfToken::class,
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
             \App\Http\Middleware\CheckForcePasswordReset::class,
-            \App\Http\Middleware\SubscriptionValid::class,
+            \App\Http\Middleware\IsSubscriptionValid::class,
             \App\Http\Middleware\IsBoardingFlow::class,
 
         ],

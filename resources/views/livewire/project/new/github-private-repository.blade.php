@@ -1,13 +1,12 @@
 <div>
     <div class="flex items-end gap-2">
         <h1>Create a new Application</h1>
-        <a href="{{ route('source.new') }}"><x-forms.button class="group-hover:text-white">
-                + Add New GitHub App
-            </x-forms.button>
-        </a>
+        <x-forms.button wire:click="saveFromRedirect('source.new')" class="group-hover:text-white">
+            + Add New GitHub App
+        </x-forms.button>
     </div>
     <div class="pb-4 ">Deploy any public or private git repositories through a GitHub App.</div>
-    @if ($github_apps->count() == 0)
+    @if ($github_apps->count() !== 0)
         <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
                 <ul class="pb-10 steps">
@@ -25,7 +24,7 @@
                                         {{ $ghapp->name }}
                                     </div>
                                     <div>{{ $ghapp->http_url }}</div>
-                                    <span wire:target="loadRepositories" wire:loading.delay
+                                    <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
                                         class="loading loading-xs text-warning loading-spinner"></span>
                                 </div>
                             </div>
@@ -39,7 +38,7 @@
                                     </div>
                                     <div class="text-xs text-gray-400 group-hover:text-white">
                                         {{ data_get($ghapp, 'html_url') }}</div>
-                                    <span wire:target="loadRepositories" wire:loading.delay
+                                    <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
                                         class="">Loading...</span>
                                 </div>
                             </div>

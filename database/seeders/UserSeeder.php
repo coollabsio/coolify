@@ -15,10 +15,12 @@ class UserSeeder extends Seeder
             'email' => 'test@example.com',
         ]);
         User::factory()->create([
+            'id' => 1,
             'name' => 'Normal User (but in root team)',
             'email' => 'test2@example.com',
         ]);
         User::factory()->create([
+            'id' => 2,
             'name' => 'Normal User (not in root team)',
             'email' => 'test3@example.com',
         ]);

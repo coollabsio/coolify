@@ -42,6 +42,9 @@ class Create extends Component
                 'is_system_wide' => $this->is_system_wide,
                 'team_id' => currentTeam()->id,
             ]);
+            if (session('from')) {
+                session(['from' => session('from') + ['source_id' => $github_app->id]]);
+            }
             redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);

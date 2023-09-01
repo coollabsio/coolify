@@ -58,9 +58,11 @@ function format_docker_envs_to_json($rawOutput)
 }
 
 function getApplicationContainerStatus(Application $application) {
-    $server = $application->destination->server;
+    $server = data_get($application,'destination.server');
     $id = $application->id;
-
+    if (!$server) {
+        return 'exited';
+    }
     $containers = getCurrentApplicationContainerStatus($server, $id);
     if ($containers->count() > 0) {
         $status = data_get($containers[0], 'State', 'exited');
