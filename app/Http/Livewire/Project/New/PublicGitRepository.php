@@ -39,7 +39,7 @@ class PublicGitRepository extends Component
         'publish_directory' => 'publish directory',
     ];
     private object $repository_url_parsed;
-    private GithubApp|GitlabApp $git_source;
+    private GithubApp|GitlabApp|null $git_source = null;
     private string $git_host;
     private string $git_repository;
 
@@ -67,18 +67,17 @@ class PublicGitRepository extends Component
 
     public function load_branch()
     {
-        $this->branch_found = false;
+        try {
+            $this->branch_found = false;
         $this->validate([
             'repository_url' => 'required|url'
         ]);
         $this->get_git_source();
-        try {
-            $this->get_branch();
-            $this->selected_branch = $this->git_branch;
+        $this->get_branch();
+        $this->selected_branch = $this->git_branch;
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }
-
         if (!$this->branch_found && $this->git_branch == 'main') {
             try {
                 $this->git_branch = 'master';
@@ -102,6 +101,9 @@ class PublicGitRepository extends Component
             $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
         } elseif ($this->git_host == 'bitbucket.org') {
             // Not supported yet
+        }
+        if (is_null($this->git_source)) {
+            throw new \Exception('Git source not found. What?!');
         }
     }
 

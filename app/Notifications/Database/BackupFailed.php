@@ -14,12 +14,13 @@ class BackupFailed extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public string $message = 'Backup FAILED';
-
+    public string $name;
+    public string $frequency;
 
     public function __construct(ScheduledDatabaseBackup $backup, public $database, public $output)
     {
-        $this->message = "❌ Database backup for {$database->name} with frequency of $backup->frequency was FAILED.\n\nReason: $output";
+        $this->name = $database->name;
+        $this->frequency = $backup->frequency;
     }
 
     public function via(object $notifiable): array
@@ -36,20 +37,23 @@ class BackupFailed extends Notification implements ShouldQueue
         if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
             $channels[] = DiscordChannel::class;
         }
-        ray($channels);
         return $channels;
     }
 
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("❌ Backup FAILED for {$this->database->name}");
-        $mail->line($this->message);
+        $mail->subject("❌ [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
+        $mail->view('emails.backup-failed', [
+            'name' => $this->name,
+            'frequency' => $this->frequency,
+            'output' => $this->output,
+        ]);
         return $mail;
     }
 
     public function toDiscord(): string
     {
-        return $this->message;
+        return "❌ Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
     }
 }

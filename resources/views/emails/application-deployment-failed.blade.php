@@ -1,8 +1,11 @@
-@if ($pull_request_id !== 0)
-    Pull Request #{{ $pull_request_id }} of {{ $name }} (<a target="_blank"
-        href="{{ $fqdn }}">{{ $fqdn }}</a>) deployment failed:
-@else
-    Deployment failed of {{ $name }} (<a target="_blank" href="{{ $fqdn }}">{{ $fqdn }}</a>):
-@endif
+<x-emails.layout>
+    @if ($pull_request_id === 0)
+        Failed to deploy a new version of {{ $name }} at [{{ $fqdn }}]({{ $fqdn }}) .
+    @else
+        Failed to deploy a pull request #{{ $pull_request_id }} of {{ $name }} at
+        [{{ $fqdn }}]({{ $fqdn }}).
+    @endif
 
-<a target="_blank" href="{{ $deployment_url }}">View Deployment Logs</a><br><br>
+[View Deployment Logs]({{ $deployment_url }})
+
+</x-emails.layout>

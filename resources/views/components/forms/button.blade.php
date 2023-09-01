@@ -12,8 +12,8 @@
     @if ($attributes->get('type') === 'submit')
         <span wire:target="submit" wire:loading.delay class="loading loading-xs text-warning loading-spinner"></span>
     @else
-        @if ($attributes->has('wire:click'))
-            <span wire:target="{{ $attributes->get('wire:click') }}" wire:loading.delay
+        @if ($attributes->whereStartsWith('wire:click')->first())
+            <span wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay
                 class="loading loading-xs loading-spinner"></span>
         @endif
     @endif

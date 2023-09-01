@@ -20,16 +20,19 @@ class InvitationLink extends Notification implements ShouldQueue
         return [TransactionalEmailChannel::class];
     }
 
-    public function toMail(User $user): MailMessage
+    public function __construct(public User $user)
     {
-        $invitation = TeamInvitation::whereEmail($user->email)->first();
+    }
+    public function toMail(): MailMessage
+    {
+        $invitation = TeamInvitation::whereEmail($this->user->email)->first();
         $invitation_team = Team::find($invitation->team->id);
 
         $mail = new MailMessage();
         $mail->subject('Invitation for ' . $invitation_team->name);
         $mail->view('emails.invitation-link', [
             'team' => $invitation_team->name,
-            'email' => $user->email,
+            'email' => $this->user->email,
             'invitation_link' => $invitation->link,
         ]);
         return $mail;

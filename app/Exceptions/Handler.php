@@ -5,6 +5,7 @@ namespace App\Exceptions;
 use App\Models\InstanceSettings;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Sentry\Laravel\Integration;
+use Sentry\State\Scope;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -48,6 +49,11 @@ class Handler extends ExceptionHandler
             if ($this->settings->do_not_track || isDev()) {
                 return;
             }
+            app('sentry')->configureScope(
+                function (Scope $scope){
+                    $scope->setUser(['id'=> config('sentry.server_name')]);
+                }
+            );
             Integration::captureUnhandledException($e);
         });
     }

@@ -26,33 +26,33 @@ class TransactionalEmailChannel
         }
         $this->bootConfigs();
         $mailMessage = $notification->toMail($notifiable);
-        if ($this->isResend) {
-            Mail::send(
-                [],
-                [],
-                fn (Message $message) => $message
-                    ->from(
-                        data_get($settings, 'smtp_from_address'),
-                        data_get($settings, 'smtp_from_name'),
-                    )
-                    ->to($email)
-                    ->subject($mailMessage->subject)
-                    ->html((string)$mailMessage->render())
-            );
-        } else {
-            Mail::send(
-                [],
-                [],
-                fn (Message $message) => $message
-                    ->from(
-                        data_get($settings, 'smtp_from_address'),
-                        data_get($settings, 'smtp_from_name'),
-                    )
-                    ->bcc($email)
-                    ->subject($mailMessage->subject)
-                    ->html((string)$mailMessage->render())
-            );
-        }
+        // if ($this->isResend) {
+        Mail::send(
+            [],
+            [],
+            fn (Message $message) => $message
+                ->from(
+                    data_get($settings, 'smtp_from_address'),
+                    data_get($settings, 'smtp_from_name'),
+                )
+                ->to($email)
+                ->subject($mailMessage->subject)
+                ->html((string)$mailMessage->render())
+        );
+        // } else {
+        //     Mail::send(
+        //         [],
+        //         [],
+        //         fn (Message $message) => $message
+        //             ->from(
+        //                 data_get($settings, 'smtp_from_address'),
+        //                 data_get($settings, 'smtp_from_name'),
+        //             )
+        //             ->bcc($email)
+        //             ->subject($mailMessage->subject)
+        //             ->html((string)$mailMessage->render())
+        //     );
+        // }
     }
 
     private function bootConfigs(): void
