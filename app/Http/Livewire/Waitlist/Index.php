@@ -1,22 +1,27 @@
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Http\Livewire\Waitlist;
 
 use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\User;
-use App\Models\Waitlist as ModelsWaitlist;
+use App\Models\Waitlist;
 use Livewire\Component;
 
-class Waitlist extends Component
+class Index extends Component
 {
     public string $email;
-    public int $waiting_in_line = 0;
+    public int $waitingInLine = 0;
 
     protected $rules = [
         'email' => 'required|email',
     ];
+    public function render()
+    {
+        return view('livewire.waitlist.index')->layout('layouts.simple');
+    }
     public function mount()
     {
+        $this->waitingInLine = Waitlist::whereVerified(true)->count();
         if (isDev()) {
             $this->email = 'waitlist@example.com';
         }
@@ -29,7 +34,7 @@ class Waitlist extends Component
             if ($already_registered) {
                 throw new \Exception('You are already on the waitlist or registered. <br>Please check your email to verify your email address or contact support.');
             }
-            $found = ModelsWaitlist::where('email', $this->email)->first();
+            $found = Waitlist::where('email', $this->email)->first();
             if ($found) {
                 if (!$found->verified) {
                     $this->emit('error', 'You are already on the waitlist. <br>Please check your email to verify your email address.');
@@ -38,7 +43,7 @@ class Waitlist extends Component
                 $this->emit('error', 'You are already on the waitlist. <br>You will be notified when your turn comes. <br>Thank you.');
                 return;
             }
-            $waitlist = ModelsWaitlist::create([
+            $waitlist = Waitlist::create([
                 'email' => $this->email,
                 'type' => 'registration',
             ]);

@@ -23,7 +23,7 @@
             <x-forms.input id="email" type="email" label="Email" placeholder="youareawesome@protonmail.com" />
             <x-forms.button type="submit">Join Waitlist</x-forms.button>
         </form>
-        Waiting in the line: <span class="font-bold text-warning">{{ $waiting_in_line }}</span>
+        Waiting in the line: <span class="font-bold text-warning">{{ $waitingInLine }}</span>
         <div class="pt-4">
             See the pricing <a href="https://coolify.io/pricing" class="text-warning">here</a>.
         </div>

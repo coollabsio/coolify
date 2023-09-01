@@ -6,7 +6,6 @@ use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\Server;
 use Livewire\Component;
-use Log;
 
 class Dashboard extends Component
 {

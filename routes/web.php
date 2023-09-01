@@ -11,6 +11,7 @@ use App\Http\Livewire\Boarding\Server as BoardingServer;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
+use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -46,7 +47,7 @@ Route::post('/forgot-password', function (Request $request) {
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
-Route::get('/waitlist', [Controller::class, 'waitlist'])->name('auth.waitlist');
+Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);

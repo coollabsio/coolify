@@ -5,11 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\InstanceSettings;
 use App\Models\Project;
 use App\Models\S3Storage;
-use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use App\Models\Waitlist;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
@@ -19,12 +17,6 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
-    public function waitlist() {
-        $waiting_in_line = Waitlist::whereVerified(true)->count();
-        return view('auth.waitlist', [
-            'waiting_in_line' => $waiting_in_line,
-        ]);
-    }
     public function subscription()
     {
         if (!isCloud()) {
