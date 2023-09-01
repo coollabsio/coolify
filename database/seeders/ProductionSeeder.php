@@ -45,7 +45,7 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        if (config('app.name') !== 'coolify-cloud') {
+        if (config('app.name') !== 'Coolify Cloud') {
             // Save SSH Keys for the Coolify Host
             $coolify_key_name = "id.root@host.docker.internal";
             $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
