@@ -12,12 +12,6 @@ class StartProxy
 {
     public function __invoke(Server $server): Activity
     {
-        // TODO: check for other proxies
-        if (is_null(data_get($server, 'proxy.type'))) {
-            $server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
-            $server->proxy->status = ProxyStatus::EXITED->value;
-            $server->save();
-        }
         $proxy_path = get_proxy_path();
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];

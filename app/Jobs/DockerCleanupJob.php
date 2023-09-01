@@ -34,7 +34,13 @@ class DockerCleanupJob implements ShouldQueue
                 if (isDev()) {
                     $this->dockerRootFilesystem = "/";
                 } else {
-                    $this->dockerRootFilesystem = instant_remote_process(["stat --printf=%m $(docker info --format '{{json .DockerRootDir}}'' |sed 's/\"//g')"], $server, false);
+                    $this->dockerRootFilesystem = instant_remote_process(
+                        [
+                            "stat --printf=%m $(docker info --format '{{json .DockerRootDir}}'' |sed 's/\"//g')"
+                        ],
+                        $server,
+                        false
+                    );
                 }
                 if (!$this->dockerRootFilesystem) {
                     continue;
@@ -47,9 +53,9 @@ class DockerCleanupJob implements ShouldQueue
                     instant_remote_process(['docker builder prune -af'], $server);
                     $usageAfter = $this->getFilesystemUsage($server);
                     if ($usageAfter <  $this->usageBefore) {
-                        ray('Saved ' . ( $this->usageBefore - $usageAfter) . '% disk space on ' . $server->name)->color('orange');
-                        send_internal_notification('DockerCleanupJob done: Saved ' . ( $this->usageBefore - $usageAfter) . '% disk space on ' . $server->name);
-                    }else {
+                        ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $server->name)->color('orange');
+                        send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $server->name);
+                    } else {
                         ray('DockerCleanupJob failed to save disk space on ' . $server->name)->color('orange');
                     }
                 } else {
