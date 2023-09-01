@@ -86,7 +86,7 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
 
 function generateApplicationContainerName(string $uuid, int $pull_request_id = 0)
 {
-    $now = now()->format('YmdHis');
+    $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         return $uuid . '-pr-' . $pull_request_id . '-' . $now;
     } else {
