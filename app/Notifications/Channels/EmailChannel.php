@@ -20,35 +20,33 @@ class EmailChannel
         }
 
         $mailMessage = $notification->toMail($notifiable);
-        if ($this->isResend) {
-            foreach ($recepients as $receipient) {
-                Mail::send(
-                    [],
-                    [],
-                    fn (Message $message) => $message
-                        ->from(
-                            data_get($notifiable, 'smtp_from_address'),
-                            data_get($notifiable, 'smtp_from_name'),
-                        )
-                        ->to($receipient)
-                        ->subject($mailMessage->subject)
-                        ->html((string)$mailMessage->render())
-                );
-            }
-        } else {
-            Mail::send(
-                [],
-                [],
-                fn (Message $message) => $message
-                    ->from(
-                        data_get($notifiable, 'smtp_from_address'),
-                        data_get($notifiable, 'smtp_from_name'),
-                    )
-                    ->bcc($recepients)
-                    ->subject($mailMessage->subject)
-                    ->html((string)$mailMessage->render())
-            );
-        }
+        // if ($this->isResend) {
+        Mail::send(
+            [],
+            [],
+            fn (Message $message) => $message
+                ->from(
+                    data_get($notifiable, 'smtp_from_address'),
+                    data_get($notifiable, 'smtp_from_name'),
+                )
+                ->to($recepients)
+                ->subject($mailMessage->subject)
+                ->html((string)$mailMessage->render())
+        );
+        // } else {
+        //     Mail::send(
+        //         [],
+        //         [],
+        //         fn (Message $message) => $message
+        //             ->from(
+        //                 data_get($notifiable, 'smtp_from_address'),
+        //                 data_get($notifiable, 'smtp_from_name'),
+        //             )
+        //             ->bcc($recepients)
+        //             ->subject($mailMessage->subject)
+        //             ->html((string)$mailMessage->render())
+        //     );
+        // }
     }
 
     private function bootConfigs($notifiable): void

@@ -18,15 +18,15 @@ class DeploymentFailed extends Notification implements ShouldQueue
 
     public Application $application;
     public string $deployment_uuid;
-    public ApplicationPreview|null $preview;
+    public ?ApplicationPreview $preview = null;
 
     public string $application_name;
-    public string|null $deployment_url = null;
+    public ?string $deployment_url = null;
     public string $project_uuid;
     public string $environment_name;
-    public string|null $fqdn;
+    public ?string $fqdn = null;
 
-    public function __construct(Application $application, string $deployment_uuid, ApplicationPreview|null $preview)
+    public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)
     {
         $this->application = $application;
         $this->deployment_uuid = $deployment_uuid;
@@ -67,9 +67,8 @@ class DeploymentFailed extends Notification implements ShouldQueue
             $mail->subject('❌ Deployment failed of ' . $this->application_name . '.');
         } else {
             $fqdn = $this->preview->fqdn;
-            $mail->subject('❌ Pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . ' deployment failed.');
+            $mail->subject('❌ Deployment failed of pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . '.');
         }
-
         $mail->view('emails.application-deployment-failed', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,

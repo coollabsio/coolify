@@ -1,8 +1,10 @@
-@if ($pull_request_id === 0)
-    A new version of <a target="_blank" href="{{ $fqdn }}">{{ $fqdn }}</a> is available:
-@else
-    Pull request #{{ $pull_request_id }} of {{ $name }} deployed successfully: <a target="_blank"
-        href="{{ $fqdn }}">Application Link</a> |
-@endif
-<a target="_blank" href="{{ $deployment_url }}">View
-    Deployment Logs</a><br><br>
+<x-emails.layout>
+    @if ($pull_request_id === 0)
+        A new version of {{ $name }} is available at [{{ $fqdn }}]({{ $fqdn }}) .
+    @else
+        Pull request #{{ $pull_request_id }} of {{ $name }} deployed successfully [{{ $fqdn }}]({{ $fqdn }}).
+    @endif
+
+[View Deployment Logs]({{ $deployment_url }})
+
+</x-emails.layout>

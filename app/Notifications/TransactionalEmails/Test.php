@@ -24,7 +24,7 @@ class Test extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject('Test Notification');
+        $mail->subject('Test Email');
         $mail->view('emails.test');
         return $mail;
     }

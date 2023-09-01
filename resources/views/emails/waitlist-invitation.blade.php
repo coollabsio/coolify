@@ -1,13 +1,19 @@
-You have been invited to join the Coolify Cloud. <a href="{{base_url()}}/login">Login here</a>
-<br>
-<br>
+<x-emails.layout>
+You have been invited to join the Coolify Cloud.
+
+[Login here]({{base_url()}}/login)
+
 Here is your initial login information.
-<br>
-Email: <br>
-{{ $email }}
-<br><br>
-Password:<br>
-{{ $password }}
-<br><br>
+
+Email:
+
+**{{ $email }}**
+
+Initial Password:
+
+**{{ $password }}**
+
 (You will forced to change it on first login.)
+
+</x-emails.layout>
 

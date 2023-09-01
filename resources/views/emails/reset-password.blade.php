@@ -1,6 +1,7 @@
-A password reset requested for your email address on "{{ config('app.name') }}".<br><br>
+<x-emails.layout>
+A password reset has been requested for this email address on [{{ config('app.name') }}]({{ config('app.url') }}).
 
-Please click the following link to reset your password: <a target="_blank" href="{{ $url }}">Password
-    Reset</a><br><br>
+Click [here]({{ $url }}) to reset your password.
 
-This password reset link will expire in {{ $count }} minutes.
+This link will expire in {{ $count }} minutes.
+</x-emails.layout>
