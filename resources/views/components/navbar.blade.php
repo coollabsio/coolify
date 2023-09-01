@@ -65,7 +65,7 @@
                 </a>
             </li>
             <div class="flex-1"></div>
-            @if (isInstanceAdmin())
+            @if (isInstanceAdmin() && !isCloud())
                 <livewire:upgrade />
             @endif
             <li title="Profile">
