@@ -9,6 +9,7 @@ use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index;
 use App\Http\Livewire\Boarding\Server as BoardingServer;
 use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Help;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
@@ -103,6 +104,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.index');
+    // Route::get('/help', Help::class)->name('help');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');

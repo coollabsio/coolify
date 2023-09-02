@@ -7,7 +7,6 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -261,15 +260,10 @@ function send_user_an_email(MailMessage $mail, string $email): void
         [],
         [],
         fn (Message $message) => $message
-            ->from(
-                data_get($settings, 'smtp_from_address'),
-                data_get($settings, 'smtp_from_name')
-            )
             ->to($email)
             ->subject($mail->subject)
             ->html((string) $mail->render())
     );
-
 }
 function isEmailEnabled($notifiable)
 {

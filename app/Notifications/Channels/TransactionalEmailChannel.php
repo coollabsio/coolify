@@ -12,7 +12,6 @@ use Log;
 
 class TransactionalEmailChannel
 {
-    private bool $isResend = false;
     public function send(User $notifiable, Notification $notification): void
     {
         $settings = InstanceSettings::get();
@@ -26,33 +25,14 @@ class TransactionalEmailChannel
         }
         $this->bootConfigs();
         $mailMessage = $notification->toMail($notifiable);
-        // if ($this->isResend) {
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
-                ->from(
-                    data_get($settings, 'smtp_from_address'),
-                    data_get($settings, 'smtp_from_name'),
-                )
                 ->to($email)
                 ->subject($mailMessage->subject)
                 ->html((string)$mailMessage->render())
         );
-        // } else {
-        //     Mail::send(
-        //         [],
-        //         [],
-        //         fn (Message $message) => $message
-        //             ->from(
-        //                 data_get($settings, 'smtp_from_address'),
-        //                 data_get($settings, 'smtp_from_name'),
-        //             )
-        //             ->bcc($email)
-        //             ->subject($mailMessage->subject)
-        //             ->html((string)$mailMessage->render())
-        //     );
-        // }
     }
 
     private function bootConfigs(): void
@@ -60,9 +40,6 @@ class TransactionalEmailChannel
         $type = set_transanctional_email_settings();
         if (!$type) {
             throw new Exception('No email settings found.');
-        }
-        if ($type === 'resend') {
-            $this->isResend = true;
         }
     }
 }

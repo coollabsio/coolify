@@ -47,6 +47,9 @@ function getEndDate()
 
 function isSubscriptionActive()
 {
+    if (!isCloud()) {
+        return false;
+    }
     $team = currentTeam();
     if (!$team) {
         return false;
