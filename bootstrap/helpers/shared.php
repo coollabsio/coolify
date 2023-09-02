@@ -149,6 +149,8 @@ function set_transanctional_email_settings(InstanceSettings | null $settings = n
     if (!$settings) {
         $settings = InstanceSettings::get();
     }
+    config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
+    config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
     if (data_get($settings, 'resend_enabled')) {
         config()->set('mail.default', 'resend');
         config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
