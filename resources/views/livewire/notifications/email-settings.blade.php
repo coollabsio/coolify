@@ -35,7 +35,13 @@
             <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
                 label="Use hosted email service" />
         </div>
+    @else
+    <div class="pb-4 w-96">
+        <x-forms.checkbox disabled id="team.use_instance_email_settings"
+            label="Use hosted email service (Pro+ subscription required)" />
+    </div>
     @endif
+    <h3 class="pb-4">Custom Email Service</h3>
     @if (!$team->use_instance_email_settings)
         <form class="flex flex-col items-end gap-2 pb-4 xl:flex-row" wire:submit.prevent='submitFromFields'>
             <x-forms.input required id="team.smtp_from_name" helper="Name used in emails." label="From Name" />
