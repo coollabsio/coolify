@@ -28,7 +28,7 @@
             This is a paid & hosted version of Coolify.<br> See the pricing <a href="https://coolify.io/pricing" class="text-warning">here</a>.
         </div>
         <div class="pt-4">
-           If you are looking for a free, limitless & self-hosted version, go <a href="https://coolify.io" class="text-warning">here</a>.
+           If you are looking for the self-hosted version go <a href="https://coolify.io" class="text-warning">here</a>.
         </div>
     </div>
 </div>
