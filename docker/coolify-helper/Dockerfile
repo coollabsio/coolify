@@ -38,5 +38,5 @@ COPY --from=minio/mc /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "while true; do sleep 1; done"]
+CMD ["tail", "-f", "/dev/null"]
 
