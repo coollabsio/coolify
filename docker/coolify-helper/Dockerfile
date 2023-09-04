@@ -2,19 +2,19 @@ FROM alpine:3.17
 
 ARG TARGETPLATFORM
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.5
+ARG DOCKER_VERSION=23.0.6
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.21.0
+ARG DOCKER_COMPOSE_VERSION=2.18.1
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.11.2
+ARG DOCKER_BUILDX_VERSION=0.10.5
 # https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.30.0
+ARG PACK_VERSION=0.29.0
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.13.0
+ARG NIXPACKS_VERSION=1.12.0
 
 USER root
 WORKDIR /artifacts
-RUN apk add --no-cache bash curl git git-lfs openssh-client tar
+RUN apk add --no-cache bash curl git git-lfs openssh-client tar tini
 RUN mkdir -p ~/.docker/cli-plugins
 RUN if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
     curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \
@@ -37,4 +37,6 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
 COPY --from=minio/mc /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
-CMD ["tail", "-f", "/dev/null"]
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["sh", "-c", "while true; do sleep 1; done"]
+
