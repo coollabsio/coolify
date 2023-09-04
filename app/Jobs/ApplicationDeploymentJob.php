@@ -306,10 +306,10 @@ class ApplicationDeploymentJob implements ShouldQueue
     {
         $this->execute_remote_command(
             [
-                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-helper).'",
+                "echo -n 'Pulling latest version of the helper image (ghcr.io/coollabsio/coolify-helper).'",
             ],
             [
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper",
+                "docker run --pull=always -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper",
                 "hidden" => true,
             ],
             [
@@ -659,7 +659,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -692,12 +692,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]
             );
         } else {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
