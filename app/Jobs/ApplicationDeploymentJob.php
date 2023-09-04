@@ -67,12 +67,6 @@ class ApplicationDeploymentJob implements ShouldQueue
     private Collection $saved_outputs;
 
     public $tries = 1;
-    public function middleware(): array
-    {
-        return [
-            (new WithoutOverlapping("dockerimagejobs"))->shared(),
-        ];
-    }
     public function __construct(int $application_deployment_queue_id)
     {
         ray()->clearScreen();
