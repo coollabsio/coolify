@@ -310,7 +310,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         if (isDev()) {
             $pull = "--pull=never";
         }
-        $runCommand = "docker run --init {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper";
+        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper";
 
         $this->execute_remote_command(
             [
