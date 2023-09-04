@@ -77,6 +77,7 @@ function generate_ssh_command(string $private_key_location, string $server_ip, s
     if ($isMux && config('coolify.mux_enabled')) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
+    $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $ssh_command .= "-i {$private_key_location} "
         . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         . '-o PasswordAuthentication=no '
@@ -214,5 +215,31 @@ function check_server_connection(Server $server)
     } finally {
         $server->settings->save();
         $server->save();
+    }
+}
+
+function checkRequiredCommands(Server $server)
+{
+    $commands = collect(["jq", "jc"]);
+    foreach ($commands as $command) {
+        $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
+        if ($commandFound) {
+            ray($command . ' found');
+            continue;
+        }
+        try {
+            instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
+        } catch (\Exception $e) {
+            ray('could not install ' . $command);
+            ray($e);
+            break;
+        }
+        $commandFound = instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'command -v {$command}'"], $server, false);
+        if ($commandFound) {
+            ray($command . ' found');
+            continue;
+        }
+        ray('could not install ' . $command);
+        break;
     }
 }

@@ -41,7 +41,7 @@ echo -e "-------------"
 echo "Installing required packages..."
 
 apt update -y >/dev/null 2>&1
-apt install -y curl wget git jq >/dev/null 2>&1
+apt install -y curl wget git jq jc >/dev/null 2>&1
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."

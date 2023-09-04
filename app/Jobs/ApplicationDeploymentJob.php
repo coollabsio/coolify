@@ -66,6 +66,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private $log_model;
     private Collection $saved_outputs;
 
+    public $tries = 1;
     public function middleware(): array
     {
         return [
@@ -242,7 +243,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     }
     private function health_check()
     {
-        ray('New container name: ',$this->container_name);
+        ray('New container name: ', $this->container_name);
         if ($this->container_name) {
             $counter = 0;
             $this->execute_remote_command(
@@ -264,7 +265,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                 );
                 $this->execute_remote_command(
                     [
-                        "echo 'New application version health check status: {$this->saved_outputs->get('health_check')}'"
+                        "echo 'New version health check status: {$this->saved_outputs->get('health_check')}'"
                     ],
                 );
                 if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
@@ -272,6 +273,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                         [
                             "echo 'Rolling update completed.'"
                         ],
+                        ["echo -n '######################'"],
                     );
                     break;
                 }
@@ -304,17 +306,24 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function prepare_builder_image()
     {
+        $pull = "--pull=always";
+        if (isDev()) {
+            $pull = "--pull=never";
+        }
+        $runCommand = "docker run --init {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper";
+
         $this->execute_remote_command(
             [
                 "echo -n 'Pulling latest version of the helper image (ghcr.io/coollabsio/coolify-helper).'",
             ],
             [
-                "docker run --pull=always -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper",
+                $runCommand,
                 "hidden" => true,
             ],
             [
                 "command" => $this->execute_in_builder("mkdir -p {$this->workdir}")
             ],
+            ["echo -n '######################'"],
         );
     }
 
@@ -654,7 +663,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private function build_image()
     {
         $this->execute_remote_command([
-            "echo -n 'Building docker image.'",
+            "echo -n 'Building docker image for your application.'",
         ]);
 
         if ($this->application->settings->is_static) {
@@ -715,6 +724,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         $this->execute_remote_command(
+            ["echo -n '######################'"],
             ["echo -n 'Rolling update started.'"],
             [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
         );
