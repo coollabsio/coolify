@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2 pb-6 ">
         <h2>Private Key</h2>
-        <a href="{{ route('private-key.new') }}">
+        <a href="{{ route('security.private-key.new') }}">
             <x-forms.button>Add a new Private Key</x-forms.button>
         </a>
         <x-forms.button wire:click.prevent='checkConnection'>
@@ -13,7 +13,7 @@
         @if (data_get($server, 'privateKey.uuid'))
             <div>
                 Currently attached Private Key:
-                <a href="{{ route('private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
+                <a href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
                     <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
                 </a>
             </div>

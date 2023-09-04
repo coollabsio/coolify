@@ -1,7 +1,5 @@
 <x-layout>
-    <x-team.navbar :team="auth()
-        ->user()
-        ->currentTeam()" />
+    <x-team.navbar />
     <h2>Members</h2>
     <div class="pt-4 overflow-hidden">
         <table>

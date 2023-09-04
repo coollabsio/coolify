@@ -1,7 +1,5 @@
 <x-layout>
-    <x-team.navbar :team="auth()
-        ->user()
-        ->currentTeam()" />
+    <x-team.navbar />
     <livewire:team.form />
     @if (isCloud())
         <div class="pb-8">
