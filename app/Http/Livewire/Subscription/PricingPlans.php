@@ -44,7 +44,7 @@ class PricingPlans extends Component
                 'price' => $priceId,
                 'quantity' => 1,
             ]],
-            'tax_id_collection' => [
+            'automatic_tax' => [
                 'enabled' => true,
             ],
             'mode' => 'subscription',
