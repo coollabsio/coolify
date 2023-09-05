@@ -262,7 +262,10 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.payment_failed':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    return;
+                }
                 SubscriptionInvoiceFailedJob::dispatch($subscription->team);
                 break;
             case 'customer.subscription.updated':
