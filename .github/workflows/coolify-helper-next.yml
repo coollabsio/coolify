@@ -1,8 +1,8 @@
-name: Coolify Helper Image (v4)
+name: Coolify Helper Image Development (v4)
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "next" ]
     paths:
       - .github/workflows/coolify-helper.yml
       - docker/coolify-helper/Dockerfile
@@ -33,7 +33,7 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
   aarch64:
     runs-on: [ self-hosted, arm64 ]
     permissions:
@@ -55,7 +55,7 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/aarch64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -77,8 +77,8 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN  }}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
-          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}
+          webhook: ${{ secrets.DISCORD_WEBHOOK_DEV_RELEASE_CHANNEL  }}

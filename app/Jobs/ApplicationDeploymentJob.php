@@ -267,7 +267,6 @@ class ApplicationDeploymentJob implements ShouldQueue
                         [
                             "echo 'Rolling update completed.'"
                         ],
-                        ["echo -n '######################'"],
                     );
                     break;
                 }
@@ -304,11 +303,12 @@ class ApplicationDeploymentJob implements ShouldQueue
         if (isDev()) {
             $pull = "--pull=never";
         }
-        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper";
+        $helperImage = config('coolify.helper_image');
+        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
 
         $this->execute_remote_command(
             [
-                "echo -n 'Pulling latest version of the helper image (ghcr.io/coollabsio/coolify-helper).'",
+                "echo -n 'Pulling helper image from $helperImage.'",
             ],
             [
                 $runCommand,
@@ -317,7 +317,6 @@ class ApplicationDeploymentJob implements ShouldQueue
             [
                 "command" => $this->execute_in_builder("mkdir -p {$this->workdir}")
             ],
-            ["echo -n '######################'"],
         );
     }
 
@@ -497,7 +496,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             ],
             'networks' => [
                 $this->destination->network => [
-                    'external' => false,
+                    'external' => true,
                     'name' => $this->destination->network,
                     'attachable' => true,
                 ]
@@ -709,7 +708,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         if ($this->currently_running_container_name) {
             $this->execute_remote_command(
-                ["echo -n 'Removing old application version.'"],
+                ["echo -n 'Removing old version of your application.'"],
                 [$this->execute_in_builder("docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
             );
         }
@@ -718,7 +717,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         $this->execute_remote_command(
-            ["echo -n '######################'"],
             ["echo -n 'Rolling update started.'"],
             [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
         );
