@@ -1,11 +1,28 @@
-
 FROM debian:12-slim
+
+ARG TARGETPLATFORM
+# https://download.docker.com/linux/static/stable/
+ARG DOCKER_VERSION=24.0.5
+# https://github.com/docker/compose/releases
+ARG DOCKER_COMPOSE_VERSION=2.21.0
+# https://github.com/docker/buildx/releases
+ARG DOCKER_BUILDX_VERSION=0.11.2
+# https://github.com/buildpacks/pack/releases
+ARG PACK_VERSION=0.30.0
+# https://github.com/railwayapp/nixpacks/releases
+ARG NIXPACKS_VERSION=1.13.0
 
 USER root
 WORKDIR /root
 ENV PATH "$PATH:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin"
 
 RUN apt update && apt -y install openssh-client openssh-server curl wget git jq jc
+RUN mkdir -p ~/.docker/cli-plugins
+RUN curl -sSL https://github.com/docker/buildx/releases/download/v${DOCKER_BUILDX_VERSION}/buildx-v${DOCKER_BUILDX_VERSION}.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx
+RUN curl -sSL https://github.com/docker/compose/releases/download/v${DOCKER_COMPOSE_VERSION}/docker-compose-linux-x86_64 -o ~/.docker/cli-plugins/docker-compose
+RUN (curl -sSL https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz | tar -C /usr/bin/ --no-same-owner -xzv --strip-components=1 docker/docker)
+RUN chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /root/.docker/cli-plugins/docker-buildx
+
 
 # Setup sshd
 RUN ssh-keygen -A

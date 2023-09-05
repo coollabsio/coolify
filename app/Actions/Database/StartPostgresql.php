@@ -65,7 +65,7 @@ class StartPostgresql
             ],
             'networks' => [
                 $this->database->destination->network => [
-                    'external' => false,
+                    'external' => true,
                     'name' => $this->database->destination->network,
                     'attachable' => true,
                 ]

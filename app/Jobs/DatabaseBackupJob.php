@@ -77,7 +77,7 @@ class DatabaseBackupJob implements ShouldQueue
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
             }
-            $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".sql";
+            $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".dump";
             $this->backup_location = $this->backup_dir . $this->backup_file;
 
             $this->backup_log = ScheduledDatabaseBackupExecution::create([
@@ -107,7 +107,7 @@ class DatabaseBackupJob implements ShouldQueue
         try {
             ray($this->backup_dir);
             $commands[] = "mkdir -p " . $this->backup_dir;
-            $commands[] = "docker exec $this->container_name pg_dumpall -U {$this->database->postgres_user} > $this->backup_location";
+            $commands[] = "docker exec $this->container_name pg_dump -Fc -U {$this->database->postgres_user} > $this->backup_location";
 
             $this->backup_output = instant_remote_process($commands, $this->server);
 

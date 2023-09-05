@@ -6,7 +6,7 @@
 ###########
 
 VERSION="1.0.0"
-DOCKER_VERSION="23.0"
+DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
@@ -54,7 +54,6 @@ mkdir -p /etc/docker
 
 test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-$DATE || cat >/etc/docker/daemon.json <<EOL
 {
-  "live-restore": true,
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "10m",
@@ -64,7 +63,6 @@ test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon
 EOL
 cat >/etc/docker/daemon.json.coolify <<EOL
 {
-  "live-restore": true,
   "log-driver": "json-file",
   "log-opts": {
     "max-size": "10m",
