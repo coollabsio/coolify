@@ -10,8 +10,7 @@
             </ul>
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
-                <div class="box group"
-                    wire:click="set_type('public')">
+                <div class="box group" wire:click="setType('public')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Public Repository
@@ -21,8 +20,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="box group"
-                    wire:click="set_type('private-gh-app')">
+                <div class="box group" wire:click="setType('private-gh-app')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Private Repository
@@ -32,8 +30,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="box group"
-                    wire:click="set_type('private-deploy-key')">
+                <div class="box group" wire:click="setType('private-deploy-key')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Private Repository (with deploy key)
@@ -45,8 +42,7 @@
                 </div>
             </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
-                <div class="box group"
-                    wire:click="set_type('dockerfile')">
+                <div class="box group" wire:click="setType('dockerfile')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Based on a Dockerfile
@@ -58,18 +54,27 @@
                 </div>
             </div>
             <h2 class="py-4">Databases</h2>
-            <div class="flex flex-col justify-start gap-2 text-left xl:flex-row">
-                <div class="box group"
-                    wire:click="set_type('postgresql')">
+            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+                <div class="box group" wire:click="setType('postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
-                            PostgreSQL
+                            New PostgreSQL
                         </div>
                         <div class="text-xs group-hover:text-white">
                             The most loved relational database in the world.
                         </div>
                     </div>
                 </div>
+                {{-- <div class="box group" wire:click="setType('existing-postgresql')">
+                    <div class="flex flex-col mx-6">
+                        <div class="group-hover:text-white">
+                            Backup Existing PostgreSQL
+                        </div>
+                        <div class="text-xs group-hover:text-white">
+                            Schedule a backup of an existing PostgreSQL database.
+                        </div>
+                    </div>
+                </div> --}}
             </div>
         @endif
         @if ($current_step === 'servers')
@@ -80,8 +85,7 @@
             </ul>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @forelse($servers as $server)
-                    <div class="box group"
-                        wire:click="set_server({{ $server }})">
+                    <div class="box group" wire:click="setServer({{ $server }})">
                         <div class="flex flex-col mx-6">
                             <div class="group-hover:text-white">
                                 {{ $server->name }}
@@ -92,9 +96,9 @@
                     </div>
                 @empty
                     <div>
-                        <div>No validated & reachable servers found.  <a class="text-white underline" href="/servers">
-                            Go to servers page
-                        </a></div>
+                        <div>No validated & reachable servers found. <a class="text-white underline" href="/servers">
+                                Go to servers page
+                            </a></div>
 
                         <x-use-magic-bar link="/server/new" />
                     </div>
@@ -109,11 +113,10 @@
             </ul>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                 @foreach ($standaloneDockers as $standaloneDocker)
-                    <div class="box group"
-                        wire:click="set_destination('{{ $standaloneDocker->uuid }}')">
+                    <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
                             <div class="font-bold group-hover:text-white">
-                               Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
+                                Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
                             </div>
                             <div class="text-xs group-hover:text-white">
                                 network: {{ $standaloneDocker->network }}</div>
@@ -121,16 +124,21 @@
                     </div>
                 @endforeach
                 @foreach ($swarmDockers as $swarmDocker)
-                <div class="box group"
-                    wire:click="set_destination('{{ $swarmDocker->uuid }}')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold group-hover:text-white">
-                           Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                    <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold group-hover:text-white">
+                                Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            @endforeach
+                @endforeach
             </div>
+        @endif
+        @if ($current_step === 'existing-postgresql')
+        <form wire:submit.prevent='addExistingPostgresql' class="flex items-end gap-2">
+            <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL" id="existingPostgresqlUrl" />
+            <x-forms.button type="submit">Add Database</x-forms.button>
+        </form>
         @endif
     </div>
 </div>

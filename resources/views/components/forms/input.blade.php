@@ -26,7 +26,8 @@
                 wire:model.defer={{ $id }} wire:dirty.class.remove='text-white'
                 wire:dirty.class="input-warning" wire:loading.attr="disabled" type="{{ $type }}"
                 @readonly($readonly) @disabled($disabled) id="{{ $id }}" name="{{ $name }}"
-                placeholder="{{ $attributes->get('placeholder') }}">
+                placeholder="{{ $attributes->get('placeholder') }}"
+                aria-placeholder="{{ $attributes->get('placeholder') }}">
 
         </div>
     @else

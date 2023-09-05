@@ -22,34 +22,52 @@ class Select extends Component
     public Collection|array $swarmDockers = [];
     public array $parameters;
 
+    public ?string $existingPostgresqlUrl = null;
+
     protected $queryString = [
         'server',
     ];
     public function mount()
     {
         $this->parameters = get_route_parameters();
+        if (isDev()) {
+            $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
+        }
     }
 
-    public function set_type(string $type)
+    // public function addExistingPostgresql()
+    // {
+    //     try {
+    //         instantCommand("psql {$this->existingPostgresqlUrl} -c 'SELECT 1'");
+    //         $this->emit('success', 'Successfully connected to the database.');
+    //     } catch (\Exception $e) {
+    //         return general_error_handler($e, $this);
+    //     }
+    // }
+    public function setType(string $type)
     {
         $this->type = $type;
+        if ($type === "existing-postgresql") {
+            $this->current_step = $type;
+            return;
+        }
         if (count($this->servers) === 1) {
             $server = $this->servers->first();
-            $this->set_server($server);
+            $this->setServer($server);
             if (count($server->destinations()) === 1) {
-                $this->set_destination($server->destinations()->first()->uuid);
+                $this->setDestination($server->destinations()->first()->uuid);
             }
         }
         if (!is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server)->first();
             if ($foundServer) {
-                return $this->set_server($foundServer);
+                return $this->setServer($foundServer);
             }
         }
         $this->current_step = 'servers';
     }
 
-    public function set_server(Server $server)
+    public function setServer(Server $server)
     {
         $this->server_id = $server->id;
         $this->standaloneDockers = $server->standaloneDockers;
@@ -57,7 +75,7 @@ class Select extends Component
         $this->current_step = 'destinations';
     }
 
-    public function set_destination(string $destination_uuid)
+    public function setDestination(string $destination_uuid)
     {
         $this->destination_uuid = $destination_uuid;
         redirect()->route('project.resources.new', [

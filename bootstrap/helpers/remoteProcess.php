@@ -93,7 +93,18 @@ function generate_ssh_command(string $private_key_location, string $server_ip, s
 
     return $ssh_command;
 }
-
+function instantCommand(string $command, $throwError = true) {
+    $process = Process::run($command);
+    $output = trim($process->output());
+    $exitCode = $process->exitCode();
+    if ($exitCode !== 0) {
+        if (!$throwError) {
+            return null;
+        }
+        throw new \RuntimeException($process->errorOutput(), $exitCode);
+    }
+    return $output;
+}
 function instant_remote_process(array $command, Server $server, $throwError = true, $repeat = 1)
 {
     $command_string = implode("\n", $command);
