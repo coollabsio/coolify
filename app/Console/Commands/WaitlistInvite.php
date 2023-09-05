@@ -9,7 +9,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
-class InviteFromWaitlist extends Command
+class WaitlistInvite extends Command
 {
     public Waitlist|null $next_patient = null;
     public User|null $new_user = null;
@@ -19,7 +19,7 @@ class InviteFromWaitlist extends Command
      *
      * @var string
      */
-    protected $signature = 'app:invite-from-waitlist {email?}';
+    protected $signature = 'waitlist:invite {email?}';
 
     /**
      * The console command description.
