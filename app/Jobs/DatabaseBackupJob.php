@@ -77,7 +77,7 @@ class DatabaseBackupJob implements ShouldQueue
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
             }
-            $this->backup_file = "/dumpall-" . Carbon::now()->timestamp . ".dump";
+            $this->backup_file = "/pg_dump-" . Carbon::now()->timestamp . ".dump";
             $this->backup_location = $this->backup_dir . $this->backup_file;
 
             $this->backup_log = ScheduledDatabaseBackupExecution::create([
