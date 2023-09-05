@@ -176,8 +176,8 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->execute_in_builder("echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
             ],
         );
-        $this->build_image_name = "{$this->application->git_repository}:build";
-        $this->production_image_name = "{$this->application->uuid}:latest";
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
@@ -201,8 +201,8 @@ class ApplicationDeploymentJob implements ShouldQueue
             $tag = $tag->substr(0, 128);
         }
 
-        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
-        $this->production_image_name = "{$this->application->uuid}:{$tag}";
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
 
         if (!$this->force_rebuild) {
@@ -277,8 +277,8 @@ class ApplicationDeploymentJob implements ShouldQueue
     }
     private function deploy_pull_request()
     {
-        $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
-        $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
+        $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->application->git_repository}:{$this->application->git_branch}.'",
