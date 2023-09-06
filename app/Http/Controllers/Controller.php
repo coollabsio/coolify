@@ -8,15 +8,41 @@ use App\Models\S3Storage;
 use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Throwable;
+use Str;
+
 
 class Controller extends BaseController
 {
     use AuthorizesRequests, ValidatesRequests;
 
+    public function link()
+    {
+        $token = request()->get('token');
+        if ($token) {
+            $decrypted = Crypt::decryptString($token);
+            $email = Str::of($decrypted)->before('@@@');
+            $password = Str::of($decrypted)->after('@@@');
+            $user = User::whereEmail($email)->first();
+            if (!$user) {
+                return redirect()->route('login');
+            }
+            if (Hash::check($password, $user->password)) {
+                Auth::login($user);
+                $team = $user->teams()->first();
+                session(['currentTeam' => $team]);
+                return redirect()->route('dashboard');
+            }
+        }
+        return redirect()->route('login')->with('error', 'Invalid credentials.');
+    }
     public function subscription()
     {
         if (!isCloud()) {
@@ -37,10 +63,12 @@ class Controller extends BaseController
         ]);
     }
 
-    public function force_passoword_reset() {
+    public function force_passoword_reset()
+    {
         return view('auth.force-password-reset');
     }
-    public function boarding() {
+    public function boarding()
+    {
         if (currentTeam()->boarding || isDev()) {
             return view('boarding');
         } else {

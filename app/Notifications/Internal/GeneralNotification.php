@@ -12,12 +12,12 @@ class GeneralNotification extends Notification implements ShouldQueue
     use Queueable;
 
     public function __construct(public string $message)
-    {}
+    {
+    }
 
     public function via(object $notifiable): array
     {
-        $channels[] = DiscordChannel::class;
-        return $channels;
+        return [DiscordChannel::class];
     }
 
     public function toDiscord(): string

@@ -6,20 +6,20 @@ use App\Models\User;
 use App\Models\Waitlist;
 use Illuminate\Console\Command;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
 class WaitlistInvite extends Command
 {
-    public Waitlist|null $next_patient = null;
-    public User|null $new_user = null;
+    public Waitlist|User|null $next_patient = null;
     public string|null $password = null;
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'waitlist:invite {email?}';
+    protected $signature = 'waitlist:invite {email?} {--only-email}';
 
     /**
      * The console command description.
@@ -34,7 +34,16 @@ class WaitlistInvite extends Command
     public function handle()
     {
         if ($this->argument('email')) {
-            $this->next_patient = Waitlist::where('email', $this->argument('email'))->first();
+            if ($this->option('only-email')) {
+                $this->next_patient = User::whereEmail($this->argument('email'))->first();
+                $this->password = Str::password();
+                $this->next_patient->update([
+                    'password' => Hash::make($this->password),
+                    'force_password_reset' => true,
+                ]);
+            } else {
+                $this->next_patient = Waitlist::where('email', $this->argument('email'))->first();
+            }
             if (!$this->next_patient) {
                 $this->error("{$this->argument('email')} not found in the waitlist.");
                 return;
@@ -43,6 +52,10 @@ class WaitlistInvite extends Command
             $this->next_patient = Waitlist::orderBy('created_at', 'asc')->where('verified', true)->first();
         }
         if ($this->next_patient) {
+            if ($this->option('only-email')) {
+                $this->send_email();
+                return;
+            }
             $this->register_user();
             $this->remove_from_waitlist();
             $this->send_email();
@@ -55,7 +68,7 @@ class WaitlistInvite extends Command
         $already_registered = User::whereEmail($this->next_patient->email)->first();
         if (!$already_registered) {
             $this->password = Str::password();
-            $this->new_user = User::create([
+            User::create([
                 'name' => Str::of($this->next_patient->email)->before('@'),
                 'email' => $this->next_patient->email,
                 'password' => Hash::make($this->password),
@@ -73,10 +86,14 @@ class WaitlistInvite extends Command
     }
     private function send_email()
     {
+        ray($this->next_patient->email, $this->password);
+        $token = Crypt::encryptString("{$this->next_patient->email}@@@$this->password");
+        $loginLink = route('auth.link', ['token' => $token]);
         $mail = new MailMessage();
         $mail->view('emails.waitlist-invitation', [
             'email' => $this->next_patient->email,
             'password' => $this->password,
+            'loginLink' => $loginLink,
         ]);
         $mail->subject('Congratulations! You are invited to join Coolify Cloud.');
         send_user_an_email($mail, $this->next_patient->email);

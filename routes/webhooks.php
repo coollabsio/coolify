@@ -225,6 +225,7 @@ Route::post('/payments/stripe/events', function () {
         ]);
         $type = data_get($event, 'type');
         $data = data_get($event, 'data.object');
+        ray('Event: '. $type);
         switch ($type) {
             case 'checkout.session.completed':
                 $clientReferenceId = data_get($data, 'client_reference_id');
@@ -239,12 +240,14 @@ Route::post('/payments/stripe/events', function () {
                 }
                 $subscription = Subscription::where('team_id', $teamId)->first();
                 if ($subscription) {
+                    send_internal_notification('Old subscription activated for team: ' . $teamId);
                     $subscription->update([
                         'stripe_subscription_id' => $subscriptionId,
                         'stripe_customer_id' => $customerId,
                         'stripe_invoice_paid' => true,
                     ]);
                 } else {
+                    send_internal_notification('New subscription for team: ' . $teamId);
                     Subscription::create([
                         'team_id' => $teamId,
                         'stripe_subscription_id' => $subscriptionId,
@@ -254,46 +257,67 @@ Route::post('/payments/stripe/events', function () {
                 }
                 break;
             case 'invoice.paid':
-                $subscriptionId = data_get($data, 'lines.data.0.subscription');
-                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 $subscription->update([
                     'stripe_invoice_paid' => true,
                 ]);
                 break;
-            case 'invoice.payment_failed':
-                $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                if (!$subscription) {
-                    return;
-                }
-                SubscriptionInvoiceFailedJob::dispatch($subscription->team);
-                break;
+            // case 'invoice.payment_failed':
+            //     $customerId = data_get($data, 'customer');
+            //     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+            //     if ($subscription) {
+            //         SubscriptionInvoiceFailedJob::dispatch($subscription->team);
+            //     }
+            //     break;
             case 'customer.subscription.updated':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
                 $planId = data_get($data, 'items.data.0.plan.id');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
-                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
+                $feedback = data_get($data, 'cancellation_details.feedback');
+                $comment = data_get($data, 'cancellation_details.comment');
                 $subscription->update([
+                    'stripe_feedback' => $feedback,
+                    'stripe_comment' => $comment,
                     'stripe_plan_id' => $planId,
                     'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                 ]);
+                ray($feedback, $comment, $alreadyCancelAtPeriodEnd, $cancelAtPeriodEnd);
+                if ($feedback) {
+                    $reason = "Cancellation feedback for {$subscription->team->id}: '" . $feedback ."'";
+                    if ($comment) {
+                        $reason .= ' with comment: \'' . $comment ."'";
+                    }
+                    send_internal_notification($reason);
+                }
+                ray($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd);
+                if ($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd) {
+                    if ($cancelAtPeriodEnd) {
+                        send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
+                    } else {
+                        send_internal_notification('Subscription resumed for team: ' . $subscription->team->id);
+                    }
+                }
                 break;
             case 'customer.subscription.deleted':
-                $subscriptionId = data_get($data, 'items.data.0.subscription');
-                $subscription = Subscription::where('stripe_subscription_id', $subscriptionId)->firstOrFail();
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 $subscription->update([
                     'stripe_subscription_id' => null,
                     'stripe_plan_id'=> null,
                     'stripe_cancel_at_period_end' => false,
                     'stripe_invoice_paid' => false,
                 ]);
+                send_internal_notification('Subscription cancelled: ' . $subscription->team->id);
                 break;
             default:
                 // Unhandled event type
         }
     } catch (Exception $e) {
-        ray($e->getMessage());
-        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
+        send_internal_notification("Subscription webhook ($type) failed: " . $e->getMessage());
         $webhook->update([
             'status' => 'failed',
             'failure_reason' => $e->getMessage(),

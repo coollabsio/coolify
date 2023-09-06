@@ -49,7 +49,9 @@ Route::post('/forgot-password', function (Request $request) {
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
-
+Route::middleware(['throttle:login'])->group(function() {
+    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+});
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);

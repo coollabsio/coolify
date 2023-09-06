@@ -18,22 +18,26 @@ class ForcePasswordReset extends Component
         'password' => 'required|min:8',
         'password_confirmation' => 'required|same:password',
     ];
-    public function mount() {
+    public function mount()
+    {
         $this->email = auth()->user()->email;
     }
-    public function submit() {
+    public function submit()
+    {
         try {
             $this->rateLimit(10);
             $this->validate();
+            $firstLogin = auth()->user()->created_at == auth()->user()->updated_at;
             auth()->user()->forceFill([
                 'password' => Hash::make($this->password),
                 'force_password_reset' => false,
             ])->save();
-            auth()->logout();
-            return redirect()->route('login')->with('status', 'Your initial password has been set.');
-        } catch(\Exception $e) {
-            return general_error_handler(err:$e, that:$this);
+            if ($firstLogin) {
+                send_internal_notification('First login for ' . auth()->user()->email);
+            }
+            return redirect()->route('dashboard');
+        } catch (\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
         }
     }
-
 }
