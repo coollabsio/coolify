@@ -57,7 +57,6 @@ class FortifyServiceProvider extends ServiceProvider
         });
 
         Fortify::loginView(function () {
-           abort(503,'Login is disabled');
             $settings = InstanceSettings::get();
             $users = User::count();
             if ($users == 0) {
