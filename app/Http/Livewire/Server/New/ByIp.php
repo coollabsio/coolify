@@ -2,6 +2,8 @@
 
 namespace App\Http\Livewire\Server\New;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -67,6 +69,11 @@ class ByIp extends Component
                 'port' => $this->port,
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
+                'proxy' => [
+                    "type" => ProxyTypes::TRAEFIK_V2->value,
+                    "status" => ProxyStatus::EXITED->value,
+                ]
+
             ]);
             $server->settings->is_part_of_swarm = $this->is_part_of_swarm;
             $server->settings->save();

@@ -1,9 +1,8 @@
-@php use App\Enums\ProxyTypes; @endphp
 <div>
     @if ($server->settings->is_usable)
         @if ($server->proxy->type)
             <div x-init="$wire.load_proxy_configuration">
-                @if ($selectedProxy->value === 'TRAEFIK_V2')
+                @if ($selectedProxy === 'TRAEFIK_V2')
                     <form wire:submit.prevent='submit'>
                         <div class="flex items-center gap-2">
                             <h2>Proxy</h2>
@@ -40,13 +39,31 @@
                             @endif
                         </div>
                     </form>
+                @elseif($selectedProxy === 'NONE')
+                    <div class="flex items-center gap-2">
+                        <h2>Proxy</h2>
+                        @if ($server->proxy->status === 'exited')
+                            <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                        @endif
+                    </div>
+                    <div class="pt-3 pb-4">None</div>
+                @else
+                <div class="flex items-center gap-2">
+                    <h2>Proxy</h2>
+                    @if ($server->proxy->status === 'exited')
+                        <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
+                    @endif
+                </div>
                 @endif
             @else
                 <div>
                     <h2>Proxy</h2>
                     <div class="subtitle ">Select a proxy you would like to use on this server.</div>
                     <div class="flex gap-2">
-                        <x-forms.button class="w-32 box" wire:click="select_proxy('{{ ProxyTypes::TRAEFIK_V2 }}')">
+                        <x-forms.button class="w-32 box" wire:click="select_proxy('NONE')">
+                            Custom (None)
+                        </x-forms.button>
+                        <x-forms.button class="w-32 box" wire:click="select_proxy('TRAEFIK_V2')">
                             Traefik
                             v2
                         </x-forms.button>
