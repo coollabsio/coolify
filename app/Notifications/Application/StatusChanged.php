@@ -37,19 +37,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_status_changes');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_status_changes');
-
-        if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-            $channels[] = DiscordChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'status_changes');
     }
 
     public function toMail(): MailMessage
@@ -70,7 +58,20 @@ class StatusChanged extends Notification implements ShouldQueue
         $message = '⛔ ' . $this->application_name . ' has been stopped.
 
 ';
-        $message .= '[Application URL](' . $this->application_url . ')';
+        $message .= '[Open Application in Coolify](' . $this->application_url . ')';
         return $message;
+    }
+    public function toTelegram(): array
+    {
+        $message = '⛔ ' . $this->application_name . ' has been stopped.';
+        return [
+            "message" => $message,
+            "buttons" => [
+                [
+                    "text" => "Open Application in Coolify",
+                    "url" => $this->application_url
+                ]
+            ],
+        ];
     }
 }

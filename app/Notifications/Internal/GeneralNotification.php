@@ -3,6 +3,7 @@
 namespace App\Notifications\Internal;
 
 use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -17,11 +18,17 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return [DiscordChannel::class];
+        return [TelegramChannel::class, DiscordChannel::class];
     }
 
     public function toDiscord(): string
     {
         return $this->message;
+    }
+    public function toTelegram(): array
+    {
+        return [
+            "message" => $this->message,
+        ];
     }
 }

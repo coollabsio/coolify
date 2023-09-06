@@ -6,19 +6,21 @@ use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Component;
 
-class DiscordSettings extends Component
+class TelegramSettings extends Component
 {
     public Team $team;
     protected $rules = [
-        'team.discord_enabled' => 'nullable|boolean',
-        'team.discord_webhook_url' => 'required|url',
-        'team.discord_notifications_test' => 'nullable|boolean',
-        'team.discord_notifications_deployments' => 'nullable|boolean',
-        'team.discord_notifications_status_changes' => 'nullable|boolean',
-        'team.discord_notifications_database_backups' => 'nullable|boolean',
+        'team.telegram_enabled' => 'nullable|boolean',
+        'team.telegram_token' => 'required|string',
+        'team.telegram_chat_id' => 'required|string',
+        'team.telegram_notifications_test' => 'nullable|boolean',
+        'team.telegram_notifications_deployments' => 'nullable|boolean',
+        'team.telegram_notifications_status_changes' => 'nullable|boolean',
+        'team.telegram_notifications_database_backups' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
-        'team.discord_webhook_url' => 'Discord Webhook',
+        'team.telegram_token' => 'Token',
+        'team.telegram_chat_id' => 'Chat ID',
     ];
 
     public function mount()
@@ -31,7 +33,7 @@ class DiscordSettings extends Component
             $this->submit();
         } catch (\Exception $e) {
             ray($e->getMessage());
-            $this->team->discord_enabled = false;
+            $this->team->telegram_enabled = false;
             $this->validate();
         }
     }

@@ -2,6 +2,9 @@
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
@@ -242,10 +245,9 @@ function validate_cron_expression($expression_to_validate): bool
 function send_internal_notification(string $message): void
 {
     try {
-        ray('Sending internal notification... 📬 ' . $message);
         $baseUrl = config('app.name');
         $team = Team::find(0);
-        $team->notify(new GeneralNotification("👀 Internal notifications from {$baseUrl}: " . $message));
+        $team->notify(new GeneralNotification("👀 {$baseUrl}: " . $message));
     } catch (\Throwable $th) {
         ray($th->getMessage());
     }
@@ -269,4 +271,24 @@ function send_user_an_email(MailMessage $mail, string $email): void
 function isEmailEnabled($notifiable)
 {
     return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
+}
+function setNotificationChannels($notifiable, $event)
+{
+    $channels = [];
+    $isEmailEnabled = isEmailEnabled($notifiable);
+    $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+    $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+    $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
+    $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
+
+    if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
+        $channels[] = DiscordChannel::class;
+    }
+    if ($isEmailEnabled) {
+        $channels[] = EmailChannel::class;
+    }
+    if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
+        $channels[] = TelegramChannel::class;
+    }
+    return $channels;
 }

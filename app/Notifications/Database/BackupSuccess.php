@@ -25,19 +25,7 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_database_backups');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_database_backups');
-
-        if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-            $channels[] = DiscordChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'database_backups');
     }
 
     public function toMail(): MailMessage
@@ -54,5 +42,12 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         return "✅ Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+    }
+    public function toTelegram(): array
+    {
+        $message = "✅ Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+        return [
+            "message" => $message,
+        ];
     }
 }

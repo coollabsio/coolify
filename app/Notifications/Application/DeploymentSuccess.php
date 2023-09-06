@@ -43,19 +43,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = data_get($notifiable, 'smtp_enabled');
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_deployments');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_deployments');
-
-        if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-            $channels[] = DiscordChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'deployments');
     }
 
     public function toMail(): MailMessage
@@ -98,5 +86,35 @@ class DeploymentSuccess extends Notification implements ShouldQueue
             $message .= '[Deployment logs](' . $this->deployment_url . ')';
         }
         return $message;
+    }
+    public function toTelegram(): array
+    {
+        if ($this->preview) {
+            $message = '✅ New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '';
+            if ($this->preview->fqdn) {
+                $buttons[] = [
+                    "text" => "Open Application",
+                    "url" => $this->preview->fqdn
+                ];
+            }
+        } else {
+            $message = '✅ New version successfully deployed of ' . $this->application_name . '';
+            if ($this->fqdn) {
+                $buttons[] = [
+                    "text" => "Open Application",
+                    "url" => $this->fqdn
+                ];
+            }
+        }
+        $buttons[] = [
+            "text" => "Deployment logs",
+            "url" => $this->deployment_url
+        ];
+        return [
+            "message" => $message,
+            "buttons" => [
+                ...$buttons
+            ],
+        ];
     }
 }
