@@ -95,8 +95,8 @@
                     <form wire:submit.prevent='submitResend' class="flex flex-col">
                         <div class="flex flex-col gap-4">
                             <div class="flex flex-col w-full gap-2 xl:flex-row">
-                                <x-forms.input type="password" id="team.resend_api_key" placeholder="API key"
-                                    label="Host" />
+                                <x-forms.input required type="password" id="team.resend_api_key" placeholder="API key"
+                                    label="API Key" />
                             </div>
                         </div>
                         <div class="flex justify-end gap-4 pt-6">
