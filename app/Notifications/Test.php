@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -19,18 +20,7 @@ class Test extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-
-        if ($isDiscordEnabled && empty($this->emails)) {
-            $channels[] = DiscordChannel::class;
-        }
-
-        if ($isEmailEnabled && !empty($this->emails)) {
-            $channels[] = EmailChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'test');
     }
 
     public function toMail(): MailMessage
@@ -47,5 +37,17 @@ class Test extends Notification implements ShouldQueue
         $message .= "\n\n";
         $message .= '[Go to your dashboard](' . base_url() . ')';
         return $message;
+    }
+    public function toTelegram(): array
+    {
+        return [
+            "message" => 'This is a test Telegram notification from Coolify.',
+            "buttons" => [
+                [
+                    "text" => "Go to your dashboard",
+                    "url" => 'https://coolify.io'
+                ]
+            ],
+        ];
     }
 }

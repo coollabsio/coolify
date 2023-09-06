@@ -50,10 +50,6 @@ class ResetPassword extends Notification
     protected function buildMailMessage($url)
     {
         $mail = new MailMessage();
-        $mail->from(
-            data_get($this->settings, 'smtp_from_address'),
-            data_get($this->settings, 'smtp_from_name'),
-        );
         $mail->subject('Reset Password');
         $mail->view('emails.reset-password', ['url' => $url, 'count' => config('auth.passwords.' . config('auth.defaults.passwords') . '.expire')]);
         return $mail;

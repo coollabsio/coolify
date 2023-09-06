@@ -43,40 +43,41 @@
                     Install Repositories on GitHub
                 </a>
             @else
-            <div class="w-48">
-                <x-forms.checkbox label="System Wide?"
-                    helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                    instantSave id="is_system_wide" />
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input id="github_app.name" label="App Name" disabled />
-                <x-forms.input id="github_app.organization" label="Organization" disabled
-                    placeholder="If empty, personal user will be used" />
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-                <x-forms.input id="github_app.api_url" label="API Url" disabled />
-            </div>
-            <div class="flex gap-2">
-                @if ($github_app->html_url === 'https://github.com')
-                    <x-forms.input id="github_app.custom_user" label="User" disabled />
-                    <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-                @else
-                    <x-forms.input id="github_app.custom_user" label="User" required />
-                    <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                @if (!isCloud())
+                    <div class="w-48">
+                        <x-forms.checkbox label="System Wide?"
+                            helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                            instantSave id="is_system_wide" />
+                    </div>
                 @endif
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
-                <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
-            </div>
-            <div class="flex gap-2">
-                <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
-                <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
-                <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
-            </div>
+                <div class="flex gap-2">
+                    <x-forms.input id="github_app.name" label="App Name" disabled />
+                    <x-forms.input id="github_app.organization" label="Organization" disabled
+                        placeholder="If empty, personal user will be used" />
+                </div>
+                <div class="flex gap-2">
+                    <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
+                    <x-forms.input id="github_app.api_url" label="API Url" disabled />
+                </div>
+                <div class="flex gap-2">
+                    @if ($github_app->html_url === 'https://github.com')
+                        <x-forms.input id="github_app.custom_user" label="User" disabled />
+                        <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
+                    @else
+                        <x-forms.input id="github_app.custom_user" label="User" required />
+                        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                    @endif
+                </div>
+                <div class="flex gap-2">
+                    <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+                    <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
+                </div>
+                <div class="flex gap-2">
+                    <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
+                    <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
+                    <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                </div>
             @endif
-
         @else
             <div class="mb-10 rounded alert alert-warning">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"

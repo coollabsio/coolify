@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -9,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Str;
 
 class DockerCleanupJob implements ShouldQueue
 {
@@ -30,6 +30,11 @@ class DockerCleanupJob implements ShouldQueue
     }
     public function handle(): void
     {
+        $queue = ApplicationDeploymentQueue::where('status', '==', 'in_progress')->get();
+        if ($queue->count() > 0) {
+            ray('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping')->color('orange');
+            return;
+        }
         try {
             ray()->showQueries()->color('orange');
             $servers = Server::all();

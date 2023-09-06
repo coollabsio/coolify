@@ -593,7 +593,7 @@ async function redirect() {
             targetUrl.pathname = `/source/new`
             break;
         case 7:
-            targetUrl.pathname = `/private-key/new`
+            targetUrl.pathname = `/security/private-key/new`
             break;
         case 8:
             targetUrl.pathname = `/destination/new`
@@ -612,7 +612,7 @@ async function redirect() {
             targetUrl.pathname = `/servers`
             break;
         case 13:
-            targetUrl.pathname = `/private-keys`
+            targetUrl.pathname = `/security/private-key`
             break;
         case 14:
             targetUrl.pathname = `/projects`

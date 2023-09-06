@@ -10,8 +10,14 @@ class InstallDocker
 {
     public function __invoke(Server $server, Team $team)
     {
-        $dockerVersion = '23.0';
-        $config = base64_encode('{ "live-restore": true }');
+        $dockerVersion = '24.0';
+        $config = base64_encode('{
+            "log-driver": "json-file",
+            "log-opts": {
+              "max-size": "10m",
+              "max-file": "3"
+            }
+          }');
         if (isDev()) {
             $activity = remote_process([
                 "echo ####### Installing Prerequisites...",

@@ -22,19 +22,7 @@ class NotReachable extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_status_changes');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_status_changes');
-
-        // if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-        //     $channels[] = EmailChannel::class;
-        // }
-        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-            $channels[] = DiscordChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'status_changes');
     }
 
     public function toMail(): MailMessage
@@ -54,5 +42,11 @@ class NotReachable extends Notification implements ShouldQueue
     {
         $message = '⛔ Server \'' . $this->server->name . '\' is unreachable (could be a temporary issue). If you receive this more than twice in a row, please check your server.';
         return $message;
+    }
+    public function toTelegram(): array
+    {
+        return [
+            "message" => '⛔ Server \'' . $this->server->name . '\' is unreachable (could be a temporary issue). If you receive this more than twice in a row, please check your server.'
+        ];
     }
 }

@@ -51,6 +51,11 @@
                             {{ session('status') }}
                         </div>
                     @endif
+                    @if (session('error'))
+                        <div class="mb-4 font-medium text-red-600">
+                            {{ session('error') }}
+                        </div>
+                    @endif
                 </form>
             </div>
         </div>

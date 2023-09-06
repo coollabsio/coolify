@@ -66,12 +66,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     private $log_model;
     private Collection $saved_outputs;
 
-    public function middleware(): array
-    {
-        return [
-            (new WithoutOverlapping("dockerimagejobs"))->shared(),
-        ];
-    }
+    public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
         ray()->clearScreen();
@@ -181,8 +176,8 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->execute_in_builder("echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
             ],
         );
-        $this->build_image_name = "{$this->application->git_repository}:build";
-        $this->production_image_name = "{$this->application->uuid}:latest";
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
@@ -206,8 +201,8 @@ class ApplicationDeploymentJob implements ShouldQueue
             $tag = $tag->substr(0, 128);
         }
 
-        $this->build_image_name = "{$this->application->git_repository}:{$tag}-build";
-        $this->production_image_name = "{$this->application->uuid}:{$tag}";
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
 
         if (!$this->force_rebuild) {
@@ -242,7 +237,7 @@ class ApplicationDeploymentJob implements ShouldQueue
     }
     private function health_check()
     {
-        ray('New container name: ',$this->container_name);
+        ray('New container name: ', $this->container_name);
         if ($this->container_name) {
             $counter = 0;
             $this->execute_remote_command(
@@ -264,7 +259,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                 );
                 $this->execute_remote_command(
                     [
-                        "echo 'New application version health check status: {$this->saved_outputs->get('health_check')}'"
+                        "echo 'New version health check status: {$this->saved_outputs->get('health_check')}'"
                     ],
                 );
                 if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
@@ -282,8 +277,8 @@ class ApplicationDeploymentJob implements ShouldQueue
     }
     private function deploy_pull_request()
     {
-        $this->build_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}-build";
-        $this->production_image_name = "{$this->application->uuid}:pr-{$this->pull_request_id}";
+        $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
         ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->application->git_repository}:{$this->application->git_branch}.'",
@@ -304,12 +299,19 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function prepare_builder_image()
     {
+        $pull = "--pull=always";
+        if (isDev()) {
+            $pull = "--pull=never";
+        }
+        $helperImage = config('coolify.helper_image');
+        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+
         $this->execute_remote_command(
             [
-                "echo -n 'Pulling latest version of the builder image (ghcr.io/coollabsio/coolify-helper).'",
+                "echo -n 'Pulling helper image from $helperImage.'",
             ],
             [
-                "docker run --pull=always -d --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/coollabsio/coolify-helper",
+                $runCommand,
                 "hidden" => true,
             ],
             [
@@ -494,7 +496,7 @@ class ApplicationDeploymentJob implements ShouldQueue
             ],
             'networks' => [
                 $this->destination->network => [
-                    'external' => false,
+                    'external' => true,
                     'name' => $this->destination->network,
                     'attachable' => true,
                 ]
@@ -654,12 +656,12 @@ class ApplicationDeploymentJob implements ShouldQueue
     private function build_image()
     {
         $this->execute_remote_command([
-            "echo -n 'Building docker image.'",
+            "echo -n 'Building docker image for your application.'",
         ]);
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -692,12 +694,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]
             );
         } else {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
@@ -706,7 +708,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         if ($this->currently_running_container_name) {
             $this->execute_remote_command(
-                ["echo -n 'Removing old application version.'"],
+                ["echo -n 'Removing old version of your application.'"],
                 [$this->execute_in_builder("docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
             );
         }

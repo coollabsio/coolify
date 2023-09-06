@@ -43,10 +43,6 @@
             @endisset
             @if ($modalSubmit)
                 {{ $modalSubmit }}
-            @else
-                <x-forms.button onclick="{{ $modalId }}.close()" type="submit">
-                    Save
-                </x-forms.button>
             @endif
 
         </form>

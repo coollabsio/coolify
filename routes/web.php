@@ -9,6 +9,7 @@ use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index;
 use App\Http\Livewire\Boarding\Server as BoardingServer;
 use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Help;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
@@ -48,7 +49,9 @@ Route::post('/forgot-password', function (Request $request) {
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
-
+Route::middleware(['throttle:login'])->group(function() {
+    Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
+});
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);
     Route::get('/destinations', [MagicController::class, 'destinations']);
@@ -103,6 +106,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
     Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.index');
+    // Route::get('/help', Help::class)->name('help');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
@@ -119,13 +123,14 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/private-keys', fn () => view('private-key.all', [
+    Route::get('/security', fn () => view('security.index'))->name('security.index');
+    Route::get('/security/private-key', fn () => view('security.private-key.index', [
         'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', false)->get()
-    ]))->name('private-key.all');
-    Route::get('/private-key/new', fn () => view('private-key.new'))->name('private-key.new');
-    Route::get('/private-key/{private_key_uuid}', fn () => view('private-key.show', [
+    ]))->name('security.private-key.index');
+    Route::get('/security/private-key/new', fn () => view('security.private-key.new'))->name('security.private-key.new');
+    Route::get('/security/private-key/{private_key_uuid}', fn () => view('security.private-key.show', [
         'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail()
-    ]))->name('private-key.show');
+    ]))->name('security.private-key.show');
 });
 
 

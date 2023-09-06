@@ -14,8 +14,10 @@
             <x-forms.input id="custom_user" label="Custom Git User" required />
             <x-forms.input id="custom_port" label="Custom Git Port" required />
         </div>
-        <x-forms.checkbox class="pt-2" id="is_system_wide" label="System Wide" />
-        <x-forms.button type="submit">
+        @if (!isCloud())
+            <x-forms.checkbox class="pt-2" id="is_system_wide" label="System Wide" />
+        @endif
+        <x-forms.button class="mt-4" type="submit">
             Save New Source
         </x-forms.button>
     </form>

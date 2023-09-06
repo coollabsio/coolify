@@ -61,9 +61,6 @@ class ProjectController extends Controller
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
         }
-        if ($server) {
-
-        }
         return view('project.new', [
             'type' => $type
         ]);

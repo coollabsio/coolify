@@ -24,6 +24,14 @@ class Team extends Model implements SendsDiscord, SendsEmail
         return data_get($this, 'discord_webhook_url', null);
     }
 
+    public function routeNotificationForTelegram()
+    {
+        return [
+            "token" => data_get($this, 'telegram_token', null),
+            "chat_id" => data_get($this, 'telegram_chat_id', null)
+        ];
+    }
+
     public function getRecepients($notification)
     {
         $recipients = data_get($notification, 'emails', null);

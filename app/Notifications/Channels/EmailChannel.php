@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Mail;
 
 class EmailChannel
 {
-    private bool $isResend = false;
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
         $this->bootConfigs($notifiable);
@@ -20,33 +19,14 @@ class EmailChannel
         }
 
         $mailMessage = $notification->toMail($notifiable);
-        // if ($this->isResend) {
         Mail::send(
             [],
             [],
             fn (Message $message) => $message
-                ->from(
-                    data_get($notifiable, 'smtp_from_address'),
-                    data_get($notifiable, 'smtp_from_name'),
-                )
                 ->to($recepients)
                 ->subject($mailMessage->subject)
                 ->html((string)$mailMessage->render())
         );
-        // } else {
-        //     Mail::send(
-        //         [],
-        //         [],
-        //         fn (Message $message) => $message
-        //             ->from(
-        //                 data_get($notifiable, 'smtp_from_address'),
-        //                 data_get($notifiable, 'smtp_from_name'),
-        //             )
-        //             ->bcc($recepients)
-        //             ->subject($mailMessage->subject)
-        //             ->html((string)$mailMessage->render())
-        //     );
-        // }
     }
 
     private function bootConfigs($notifiable): void
@@ -56,13 +36,11 @@ class EmailChannel
             if (!$type) {
                 throw new Exception('No email settings found.');
             }
-            if ($type === 'resend') {
-                $this->isResend = true;
-            }
             return;
         }
+        config()->set('mail.from.address', data_get($notifiable, 'smtp_from_address'));
+        config()->set('mail.from.name', data_get($notifiable, 'smtp_from_name'));
         if (data_get($notifiable, 'resend_enabled')) {
-            $this->isResend = true;
             config()->set('mail.default', 'resend');
             config()->set('resend.api_key', data_get($notifiable, 'resend_api_key'));
         }

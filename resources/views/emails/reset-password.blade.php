@@ -1,5 +1,5 @@
 <x-emails.layout>
-A password reset has been requested for this email address on [{{ config('app.name') }}]({{ config('app.url') }}).
+A password reset has been requested for this email address.
 
 Click [here]({{ $url }}) to reset your password.
 

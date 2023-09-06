@@ -12,7 +12,7 @@ class Proxy extends Component
 {
     public Server $server;
 
-    public ProxyTypes $selectedProxy = ProxyTypes::TRAEFIK_V2;
+    public ?string $selectedProxy = null;
     public $proxy_settings = null;
     public string|null $redirect_url = null;
 
@@ -20,6 +20,7 @@ class Proxy extends Component
 
     public function mount()
     {
+        $this->selectedProxy = $this->server->proxy->type;
         $this->redirect_url = $this->server->proxy->redirect_url;
     }
 
@@ -35,11 +36,12 @@ class Proxy extends Component
         $this->emit('proxyStatusUpdated');
     }
 
-    public function select_proxy(ProxyTypes $proxy_type)
+    public function select_proxy($proxy_type)
     {
         $this->server->proxy->type = $proxy_type;
         $this->server->proxy->status = 'exited';
         $this->server->save();
+        $this->selectedProxy = $this->server->proxy->type;
         $this->emit('proxyStatusUpdated');
     }
 

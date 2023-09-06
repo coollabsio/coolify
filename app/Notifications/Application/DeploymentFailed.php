@@ -43,19 +43,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        $channels = [];
-        $isEmailEnabled = isEmailEnabled($notifiable);
-        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
-        $isSubscribedToEmailEvent = data_get($notifiable, 'smtp_notifications_deployments');
-        $isSubscribedToDiscordEvent = data_get($notifiable, 'discord_notifications_deployments');
-
-        if ($isEmailEnabled && $isSubscribedToEmailEvent) {
-            $channels[] = EmailChannel::class;
-        }
-        if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
-            $channels[] = DiscordChannel::class;
-        }
-        return $channels;
+        return setNotificationChannels($notifiable, 'deployments');
     }
 
     public function toMail(): MailMessage
@@ -88,5 +76,20 @@ class DeploymentFailed extends Notification implements ShouldQueue
             $message .= '[View Deployment Logs](' . $this->deployment_url . ')';
         }
         return $message;
+    }
+    public function toTelegram(): array
+    {
+        if ($this->preview) {
+            $message = '❌ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
+        } else {
+            $message = '❌ Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
+        }
+        return [
+            "message" => $message,
+            "buttons" => [
+                "text" => "View Deployment Logs",
+                "url" => $this->deployment_url
+            ],
+        ];
     }
 }

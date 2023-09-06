@@ -6,6 +6,7 @@ x-testing-host: &testing-host-base
     context: ./docker/testing-host
   networks:
     - coolify
+  init: true
 
 services:
   coolify:
@@ -53,6 +54,7 @@ services:
     <<: *testing-host-base
     container_name: coolify-testing-host
     volumes:
+      - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/coolify/:/data/coolify
   mailpit:

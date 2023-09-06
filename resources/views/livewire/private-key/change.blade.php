@@ -6,7 +6,7 @@
     </x-modal>
     <form class="flex flex-col gap-2" wire:submit.prevent='changePrivateKey'>
         <div class="flex items-end gap-2">
-            <h1>Private Key</h1>
+            <h2>Private Key</h2>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
@@ -16,7 +16,6 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="pb-8">Private Key used for SSH connection</div>
         <x-forms.input id="private_key.name" label="Name" required />
         <x-forms.input id="private_key.description" label="Description" />
         <div>

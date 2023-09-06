@@ -47,6 +47,9 @@ class PricingPlans extends Component
             'tax_id_collection' => [
                 'enabled' => true,
             ],
+            'automatic_tax' => [
+                'enabled' => true,
+            ],
             'mode' => 'subscription',
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),

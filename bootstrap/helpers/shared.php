@@ -2,12 +2,14 @@
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -149,6 +151,8 @@ function set_transanctional_email_settings(InstanceSettings | null $settings = n
     if (!$settings) {
         $settings = InstanceSettings::get();
     }
+    config()->set('mail.from.address', data_get($settings, 'smtp_from_address'));
+    config()->set('mail.from.name', data_get($settings, 'smtp_from_name'));
     if (data_get($settings, 'resend_enabled')) {
         config()->set('mail.default', 'resend');
         config()->set('resend.api_key', data_get($settings, 'resend_api_key'));
@@ -241,9 +245,9 @@ function validate_cron_expression($expression_to_validate): bool
 function send_internal_notification(string $message): void
 {
     try {
-        $baseUrl = base_url(false);
+        $baseUrl = config('app.name');
         $team = Team::find(0);
-        $team->notify(new GeneralNotification("👀 Internal notifications from {$baseUrl}: " . $message));
+        $team->notify(new GeneralNotification("👀 {$baseUrl}: " . $message));
     } catch (\Throwable $th) {
         ray($th->getMessage());
     }
@@ -259,17 +263,32 @@ function send_user_an_email(MailMessage $mail, string $email): void
         [],
         [],
         fn (Message $message) => $message
-            ->from(
-                data_get($settings, 'smtp_from_address'),
-                data_get($settings, 'smtp_from_name')
-            )
             ->to($email)
             ->subject($mail->subject)
             ->html((string) $mail->render())
     );
-
 }
 function isEmailEnabled($notifiable)
 {
     return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
+}
+function setNotificationChannels($notifiable, $event)
+{
+    $channels = [];
+    $isEmailEnabled = isEmailEnabled($notifiable);
+    $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+    $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+    $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
+    $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
+
+    if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
+        $channels[] = DiscordChannel::class;
+    }
+    if ($isEmailEnabled) {
+        $channels[] = EmailChannel::class;
+    }
+    if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
+        $channels[] = TelegramChannel::class;
+    }
+    return $channels;
 }

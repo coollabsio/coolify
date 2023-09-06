@@ -2,7 +2,7 @@ name: Coolify Helper Image (v4)
 
 on:
   push:
-    branches: [ "main", "next" ]
+    branches: [ "main" ]
     paths:
       - .github/workflows/coolify-helper.yml
       - docker/coolify-helper/Dockerfile
@@ -55,7 +55,7 @@ jobs:
           file: docker/coolify-helper/Dockerfile
           platforms: linux/aarch64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aarch64
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64
   merge-manifest:
     runs-on: ubuntu-latest
     permissions:
@@ -78,3 +78,7 @@ jobs:
       - name: Create & publish manifest
         run: |
           docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - uses: sarisia/actions-status-discord@v1
+        if: always()
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK_PROD_RELEASE_CHANNEL  }}

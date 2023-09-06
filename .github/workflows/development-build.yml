@@ -3,6 +3,9 @@ name: Development Build (v4)
 on:
   push:
     branches: ["next"]
+    paths-ignore:
+      - .github/workflows/coolify-helper.yml
+      - docker/coolify-helper/Dockerfile
 
 env:
   REGISTRY: ghcr.io

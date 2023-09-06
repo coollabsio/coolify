@@ -49,6 +49,7 @@ class EmailSettings extends Component
 
     public function mount()
     {
+        $this->team = auth()->user()->currentTeam();
         ['sharedEmailEnabled' => $this->sharedEmailEnabled] = $this->team->limits;
         $this->emails = auth()->user()->email;
     }

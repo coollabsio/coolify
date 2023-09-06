@@ -8,26 +8,30 @@ use Livewire\Component;
 
 class DiscordSettings extends Component
 {
-    public Team $model;
+    public Team $team;
     protected $rules = [
-        'model.discord_enabled' => 'nullable|boolean',
-        'model.discord_webhook_url' => 'required|url',
-        'model.discord_notifications_test' => 'nullable|boolean',
-        'model.discord_notifications_deployments' => 'nullable|boolean',
-        'model.discord_notifications_status_changes' => 'nullable|boolean',
-        'model.discord_notifications_database_backups' => 'nullable|boolean',
+        'team.discord_enabled' => 'nullable|boolean',
+        'team.discord_webhook_url' => 'required|url',
+        'team.discord_notifications_test' => 'nullable|boolean',
+        'team.discord_notifications_deployments' => 'nullable|boolean',
+        'team.discord_notifications_status_changes' => 'nullable|boolean',
+        'team.discord_notifications_database_backups' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
-        'model.discord_webhook_url' => 'Discord Webhook',
+        'team.discord_webhook_url' => 'Discord Webhook',
     ];
 
+    public function mount()
+    {
+        $this->team = auth()->user()->currentTeam();
+    }
     public function instantSave()
     {
         try {
             $this->submit();
         } catch (\Exception $e) {
             ray($e->getMessage());
-            $this->model->discord_enabled = false;
+            $this->team->discord_enabled = false;
             $this->validate();
         }
     }
@@ -41,8 +45,8 @@ class DiscordSettings extends Component
 
     public function saveModel()
     {
-        $this->model->save();
-        if (is_a($this->model, Team::class)) {
+        $this->team->save();
+        if (is_a($this->team, Team::class)) {
             refreshSession();
         }
         $this->emit('success', 'Settings saved.');
@@ -50,7 +54,7 @@ class DiscordSettings extends Component
 
     public function sendTestNotification()
     {
-        $this->model->notify(new Test);
+        $this->team->notify(new Test());
         $this->emit('success', 'Test notification sent.');
     }
 }
