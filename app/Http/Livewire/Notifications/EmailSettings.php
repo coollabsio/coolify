@@ -107,7 +107,14 @@ class EmailSettings extends Component
             return general_error_handler($e, $this);
         }
     }
-
+    public function saveModel()
+    {
+        $this->team->save();
+        if (is_a($this->team, Team::class)) {
+            refreshSession();
+        }
+        $this->emit('success', 'Settings saved.');
+    }
     public function submit()
     {
         try {
