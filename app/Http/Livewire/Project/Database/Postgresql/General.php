@@ -12,6 +12,7 @@ class General extends Component
     public StandalonePostgresql $database;
     public string $new_filename;
     public string $new_content;
+    public string $db_url;
 
     protected $listeners = ['refresh', 'save_init_script', 'delete_init_script'];
 
@@ -26,6 +27,8 @@ class General extends Component
         'database.init_scripts' => 'nullable',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
+        'database.is_public' => 'nullable|boolean',
+        'database.public_port' => 'nullable|integer',
     ];
     protected $validationAttributes = [
         'database.name' => 'Name',
@@ -38,8 +41,43 @@ class General extends Component
         'database.init_scripts' => 'Init Scripts',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
+        'database.is_public' => 'Is Public',
+        'database.public_port' => 'Public Port',
     ];
+    public function mount()
+    {
+        $this->getDbUrl();
+    }
+    public function getDbUrl() {
+        if ($this->database->is_public) {
+            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->destination->server->ip}:{$this->database->public_port}/{$this->database->postgres_db}";
+        } else {
+            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->uuid}:5432/{$this->database->postgres_db}";
+        }
+    }
+    public function instantSave()
+    {
+        try {
+            if ($this->database->is_public && !$this->database->public_port) {
+                $this->emit('error', 'Public port is required.');
+                $this->database->is_public = false;
+                return;
+            }
+            if ($this->database->is_public) {
+                startPostgresProxy($this->database);
+                $this->emit('success', 'Database is now publicly accessible.');
+            } else {
+                stopPostgresProxy($this->database);
+                $this->emit('success', 'Database is no longer publicly accessible.');
+            }
+            $this->getDbUrl();
+            $this->database->save();
+        } catch(Exception $e) {
+            $this->database->is_public = !$this->database->is_public;
+            return general_error_handler(err: $e, that: $this);
+        }
 
+    }
     public function save_init_script($script)
     {
         $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);

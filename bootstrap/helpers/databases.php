@@ -20,7 +20,7 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
     }
     return StandalonePostgresql::create([
         'name' => generate_database_name('postgresql'),
-        'postgres_password' => \Illuminate\Support\Str::password(),
+        'postgres_password' => \Illuminate\Support\Str::password(symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),

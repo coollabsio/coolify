@@ -24,7 +24,7 @@
             @endif
         </span>
         <input @disabled($disabled) type="checkbox" {{ $attributes->merge(['class' => $defaultClass]) }}
-            @if ($instantSave) wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
+            @if ($instantSave) wire:loading.attr="disabled" wire:click='{{ $instantSave === 'instantSave' || $instantSave == '1' ? 'instantSave' : $instantSave }}'
                wire:model.defer={{ $id }} @else wire:model.defer={{ $value ?? $id }} @endif />
     </label>
 </div>
