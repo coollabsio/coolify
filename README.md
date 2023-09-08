@@ -38,6 +38,18 @@ You can find the installation script [here](./scripts/install.sh).
 
 Contact us [here](https://docs.coollabs.io/contact).
 
+## Recognitions
+
+<a href="https://news.ycombinator.com/item?id=26624341">
+  <img
+    style="width: 250px; height: 54px;" width="250" height="54"
+    alt="Featured on Hacker News"
+    src="https://hackernews-badge.vercel.app/api?id=26624341"
+  />
+</a>
+
+<a href="https://www.producthunt.com/posts/coolify?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
+
 ## 💰 Financial Contributors
 
 Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/coollabsio/contribute)]
