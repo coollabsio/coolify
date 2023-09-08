@@ -32,7 +32,7 @@ class TelegramChannel
                 break;
         }
         if (!$telegramToken || !$chatId || !$message) {
-            throw new \Exception('Telegram token, chat id and message are required');
+            return;
         }
         dispatch(new SendMessageToTelegramJob($message, $buttons, $telegramToken, $chatId, $topicId));
     }
