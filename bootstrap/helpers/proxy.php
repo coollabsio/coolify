@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use App\Models\StandalonePostgresql;
 use Symfony\Component\Yaml\Yaml;
 
 function get_proxy_path()
@@ -165,4 +166,76 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
             ray($yaml);
         }
     }
+}
+
+function startPostgresProxy(StandalonePostgresql $database)
+{
+    $containerName = "{$database->uuid}-proxy";
+    $configuration_dir = database_proxy_dir($database->uuid);
+    $nginxconf = <<<EOF
+user  nginx;
+worker_processes  auto;
+
+error_log  /var/log/nginx/error.log;
+
+events {
+    worker_connections  1024;
+}
+stream {
+   server {
+        listen $database->public_port;
+        proxy_pass $database->uuid:5432;
+   }
+}
+EOF;
+    $docker_compose = [
+        'version' => '3.8',
+        'services' => [
+            $containerName => [
+                'image' => "nginx:stable-alpine",
+                'container_name' => $containerName,
+                'restart' => RESTART_MODE,
+                'volumes' => [
+                    "$configuration_dir/nginx.conf:/etc/nginx/nginx.conf:ro",
+                ],
+                'ports' => [
+                    "$database->public_port:$database->public_port",
+                ],
+                'networks' => [
+                    $database->destination->network,
+                ],
+                'healthcheck' => [
+                    'test' => [
+                        'CMD-SHELL',
+                        'stat /etc/nginx/nginx.conf || exit 1',
+                    ],
+                    'interval' => '5s',
+                    'timeout' => '5s',
+                    'retries' => 3,
+                    'start_period' => '1s'
+                ],
+            ]
+        ],
+        'networks' => [
+            $database->destination->network => [
+                'external' => true,
+                'name' => $database->destination->network,
+                'attachable' => true,
+            ]
+        ]
+    ];
+    $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
+    $nginxconf_base64 = base64_encode($nginxconf);
+    instant_remote_process([
+        "mkdir -p $configuration_dir",
+        "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
+        "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
+        "docker compose --project-directory {$configuration_dir} up -d >/dev/null",
+
+
+    ], $database->destination->server);
+}
+function stopPostgresProxy(StandalonePostgresql $database)
+{
+    instant_remote_process(["docker rm -f {$database->uuid}-proxy"], $database->destination->server);
 }

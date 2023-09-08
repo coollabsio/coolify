@@ -42,8 +42,13 @@ class Heading extends Component
             ["docker rm -f {$this->database->uuid}"],
             $this->database->destination->server
         );
+        if ($this->database->is_public) {
+            stopPostgresProxy($this->database);
+            $this->database->is_public = false;
+        }
         $this->database->status = 'stopped';
         $this->database->save();
+        $this->emit('refresh');
         // $this->database->environment->project->team->notify(new StatusChanged($this->database));
     }
 

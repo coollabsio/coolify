@@ -1,20 +1,30 @@
-# Coolify v4 Beta
+# About the Project
 
-An open-source & self-hostable Heroku / Netlify alternative.
+Coolify is an open-source & self-hostable alternative to Heroku / Netlify / Vercel / etc. 
+
+It helps you to manage your servers, applications, databases on your own hardware, all you need is SSH connection. You can manage VPS, Bare Metal, Raspberry PI's anything.
+
+Image if you could have the ease of a cloud but with your own servers. That is **Coolify**.
+
+No vendor lock-in, which means that all the configuration for your applications/databases/etc are saved to your server. So if you decide to stop using Coolify (oh nooo), you could still manage your running resources. You just lose the automations and all the magic. 🪄️
+
+For more information, take a look at our landing page [here](https://coolify.io).
+
+> If you are looking for previous (v3) version, it is [here](https://github.com/coollabsio/coolify/tree/v3).
+
+# Cloud
+
+If you do not want to self-host Coolify, there is a paid cloud version available: https://app.coolify.io
+
+You can easily attach your own servers, get all the automations, free email notifications, etc.
+
+For more information & pricing, take a look at our landing page [here](https://coolify.io).
 
 # Beta
 
-You are checking the next-gen of Coolify, aka v4. Hi 👋
+The latest version (v4) is still in beta. That does not mean it is unstable. All the features that are available are stable enough be usable in real-life. 
 
-It is still in beta, lots of improvements will come every day. Things could break, but we are working hard to make it stable as soon as possible. If you find any bugs, please report them.
-
-Automatic updates are available, so you will receive the latest version as soon as it is released.
-
-If you are looking for v3, check out the [v3 branch](https://github.com/coollabsio/coolify/tree/v3).
-
-## What's new?
-
-Well, the whole tech stack changed, core is different, so yeah, a lot (documentation incoming).
+There are hundreds of people using it for managing their client's applications, freelancers, hobbyists, businesses.
 
 # Installation
 
@@ -26,13 +36,19 @@ You can find the installation script [here](./scripts/install.sh).
 
 ## Support
 
--   Twitter: [@heyandras](https://twitter.com/heyandras)
--   Mastodon: [@andrasbacsai@fosstodon.org](https://fosstodon.org/@andrasbacsai)
--   Email: [andras@coollabs.io](mailto:andras@coollabs.io)
--   Discord: [Invitation](https://coollabs.io/discord)
--   Telegram: [@andrasbacsai](https://t.me/andrasbacsai)
+Contact us [here](https://docs.coollabs.io/contact).
 
----
+## Recognitions
+
+<a href="https://news.ycombinator.com/item?id=26624341">
+  <img
+    style="width: 250px; height: 54px;" width="250" height="54"
+    alt="Featured on Hacker News"
+    src="https://hackernews-badge.vercel.app/api?id=26624341"
+  />
+</a>
+
+<a href="https://www.producthunt.com/posts/coolify?utm_source=badge-featured&utm_medium=badge&utm_souce=badge-coolify" target="_blank"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=338273&theme=light" alt="Coolify - An&#0032;open&#0045;source&#0032;&#0038;&#0032;self&#0045;hostable&#0032;Heroku&#0044;&#0032;Netlify&#0032;alternative | Product Hunt" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 
 ## 💰 Financial Contributors
 

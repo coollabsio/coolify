@@ -28,6 +28,10 @@ function database_configuration_dir(): string
 {
     return '/data/coolify/databases';
 }
+function database_proxy_dir($uuid): string
+{
+    return "/data/coolify/databases/$uuid/proxy";
+}
 
 function backup_dir(): string
 {
