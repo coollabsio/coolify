@@ -22,12 +22,12 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if ($settings->resend_enabled || $settings->smtp_enabled)
-            <x-forms.button onclick="sendTestEmail.showModal()"
-                class="text-white normal-case btn btn-xs no-animation btn-primary">
-                Send Test Email
-            </x-forms.button>
-        @endif
+            @if (isEmailEnabled($settings))
+                <x-forms.button onclick="sendTestEmail.showModal()"
+                    class="text-white normal-case btn btn-xs no-animation btn-primary">
+                    Send Test Email
+                </x-forms.button>
+            @endif
         </div>
     </form>
     <div class="flex flex-col gap-4">
@@ -74,7 +74,8 @@
                 <form wire:submit.prevent='submitResend' class="flex flex-col">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key" label="Host" />
+                            <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key"
+                                label="Host" />
                         </div>
                     </div>
                     <div class="flex justify-end gap-4 pt-6">

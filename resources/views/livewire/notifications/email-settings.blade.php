@@ -21,7 +21,7 @@
                     Copy from Instance Settings
                 </x-forms.button>
             @endif
-            @if (isEmailEnabled($team) || data_get($team, 'use_instance_email_settings'))
+            @if (isEmailEnabled($team) && auth()->user()->isAdminFromSession())
                 <x-forms.button onclick="sendTestEmail.showModal()"
                     class="text-white normal-case btn btn-xs no-animation btn-primary">
                     Send Test Email
@@ -36,10 +36,10 @@
                 label="Use hosted email service" />
         </div>
     @else
-    <div class="pb-4 w-96">
-        <x-forms.checkbox disabled id="team.use_instance_email_settings"
-            label="Use hosted email service (Pro+ subscription required)" />
-    </div>
+        <div class="pb-4 w-96">
+            <x-forms.checkbox disabled id="team.use_instance_email_settings"
+                label="Use hosted email service (Pro+ subscription required)" />
+        </div>
     @endif
     @if (!$team->use_instance_email_settings)
         <form class="flex flex-col items-end gap-2 pb-4 xl:flex-row" wire:submit.prevent='submitFromFields'>
@@ -112,25 +112,23 @@
         <h2 class="mt-4">Subscribe to events</h2>
         <div class="w-64">
             @if (isDev())
-            <h3 class="mt-4">Test</h3>
-            <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_test" label="Enabled" />
-            </div>
+                <h3 class="mt-4">Test</h3>
+                <div class="flex items-end gap-10">
+                    <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_test" label="Enabled" />
+                </div>
             @endif
             <h3 class="mt-4">Container Status Changes</h3>
             <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_status_changes"
-                label="Enabled" />
+                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_status_changes" label="Enabled" />
             </div>
             <h3 class="mt-4">Application Deployments</h3>
             <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_deployments"
-                label="Enabled" />
+                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_deployments" label="Enabled" />
             </div>
             <h3 class="mt-4">Backup Status</h3>
             <div class="flex items-end gap-10">
                 <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_database_backups"
-                label="Enabled" />
+                    label="Enabled" />
             </div>
         </div>
     @endif
