@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
+use Cache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -94,7 +95,9 @@ class User extends Authenticatable implements SendsEmail
 
     public function currentTeam()
     {
-        return Team::find(session('currentTeam')->id);
+        return Cache::remember('team:' . auth()->user()->id, 3600, function() {
+            return Team::find(session('currentTeam')->id);
+        });
     }
 
     public function otherTeams()
