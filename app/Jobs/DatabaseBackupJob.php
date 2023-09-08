@@ -24,22 +24,22 @@ class DatabaseBackupJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public Team|null $team = null;
+    public ?Team $team = null;
     public Server $server;
-    public ScheduledDatabaseBackup|null $backup;
+    public ?ScheduledDatabaseBackup $backup = null;
     public string $database_type;
-    public StandalonePostgresql $database;
+    public ?StandalonePostgresql $database = null;
     public string $database_status;
 
-    public string|null $container_name = null;
-    public ScheduledDatabaseBackupExecution|null $backup_log = null;
+    public ?string $container_name = null;
+    public ?ScheduledDatabaseBackupExecution $backup_log = null;
     public string $backup_status;
-    public string|null $backup_location = null;
+    public ?string $backup_location = null;
     public string $backup_dir;
     public string $backup_file;
     public int $size = 0;
-    public string|null $backup_output = null;
-    public S3Storage|null $s3 = null;
+    public ?string $backup_output = null;
+    public ?S3Storage $s3 = null;
 
     public function __construct($backup)
     {
