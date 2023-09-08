@@ -105,7 +105,7 @@ class Application extends BaseModel
 
     public function environment_variables(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false);
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', false)->orderBy('key', 'asc');
     }
 
     public function runtime_environment_variables(): HasMany
@@ -127,7 +127,7 @@ class Application extends BaseModel
 
     public function environment_variables_preview(): HasMany
     {
-        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true);
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
     }
 
     public function runtime_environment_variables_preview(): HasMany

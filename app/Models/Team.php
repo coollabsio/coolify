@@ -28,7 +28,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return [
             "token" => data_get($this, 'telegram_token', null),
-            "chat_id" => data_get($this, 'telegram_chat_id', null)
+            "chat_id" => data_get($this, 'telegram_chat_id', null),
         ];
     }
 

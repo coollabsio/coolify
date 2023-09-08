@@ -46,6 +46,10 @@ class DatabaseBackupJob implements ShouldQueue
         $this->backup = $backup;
         $this->team = Team::find($backup->team_id);
         $this->database = $this->backup->database;
+        if (!$this->database) {
+            ray('Database not found');
+            return;
+        }
         $this->database_type = $this->database->type();
         $this->server = $this->database->destination->server;
         $this->database_status = $this->database->status;

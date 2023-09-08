@@ -31,6 +31,7 @@ class SendMessageToTelegramJob implements ShouldQueue
         public array $buttons,
         public string $token,
         public string $chatId,
+        public ?string $topicId = null,
     ) {
     }
 
@@ -63,7 +64,9 @@ class SendMessageToTelegramJob implements ShouldQueue
             'chat_id' => $this->chatId,
             'text' => $this->text,
         ];
-        ray($payload);
+        if ($this->topicId) {
+            $payload['message_thread_id'] = $this->topicId;
+        }
         $response = Http::post($url, $payload);
         if ($response->failed()) {
             throw new \Exception('Telegram notification failed with ' . $response->status() . ' status code.' . $response->body());

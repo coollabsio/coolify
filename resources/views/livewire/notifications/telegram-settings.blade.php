@@ -16,27 +16,50 @@
             <x-forms.checkbox instantSave id="team.telegram_enabled" label="Notification Enabled" />
         </div>
         <div class="flex gap-2">
-            <x-forms.input type="password" helper="Get it from the <a class='inline-block text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram." required
-                id="team.telegram_token" label="Token" />
-            <x-forms.input type="password" helper="Recommended to add your bot to a group chat and add its Chat ID here." required
+            <x-forms.input type="password"
+                helper="Get it from the <a class='inline-block text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                required id="team.telegram_token" label="Token" />
+            <x-forms.input
+                helper="Recommended to add your bot to a group chat and add its Chat ID here." required
                 id="team.telegram_chat_id" label="Chat ID" />
         </div>
-    </form>
     @if (data_get($team, 'telegram_enabled'))
-        <h3 class="mt-4">Subscribe to events</h3>
-        <div class="w-64">
+        <h2 class="mt-4">Subscribe to events</h2>
+        <div class="w-96">
             @if (isDev())
-                <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_test" label="Test" />
+            <h3 class="mt-4">Test</h3>
+                <div class="flex items-end gap-10">
+                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_test" label="Enabled" />
+                    <x-forms.input
+                        helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
+                        id="team.telegram_notifications_test_message_thread_id" label="Custom Topic ID" />
+                </div>
             @endif
-            <h4 class="mt-4">General</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_status_changes"
-                label="Container Status Changes" />
-            <h4 class="mt-4">Applications</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_deployments"
-                label="Deployments" />
-            <h4 class="mt-4">Databases</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_database_backups"
-                label="Backup Statuses" />
+            <h3 class="mt-4">Container Status Changes</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_status_changes"
+                label="Enabled" />
+                <x-forms.input
+                    helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
+                    id="team.telegram_notifications_status_changes_message_thread_id" label="Custom Topic ID" />
+            </div>
+            <h3 class="mt-4">Application Deployments</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_deployments"
+                label="Enabled" />
+                <x-forms.input
+                    helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
+                    id="team.telegram_notifications_deployments_message_thread_id" label="Custom Topic ID" />
+            </div>
+            <h3 class="mt-4">Backup Status</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_database_backups"
+                label="Enabled" />
+                <x-forms.input
+                    helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
+                    id="team.telegram_notifications_database_backups_message_thread_id" label="Custom Topic ID" />
+            </div>
         </div>
-    @endif
+        @endif
+    </form>
 </div>
