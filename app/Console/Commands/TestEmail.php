@@ -23,6 +23,7 @@ use Mail;
 use Str;
 
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\text;
 
 class TestEmail extends Command
 {
@@ -31,7 +32,7 @@ class TestEmail extends Command
      *
      * @var string
      */
-    protected $signature = 'email:test {to}';
+    protected $signature = 'email:test';
 
     /**
      * The console command description.
@@ -44,9 +45,10 @@ class TestEmail extends Command
      * Execute the console command.
      */
     private ?MailMessage $mail = null;
+    private string $email = 'andras.bacsai@protonmail.com';
     public function handle()
     {
-        $email = select(
+        $type = select(
             'Which Email should be sent?',
             options: [
                 'emails-test' => 'Test',
@@ -60,15 +62,15 @@ class TestEmail extends Command
                 'waitlist-confirmation' => 'Waitlist Confirmation',
             ],
         );
-        $type = set_transanctional_email_settings();
-        if (!$type) {
-            throw new Exception('No email settings found.');
-        }
+        $this->email = text('Email Address to send to');
+        set_transanctional_email_settings();
+
         $this->mail = new MailMessage();
         $this->mail->subject("Test Email");
-        switch ($email) {
+        switch ($type) {
             case 'emails-test':
                 $this->mail = (new Test())->toMail();
+                $this->sendEmail();
                 break;
             case 'application-deployment-success':
                 $application = Application::all()->first();
@@ -176,7 +178,7 @@ class TestEmail extends Command
                     'internal@example.com',
                     'Test Email',
                 )
-                ->to($this->argument('to') ?? 'test@example.com')
+                ->to($this->email)
                 ->subject($this->mail->subject)
                 ->html((string)$this->mail->render())
         );
