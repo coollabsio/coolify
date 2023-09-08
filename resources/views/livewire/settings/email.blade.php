@@ -67,7 +67,7 @@
             <summary class="text-xl collapse-title">
                 <div>Resend</div>
                 <div class="w-32">
-                    <x-forms.checkbox instantSave='submitResend' id="settings.resend_enabled" label="Enabled" />
+                    <x-forms.checkbox instantSave='instantSaveResend' id="settings.resend_enabled" label="Enabled" />
                 </div>
             </summary>
             <div class="collapse-content">

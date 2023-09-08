@@ -60,7 +60,6 @@ class Email extends Component
             $this->validate([
                 'settings.resend_api_key' => 'required'
             ]);
-            $this->settings->smtp_enabled = false;
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Exception $e) {
@@ -68,9 +67,18 @@ class Email extends Component
             return general_error_handler($e, $this);
         }
     }
+    public function instantSaveResend() {
+        try {
+            $this->settings->smtp_enabled = false;
+            $this->submitResend();
+        } catch (\Exception $e) {
+            return general_error_handler($e, $this);
+        }
+    }
     public function instantSave()
     {
         try {
+            $this->settings->resend_enabled = false;
             $this->submit();
         } catch (\Exception $e) {
             return general_error_handler($e, $this);
@@ -89,7 +97,6 @@ class Email extends Component
                 'settings.smtp_password' => 'nullable',
                 'settings.smtp_timeout' => 'nullable',
             ]);
-            $this->settings->resend_enabled = false;
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Exception $e) {
