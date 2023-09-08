@@ -16,6 +16,7 @@ class DeploymentFailed extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 5;
     public Application $application;
     public string $deployment_uuid;
     public ?ApplicationPreview $preview = null;

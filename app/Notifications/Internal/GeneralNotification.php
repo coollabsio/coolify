@@ -12,6 +12,7 @@ class GeneralNotification extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 5;
     public function __construct(public string $message)
     {
     }

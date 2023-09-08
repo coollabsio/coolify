@@ -14,6 +14,7 @@ class BackupFailed extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 5;
     public string $name;
     public string $frequency;
 
