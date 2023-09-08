@@ -20,13 +20,16 @@ class EnvironmentVariable extends Model
     {
         static::created(function ($environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
-                ModelsEnvironmentVariable::create([
-                    'key' => $environment_variable->key,
-                    'value' => $environment_variable->value,
-                    'is_build_time' => $environment_variable->is_build_time,
-                    'application_id' => $environment_variable->application_id,
-                    'is_preview' => true,
-                ]);
+                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview',true)->first();
+                if (!$found) {
+                    ModelsEnvironmentVariable::create([
+                        'key' => $environment_variable->key,
+                        'value' => $environment_variable->value,
+                        'is_build_time' => $environment_variable->is_build_time,
+                        'application_id' => $environment_variable->application_id,
+                        'is_preview' => true,
+                    ]);
+                }
             }
         });
     }
