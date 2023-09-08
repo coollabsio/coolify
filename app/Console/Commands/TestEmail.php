@@ -31,7 +31,7 @@ class TestEmail extends Command
      *
      * @var string
      */
-    protected $signature = 'email:test';
+    protected $signature = 'email:test {to}';
 
     /**
      * The console command description.
@@ -176,7 +176,7 @@ class TestEmail extends Command
                     'internal@example.com',
                     'Test Email',
                 )
-                ->to('test@example.com')
+                ->to($this->argument('to') ?? 'test@example.com')
                 ->subject($this->mail->subject)
                 ->html((string)$this->mail->render())
         );
