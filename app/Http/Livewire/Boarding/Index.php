@@ -6,6 +6,7 @@ use App\Actions\Server\InstallDocker;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Team;
 use Illuminate\Support\Collection;
 use Livewire\Component;
 
@@ -70,9 +71,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function skipBoarding()
     {
-        currentTeam()->update([
+        Team::find(currentTeam()->id)->update([
             'show_boarding' => false
         ]);
+        ray(currentTeam());
         refreshSession();
         return redirect()->route('dashboard');
     }

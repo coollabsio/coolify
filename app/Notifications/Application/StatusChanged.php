@@ -14,6 +14,7 @@ class StatusChanged extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 5;
     public $application;
 
     public string $application_name;

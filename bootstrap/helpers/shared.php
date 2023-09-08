@@ -57,9 +57,15 @@ function showBoarding(): bool
 {
     return currentTeam()->show_boarding ?? false;
 }
-function refreshSession(): void
+function refreshSession(?Team $team = null): void
 {
-    $team = Team::find(currentTeam()->id);
+    if (!$team) {
+        $team = Team::find(currentTeam()->id);
+    }
+    Cache::forget('team:' . auth()->user()->id);
+    Cache::remember('team:' . auth()->user()->id, 3600, function() use ($team) {
+        return $team;
+    });
     session(['currentTeam' => $team]);
 }
 function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed

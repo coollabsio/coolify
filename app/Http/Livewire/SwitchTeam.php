@@ -23,7 +23,7 @@ class SwitchTeam extends Component
         if (!$team_to_switch_to) {
             return;
         }
-        session(['currentTeam' => $team_to_switch_to]);
+        refreshSession($team_to_switch_to);
         return redirect(request()->header('Referer'));
     }
 }

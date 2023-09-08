@@ -40,7 +40,7 @@ class InstallDocker
                 "echo ####### Restarting Docker Engine...",
                 "systemctl restart docker",
                 "echo ####### Creating default network...",
-                "docker network create --attachable coolify",
+                "docker network create --attachable coolify >/dev/null 2>&1 || true",
                 "echo ####### Done!"
             ], $server);
             $found = StandaloneDocker::where('server_id', $server->id);

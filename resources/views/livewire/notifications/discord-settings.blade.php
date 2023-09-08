@@ -20,20 +20,31 @@
             id="team.discord_webhook_url" label="Webhook" />
     </form>
     @if (data_get($team, 'discord_enabled'))
-        <h3 class="mt-4">Subscribe to events</h3>
+        <h2 class="mt-4">Subscribe to events</h2>
         <div class="w-64">
+
+
             @if (isDev())
-                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_test" label="Test" />
+            <h3 class="mt-4">Test</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_test" label="Enabled" />
+            </div>
             @endif
-            <h4 class="mt-4">General</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_status_changes"
-                label="Container Status Changes" />
-            <h4 class="mt-4">Applications</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_deployments"
-                label="Deployments" />
-            <h4 class="mt-4">Databases</h4>
-            <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_database_backups"
-                label="Backup Statuses" />
+            <h3 class="mt-4">Container Status Changes</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_status_changes"
+                label="Enabled" />
+            </div>
+            <h3 class="mt-4">Application Deployments</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_deployments"
+                label="Enabled" />
+            </div>
+            <h3 class="mt-4">Backup Status</h3>
+            <div class="flex items-end gap-10">
+                <x-forms.checkbox instantSave="saveModel" id="team.discord_notifications_database_backups"
+                label="Enabled" />
+            </div>
         </div>
     @endif
 </div>

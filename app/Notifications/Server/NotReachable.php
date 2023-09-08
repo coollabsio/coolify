@@ -15,6 +15,7 @@ class NotReachable extends Notification implements ShouldQueue
 {
     use Queueable;
 
+    public $tries = 5;
     public function __construct(public Server $server)
     {
 
