@@ -174,10 +174,6 @@ class TestEmail extends Command
             [],
             [],
             fn (Message $message) => $message
-                ->from(
-                    'internal@example.com',
-                    'Test Email',
-                )
                 ->to($this->email)
                 ->subject($this->mail->subject)
                 ->html((string)$this->mail->render())
