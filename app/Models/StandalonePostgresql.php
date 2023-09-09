@@ -28,6 +28,11 @@ class StandalonePostgresql extends BaseModel
                 'is_readonly' => true
             ]);
         });
+        static::deleted(function ($database) {
+            $database->scheduledBackups()->delete();
+            $database->persistentStorages()->delete();
+            instant_remote_process(['docker volume rm postgres-data-' . $database->uuid], $database->destination->server, false);
+        });
     }
 
     public function portsMappings(): Attribute

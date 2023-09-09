@@ -26,10 +26,8 @@ class DatabaseBackupJob implements ShouldQueue
 
     public ?Team $team = null;
     public Server $server;
-    public ?ScheduledDatabaseBackup $backup = null;
-    public string $database_type;
-    public ?StandalonePostgresql $database = null;
-    public ?string $database_status = null;
+    public ScheduledDatabaseBackup $backup;
+    public StandalonePostgresql $database;
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
@@ -45,13 +43,8 @@ class DatabaseBackupJob implements ShouldQueue
     {
         $this->backup = $backup;
         $this->team = Team::find($backup->team_id);
-        $this->database = data_get($this->backup,'database');
-        if (is_null($this->database)) {
-            ray('Database not found');
-        }
-        $this->database_type = $this->database->type();
+        $this->database = data_get($this->backup, 'database');
         $this->server = $this->database->destination->server;
-        $this->database_status = data_get($this->database,'status');
         $this->s3 = $this->backup->s3;
     }
 
@@ -68,7 +61,7 @@ class DatabaseBackupJob implements ShouldQueue
     public function handle(): void
     {
         try {
-            if ($this->database_status !== 'running') {
+            if (data_get($this->database, 'status') !== 'running') {
                 ray('database not running');
                 return;
             }
@@ -87,7 +80,7 @@ class DatabaseBackupJob implements ShouldQueue
                 'filename' => $this->backup_location,
                 'scheduled_database_backup_id' => $this->backup->id,
             ]);
-            if ($this->database_type === 'standalone-postgresql') {
+            if ($this->database->type() === 'standalone-postgresql') {
                 $this->backup_standalone_postgresql();
             }
             $this->calculate_size();
@@ -102,7 +95,6 @@ class DatabaseBackupJob implements ShouldQueue
             send_internal_notification('DatabaseBackupJob failed with: ' . $th->getMessage());
             throw $th;
         }
-
     }
 
     private function backup_standalone_postgresql(): void
