@@ -37,7 +37,7 @@ class Create extends Component
             if ($this->from === 'server') {
                 return redirect()->route('server.create');
             }
-            return redirect()->route('private-key.show', ['private_key_uuid' => $private_key->uuid]);
+            return redirect()->route('security.private-key.show', ['private_key_uuid' => $private_key->uuid]);
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }

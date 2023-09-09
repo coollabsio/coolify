@@ -54,13 +54,19 @@ class Form extends Component
             ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server);
             if ($uptime) {
                 $this->uptime = $uptime;
+                $this->emit('success', 'Server is reachable!');
+            } else {
+                throw new \Exception('Server is not rachable');
             }
             if ($dockerVersion) {
                 $this->dockerVersion = $dockerVersion;
                 $this->emit('proxyStatusUpdated');
+                $this->emit('success', 'Docker Engine 23+ is installed!');
+            } else {
+                throw new \Exception('Old Docker version detected (lower than 23).');
             }
         } catch (\Exception $e) {
-            return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
+            return general_error_handler($e, that: $this);
         }
     }
 
@@ -77,8 +83,6 @@ class Form extends Component
         } catch (\Exception $e) {
             return general_error_handler(err: $e, that: $this);
         }
-
-
     }
     public function submit()
     {

@@ -164,9 +164,9 @@ function refresh_server_connection(PrivateKey $private_key)
         // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
         // check if user is authenticated
-        if (currentTeam()->id) {
-            currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
-        }
+        // if (currentTeam()->id) {
+        //     currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
+        // }
     }
 }
 
@@ -184,7 +184,7 @@ function validateServer(Server $server)
         }
         $server->settings->is_reachable = true;
 
-        $dockerVersion = instant_remote_process(['docker version|head -2|grep -i version'], $server, false);
+        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $server, false);
         if (!$dockerVersion) {
             $dockerVersion = null;
             return [
@@ -192,7 +192,13 @@ function validateServer(Server $server)
                 "dockerVersion" => null,
             ];
         }
-        $server->settings->is_usable = true;
+        $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
+        if ($majorDockerVersion <= 22) {
+            $dockerVersion = null;
+            $server->settings->is_usable = false;
+        } else {
+            $server->settings->is_usable = true;
+        }
         return [
             "uptime" => $uptime,
             "dockerVersion" => $dockerVersion,
@@ -202,7 +208,7 @@ function validateServer(Server $server)
         $server->settings->is_usable = false;
         throw $e;
     } finally {
-        $server->settings->save();
+        if(data_get($server,'settings')) $server->settings->save();
     }
 }
 
