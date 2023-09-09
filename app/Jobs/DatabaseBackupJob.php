@@ -29,7 +29,7 @@ class DatabaseBackupJob implements ShouldQueue
     public ?ScheduledDatabaseBackup $backup = null;
     public string $database_type;
     public ?StandalonePostgresql $database = null;
-    public string $database_status;
+    public ?string $database_status = null;
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
@@ -45,14 +45,13 @@ class DatabaseBackupJob implements ShouldQueue
     {
         $this->backup = $backup;
         $this->team = Team::find($backup->team_id);
-        $this->database = $this->backup->database;
-        if (!$this->database) {
+        $this->database = data_get($this->backup,'database');
+        if (is_null($this->database)) {
             ray('Database not found');
-            return;
         }
         $this->database_type = $this->database->type();
         $this->server = $this->database->destination->server;
-        $this->database_status = $this->database->status;
+        $this->database_status = data_get($this->database,'status');
         $this->s3 = $this->backup->s3;
     }
 
