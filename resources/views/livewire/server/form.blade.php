@@ -18,11 +18,6 @@
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
             @endif
-            @if (!$server->settings->is_reachable || !$server->settings->is_usable)
-                <x-forms.button wire:click.prevent='validateServer'>
-                    Validate Server
-                </x-forms.button>
-            @endif
 
         </div>
         @if (!$server->settings->is_reachable || !$server->settings->is_usable)
@@ -51,43 +46,25 @@
                 </div>
             </div>
         </div>
-        @if ($server->settings->is_reachable)
+        @if (!$server->settings->is_reachable)
+            <x-forms.button class="mt-8 mb-4 box" wire:click.prevent='validateServer'>
+                Validate Server
+            </x-forms.button>
+        @endif
+        @if ($server->settings->is_reachable && !$server->settings->is_usable && $server->id !== 0)
+            <x-forms.button wire:poll.2000ms='validateServer' class="mt-8 mb-4 box" onclick="installDocker.showModal()" wire:click.prevent='installDocker' isHighlighted>
+                    Install Docker Engine 24.0
+            </x-forms.button>
+        @endif
+        @if ($server->settings->is_usable)
             <h3 class="py-4">Settings</h3>
             <div class="flex items-center w-64 gap-2">
                 <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
                     helper="Disk cleanup job will be executed if disk usage is more than this number." />
             </div>
-
-            <h3 class="py-4">Actions</h3>
-            <div class="flex items-center gap-2">
-                <x-forms.button wire:click.prevent='validateServer'>
-                    Check Server Details
-                </x-forms.button>
-                @if ($server->id !== 0)
-                    <x-forms.button wire:click.prevent='installDocker' isHighlighted>
-                        @if ($server->settings->is_usable)
-                            Reconfigure Docker Engine
-                        @else
-                            Install Docker Engine
-                        @endif
-                    </x-forms.button>
-                @endif
-            </div>
         @endif
-        <div class="container w-full py-4 mx-auto">
-            <livewire:activity-monitor header="Logs" />
-        </div>
-        @isset($uptime)
-            <h3 class="pb-3">Server Info</h3>
-            <div class="py-2 pb-4">
-                <p>Uptime: {{ $uptime }}</p>
-                @isset($dockerVersion)
-                    <p>Docker Engine {{ $dockerVersion }}</p>
-                @endisset
-            </div>
-        @endisset
     </form>
-    <h2>Danger Zone</h2>
+    <h2 class="pt-4">Danger Zone</h2>
     <div class="">Woah. I hope you know what are you doing.</div>
     <h4 class="pt-4">Delete Server</h4>
     <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming

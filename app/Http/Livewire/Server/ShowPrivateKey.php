@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Server;
 
 use App\Models\Server;
 use Livewire\Component;
-use Masmerise\Toaster\Toaster;
 
 class ShowPrivateKey extends Component
 {
@@ -12,14 +11,24 @@ class ShowPrivateKey extends Component
     public $privateKeys;
     public $parameters;
 
-    public function setPrivateKey($private_key_id)
+    public function setPrivateKey($newPrivateKeyId)
     {
-        $this->server->update([
-            'private_key_id' => $private_key_id
-        ]);
-        refresh_server_connection($this->server->privateKey);
-        $this->server->refresh();
-        $this->checkConnection();
+        try {
+            $oldPrivateKeyId = $this->server->private_key_id;
+            $this->server->update([
+                'private_key_id' => $newPrivateKeyId
+            ]);
+            $this->server->refresh();
+            refresh_server_connection($this->server->privateKey);
+            $this->checkConnection();
+        } catch (\Exception $e) {
+            $this->server->update([
+                'private_key_id' => $oldPrivateKeyId
+            ]);
+            $this->server->refresh();
+             refresh_server_connection($this->server->privateKey);
+            return general_error_handler($e, that: $this);
+        }
     }
 
     public function checkConnection()
@@ -27,13 +36,17 @@ class ShowPrivateKey extends Component
         try {
             ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server);
             if ($uptime) {
-                Toaster::success('Server is reachable with this private key.');
+                $this->emit('success', 'Server is reachable with this private key.');
+            } else {
+                throw new \Exception('Server is not reachable with this private key.');
             }
             if ($dockerVersion) {
-                Toaster::success('Server is usable for Coolify.');
+                $this->emit('success', 'Server is usable for Coolify.');
+            } else {
+                throw new \Exception('Old Docker version detected (lower than 23).');
             }
         } catch (\Exception $e) {
-            return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
+            throw new \Exception($e->getMessage());
         }
     }
 

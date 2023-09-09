@@ -22,11 +22,13 @@
         @endif
 
     </div>
-    <h3 class="pb-4">Select a different Private Key</h3>
-    <div class="grid gap-2">
+    <h3 class="pb-4">Choose another Key</h3>
+    <div class="grid grid-cols-3 gap-2">
         @forelse ($privateKeys as $private_key)
-            <div class="cursor-pointer box" wire:click='setPrivateKey({{ $private_key->id }})'>{{ $private_key->name }}
-            </div>
+            <x-forms.button class="flex flex-col box" wire:click='setPrivateKey({{ $private_key->id }})'>
+                <div>{{ $private_key->name }}</div>
+                <div class="text-xs">{{ $private_key->description }}</div>
+            </x-forms.button>
         @empty
             <div>No private keys found.
                 <x-use-magic-bar link="/security/private-key/new" />

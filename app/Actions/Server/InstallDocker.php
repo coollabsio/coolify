@@ -18,42 +18,42 @@ class InstallDocker
               "max-file": "3"
             }
           }');
+        $found = StandaloneDocker::where('server_id', $server->id);
+        if ($found->count() == 0) {
+            StandaloneDocker::create([
+                'name' => 'coolify',
+                'network' => 'coolify',
+                'server_id' => $server->id,
+            ]);
+        }
         if (isDev()) {
-            $activity = remote_process([
-                "echo ####### Installing Prerequisites...",
-                "echo ####### Installing/updating Docker Engine...",
-                "echo ####### Configuring Docker Engine (merging existing configuration with the required)...",
-                "echo ####### Restarting Docker Engine...",
+            return remote_process([
+                "echo '####### Installing Prerequisites...'",
+                "sleep 1",
+                "echo '####### Installing/updating Docker Engine...'",
+                "echo '####### Configuring Docker Engine (merging existing configuration with the required)...'",
+                "sleep 4",
+                "echo '####### Restarting Docker Engine...'",
+                "ls -l /tmp"
             ], $server);
         } else {
-            $activity = remote_process([
-                "echo ####### Installing Prerequisites...",
+            return remote_process([
+                "echo '####### Installing Prerequisites...'",
                 "command -v jq >/dev/null || apt-get update",
                 "command -v jq >/dev/null || apt install -y jq",
-                "echo ####### Installing/updating Docker Engine...",
+                "echo '####### Installing/updating Docker Engine...'",
                 "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh",
-                "echo ####### Configuring Docker Engine (merging existing configuration with the required)...",
+                "echo '####### Configuring Docker Engine (merging existing configuration with the required)...'",
                 "test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json \"/etc/docker/daemon.json.original-`date +\"%Y%m%d-%H%M%S\"`\" || echo '{$config}' | base64 -d > /etc/docker/daemon.json",
                 "echo '{$config}' | base64 -d > /etc/docker/daemon.json.coolify",
                 "cat <<< $(jq . /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json.coolify",
                 "cat <<< $(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json",
-                "echo ####### Restarting Docker Engine...",
+                "echo '####### Restarting Docker Engine...'",
                 "systemctl restart docker",
-                "echo ####### Creating default network...",
+                "echo '####### Creating default Docker network (coolify)...'",
                 "docker network create --attachable coolify >/dev/null 2>&1 || true",
-                "echo ####### Done!"
+                "echo '####### Done!'"
             ], $server);
-            $found = StandaloneDocker::where('server_id', $server->id);
-            if ($found->count() == 0) {
-                StandaloneDocker::create([
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $server->id,
-                ]);
-            }
         }
-
-
-        return $activity;
     }
 }

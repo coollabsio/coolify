@@ -30,19 +30,19 @@ class StartProxy
         $server->save();
 
         $activity = remote_process([
-            "echo 'Creating required Docker networks...'",
+            "echo '####### Creating required Docker networks...'",
             ...$create_networks_command,
             "cd $proxy_path",
-            "echo 'Creating Docker Compose file...'",
-            "echo 'Pulling docker image...'",
+            "echo '####### Creating Docker Compose file...'",
+            "echo '####### Pulling docker image...'",
             'docker compose pull',
-            "echo 'Stopping existing proxy...'",
+            "echo '####### Stopping existing proxy...'",
             'docker compose down -v --remove-orphans',
             "lsof -nt -i:80 | xargs -r kill -9",
             "lsof -nt -i:443 | xargs -r kill -9",
-            "echo 'Starting proxy...'",
+            "echo '####### Starting proxy...'",
             'docker compose up -d --remove-orphans',
-            "echo 'Proxy installed successfully...'"
+            "echo '####### Proxy installed successfully...'"
         ], $server);
 
         return $activity;
