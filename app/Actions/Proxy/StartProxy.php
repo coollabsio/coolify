@@ -35,7 +35,7 @@ class StartProxy
             "cd $proxy_path",
             "echo 'Creating Docker Compose file...'",
             "echo 'Pulling docker image...'",
-            'docker compose pull -q',
+            'docker compose pull',
             "echo 'Stopping existing proxy...'",
             'docker compose down -v --remove-orphans',
             "lsof -nt -i:80 | xargs -r kill -9",
