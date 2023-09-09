@@ -74,6 +74,11 @@ class Kernel extends ConsoleKernel
             if (!$scheduled_backup->enabled) {
                 continue;
             }
+            if (is_null(data_get($scheduled_backup,'database'))) {
+                ray('database not found');
+                $scheduled_backup->delete();
+                continue;
+            }
 
             if (isset(VALID_CRON_STRINGS[$scheduled_backup->frequency])) {
                 $scheduled_backup->frequency = VALID_CRON_STRINGS[$scheduled_backup->frequency];
