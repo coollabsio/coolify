@@ -8,13 +8,14 @@
             <div class="w-96">
                 <form action="/user/confirm-password" method="POST" class="flex flex-col gap-2">
                     @csrf
-                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}"
-                        autofocus />
+                    <x-forms.input required type="password" name="password" label="{{ __('input.password') }}" autofocus />
                     <x-forms.button type="submit">{{ __('auth.confirm_password') }}</x-forms.button>
                 </form>
                 @if ($errors->any())
-                    <div class="text-center text-error">
-                        <span>{{ __('auth.failed') }}</span>
+                    <div class="text-xs text-center text-error">
+                        @foreach ($errors->all() as $error)
+                            <p>{{ $error }}</p>
+                        @endforeach
                     </div>
                 @endif
                 @if (session('status'))

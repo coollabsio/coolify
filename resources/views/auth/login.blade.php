@@ -43,7 +43,9 @@
                     @endif
                     @if ($errors->any())
                         <div class="text-xs text-center text-error">
-                            <span>{{ __('auth.failed') }}</span>
+                            @foreach ($errors->all() as $error)
+                                <p>{{ $error }}</p>
+                            @endforeach
                         </div>
                     @endif
                     @if (session('status'))
