@@ -24,8 +24,10 @@
                     <x-forms.button type="submit">{{ __('auth.reset_password') }}</x-forms.button>
                 </form>
                 @if ($errors->any())
-                    <div class="text-center text-error">
-                        <span>{{ __('auth.failed') }}</span>
+                    <div class="text-xs text-center text-error">
+                        @foreach ($errors->all() as $error)
+                            <p>{{ $error }}</p>
+                        @endforeach
                     </div>
                 @endif
                 @if (session('status'))
