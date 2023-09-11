@@ -20,7 +20,7 @@
                     </template>
                     <template x-if="showRecovery">
                         <div>
-                            <x-forms.input required type="text" name="recovery_code "
+                            <x-forms.input required type="text" name="recovery_code"
                                 label="{{ __('input.recovery_code') }}" />
                             <div class="pt-2 text-xs cursor-pointer hover:underline hover:text-white"
                                 x-on:click="showRecovery = !showRecovery">Use
