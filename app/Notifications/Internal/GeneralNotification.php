@@ -19,7 +19,17 @@ class GeneralNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return [TelegramChannel::class, DiscordChannel::class];
+        $channels = [];
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+
+        if ($isDiscordEnabled) {
+            $channels[] = DiscordChannel::class;
+        }
+        if ($isTelegramEnabled) {
+            $channels[] = TelegramChannel::class;
+        }
+        return $channels;
     }
 
     public function toDiscord(): string
