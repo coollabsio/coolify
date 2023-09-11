@@ -135,7 +135,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->selectedExistingPrivateKey = null;
         $this->privateKeyType = $type;
-        if ($type === 'create' && !isDev()) {
+        if ($type === 'create') {
             $this->createNewPrivateKey();
         }
         $this->currentState = 'create-private-key';

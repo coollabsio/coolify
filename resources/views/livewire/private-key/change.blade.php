@@ -20,6 +20,10 @@
         <x-forms.input id="private_key.description" label="Description" />
         <div>
             <div class="flex items-end gap-2 py-2 ">
+                <div class="pl-1 ">Public Key</div>
+            </div>
+            <x-forms.input readonly id="public_key" />
+            <div class="flex items-end gap-2 py-2 ">
                 <div class="pl-1 ">Private Key <span class='text-helper'>*</span></div>
                 <div class="text-xs text-white underline cursor-pointer" x-cloak x-show="!showPrivateKey"
                     x-on:click="showPrivateKey = true">
@@ -43,5 +47,6 @@
                 <x-forms.textarea rows="10" id="private_key.private_key" required />
             </div>
         </div>
+
     </form>
 </div>
