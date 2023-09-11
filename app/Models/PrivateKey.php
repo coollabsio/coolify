@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use phpseclib3\Crypt\PublicKeyLoader;
 
 class PrivateKey extends BaseModel
 {
@@ -17,6 +18,15 @@ class PrivateKey extends BaseModel
     {
         $selectArray = collect($select)->concat(['id']);
         return PrivateKey::whereTeamId(currentTeam()->id)->select($selectArray->all());
+    }
+
+    public function publicKey()
+    {
+        try {
+            return PublicKeyLoader::load($this->private_key)->getPublicKey()->toString('OpenSSH',['comment' => '']);
+        } catch (\Exception $e) {
+            return 'Error loading private key';
+        }
     }
 
     public function isEmpty()

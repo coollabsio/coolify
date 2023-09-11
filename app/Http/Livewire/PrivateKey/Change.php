@@ -8,7 +8,7 @@ use Livewire\Component;
 class Change extends Component
 {
     public PrivateKey $private_key;
-
+    public $public_key;
     protected $rules = [
         'private_key.name' => 'required|string',
         'private_key.description' => 'nullable|string',
@@ -21,6 +21,14 @@ class Change extends Component
         'private_key.private_key' => 'private key'
     ];
 
+    public function mount()
+    {
+        try {
+            $this->public_key = $this->private_key->publicKey();
+        }catch(\Exception $e) {
+            return general_error_handler(err: $e, that: $this);
+        }
+    }
     public function delete()
     {
         try {
