@@ -20,6 +20,9 @@
         }
     </style>
     @livewireStyles
+    @if (config('app.name') == 'Coolify Cloud')
+        <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
+    @endif
 </head>
 @section('body')
 
