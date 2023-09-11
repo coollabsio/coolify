@@ -77,6 +77,11 @@ class All extends Component
                 $environment->save();
             }
         }
+        if ($isPreview) {
+            $this->emit('success', 'Preview environment variables updated successfully.');
+        } else {
+            $this->emit('success', 'Environment variables updated successfully.');
+        }
         $this->refreshEnvs();
     }
     public function refreshEnvs()
