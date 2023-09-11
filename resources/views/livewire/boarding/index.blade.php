@@ -115,9 +115,9 @@
                         <x-forms.textarea required placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key"
                             id="privateKey" />
                         @if ($privateKeyType === 'create')
-                            <span class="font-bold text-warning">Copy this to your server's ~/.ssh/authorized_keys
-                                file.</span>
-                            <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
+                        <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
+                        <span class="font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's ~/.ssh/authorized_keys
+                            file.</span>
                         @endif
                         <x-forms.button type="submit">Save</x-forms.button>
                     </form>
