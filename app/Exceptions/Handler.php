@@ -50,8 +50,13 @@ class Handler extends ExceptionHandler
                 return;
             }
             app('sentry')->configureScope(
-                function (Scope $scope){
-                    $scope->setUser(['id'=> config('sentry.server_name')]);
+                function (Scope $scope) {
+                    $scope->setUser(
+                        [
+                            'id' => config('sentry.server_name'),
+                            'email' => auth()->user()->email
+                        ]
+                    );
                 }
             );
             Integration::captureUnhandledException($e);
