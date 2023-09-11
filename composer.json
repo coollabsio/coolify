@@ -35,7 +35,8 @@
         "spatie/url": "^2.2",
         "stripe/stripe-php": "^12.0",
         "symfony/yaml": "^6.2",
-        "visus/cuid2": "^2.0.0"
+        "visus/cuid2": "^2.0.0",
+        "yosymfony/toml": "^1.0"
     },
     "require-dev": {
         "fakerphp/faker": "^v1.21.0",
