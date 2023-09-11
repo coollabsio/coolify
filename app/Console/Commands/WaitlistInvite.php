@@ -91,8 +91,6 @@ class WaitlistInvite extends Command
         $loginLink = route('auth.link', ['token' => $token]);
         $mail = new MailMessage();
         $mail->view('emails.waitlist-invitation', [
-            'email' => $this->next_patient->email,
-            'password' => $this->password,
             'loginLink' => $loginLink,
         ]);
         $mail->subject('Congratulations! You are invited to join Coolify Cloud.');

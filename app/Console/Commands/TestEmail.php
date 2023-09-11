@@ -2,12 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
+use App\Models\Waitlist;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\StatusChanged;
@@ -19,6 +21,7 @@ use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Process;
 use Mail;
 use Str;
 
@@ -148,23 +151,20 @@ class TestEmail extends Command
             case 'waitlist-invitation-link':
                 $this->mail = new MailMessage();
                 $this->mail->view('emails.waitlist-invitation', [
-                    'email' => 'test2@example.com',
-                    'password' => "supersecretpassword",
+                    'loginLink' => 'https://coolify.io',
                 ]);
                 $this->mail->subject('Congratulations! You are invited to join Coolify Cloud.');
                 $this->sendEmail();
                 break;
             case 'waitlist-confirmation':
-                $this->mail = new MailMessage();
-                $this->mail->view(
-                    'emails.waitlist-confirmation',
-                    [
-                        'confirmation_url' => 'http://example.com',
-                        'cancel_url' => 'http://example.com',
-                    ]
-                );
-                $this->mail->subject('You are on the waitlist!');
-                $this->sendEmail();
+                $found = Waitlist::where('email', $this->email)->first();
+                if ($found) {
+                    SendConfirmationForWaitlistJob::dispatch($this->email, $found->uuid);
+
+                } else {
+                    throw new Exception('Waitlist not found');
+                }
+
                 break;
         }
     }
