@@ -38,12 +38,13 @@ class ShowPrivateKey extends Component
             if ($uptime) {
                 $this->emit('success', 'Server is reachable with this private key.');
             } else {
-                throw new \Exception('Server is not reachable with this private key.');
+                $this->emit('error', 'Server is not reachable with this private key.');
+                return;
             }
             if ($dockerVersion) {
                 $this->emit('success', 'Server is usable for Coolify.');
             } else {
-                throw new \Exception('Old Docker version detected (lower than 23).');
+                $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
             }
         } catch (\Exception $e) {
             throw new \Exception($e->getMessage());
