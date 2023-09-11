@@ -49,7 +49,7 @@ Route::post('/forgot-password', function (Request $request) {
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
-Route::middleware(['throttle:login'])->group(function() {
+Route::middleware(['throttle:login'])->group(function () {
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
 Route::prefix('magic')->middleware(['auth'])->group(function () {
@@ -143,7 +143,11 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('source.all');
     Route::get('/source/github/{github_app_uuid}', function (Request $request) {
-        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first()->makeVisible('client_secret')->makeVisible('webhook_secret');
+        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
+        if (!$github_app) {
+            abort(404);
+        }
+        $github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
         $settings = InstanceSettings::get();
         $name = Str::of(Str::kebab($github_app->name));
         if ($settings->public_ipv4) {
