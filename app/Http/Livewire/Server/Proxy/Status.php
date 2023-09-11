@@ -10,7 +10,8 @@ class Status extends Component
     public Server $server;
 
     protected $listeners = ['proxyStatusUpdated'];
-    public function proxyStatusUpdated() {
+    public function proxyStatusUpdated()
+    {
         $this->server->refresh();
     }
     public function getProxyStatus()
@@ -25,10 +26,10 @@ class Status extends Component
         } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
-
     }
-    public function getProxyStatusWithNoti() {
-        $this->emit('success', 'Refreshing proxy status.');
+    public function getProxyStatusWithNoti()
+    {
+        $this->emit('success', 'Refreshed proxy status.');
         $this->getProxyStatus();
     }
 }
