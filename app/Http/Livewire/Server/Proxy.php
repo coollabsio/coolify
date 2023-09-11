@@ -14,14 +14,14 @@ class Proxy extends Component
 
     public ?string $selectedProxy = null;
     public $proxy_settings = null;
-    public string|null $redirect_url = null;
+    public ?string $redirect_url = null;
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
 
     public function mount()
     {
-        $this->selectedProxy = $this->server->proxy->type;
-        $this->redirect_url = $this->server->proxy->redirect_url;
+        $this->selectedProxy = data_get($this->server, 'proxy.type');
+        $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
     public function proxyStatusUpdated()
@@ -69,9 +69,10 @@ class Proxy extends Component
         }
     }
 
-    public function load_proxy_configuration()
+    public function loadProxyConfiguration()
     {
         try {
+            ray('loadProxyConfiguration');
             $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server);
         } catch (\Throwable $e) {
             return general_error_handler(err: $e);

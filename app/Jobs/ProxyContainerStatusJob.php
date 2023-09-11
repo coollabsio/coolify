@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Actions\Proxy\StartProxy;
+use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
@@ -11,7 +13,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Str;
 
 class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
 {
@@ -28,29 +29,49 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping($this->server->id)];
+        return [new WithoutOverlapping($this->server->uuid)];
     }
 
-    public function uniqueId(): int
+    public function uniqueId(): string
     {
-        return $this->server->id;
+        ray($this->server->uuid);
+        return $this->server->uuid;
     }
 
     public function handle(): void
     {
         try {
-            $container = getContainerStatus(server: $this->server, all_data: true, container_id: 'coolify-proxy', throwError: false);
-            $status = data_get($container, 'State.Status');
-            if ($status && data_get($this->server, 'proxy.status') !== $status) {
-                $this->server->proxy->status = $status;
-                if ($this->server->proxy->status === 'running') {
-                    $traefik = $container['Config']['Labels']['org.opencontainers.image.title'];
-                    $version = $container['Config']['Labels']['org.opencontainers.image.version'];
-                    if (isset($version) && isset($traefik) && $traefik === 'Traefik' && Str::of($version)->startsWith('v2')) {
-                        $this->server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
-                    }
+            $proxyType = data_get($this->server, 'proxy.type');
+            if ($proxyType === ProxyTypes::NONE->value) {
+                return;
+            }
+            if (is_null($proxyType)) {
+                if ($this->server->isProxyShouldRun()) {
+                    $this->server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+                    $this->server->proxy->status = ProxyStatus::EXITED->value;
+                    $this->server->save();
+                    resolve(StartProxy::class)($this->server);
+                    return;
                 }
-                $this->server->save();
+            }
+
+            $container = getContainerStatus(server: $this->server, all_data: true, container_id: 'coolify-proxy', throwError: false);
+            $containerStatus = data_get($container, 'State.Status');
+            $databaseContainerStatus = data_get($this->server, 'proxy.status', 'exited');
+
+
+            if ($proxyType !== ProxyTypes::NONE->value) {
+                if ($containerStatus === 'running') {
+                    $this->server->proxy->status = $containerStatus;
+                    $this->server->save();
+                    return;
+                }
+                if ((is_null($containerStatus) ||$containerStatus !== 'running' || $databaseContainerStatus !== 'running' || ($containerStatus && $databaseContainerStatus !== $containerStatus)) && $this->server->isProxyShouldRun()) {
+                    $this->server->proxy->status = $containerStatus;
+                    $this->server->save();
+                    resolve(StartProxy::class)($this->server);
+                    return;
+                }
             }
         } catch (\Throwable $e) {
             if ($e->getCode() === 1) {

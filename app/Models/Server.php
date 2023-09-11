@@ -30,7 +30,6 @@ class Server extends BaseModel
                     'server_id' => $server->id,
                 ]);
             }
-
         });
         static::deleting(function ($server) {
             $server->destinations()->each(function ($destination) {
@@ -72,7 +71,6 @@ class Server extends BaseModel
         $swarmDocker = collect($server->swarmDockers->all());
         return $standaloneDocker->concat($swarmDocker);
     }
-
     public function settings()
     {
         return $this->hasOne(ServerSetting::class);
@@ -93,7 +91,8 @@ class Server extends BaseModel
         return false;
     }
 
-    public function databases() {
+    public function databases()
+    {
         return $this->destinations()->map(function ($standaloneDocker) {
             $postgresqls = $standaloneDocker->postgresqls;
             return $postgresqls?->concat([]) ?? collect([]);
@@ -136,5 +135,22 @@ class Server extends BaseModel
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+    public function isProxyShouldRun()
+    {
+        $shouldRun = false;
+        foreach ($this->applications() as $application) {
+            if (data_get($application, 'fqdn')) {
+                $shouldRun = true;
+                break;
+            }
+        }
+        if ($this->id === 0) {
+            $settings = InstanceSettings::get();
+            if (data_get($settings, 'fqdn')) {
+                $shouldRun = true;
+            }
+        }
+        return $shouldRun;
     }
 }

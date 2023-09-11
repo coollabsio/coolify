@@ -7,16 +7,7 @@
             </p>
         </x-slot:modalBody>
     </x-modal>
-    <x-modal yesOrNo modalId="startProxy" modalTitle="Start Proxy" action="start_proxy">
-        <x-slot:modalBody>
-            <p>This will start the proxy on this server and
-                <x-highlighted text="stop any running process that is using port 80 and 443" />.
-                <br>Please think
-                again.
-            </p>
-        </x-slot:modalBody>
-    </x-modal>
-    @if (data_get($server, 'proxy.type'))
+    @if (is_null(data_get($server, 'proxy.type')) || data_get($server, 'proxy.type') !== 'NONE')
         @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
                 <button>
@@ -37,8 +28,8 @@
                 </x-forms.button>
             </div>
         @else
-            <x-forms.button isModal noStyle modalId="startProxy"
-                class="flex items-center gap-2 cursor-pointer hover:text-white">
+            <button wire:click='startProxy' onclick="startProxy.showModal()"
+                class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                     stroke-linejoin="round">
@@ -46,7 +37,7 @@
                     <path d="M7 4v16l13 -8z" />
                 </svg>
                 Start Proxy
-            </x-forms.button>
+            </button>
         @endif
     @endif
 </div>
