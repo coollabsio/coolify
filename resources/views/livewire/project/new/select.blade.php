@@ -76,6 +76,10 @@
                     </div>
                 </div> --}}
             </div>
+            <h2 class="py-4">Services</h2>
+            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+                Ghost, Plausible, Wordpress, etc... Coming very very soon...
+            </div>
         @endif
         @if ($current_step === 'servers')
             <ul class="pb-10 steps">
@@ -135,10 +139,11 @@
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')
-        <form wire:submit.prevent='addExistingPostgresql' class="flex items-end gap-2">
-            <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL" id="existingPostgresqlUrl" />
-            <x-forms.button type="submit">Add Database</x-forms.button>
-        </form>
+            <form wire:submit.prevent='addExistingPostgresql' class="flex items-end gap-2">
+                <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
+                    id="existingPostgresqlUrl" />
+                <x-forms.button type="submit">Add Database</x-forms.button>
+            </form>
         @endif
     </div>
 </div>

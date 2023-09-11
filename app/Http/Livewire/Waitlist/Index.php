@@ -10,6 +10,7 @@ use Livewire\Component;
 class Index extends Component
 {
     public string $email;
+    public int $users = 0;
     public int $waitingInLine = 0;
 
     protected $rules = [
@@ -22,6 +23,7 @@ class Index extends Component
     public function mount()
     {
         $this->waitingInLine = Waitlist::whereVerified(true)->count();
+        $this->users = User::count();
         if (isDev()) {
             $this->email = 'waitlist@example.com';
         }
