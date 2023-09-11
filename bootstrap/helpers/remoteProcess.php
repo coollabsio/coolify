@@ -203,7 +203,7 @@ function validateServer(Server $server)
             "uptime" => $uptime,
             "dockerVersion" => $dockerVersion,
         ];
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         $server->settings->is_reachable = false;
         $server->settings->is_usable = false;
         throw $e;
@@ -219,7 +219,7 @@ function check_server_connection(Server $server)
         instant_remote_process(['uptime'], $server);
         $server->unreachable_count = 0;
         $server->settings->is_reachable = true;
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         if ($server->unreachable_count == 2) {
             $server->team->notify(new NotReachable($server));
             $server->settings->is_reachable = false;
@@ -246,7 +246,7 @@ function checkRequiredCommands(Server $server)
         }
         try {
             instant_remote_process(["docker run --rm --privileged --net=host --pid=host --ipc=host --volume /:/host busybox chroot /host bash -c 'apt update && apt install -y {$command}'"], $server);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             ray('could not install ' . $command);
             ray($e);
             break;

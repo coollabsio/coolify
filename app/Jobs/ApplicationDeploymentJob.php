@@ -28,6 +28,8 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 use Visus\Cuid2\Cuid2;
+use Yosymfony\Toml\Toml;
+use Yosymfony\Toml\TomlArray;
 
 class ApplicationDeploymentJob implements ShouldQueue
 {
@@ -133,7 +135,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                     $this->deploy();
                 }
             }
-            if ($this->application->fqdn) dispatch(new ProxyStartJob($this->server));
+            if ($this->application->fqdn) dispatch(new ProxyContainerStatusJob($this->server));
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (Exception $e) {
             ray($e);
@@ -411,6 +413,7 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function generate_nixpacks_confs()
     {
+        ray('nixpkgsarchive', $this->application->nixpkgsarchive);
         $this->execute_remote_command(
             [
                 "echo -n 'Generating nixpacks configuration.'",
@@ -419,6 +422,13 @@ class ApplicationDeploymentJob implements ShouldQueue
             [$this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
             [$this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile")]
         );
+
+        // if ($this->application->nixpkgsarchive) {
+        //     $this->execute_remote_command([
+        //         $this->execute_in_builder("cat {$this->workdir}/nixpacks.toml"), "hidden" => true, "save" => 'nixpacks_toml'
+        //     ]);
+
+        // }
     }
 
     private function nixpacks_build_cmd()

@@ -63,7 +63,7 @@ class EmailSettings extends Component
             ]);
             $this->team->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -82,7 +82,7 @@ class EmailSettings extends Component
             $this->team->resend_enabled = false;
             $this->team->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -92,7 +92,7 @@ class EmailSettings extends Component
         try {
             $this->team->smtp_enabled = false;
             $this->submitResend();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
             return general_error_handler($e, $this);
         }
@@ -102,7 +102,7 @@ class EmailSettings extends Component
         try {
             $this->team->resend_enabled = false;
             $this->submit();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
             return general_error_handler($e, $this);
         }
@@ -131,7 +131,7 @@ class EmailSettings extends Component
             ]);
             $this->team->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
             return general_error_handler($e, $this);
         }
@@ -146,7 +146,7 @@ class EmailSettings extends Component
             $this->team->save();
             refreshSession();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->team->resend_enabled = false;
             return general_error_handler($e, $this);
         }

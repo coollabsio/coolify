@@ -56,16 +56,17 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable!');
             } else {
-                throw new \Exception('Server is not rachable');
+                $this->emit('error', 'Server is not rachable');
+                return;
             }
             if ($dockerVersion) {
                 $this->dockerVersion = $dockerVersion;
                 $this->emit('proxyStatusUpdated');
                 $this->emit('success', 'Docker Engine 23+ is installed!');
             } else {
-                throw new \Exception('Old Docker version detected (lower than 23).');
+                $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, that: $this);
         }
     }
@@ -80,7 +81,7 @@ class Form extends Component
             }
             $this->server->delete();
             return redirect()->route('server.all');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

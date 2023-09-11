@@ -11,7 +11,7 @@
         </form>
     </dialog>
     <div class="flex items-center gap-2">
-        <h2>Transactional/Shared Email</h2>
+        <h2>Transactional Email</h2>
     </div>
     <div class="pb-4 ">Email settings for password resets, invitations, shared with Pro+ subscribers etc.</div>
     <form wire:submit.prevent='submitFromFields' class="pb-4">

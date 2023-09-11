@@ -154,8 +154,8 @@ class Controller extends BaseController
                 $invitation->delete();
                 abort(401);
             }
-        } catch (Throwable $th) {
-            throw $th;
+        } catch (Throwable $e) {
+            throw $e;
         }
     }
 
@@ -172,8 +172,8 @@ class Controller extends BaseController
             }
             $invitation->delete();
             return redirect()->route('team.index');
-        } catch (Throwable $th) {
-            throw $th;
+        } catch (Throwable $e) {
+            throw $e;
         }
     }
 }

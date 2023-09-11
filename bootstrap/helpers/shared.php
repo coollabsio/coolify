@@ -89,18 +89,18 @@ function general_error_handler(Throwable | null $err = null, $that = null, $isJs
             }
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
-    } catch (Throwable $error) {
+    } catch (Throwable $e) {
         if ($that) {
-            return $that->emit('error', $customErrorMessage ?? $error->getMessage());
+            return $that->emit('error', $customErrorMessage ?? $e->getMessage());
         } elseif ($isJson) {
             return response()->json([
-                'code' => $error->getCode(),
-                'error' => $error->getMessage(),
+                'code' => $e->getCode(),
+                'error' => $e->getMessage(),
             ]);
         } else {
             ray($customErrorMessage);
-            ray($error);
-            return $customErrorMessage ?? $error->getMessage();
+            ray($e);
+            return $customErrorMessage ?? $e->getMessage();
         }
     }
 }
@@ -116,9 +116,9 @@ function get_latest_version_of_coolify(): string
         $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
         $versions = $response->json();
         return data_get($versions, 'coolify.v4.version');
-    } catch (Throwable $th) {
-        //throw $th;
-        ray($th->getMessage());
+    } catch (Throwable $e) {
+        //throw $e;
+        ray($e->getMessage());
         return '0.0.0';
     }
 }
@@ -258,8 +258,8 @@ function send_internal_notification(string $message): void
         $baseUrl = config('app.name');
         $team = Team::find(0);
         $team->notify(new GeneralNotification("👀 {$baseUrl}: " . $message));
-    } catch (\Throwable $th) {
-        ray($th->getMessage());
+    } catch (\Throwable $e) {
+        ray($e->getMessage());
     }
 }
 function send_user_an_email(MailMessage $mail, string $email): void

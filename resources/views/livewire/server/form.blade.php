@@ -52,16 +52,15 @@
             </x-forms.button>
         @endif
         @if ($server->settings->is_reachable && !$server->settings->is_usable && $server->id !== 0)
-            <x-forms.button wire:poll.2000ms='validateServer' class="mt-8 mb-4 box" onclick="installDocker.showModal()" wire:click.prevent='installDocker' isHighlighted>
-                    Install Docker Engine 24.0
+            <x-forms.button wire:poll.2000ms='validateServer' class="mt-8 mb-4 box" onclick="installDocker.showModal()"
+                wire:click.prevent='installDocker' isHighlighted>
+                Install Docker Engine 24.0
             </x-forms.button>
         @endif
         @if ($server->settings->is_usable)
             <h3 class="py-4">Settings</h3>
-            <div class="flex items-center w-64 gap-2">
                 <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
                     helper="Disk cleanup job will be executed if disk usage is more than this number." />
-            </div>
         @endif
     </form>
     <h2 class="pt-4">Danger Zone</h2>

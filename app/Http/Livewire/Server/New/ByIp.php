@@ -78,7 +78,7 @@ class ByIp extends Component
             $server->settings->is_part_of_swarm = $this->is_part_of_swarm;
             $server->settings->save();
             return redirect()->route('server.show', $server->uuid);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }

@@ -35,7 +35,7 @@ class TelegramSettings extends Component
     {
         try {
             $this->submit();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             ray($e->getMessage());
             $this->team->telegram_enabled = false;
             $this->validate();

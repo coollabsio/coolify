@@ -75,7 +75,7 @@ class DockerCleanupJob implements ShouldQueue
                     ray('No need to clean up ' . $server->name)->color('orange');
                 }
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('DockerCleanupJob failed with: ' . $e->getMessage());
             ray($e->getMessage())->color('orange');
             throw $e;

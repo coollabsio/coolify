@@ -32,7 +32,7 @@ class RunCommand extends Component
         try {
             $activity = remote_process([$this->command], Server::where('uuid', $this->server)->first(), ignore_errors: true);
             $this->emit('newMonitorActivity', $activity->id);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }

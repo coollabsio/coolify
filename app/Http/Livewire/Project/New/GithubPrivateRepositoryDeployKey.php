@@ -117,7 +117,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'environment_name' => $environment->name,
                 'application_uuid' => $application->uuid,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

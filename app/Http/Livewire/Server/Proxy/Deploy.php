@@ -10,15 +10,20 @@ class Deploy extends Component
 {
     public Server $server;
     public $proxy_settings = null;
+    protected $listeners = ['proxyStatusUpdated'];
 
-    public function start_proxy()
+    public function proxyStatusUpdated() {
+        $this->server->refresh();
+    }
+    public function startProxy()
     {
         if (
             $this->server->proxy->last_applied_settings &&
             $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
         ) {
-            $this->emit('saveConfiguration', $this->server);
+            resolve(SaveConfigurationSync::class)($this->server, $this->proxy_settings);
         }
+
         $activity = resolve(StartProxy::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }

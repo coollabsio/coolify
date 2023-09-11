@@ -26,11 +26,17 @@
                     @endif
                 @endif
             </div>
-            <x-forms.select id="application.build_pack" label="Build Pack" required>
-                <option value="nixpacks">Nixpacks</option>
-                <option value="dockerfile">Dockerfile</option>
-                <option disabled value="compose">Compose</option>
-            </x-forms.select>
+            <div class="flex items-end gap-2">
+                <x-forms.select id="application.build_pack" label="Build Pack" required>
+                    <option value="nixpacks">Nixpacks</option>
+                    <option value="dockerfile">Dockerfile</option>
+                    <option disabled value="compose">Compose</option>
+                </x-forms.select>
+                {{-- @if ($application->build_pack === 'nixpacks')
+                    <x-forms.input id="application.nixpkgsarchive" label="NixPackages Archive (nixpkgsArchive)"
+                        helper="You can customize the NixPackages archive to use."> </x-forms.input>
+                @endif --}}
+            </div>
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>

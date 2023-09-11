@@ -30,7 +30,7 @@ class Actions extends Component
                 $this->emit('success', 'Subscription cancelled successfully. Reloading in 5s.');
                 $this->emit('reloadWindow', 5000);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -65,7 +65,7 @@ class Actions extends Component
                 $this->emit('success', 'Subscription resumed successfully. Reloading in 5s.');
                 $this->emit('reloadWindow', 5000);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }

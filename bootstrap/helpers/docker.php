@@ -52,7 +52,7 @@ function format_docker_envs_to_json($rawOutput)
             $env = explode('=', $env);
             return [$env[0] => $env[1]];
         });
-    } catch (\Throwable $th) {
+    } catch (\Throwable $e) {
         return collect([]);
     }
 }

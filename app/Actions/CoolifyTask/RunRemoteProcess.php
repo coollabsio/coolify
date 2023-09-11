@@ -97,7 +97,6 @@ class RunRemoteProcess
             'status' => $status->value,
         ]);
         $this->activity->save();
-
         if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
             throw new \RuntimeException($processResult->errorOutput());
         }

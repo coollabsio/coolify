@@ -42,7 +42,7 @@ class CreateScheduledBackup extends Component
                 'team_id' => currentTeam()->id,
             ]);
             $this->emit('refreshScheduledBackups');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             general_error_handler($e, $this);
         } finally {
             $this->frequency = '';

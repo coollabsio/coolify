@@ -14,14 +14,14 @@ class Proxy extends Component
 
     public ?string $selectedProxy = null;
     public $proxy_settings = null;
-    public string|null $redirect_url = null;
+    public ?string $redirect_url = null;
 
     protected $listeners = ['proxyStatusUpdated', 'saveConfiguration' => 'submit'];
 
     public function mount()
     {
-        $this->selectedProxy = $this->server->proxy->type;
-        $this->redirect_url = $this->server->proxy->redirect_url;
+        $this->selectedProxy = data_get($this->server, 'proxy.type');
+        $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
     public function proxyStatusUpdated()
@@ -55,7 +55,7 @@ class Proxy extends Component
 
             setup_default_redirect_404(redirect_url: $this->server->proxy->redirect_url, server: $this->server);
             $this->emit('success', 'Proxy configuration saved.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }
@@ -64,16 +64,17 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server, true);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }
 
-    public function load_proxy_configuration()
+    public function loadProxyConfiguration()
     {
         try {
+            ray('loadProxyConfiguration');
             $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }

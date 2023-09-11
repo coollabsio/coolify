@@ -47,7 +47,7 @@ class DatabaseContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 $this->database->status = $status;
                 $this->database->save();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('DatabaseContainerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
             throw $e;

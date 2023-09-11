@@ -13,9 +13,10 @@ class Modal extends Component
      */
     public function __construct(
         public string      $modalId,
-        public string|null $modalTitle = null,
-        public string|null $modalBody = null,
-        public string|null $modalSubmit = null,
+        public ?string     $submitWireAction = null,
+        public ?string     $modalTitle = null,
+        public ?string     $modalBody = null,
+        public ?string     $modalSubmit = null,
         public bool        $noSubmit = false,
         public bool        $yesOrNo = false,
         public string      $action = 'delete'

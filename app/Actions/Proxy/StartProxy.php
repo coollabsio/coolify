@@ -2,8 +2,6 @@
 
 namespace App\Actions\Proxy;
 
-use App\Enums\ProxyStatus;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
@@ -36,11 +34,14 @@ class StartProxy
             "echo '####### Creating Docker Compose file...'",
             "echo '####### Pulling docker image...'",
             'docker compose pull',
-            "echo '####### Stopping existing proxy...'",
+            "echo '####### Stopping existing coolify-proxy...'",
             'docker compose down -v --remove-orphans',
             "lsof -nt -i:80 | xargs -r kill -9",
             "lsof -nt -i:443 | xargs -r kill -9",
-            "echo '####### Starting proxy...'",
+            "systemctl disable nginx > /dev/null 2>&1 || true",
+            "systemctl disable apache2 > /dev/null 2>&1 || true",
+            "systemctl disable apache > /dev/null 2>&1 || true",
+            "echo '####### Starting coolify-proxy...'",
             'docker compose up -d --remove-orphans',
             "echo '####### Proxy installed successfully...'"
         ], $server);

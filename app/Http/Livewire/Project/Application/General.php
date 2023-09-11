@@ -48,6 +48,7 @@ class General extends Component
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
         'application.dockerfile' => 'nullable',
+        'application.nixpkgsarchive' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -66,6 +67,7 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
         'application.dockerfile' => 'Dockerfile',
+        'application.nixpkgsarchive' => 'Nixpkgs archive',
     ];
 
     public function instantSave()
@@ -159,7 +161,7 @@ class General extends Component
             }
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

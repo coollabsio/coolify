@@ -10,7 +10,7 @@ ARG DOCKER_BUILDX_VERSION=0.11.2
 # https://github.com/buildpacks/pack/releases
 ARG PACK_VERSION=0.30.0
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.13.0
+ARG NIXPACKS_VERSION=1.14.0
 
 USER root
 WORKDIR /root

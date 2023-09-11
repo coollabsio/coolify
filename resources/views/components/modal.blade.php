@@ -34,7 +34,8 @@
         </form>
     @else
         <form method="dialog" class="flex flex-col w-11/12 max-w-5xl gap-2 rounded modal-box"
-        @if(!$noSubmit) wire:submit.prevent='submit' @endif>
+        @if($submitWireAction) wire:submit.prevent={{$submitWireAction}} @endif
+        @if(!$noSubmit && !$submitWireAction) wire:submit.prevent='submit' @endif>
             @isset($modalTitle)
                 <h3 class="text-lg font-bold">{{ $modalTitle }}</h3>
             @endisset

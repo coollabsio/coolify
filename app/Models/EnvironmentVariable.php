@@ -20,7 +20,7 @@ class EnvironmentVariable extends Model
     {
         static::created(function ($environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
-                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview',true)->first();
+                $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
                 if (!$found) {
                     ModelsEnvironmentVariable::create([
                         'key' => $environment_variable->key,
@@ -45,26 +45,22 @@ class EnvironmentVariable extends Model
     private function get_environment_variables(string $environment_variable): string|null
     {
         // $team_id = currentTeam()->id;
-        if (str_contains(trim($environment_variable), '{{') && str_contains(trim($environment_variable), '}}')) {
-            $environment_variable = preg_replace('/\s+/', '', $environment_variable);
-            $environment_variable = str_replace('{{', '', $environment_variable);
-            $environment_variable = str_replace('}}', '', $environment_variable);
-            if (str_starts_with($environment_variable, 'global.')) {
-                $environment_variable = str_replace('global.', '', $environment_variable);
-                // $environment_variable = GlobalEnvironmentVariable::where('name', $environment_variable)->where('team_id', $team_id)->first()?->value;
-                return $environment_variable;
-            }
+        $environment_variable = trim(decrypt($environment_variable));
+        if (Str::startsWith($environment_variable, '{{') && Str::endsWith($environment_variable, '}}') && Str::contains($environment_variable, 'global.')) {
+            $variable = Str::after($environment_variable, 'global.');
+            $variable = Str::before($variable, '}}');
+            $variable = Str::of($variable)->trim()->value;
+               // $environment_variable = GlobalEnvironmentVariable::where('name', $environment_variable)->where('team_id', $team_id)->first()?->value;
+               ray('global env variable');
+               return $environment_variable;
         }
-        return decrypt($environment_variable);
+        return $environment_variable;
     }
 
     private function set_environment_variables(string $environment_variable): string|null
     {
         $environment_variable = trim($environment_variable);
-        if (!str_contains(trim($environment_variable), '{{') && !str_contains(trim($environment_variable), '}}')) {
-            return encrypt($environment_variable);
-        }
-        return $environment_variable;
+        return encrypt($environment_variable);
     }
 
     protected function key(): Attribute

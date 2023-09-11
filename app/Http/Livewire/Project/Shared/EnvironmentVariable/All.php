@@ -77,6 +77,11 @@ class All extends Component
                 $environment->save();
             }
         }
+        if ($isPreview) {
+            $this->emit('success', 'Preview environment variables updated successfully.');
+        } else {
+            $this->emit('success', 'Environment variables updated successfully.');
+        }
         $this->refreshEnvs();
     }
     public function refreshEnvs()
@@ -108,7 +113,7 @@ class All extends Component
             $environment->save();
             $this->refreshEnvs();
             $this->emit('success', 'Environment variable added successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

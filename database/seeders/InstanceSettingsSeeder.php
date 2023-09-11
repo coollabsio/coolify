@@ -38,7 +38,7 @@ class InstanceSettingsSeeder extends Seeder
             if (is_null($settings->public_ipv6) && $ipv6) {
                 $settings->update(['public_ipv6' => $ipv6]);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
         }
     }

@@ -28,8 +28,8 @@ class Form extends Component
         try {
             $this->team->save();
             refreshSession();
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler($e, $this);
         }
     }
 }

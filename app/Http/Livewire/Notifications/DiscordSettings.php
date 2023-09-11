@@ -29,7 +29,7 @@ class DiscordSettings extends Component
     {
         try {
             $this->submit();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             ray($e->getMessage());
             $this->team->discord_enabled = false;
             $this->validate();

@@ -39,7 +39,7 @@ return [
             'queue' => 'long-running',
             'retry_after' => 3600,
             'block_for' => null,
-            'after_commit' => false,
+            'after_commit' => true,
         ],
         'database' => [
             'driver' => 'database',
@@ -75,7 +75,7 @@ return [
             'queue' => env('REDIS_QUEUE', 'default'),
             'retry_after' => 300,
             'block_for' => null,
-            'after_commit' => false,
+            'after_commit' => true,
         ],
 
     ],

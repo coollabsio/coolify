@@ -19,7 +19,7 @@ class WaitlistInvite extends Command
      *
      * @var string
      */
-    protected $signature = 'waitlist:invite {email?} {--only-email}';
+    protected $signature = 'waitlist:invite {--people=1} {--only-email} {email?}';
 
     /**
      * The console command description.
@@ -33,6 +33,12 @@ class WaitlistInvite extends Command
      */
     public function handle()
     {
+        $people = $this->option('people');
+        for ($i = 0; $i < $people; $i++) {
+            $this->main();
+        }
+    }
+    private function main() {
         if ($this->argument('email')) {
             if ($this->option('only-email')) {
                 $this->next_patient = User::whereEmail($this->argument('email'))->first();

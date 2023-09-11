@@ -28,7 +28,7 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique
     {
         try {
             // $this->cleanup_waitlist();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             send_internal_notification('CleanupInstanceStuffsJob failed with error: ' . $e->getMessage());
             ray($e->getMessage());
             throw $e;

@@ -38,7 +38,7 @@ class Change extends Component
                 return redirect()->route('security.private-key.index');
             }
             $this->emit('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }
@@ -49,7 +49,7 @@ class Change extends Component
             $this->private_key->private_key = formatPrivateKey($this->private_key->private_key);
             $this->private_key->save();
             refresh_server_connection($this->private_key);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }
