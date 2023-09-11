@@ -189,12 +189,16 @@ Route::get('/waitlist/confirm', function () {
                     send_internal_notification('Waitlist confirmed: ' . $email);
                     return 'Thank you for confirming your email address. We will notify you when you are next in line.';
                 } else {
+                    $found->delete();
+                    send_internal_notification('Waitlist expired: ' . $email);
                     return 'Your confirmation code has expired. Please sign up again.';
                 }
             }
         }
         return redirect()->route('dashboard');
-    } catch (error) {
+    } catch (Exception $e) {
+        send_internal_notification('Waitlist confirmation failed: ' . $e->getMessage());
+        ray($e->getMessage());
         return redirect()->route('dashboard');
     }
 })->name('webhooks.waitlist.confirm');
@@ -209,7 +213,9 @@ Route::get('/waitlist/cancel', function () {
             return 'Your email address has been removed from the waitlist.';
         }
         return redirect()->route('dashboard');
-    } catch (error) {
+    } catch (Exception $e) {
+        send_internal_notification('Waitlist cancellation failed: ' . $e->getMessage());
+        ray($e->getMessage());
         return redirect()->route('dashboard');
     }
 })->name('webhooks.waitlist.cancel');
