@@ -34,9 +34,9 @@ class CheckLicense extends Component
             try {
                 resolve(CheckResaleLicense::class)();
                 $this->emit('reloadWindow');
-            } catch (\Throwable $th) {
-                session()->flash('error', 'Something went wrong. Please contact support. <br>Error: ' . $th->getMessage());
-                ray($th->getMessage());
+            } catch (\Throwable $e) {
+                session()->flash('error', 'Something went wrong. Please contact support. <br>Error: ' . $e->getMessage());
+                ray($e->getMessage());
                 return redirect()->to('/settings/license');
             }
         }

@@ -21,7 +21,7 @@ class ShowPrivateKey extends Component
             $this->server->refresh();
             refresh_server_connection($this->server->privateKey);
             $this->checkConnection();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->server->update([
                 'private_key_id' => $oldPrivateKeyId
             ]);
@@ -46,7 +46,7 @@ class ShowPrivateKey extends Component
             } else {
                 $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             throw new \Exception($e->getMessage());
         }
     }

@@ -57,7 +57,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue
             } else {
                 $this->create_comment();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             ray($e);
             throw $e;
         }

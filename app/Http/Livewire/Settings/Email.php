@@ -50,7 +50,7 @@ class Email extends Component
             ]);
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -62,7 +62,7 @@ class Email extends Component
             ]);
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->settings->resend_enabled = false;
             return general_error_handler($e, $this);
         }
@@ -71,7 +71,7 @@ class Email extends Component
         try {
             $this->settings->smtp_enabled = false;
             $this->submitResend();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -80,7 +80,7 @@ class Email extends Component
         try {
             $this->settings->resend_enabled = false;
             $this->submit();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }
@@ -99,7 +99,7 @@ class Email extends Component
             ]);
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }

@@ -90,10 +90,10 @@ class DatabaseBackupJob implements ShouldQueue
             }
             $this->save_backup_logs();
             // TODO: Notify user
-        } catch (\Throwable $th) {
-            ray($th->getMessage());
-            send_internal_notification('DatabaseBackupJob failed with: ' . $th->getMessage());
-            throw $th;
+        } catch (\Throwable $e) {
+            ray($e->getMessage());
+            send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -116,10 +116,10 @@ class DatabaseBackupJob implements ShouldQueue
 
             $this->backup_status = 'success';
             $this->team->notify(new BackupSuccess($this->backup, $this->database));
-        } catch (Throwable $th) {
+        } catch (Throwable $e) {
             $this->backup_status = 'failed';
-            $this->add_to_backup_output($th->getMessage());
-            ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $th->getMessage());
+            $this->add_to_backup_output($e->getMessage());
+            ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());
             $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
         } finally {
             $this->backup_log->update([
@@ -173,9 +173,9 @@ class DatabaseBackupJob implements ShouldQueue
             instant_remote_process($commands, $this->server);
             $this->add_to_backup_output('Uploaded to S3.');
             ray('Uploaded to S3. ' . $this->backup_location . ' to s3://' . $bucket . $this->backup_dir);
-        } catch (\Throwable $th) {
-            $this->add_to_backup_output($th->getMessage());
-            ray($th->getMessage());
+        } catch (\Throwable $e) {
+            $this->add_to_backup_output($e->getMessage());
+            ray($e->getMessage());
         } finally {
             $command = "docker rm -f backup-of-{$this->backup->uuid}";
             instant_remote_process([$command], $this->server);

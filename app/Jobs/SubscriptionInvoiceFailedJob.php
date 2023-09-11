@@ -33,10 +33,10 @@ class SubscriptionInvoiceFailedJob implements ShouldQueue
                     send_user_an_email($mail, $member->email);
                 }
             });
-        } catch (\Throwable $th) {
-            send_internal_notification('SubscriptionInvoiceFailedJob failed with: ' . $th->getMessage());
-            ray($th->getMessage());
-            throw $th;
+        } catch (\Throwable $e) {
+            send_internal_notification('SubscriptionInvoiceFailedJob failed with: ' . $e->getMessage());
+            ray($e->getMessage());
+            throw $e;
         }
     }
 }

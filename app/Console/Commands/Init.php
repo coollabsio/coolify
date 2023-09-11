@@ -26,7 +26,7 @@ class Init extends Command
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
         }
     }

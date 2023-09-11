@@ -108,7 +108,7 @@ class All extends Component
             $environment->save();
             $this->refreshEnvs();
             $this->emit('success', 'Environment variable added successfully.');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

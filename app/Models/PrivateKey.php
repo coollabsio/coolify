@@ -24,7 +24,7 @@ class PrivateKey extends BaseModel
     {
         try {
             return PublicKeyLoader::load($this->private_key)->getPublicKey()->toString('OpenSSH',['comment' => '']);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return 'Error loading private key';
         }
     }

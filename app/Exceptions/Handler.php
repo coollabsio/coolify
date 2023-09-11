@@ -25,7 +25,7 @@ class Handler extends ExceptionHandler
      * @var array<int, class-string<\Throwable>>
      */
     protected $dontReport = [
-        //
+        ProcessException::class
     ];
     /**
      * A list of the inputs that are never flashed to the session on validation exceptions.

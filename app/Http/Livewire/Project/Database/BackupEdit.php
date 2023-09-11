@@ -51,7 +51,7 @@ class BackupEdit extends Component
             $this->backup->save();
             $this->backup->refresh();
             $this->emit('success', 'Backup updated successfully');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->emit('error', $e->getMessage());
         }
     }
@@ -76,7 +76,7 @@ class BackupEdit extends Component
             $this->backup->save();
             $this->backup->refresh();
             $this->emit('success', 'Backup updated successfully');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             $this->emit('error', $e->getMessage());
         }
     }

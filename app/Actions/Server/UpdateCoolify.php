@@ -43,11 +43,11 @@ class UpdateCoolify
                 $this->update();
             }
             send_internal_notification('InstanceAutoUpdateJob done to version: ' . $this->latestVersion . ' from version: ' . $this->currentVersion);
-        } catch (\Exception $th) {
+        } catch (\Throwable $e) {
             ray('InstanceAutoUpdateJob failed');
-            ray($th->getMessage());
-            send_internal_notification('InstanceAutoUpdateJob failed: ' . $th->getMessage());
-            throw $th;
+            ray($e->getMessage());
+            send_internal_notification('InstanceAutoUpdateJob failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 

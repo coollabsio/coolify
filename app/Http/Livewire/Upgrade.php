@@ -37,7 +37,7 @@ class Upgrade extends Component
             $this->showProgress = true;
             resolve(UpdateCoolify::class)(true);
             Toaster::success("Upgrading to {$this->latestVersion} version...");
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

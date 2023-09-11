@@ -51,7 +51,7 @@ class Change extends Component
         try {
             $this->validate();
             $this->github_app->save();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }
@@ -65,7 +65,7 @@ class Change extends Component
         try {
             $this->github_app->delete();
             redirect()->route('source.all');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

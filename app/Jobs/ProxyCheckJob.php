@@ -37,10 +37,10 @@ class ProxyCheckJob implements ShouldQueue
                     resolve(StartProxy::class)($server);
                 }
             }
-        } catch (\Throwable $th) {
-            ray($th->getMessage());
-            send_internal_notification('ProxyCheckJob failed with: ' . $th->getMessage());
-            throw $th;
+        } catch (\Throwable $e) {
+            ray($e->getMessage());
+            send_internal_notification('ProxyCheckJob failed with: ' . $e->getMessage());
+            throw $e;
         }
     }
 }

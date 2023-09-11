@@ -193,7 +193,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             }
             $this->getProxyType();
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(customErrorMessage: "Server is not reachable. Reason: {$e->getMessage()}", that: $this);
         }
     }

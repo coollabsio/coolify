@@ -66,7 +66,7 @@ class Form extends Component
             } else {
                 $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, that: $this);
         }
     }
@@ -81,7 +81,7 @@ class Form extends Component
             }
             $this->server->delete();
             return redirect()->route('server.all');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

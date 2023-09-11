@@ -20,8 +20,8 @@ class SaveConfigurationSync
                 "mkdir -p $proxy_path",
                 "echo '$docker_compose_yml_base64' | base64 -d > $proxy_path/docker-compose.yml",
             ], $server);
-        } catch (\Throwable $th) {
-            ray($th);
+        } catch (\Throwable $e) {
+            ray($e);
         }
 
     }

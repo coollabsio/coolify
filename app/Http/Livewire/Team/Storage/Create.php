@@ -67,8 +67,8 @@ class Create extends Component
             $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
             $this->storage->save();
             return redirect()->route('team.storages.show', $this->storage->uuid);
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler($e, $this);
         }
     }
 
@@ -77,8 +77,8 @@ class Create extends Component
         try {
             $this->storage->testConnection();
             return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
-        } catch (\Throwable $th) {
-            return general_error_handler($th, $this);
+        } catch (\Throwable $e) {
+            return general_error_handler($e, $this);
         }
     }
 }

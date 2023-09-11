@@ -52,7 +52,7 @@ class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 }
                 $this->server->save();
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             if ($e->getCode() === 1) {
                 $this->server->proxy->status = 'exited';
                 $this->server->save();

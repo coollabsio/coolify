@@ -46,9 +46,9 @@ class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
                 $this->application->status = $status;
                 $this->application->save();
             }
-        } catch (\Exception $th) {
-            ray($th->getMessage());
-            throw $th;
+        } catch (\Throwable $e) {
+            ray($e->getMessage());
+            throw $e;
         }
     }
 }

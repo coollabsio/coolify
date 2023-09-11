@@ -37,7 +37,7 @@ class Form extends Component
             }
             $this->destination->delete();
             return redirect()->route('dashboard');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e);
         }
     }

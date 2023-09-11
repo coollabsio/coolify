@@ -31,7 +31,7 @@ class AddEnvironment extends Component
                 'project_uuid' => $this->project->uuid,
                 'environment_name' => $environment->name,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             general_error_handler($e, $this);
         } finally {
             $this->name = '';

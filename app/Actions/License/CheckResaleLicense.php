@@ -57,13 +57,13 @@ class CheckResaleLicense
                 throw new \Exception('Invalid license key.');
             }
             throw new \Exception('Cannot activate license key.');
-        } catch (\Throwable $th) {
-            ray($th);
+        } catch (\Throwable $e) {
+            ray($e);
             $settings->update([
                 'resale_license' => null,
                 'is_resale_license_active' => false,
             ]);
-            throw $th;
+            throw $e;
         }
     }
 }

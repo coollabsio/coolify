@@ -21,10 +21,10 @@ class CheckResaleLicenseJob implements ShouldQueue
     {
         try {
             resolve(CheckResaleLicense::class)();
-        } catch (\Throwable $th) {
-            send_internal_notification('CheckResaleLicenseJob failed with: ' . $th->getMessage());
-            ray($th);
-            throw $th;
+        } catch (\Throwable $e) {
+            send_internal_notification('CheckResaleLicenseJob failed with: ' . $e->getMessage());
+            ray($e);
+            throw $e;
         }
     }
 }

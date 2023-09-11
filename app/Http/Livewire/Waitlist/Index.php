@@ -52,7 +52,7 @@ class Index extends Component
 
             $this->emit('success', 'Check your email to verify your email address.');
             dispatch(new SendConfirmationForWaitlistJob($this->email, $waitlist->uuid));
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

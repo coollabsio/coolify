@@ -28,7 +28,7 @@ class All extends Component
             $this->resource->refresh();
             $this->emit('success', 'Storage added successfully');
             $this->emit('clearAddStorage');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

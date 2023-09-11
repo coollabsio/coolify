@@ -82,7 +82,7 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
             echo "All files uploaded & purged...\n";
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             echo $e->getMessage();
         }
     }

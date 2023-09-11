@@ -75,14 +75,14 @@ class PublicGitRepository extends Component
         $this->get_git_source();
         $this->get_branch();
         $this->selected_branch = $this->git_branch;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
         if (!$this->branch_found && $this->git_branch == 'main') {
             try {
                 $this->git_branch = 'master';
                 $this->get_branch();
-            } catch (\Exception $e) {
+            } catch (\Throwable $e) {
                 return general_error_handler(err: $e, that: $this);
             }
         }
@@ -161,7 +161,7 @@ class PublicGitRepository extends Component
                 'environment_name' => $environment->name,
                 'application_uuid' => $application->uuid,
             ]);
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }

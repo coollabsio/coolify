@@ -19,7 +19,7 @@ class Edit extends Component
         try {
             $this->project->save();
             $this->emit('saved');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler($e, $this);
         }
     }

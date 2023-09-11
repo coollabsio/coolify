@@ -35,10 +35,10 @@ class ProxyStartJob implements ShouldQueue
                 $this->server->save();
             }
             resolve(StartProxy::class)($this->server);
-        } catch (\Throwable $th) {
-            send_internal_notification('ProxyStartJob failed with: ' . $th->getMessage());
-            ray($th->getMessage());
-            throw $th;
+        } catch (\Throwable $e) {
+            send_internal_notification('ProxyStartJob failed with: ' . $e->getMessage());
+            ray($e->getMessage());
+            throw $e;
         }
     }
 }

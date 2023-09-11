@@ -161,7 +161,7 @@ class General extends Component
             }
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }
     }
