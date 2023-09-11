@@ -181,11 +181,17 @@ Route::get('/waitlist/confirm', function () {
     ray($email, $confirmation_code);
     try {
         $found = Waitlist::where('uuid', $confirmation_code)->where('email', $email)->first();
-        if ($found && !$found->verified && $found->created_at > now()->subMinutes(config('constants.waitlist.expiration'))) {
-            $found->verified = true;
-            $found->save();
-            send_internal_notification('Waitlist confirmed: ' . $email);
-            return 'Thank you for confirming your email address. We will notify you when you are next in line.';
+        if ($found) {
+            if (!$found->verified) {
+                if ($found->created_at > now()->subMinutes(config('constants.waitlist.expiration'))) {
+                    $found->verified = true;
+                    $found->save();
+                    send_internal_notification('Waitlist confirmed: ' . $email);
+                    return 'Thank you for confirming your email address. We will notify you when you are next in line.';
+                } else {
+                    return 'Your confirmation code has expired. Please sign up again.';
+                }
+            }
         }
         return redirect()->route('dashboard');
     } catch (error) {
@@ -225,7 +231,7 @@ Route::post('/payments/stripe/events', function () {
         ]);
         $type = data_get($event, 'type');
         $data = data_get($event, 'data.object');
-        ray('Event: '. $type);
+        ray('Event: ' . $type);
         switch ($type) {
             case 'checkout.session.completed':
                 $clientReferenceId = data_get($data, 'client_reference_id');
@@ -263,13 +269,13 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => true,
                 ]);
                 break;
-            // case 'invoice.payment_failed':
-            //     $customerId = data_get($data, 'customer');
-            //     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-            //     if ($subscription) {
-            //         SubscriptionInvoiceFailedJob::dispatch($subscription->team);
-            //     }
-            //     break;
+                // case 'invoice.payment_failed':
+                //     $customerId = data_get($data, 'customer');
+                //     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                //     if ($subscription) {
+                //         SubscriptionInvoiceFailedJob::dispatch($subscription->team);
+                //     }
+                //     break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
@@ -287,9 +293,9 @@ Route::post('/payments/stripe/events', function () {
                 ]);
                 ray($feedback, $comment, $alreadyCancelAtPeriodEnd, $cancelAtPeriodEnd);
                 if ($feedback) {
-                    $reason = "Cancellation feedback for {$subscription->team->id}: '" . $feedback ."'";
+                    $reason = "Cancellation feedback for {$subscription->team->id}: '" . $feedback . "'";
                     if ($comment) {
-                        $reason .= ' with comment: \'' . $comment ."'";
+                        $reason .= ' with comment: \'' . $comment . "'";
                     }
                     send_internal_notification($reason);
                 }
@@ -307,7 +313,7 @@ Route::post('/payments/stripe/events', function () {
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 $subscription->update([
                     'stripe_subscription_id' => null,
-                    'stripe_plan_id'=> null,
+                    'stripe_plan_id' => null,
                     'stripe_cancel_at_period_end' => false,
                     'stripe_invoice_paid' => false,
                 ]);
