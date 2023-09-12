@@ -59,7 +59,7 @@ class PricingPlans extends Component
 
         if (!data_get($team,'subscription.stripe_trial_already_ended')) {
             $payload['subscription_data'] = [
-                'trial_period_days' => 30,
+                'trial_period_days' => config('constants.limits.trial_period'),
                 'trial_settings' => [
                     'end_behavior' => [
                         'missing_payment_method' => 'cancel',
