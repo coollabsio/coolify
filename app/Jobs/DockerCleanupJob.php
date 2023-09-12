@@ -36,11 +36,11 @@ class DockerCleanupJob implements ShouldQueue
             return;
         }
         try {
-            ray()->showQueries()->color('orange');
+            // ray()->showQueries()->color('orange');
             $servers = Server::all();
             foreach ($servers as $server) {
                 if (
-                    !$server->settings->is_reachable && !$server->settings->is_usable
+                    !$server->isFunctional()
                 ) {
                     continue;
                 }

@@ -1,5 +1,5 @@
 <div>
-    @if ($server->settings->is_usable)
+    @if ($server->isFunctional())
         <div class="flex items-end gap-2">
             <h2>Destinations</h2>
             <a href="{{ route('destination.new', ['server_id' => $server->id]) }}">

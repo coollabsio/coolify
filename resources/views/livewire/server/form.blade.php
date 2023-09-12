@@ -20,7 +20,7 @@
             @endif
 
         </div>
-        @if (!$server->settings->is_reachable || !$server->settings->is_usable)
+        @if (!$server->isFunctional())
             You can't use this server until it is validated.
         @else
             Server validated.
@@ -57,7 +57,7 @@
                 Install Docker Engine 24.0
             </x-forms.button>
         @endif
-        @if ($server->settings->is_usable)
+        @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
                 <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
                     helper="Disk cleanup job will be executed if disk usage is more than this number." />

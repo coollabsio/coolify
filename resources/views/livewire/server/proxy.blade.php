@@ -1,5 +1,5 @@
 <div>
-    @if (data_get($server,'settings.is_usable'))
+    @if ($server->isFunctional())
         @if (data_get($server,'proxy.type'))
         <x-modal submitWireAction="proxyStatusUpdated" modalId="startProxy">
             <x-slot:modalBody>
