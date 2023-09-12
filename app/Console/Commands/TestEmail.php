@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\StandalonePostgresql;
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\Waitlist;
@@ -62,9 +63,13 @@ class TestEmail extends Command
                 'invitation-link' => 'Invitation Link',
                 'waitlist-invitation-link' => 'Waitlist Invitation Link',
                 'waitlist-confirmation' => 'Waitlist Confirmation',
+                'realusers-before-trial' => 'REAL - Registered Users Before Trial without Subscription',
             ],
         );
-        $this->email = text('Email Address to send to');
+        $emailsGathered = ['realusers-before-trial'];
+        if (!in_array($type, $emailsGathered)) {
+            $this->email = text('Email Address to send to');
+        }
         set_transanctional_email_settings();
 
         $this->mail = new MailMessage();
@@ -159,16 +164,39 @@ class TestEmail extends Command
                 $found = Waitlist::where('email', $this->email)->first();
                 if ($found) {
                     SendConfirmationForWaitlistJob::dispatch($this->email, $found->uuid);
-
                 } else {
                     throw new Exception('Waitlist not found');
                 }
 
                 break;
+            case 'realusers-before-trial':
+                $this->mail = new MailMessage();
+                $this->mail->view('emails.before-trial-conversion');
+                $this->mail->subject('Trial period has been added for all subscription plans.');
+                $teams = Team::doesntHave('subscription')->where('id', '!=', 0)->get();
+                if (!$teams || $teams->isEmpty()) {
+                    echo 'No teams found.' . PHP_EOL;
+                    return;
+                }
+                $emails = [];
+                foreach ($teams as $team) {
+                    foreach($team->members as $member) {
+                        if ($member->email) {
+                            $emails[] = $member->email;
+                        }
+                    }
+                }
+                $emails = array_unique($emails);
+                foreach ($emails as $email) {
+                    $this->sendEmail($email);
+                }
         }
     }
-    private function sendEmail()
+    private function sendEmail(string $email = null)
     {
+        if ($email) {
+            $this->email = $email;
+        }
         Mail::send(
             [],
             [],
