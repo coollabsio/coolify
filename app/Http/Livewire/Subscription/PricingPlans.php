@@ -8,6 +8,10 @@ use Stripe\Checkout\Session;
 
 class PricingPlans extends Component
 {
+    public bool $isTrial = false;
+    public function mount() {
+        $this->isTrial = !data_get(currentTeam(),'subscription.stripe_trial_already_ended');
+    }
     public function subscribeStripe($type)
     {
         $team = currentTeam();

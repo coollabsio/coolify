@@ -2,29 +2,29 @@
     @if (config('subscription.provider') === 'stripe')
         <x-slot:basic>
             <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-monthly')"> Subscribe
+                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-monthly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
 
             <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-yearly')"> Subscribe
+                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-yearly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
         </x-slot:basic>
         <x-slot:pro>
             <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('pro-monthly')"> Subscribe
+                class="w-full h-10 buyme" wire:click="subscribeStripe('pro-monthly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
 
             <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-pro" class="w-full h-10 buyme"
-                wire:click="subscribeStripe('pro-yearly')"> Subscribe
+                wire:click="subscribeStripe('pro-yearly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
         </x-slot:pro>
         <x-slot:ultimate>
             <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('ultimate-monthly')"> Subscribe
+                class="w-full h-10 buyme" wire:click="subscribeStripe('ultimate-monthly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
 
             <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('ultimate-yearly')"> Subscribe
+                class="w-full h-10 buyme" wire:click="subscribeStripe('ultimate-yearly')"> {{$isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
         </x-slot:ultimate>
     @endif
