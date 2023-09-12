@@ -262,21 +262,33 @@ function send_internal_notification(string $message): void
         ray($e->getMessage());
     }
 }
-function send_user_an_email(MailMessage $mail, string $email): void
+function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null): void
 {
     $settings = InstanceSettings::get();
     $type = set_transanctional_email_settings($settings);
     if (!$type) {
         throw new Exception('No email settings found.');
     }
-    Mail::send(
-        [],
-        [],
-        fn (Message $message) => $message
-            ->to($email)
-            ->subject($mail->subject)
-            ->html((string) $mail->render())
-    );
+    if ($cc) {
+        Mail::send(
+            [],
+            [],
+            fn (Message $message) => $message
+                ->to($email)
+                ->cc($cc)
+                ->subject($mail->subject)
+                ->html((string) $mail->render())
+        );
+    } else {
+        Mail::send(
+            [],
+            [],
+            fn (Message $message) => $message
+                ->to($email)
+                ->subject($mail->subject)
+                ->html((string) $mail->render())
+        );
+    }
 }
 function isEmailEnabled($notifiable)
 {
