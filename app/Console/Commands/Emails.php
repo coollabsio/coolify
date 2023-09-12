@@ -25,30 +25,31 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Mail;
 use Str;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
-class TestEmail extends Command
+class Emails extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'email:test';
+    protected $signature = 'emails';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send a test email to the admin';
+    protected $description = 'Send out test / prod emails';
 
     /**
      * Execute the console command.
      */
     private ?MailMessage $mail = null;
-    private string $email = 'andras.bacsai@protonmail.com';
+    private ?string $email = null;
     public function handle()
     {
         $type = select(
@@ -180,16 +181,24 @@ class TestEmail extends Command
                 }
                 $emails = [];
                 foreach ($teams as $team) {
-                    foreach($team->members as $member) {
+                    foreach ($team->members as $member) {
                         if ($member->email) {
                             $emails[] = $member->email;
                         }
                     }
                 }
                 $emails = array_unique($emails);
+                $this->info("Sending to " . count($emails) . " emails.");
                 foreach ($emails as $email) {
-                    $this->sendEmail($email);
+                    $this->info($email);
                 }
+                $confirmed = confirm('Are you sure?');
+                if ($confirmed) {
+                    foreach ($emails as $email) {
+                        $this->sendEmail($email);
+                    }
+                }
+                break;
         }
     }
     private function sendEmail(string $email = null)
@@ -205,5 +214,6 @@ class TestEmail extends Command
                 ->subject($this->mail->subject)
                 ->html((string)$this->mail->render())
         );
+        $this->info("Email sent to $this->email successfully. 📧");
     }
 }
