@@ -1,6 +1,7 @@
 <?php
 
-use App\Jobs\SubscriptionInvoiceFailedJob;
+use App\Jobs\SubscriptionTrialEndedJob;
+use App\Jobs\SubscriptionTrialEndsSoonJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\GithubApp;
@@ -271,20 +272,17 @@ Route::post('/payments/stripe/events', function () {
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $planId = data_get($data, 'lines.data.0.plan.id');
                 $subscription->update([
+                    'stripe_plan_id' => $planId,
                     'stripe_invoice_paid' => true,
                 ]);
                 break;
-                // case 'invoice.payment_failed':
-                //     $customerId = data_get($data, 'customer');
-                //     $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
-                //     if ($subscription) {
-                //         SubscriptionInvoiceFailedJob::dispatch($subscription->team);
-                //     }
-                //     break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
+                $status = data_get($data, 'status');
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
                 $planId = data_get($data, 'items.data.0.plan.id');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
@@ -297,7 +295,19 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_plan_id' => $planId,
                     'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                 ]);
-                ray($feedback, $comment, $alreadyCancelAtPeriodEnd, $cancelAtPeriodEnd);
+                if ($status === 'paused') {
+                    $subscription->update([
+                        'stripe_invoice_paid' => false,
+                    ]);
+                    send_internal_notification('Subscription paused for team: ' . $subscription->team->id);
+                }
+
+                // Trial ended but subscribed, reactive servers
+                if ($trialEndedAlready && $status === 'active') {
+                    $team = data_get($subscription, 'team');
+                    $team->trialEndedButSubscribed();
+                }
+
                 if ($feedback) {
                     $reason = "Cancellation feedback for {$subscription->team->id}: '" . $feedback . "'";
                     if ($comment) {
@@ -305,7 +315,6 @@ Route::post('/payments/stripe/events', function () {
                     }
                     send_internal_notification($reason);
                 }
-                ray($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd);
                 if ($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd) {
                     if ($cancelAtPeriodEnd) {
                         send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
@@ -315,15 +324,43 @@ Route::post('/payments/stripe/events', function () {
                 }
                 break;
             case 'customer.subscription.deleted':
+                // End subscription
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $team = data_get($subscription, 'team');
+                $team->trialEnded();
                 $subscription->update([
                     'stripe_subscription_id' => null,
                     'stripe_plan_id' => null,
                     'stripe_cancel_at_period_end' => false,
                     'stripe_invoice_paid' => false,
+                    'stripe_trial_already_ended' => true,
                 ]);
                 send_internal_notification('Subscription cancelled: ' . $subscription->team->id);
+                break;
+            case 'customer.subscription.trial_will_end':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $team = data_get($subscription, 'team');
+                if (!$team) {
+                    throw new Exception('No team found for subscription: ' . $subscription->id);
+                }
+                SubscriptionTrialEndsSoonJob::dispatch($team);
+                break;
+            case 'customer.subscription.paused':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $team = data_get($subscription, 'team');
+                if (!$team) {
+                    throw new Exception('No team found for subscription: ' . $subscription->id);
+                }
+                $team->trialEnded();
+                $subscription->update([
+                    'stripe_trial_already_ended' => true,
+                    'stripe_invoice_paid' => false,
+                ]);
+                SubscriptionTrialEndedJob::dispatch($team);
+                send_internal_notification('Subscription paused for team: ' . $subscription->team->id);
                 break;
             default:
                 // Unhandled event type

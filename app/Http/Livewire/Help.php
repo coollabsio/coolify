@@ -30,7 +30,7 @@ class Help extends Component
         try {
             $this->rateLimit(1, 60);
             $this->validate();
-            $subscriptionType = auth()->user()?->subscription?->type() ?? 'unknown';
+            $subscriptionType = auth()->user()?->subscription?->type();
             $debug = "Route: {$this->path}";
             $mail = new MailMessage();
             $mail->view(

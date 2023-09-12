@@ -10,6 +10,7 @@ class PricingPlans extends Component
 {
     public function subscribeStripe($type)
     {
+        $team = currentTeam();
         Stripe::setApiKey(config('subscription.stripe_api_key'));
         switch ($type) {
             case 'basic-monthly':
@@ -50,10 +51,23 @@ class PricingPlans extends Component
             'automatic_tax' => [
                 'enabled' => true,
             ],
+
             'mode' => 'subscription',
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ];
+
+        if (!data_get($team,'subscription.stripe_trial_already_ended')) {
+            $payload['subscription_data'] = [
+                'trial_period_days' => 30,
+                'trial_settings' => [
+                    'end_behavior' => [
+                        'missing_payment_method' => 'cancel',
+                    ]
+                ],
+            ];
+            $payload['payment_method_collection'] = 'if_required';
+        }
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;
         if ($customer) {
             $payload['customer'] = $customer;

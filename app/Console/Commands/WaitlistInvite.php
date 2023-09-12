@@ -92,7 +92,6 @@ class WaitlistInvite extends Command
     }
     private function send_email()
     {
-        ray($this->next_patient->email, $this->password);
         $token = Crypt::encryptString("{$this->next_patient->email}@@@$this->password");
         $loginLink = route('auth.link', ['token' => $token]);
         $mail = new MailMessage();

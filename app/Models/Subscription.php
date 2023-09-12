@@ -33,7 +33,7 @@ class Subscription extends Model
         }
         if (isStripe()) {
             if (!$this->stripe_plan_id) {
-                return  'unknown';
+                return  'zero';
             }
             $subscription = Subscription::where('id', $this->id)->first();
             if (!$subscription) {
@@ -54,6 +54,6 @@ class Subscription extends Model
                 return Str::of($stripePlanId)->after('stripe_price_id_')->before('_')->lower();
             }
         }
-        return 'unknown';
+        return 'zero';
     }
 }
