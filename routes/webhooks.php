@@ -119,6 +119,11 @@ Route::post('/source/github/events', function () {
             return response('Nothing to do. No applications found.');
         }
         foreach ($applications as $application) {
+            $isFunctional = $application->destination->server->isFunctional();
+            if (!$isFunctional) {
+                ray('Server is not functional: ' . $application->destination->server->name);
+                continue;
+            }
             if ($x_github_event === 'push') {
                 if ($application->isDeployable()) {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
