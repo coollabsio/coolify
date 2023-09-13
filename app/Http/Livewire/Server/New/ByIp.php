@@ -58,7 +58,7 @@ class ByIp extends Component
     {
         $this->validate();
         try {
-            if (!$this->private_key_id) {
+            if (is_null($this->private_key_id)) {
                 return $this->emit('error', 'You must select a private key');
             }
             $server = Server::create([

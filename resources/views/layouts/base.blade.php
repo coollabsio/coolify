@@ -28,14 +28,12 @@
 
     <body>
         @livewireScripts
-        @if (isSubscriptionActive() || isDev())
-            <dialog id="help" class="modal">
-                <livewire:help />
-                <form method="dialog" class="modal-backdrop">
-                    <button>close</button>
-                </form>
-            </dialog>
-        @endif
+        <dialog id="help" class="modal">
+            <livewire:help />
+            <form method="dialog" class="modal-backdrop">
+                <button>close</button>
+            </form>
+        </dialog>
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
         <script>

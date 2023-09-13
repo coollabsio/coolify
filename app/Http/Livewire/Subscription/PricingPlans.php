@@ -8,8 +8,13 @@ use Stripe\Checkout\Session;
 
 class PricingPlans extends Component
 {
+    public bool $isTrial = false;
+    public function mount() {
+        $this->isTrial = !data_get(currentTeam(),'subscription.stripe_trial_already_ended');
+    }
     public function subscribeStripe($type)
     {
+        $team = currentTeam();
         Stripe::setApiKey(config('subscription.stripe_api_key'));
         switch ($type) {
             case 'basic-monthly':
@@ -50,10 +55,23 @@ class PricingPlans extends Component
             'automatic_tax' => [
                 'enabled' => true,
             ],
+
             'mode' => 'subscription',
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ];
+
+        if (!data_get($team,'subscription.stripe_trial_already_ended')) {
+            $payload['subscription_data'] = [
+                'trial_period_days' => config('constants.limits.trial_period'),
+                'trial_settings' => [
+                    'end_behavior' => [
+                        'missing_payment_method' => 'cancel',
+                    ]
+                ],
+            ];
+            $payload['payment_method_collection'] = 'if_required';
+        }
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;
         if ($customer) {
             $payload['customer'] = $customer;

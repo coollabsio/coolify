@@ -21,6 +21,7 @@
                 </label>
             </fieldset>
         </div>
+        <div class="py-2 text-center"><span class="font-bold text-warning">{{config('constants.limits.trial_period')}} days trial</span> included on all plans, without credit card details.</div>
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
             <div>Save <span class="font-bold text-warning">1 month</span> annually with the yearly plans.
             </div>

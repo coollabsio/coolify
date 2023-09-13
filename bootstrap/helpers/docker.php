@@ -26,8 +26,11 @@ function format_docker_command_output_to_json($rawOutput): Collection
         ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
 }
 
-function format_docker_labels_to_json($rawOutput): Collection
+function format_docker_labels_to_json(string|Array $rawOutput): Collection
 {
+    if (is_array($rawOutput)) {
+        return collect($rawOutput);
+    }
     $outputLines = explode(PHP_EOL, $rawOutput);
 
     return collect($outputLines)

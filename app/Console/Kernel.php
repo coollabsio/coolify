@@ -11,6 +11,7 @@ use App\Jobs\DatabaseContainerStatusJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ProxyContainerStatusJob;
+use App\Jobs\ServerDetailsCheckJob;
 use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
@@ -24,20 +25,25 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         if (isDev()) {
-            $schedule->command('horizon:snapshot')->everyMinute();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
+            $schedule->job(new ServerDetailsCheckJob(Server::find(0)))->everyTenMinutes()->onOneServer();
+            // $schedule->command('horizon:snapshot')->everyMinute();
+            // $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
-            $schedule->job(new DockerCleanupJob)->everyOddHour();
+            // $schedule->job(new DockerCleanupJob)->everyOddHour();
+            // $this->instance_auto_update($schedule);
+            // $this->check_scheduled_backups($schedule);
+            // $this->check_resources($schedule);
+            // $this->check_proxies($schedule);
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTenMinutes()->onOneServer();
             $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
             $schedule->job(new DockerCleanupJob)->everyTenMinutes()->onOneServer();
+            $this->instance_auto_update($schedule);
+            $this->check_scheduled_backups($schedule);
+            $this->check_resources($schedule);
+            $this->check_proxies($schedule);
         }
-        $this->instance_auto_update($schedule);
-        $this->check_scheduled_backups($schedule);
-        $this->check_resources($schedule);
-        $this->check_proxies($schedule);
     }
     private function check_proxies($schedule)
     {

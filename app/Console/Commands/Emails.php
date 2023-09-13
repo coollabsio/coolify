@@ -6,7 +6,9 @@ use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\Server;
 use App\Models\StandalonePostgresql;
+use App\Models\Team;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Models\Waitlist;
@@ -24,30 +26,31 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Mail;
 use Str;
 
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
 
-class TestEmail extends Command
+class Emails extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'email:test';
+    protected $signature = 'emails';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Send a test email to the admin';
+    protected $description = 'Send out test / prod emails';
 
     /**
      * Execute the console command.
      */
     private ?MailMessage $mail = null;
-    private string $email = 'andras.bacsai@protonmail.com';
+    private ?string $email = null;
     public function handle()
     {
         $type = select(
@@ -62,9 +65,14 @@ class TestEmail extends Command
                 'invitation-link' => 'Invitation Link',
                 'waitlist-invitation-link' => 'Waitlist Invitation Link',
                 'waitlist-confirmation' => 'Waitlist Confirmation',
+                'realusers-before-trial' => 'REAL - Registered Users Before Trial without Subscription',
+                'realusers-server-lost-connection' => 'REAL - Server Lost Connection',
             ],
         );
-        $this->email = text('Email Address to send to');
+        $emailsGathered = ['realusers-before-trial','realusers-server-lost-connection'];
+        if (!in_array($type, $emailsGathered)) {
+            $this->email = text('Email Address to send to');
+        }
         set_transanctional_email_settings();
 
         $this->mail = new MailMessage();
@@ -159,16 +167,73 @@ class TestEmail extends Command
                 $found = Waitlist::where('email', $this->email)->first();
                 if ($found) {
                     SendConfirmationForWaitlistJob::dispatch($this->email, $found->uuid);
-
                 } else {
                     throw new Exception('Waitlist not found');
                 }
 
                 break;
+            case 'realusers-before-trial':
+                $this->mail = new MailMessage();
+                $this->mail->view('emails.before-trial-conversion');
+                $this->mail->subject('Trial period has been added for all subscription plans.');
+                $teams = Team::doesntHave('subscription')->where('id', '!=', 0)->get();
+                if (!$teams || $teams->isEmpty()) {
+                    echo 'No teams found.' . PHP_EOL;
+                    return;
+                }
+                $emails = [];
+                foreach ($teams as $team) {
+                    foreach ($team->members as $member) {
+                        if ($member->email) {
+                            $emails[] = $member->email;
+                        }
+                    }
+                }
+                $emails = array_unique($emails);
+                $this->info("Sending to " . count($emails) . " emails.");
+                foreach ($emails as $email) {
+                    $this->info($email);
+                }
+                $confirmed = confirm('Are you sure?');
+                if ($confirmed) {
+                    foreach ($emails as $email) {
+                        $this->sendEmail($email);
+                    }
+                }
+                break;
+            case 'realusers-server-lost-connection':
+                $serverId = text('Server Id');
+                $server = Server::find($serverId);
+                if (!$server) {
+                    throw new Exception('Server not found');
+                }
+                $admins = [];
+                $members = $server->team->members;
+                foreach ($members as $member) {
+                    if ($member->isAdmin()) {
+                        $admins[] = $member->email;
+                    }
+                }
+                $this->info('Sending to ' . count($admins) . ' admins.');
+                foreach ($admins as $admin) {
+                    $this->info($admin);
+                }
+                $this->mail = new MailMessage();
+                $this->mail->view('emails.server-lost-connection', [
+                    'name' => $server->name,
+                ]);
+                $this->mail->subject('Action required: Server ' . $server->name . ' lost connection.');
+                foreach ($admins as $email) {
+                    $this->sendEmail($email);
+                }
+                break;
         }
     }
-    private function sendEmail()
+    private function sendEmail(string $email = null)
     {
+        if ($email) {
+            $this->email = $email;
+        }
         Mail::send(
             [],
             [],
@@ -177,5 +242,6 @@ class TestEmail extends Command
                 ->subject($this->mail->subject)
                 ->html((string)$this->mail->render())
         );
+        $this->info("Email sent to $this->email successfully. 📧");
     }
 }

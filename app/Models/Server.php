@@ -153,4 +153,7 @@ class Server extends BaseModel
         }
         return $shouldRun;
     }
+    public function isFunctional() {
+        return $this->settings->is_reachable && $this->settings->is_usable;
+    }
 }

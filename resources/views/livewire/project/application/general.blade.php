@@ -32,10 +32,6 @@
                     <option value="dockerfile">Dockerfile</option>
                     <option disabled value="compose">Compose</option>
                 </x-forms.select>
-                {{-- @if ($application->build_pack === 'nixpacks')
-                    <x-forms.input id="application.nixpkgsarchive" label="NixPackages Archive (nixpkgsArchive)"
-                        helper="You can customize the NixPackages archive to use."> </x-forms.input>
-                @endif --}}
             </div>
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>

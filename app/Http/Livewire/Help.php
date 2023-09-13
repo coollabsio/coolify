@@ -30,7 +30,7 @@ class Help extends Component
         try {
             $this->rateLimit(1, 60);
             $this->validate();
-            $subscriptionType = auth()->user()?->subscription?->type() ?? 'unknown';
+            $subscriptionType = auth()->user()?->subscription?->type() ?? 'Free';
             $debug = "Route: {$this->path}";
             $mail = new MailMessage();
             $mail->view(
@@ -41,7 +41,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP - {$subscriptionType}]: {$this->subject}");
-            send_user_an_email($mail, 'hi@coollabs.io');
+            send_user_an_email($mail, 'hi@coollabs.io', auth()->user()?->email);
             $this->emit('success', 'Your message has been sent successfully. We will get in touch with you as soon as possible.');
         } catch (\Throwable $e) {
             return general_error_handler($e, $this);

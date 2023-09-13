@@ -413,7 +413,6 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function generate_nixpacks_confs()
     {
-        ray('nixpkgsarchive', $this->application->nixpkgsarchive);
         $this->execute_remote_command(
             [
                 "echo -n 'Generating nixpacks configuration.'",
@@ -422,13 +421,6 @@ class ApplicationDeploymentJob implements ShouldQueue
             [$this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
             [$this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile")]
         );
-
-        // if ($this->application->nixpkgsarchive) {
-        //     $this->execute_remote_command([
-        //         $this->execute_in_builder("cat {$this->workdir}/nixpacks.toml"), "hidden" => true, "save" => 'nixpacks_toml'
-        //     ]);
-
-        // }
     }
 
     private function nixpacks_build_cmd()
@@ -508,7 +500,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->destination->network => [
                     'external' => true,
                     'name' => $this->destination->network,
-                    'attachable' => true,
+                    'attachable' => true
                 ]
             ]
         ];
@@ -648,6 +640,10 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function generate_healthcheck_commands()
     {
+        if ($this->application->dockerfile) {
+            // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
+            return 'exit 0';
+        }
         if (!$this->application->health_check_port) {
             $this->application->health_check_port = $this->application->ports_exposes_array[0];
         }

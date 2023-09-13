@@ -17,7 +17,7 @@ class Status extends Component
     public function getProxyStatus()
     {
         try {
-            if (data_get($this->server, 'settings.is_usable') && data_get($this->server, 'settings.is_reachable')) {
+            if ($this->server->isFunctional()) {
                 $container = getContainerStatus(server: $this->server, container_id: 'coolify-proxy');
                 $this->server->proxy->status = $container;
                 $this->server->save();

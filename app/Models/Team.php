@@ -120,4 +120,20 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return $this->hasMany(S3Storage::class);
     }
+    public function trialEnded() {
+        foreach ($this->servers as $server) {
+            $server->settings()->update([
+                'is_usable' => false,
+                'is_reachable' => false,
+            ]);
+        }
+    }
+    public function trialEndedButSubscribed() {
+        foreach ($this->servers as $server) {
+            $server->settings()->update([
+                'is_usable' => true,
+                'is_reachable' => true,
+            ]);
+        }
+    }
 }
