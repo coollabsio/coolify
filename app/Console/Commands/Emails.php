@@ -6,6 +6,7 @@ use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Models\TeamInvitation;
@@ -65,9 +66,10 @@ class Emails extends Command
                 'waitlist-invitation-link' => 'Waitlist Invitation Link',
                 'waitlist-confirmation' => 'Waitlist Confirmation',
                 'realusers-before-trial' => 'REAL - Registered Users Before Trial without Subscription',
+                'realusers-server-lost-connection' => 'REAL - Server Lost Connection',
             ],
         );
-        $emailsGathered = ['realusers-before-trial'];
+        $emailsGathered = ['realusers-before-trial','realusers-server-lost-connection'];
         if (!in_array($type, $emailsGathered)) {
             $this->email = text('Email Address to send to');
         }
@@ -197,6 +199,32 @@ class Emails extends Command
                     foreach ($emails as $email) {
                         $this->sendEmail($email);
                     }
+                }
+                break;
+            case 'realusers-server-lost-connection':
+                $serverId = text('Server Id');
+                $server = Server::find($serverId);
+                if (!$server) {
+                    throw new Exception('Server not found');
+                }
+                $admins = [];
+                $members = $server->team->members;
+                foreach ($members as $member) {
+                    if ($member->isAdmin()) {
+                        $admins[] = $member->email;
+                    }
+                }
+                $this->info('Sending to ' . count($admins) . ' admins.');
+                foreach ($admins as $admin) {
+                    $this->info($admin);
+                }
+                $this->mail = new MailMessage();
+                $this->mail->view('emails.server-lost-connection', [
+                    'name' => $server->name,
+                ]);
+                $this->mail->subject('Action required: Server ' . $server->name . ' lost connection.');
+                foreach ($admins as $email) {
+                    $this->sendEmail($email);
                 }
                 break;
         }
