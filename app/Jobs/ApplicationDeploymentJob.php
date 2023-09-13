@@ -500,7 +500,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                 $this->destination->network => [
                     'external' => true,
                     'name' => $this->destination->network,
-                    'attachable' => true,
+                    'attachable' => true
                 ]
             ]
         ];
@@ -640,6 +640,10 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function generate_healthcheck_commands()
     {
+        if ($this->application->dockerfile) {
+            // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
+            return 'exit 0';
+        }
         if (!$this->application->health_check_port) {
             $this->application->health_check_port = $this->application->ports_exposes_array[0];
         }
