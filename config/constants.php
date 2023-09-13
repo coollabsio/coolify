@@ -1,5 +1,10 @@
 <?php
 return [
+    'ssh' =>[
+        'connection_timeout' => 10,
+        'server_interval' => 20,
+        'command_timeout' => 7200,
+    ],
     'waitlist' => [
         'expiration' => 10,
     ],

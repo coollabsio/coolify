@@ -56,7 +56,7 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable!');
             } else {
-                $this->emit('error', 'Server is not rachable');
+                $this->emit('error', 'Server is not reachable');
                 return;
             }
             if ($dockerVersion) {
