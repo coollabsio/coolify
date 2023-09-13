@@ -15,7 +15,7 @@
                 @if (is_transactional_emails_active())
                     <form action="/forgot-password" method="POST" class="flex flex-col gap-2">
                         @csrf
-                        <x-forms.input required value="test@example.com" type="email" name="email"
+                        <x-forms.input required type="email" name="email"
                             label="{{ __('input.email') }}" autofocus />
                         <x-forms.button type="submit">{{ __('auth.forgot_password_send_email') }}</x-forms.button>
                     </form>

@@ -30,6 +30,10 @@ use Laravel\Fortify\Fortify;
 
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
+        $arrayOfRequest = $request->only(Fortify::email());
+        $request->merge([
+            'email' => Str::lower($arrayOfRequest['email']),
+        ]);
         $type = set_transanctional_email_settings();
         if (!$type) {
             return response()->json(['message' => 'Transactional emails are not active'], 400);
