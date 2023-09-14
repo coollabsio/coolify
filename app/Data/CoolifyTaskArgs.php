@@ -13,7 +13,6 @@ class CoolifyTaskArgs extends Data
 {
     public function __construct(
         public string  $server_ip,
-        public string  $private_key_location,
         public string  $command,
         public int     $port,
         public string  $user,

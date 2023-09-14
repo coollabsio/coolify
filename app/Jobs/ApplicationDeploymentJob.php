@@ -17,10 +17,10 @@ use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -28,10 +28,8 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 use Visus\Cuid2\Cuid2;
-use Yosymfony\Toml\Toml;
-use Yosymfony\Toml\TomlArray;
 
-class ApplicationDeploymentJob implements ShouldQueue
+class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ExecuteRemoteCommand;
 
@@ -49,7 +47,6 @@ class ApplicationDeploymentJob implements ShouldQueue
     private GithubApp|GitlabApp $source;
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
-    private string $private_key_location;
     private ApplicationPreview|null $preview = null;
 
     private string $container_name;
@@ -92,7 +89,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
-        $this->private_key_location = save_private_key_for_server($this->server);
+        addPrivateKeyToSshAgent($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn
@@ -122,6 +119,9 @@ class ApplicationDeploymentJob implements ShouldQueue
         if ($containers->count() > 0) {
             $this->currently_running_container_name = data_get($containers[0], 'Names');
         }
+        if ($this->pull_request_id !== 0 && $this->pull_request_id !== null) {
+            $this->currently_running_container_name = $this->container_name;
+        }
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -135,7 +135,9 @@ class ApplicationDeploymentJob implements ShouldQueue
                     $this->deploy();
                 }
             }
-            if ($this->application->fqdn) dispatch(new ProxyContainerStatusJob($this->server));
+            if ($this->server->isProxyShouldRun()) {
+                dispatch(new ContainerStatusJob($this->server));
+            }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (Exception $e) {
             ray($e);
@@ -270,6 +272,7 @@ class ApplicationDeploymentJob implements ShouldQueue
                             "echo 'Rolling update completed.'"
                         ],
                     );
+                    $this->application->update(['status' => 'running']);
                     break;
                 }
                 $counter++;
@@ -296,7 +299,11 @@ class ApplicationDeploymentJob implements ShouldQueue
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->rolling_update();
+        $this->stop_running_container();
+        $this->execute_remote_command(
+            ["echo -n 'Starting preview deployment.'"],
+            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+        );
     }
 
     private function prepare_builder_image()
@@ -576,10 +583,15 @@ class ApplicationDeploymentJob implements ShouldQueue
 
     private function set_labels_for_applications()
     {
+
+        $appId = $this->application->id;
+        if ($this->pull_request_id !== 0) {
+            $appId = $appId . '-pr-' . $this->pull_request_id;
+        }
         $labels = [];
         $labels[] = 'coolify.managed=true';
         $labels[] = 'coolify.version=' . config('version');
-        $labels[] = 'coolify.applicationId=' . $this->application->id;
+        $labels[] = 'coolify.applicationId=' . $appId;
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
         if ($this->pull_request_id !== 0) {

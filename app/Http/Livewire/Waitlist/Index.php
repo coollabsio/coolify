@@ -6,6 +6,7 @@ use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\User;
 use App\Models\Waitlist;
 use Livewire\Component;
+use Str;
 
 class Index extends Component
 {
@@ -46,7 +47,7 @@ class Index extends Component
                 return;
             }
             $waitlist = Waitlist::create([
-                'email' => $this->email,
+                'email' => Str::lower($this->email),
                 'type' => 'registration',
             ]);
 

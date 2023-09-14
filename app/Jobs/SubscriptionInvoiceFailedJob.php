@@ -4,13 +4,14 @@ namespace App\Jobs;
 
 use App\Models\Team;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class SubscriptionInvoiceFailedJob implements ShouldQueue
+class SubscriptionInvoiceFailedJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

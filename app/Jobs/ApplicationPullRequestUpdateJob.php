@@ -6,12 +6,13 @@ use App\Enums\ProcessStatus;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ApplicationPullRequestUpdateJob implements ShouldQueue
+class ApplicationPullRequestUpdateJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

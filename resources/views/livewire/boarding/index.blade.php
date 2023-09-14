@@ -5,12 +5,34 @@
             <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
             <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
             <div class="flex justify-center ">
-                <x-forms.button class="justify-center box" wire:click="welcome">Get Started
+                <x-forms.button class="justify-center box" wire:click="$set('currentState','explanation')">Get Started
                 </x-forms.button>
             </div>
         @endif
     </div>
     <div>
+        @if ($currentState === 'explanation')
+            <x-boarding-step title="What is Coolify?">
+                <x-slot:question>
+                    Coolify is an all-in-one application to automate tasks on your servers, deploy application with Git
+                    integrations, deploy databases and services, monitor these resources with notifications and alerts
+                    without vendor lock-in
+                    and <a href="https://coolify.io" class="text-white hover:underline">much much more</a>.
+                    <br><br>
+                    <span class="text-xl">
+                        <x-highlighted text="Self-hosting with superpowers!" /></span>
+                </x-slot:question>
+                <x-slot:explanation>
+                    <p><x-highlighted text="Task automation:" /> You do not to manage your servers too much. Coolify do it for you.</p>
+                    <p><x-highlighted text="No vendor lock-in:" /> All configurations are stored on your server, so everything works without Coolify (except integrations and automations).</p>
+                    <p><x-highlighted text="Monitoring:" />You will get notified on your favourite platform (Discord, Telegram, Email, etc.) when something goes wrong, or an action needed from your side.</p>
+                </x-slot:explanation>
+                <x-slot:actions>
+                    <x-forms.button class="justify-center box" wire:click="explanation">Next
+                    </x-forms.button>
+                </x-slot:actions>
+            </x-boarding-step>
+        @endif
         @if ($currentState === 'select-server-type')
             <x-boarding-step title="Server">
                 <x-slot:question>
@@ -18,9 +40,11 @@
                     or on a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:target="setServerType('localhost')" wire:click="setServerType('localhost')">Localhost
+                    <x-forms.button class="justify-center box" wire:target="setServerType('localhost')"
+                        wire:click="setServerType('localhost')">Localhost
                     </x-forms.button>
-                    <x-forms.button class="justify-center box" wire:target="setServerType('remote')" wire:click="setServerType('remote')">Remote Server
+                    <x-forms.button class="justify-center box" wire:target="setServerType('remote')"
+                        wire:click="setServerType('remote')">Remote Server
                     </x-forms.button>
                 </x-slot:actions>
                 <x-slot:explanation>
@@ -42,9 +66,11 @@
                     Do you have your own SSH Private Key?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('own')" wire:click="setPrivateKey('own')">Yes
+                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('own')"
+                        wire:click="setPrivateKey('own')">Yes
                     </x-forms.button>
-                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('create')" wire:click="setPrivateKey('create')">No (create one for me)
+                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('create')"
+                        wire:click="setPrivateKey('create')">No (create one for me)
                     </x-forms.button>
                     @if (count($privateKeys) > 0)
                         <form wire:submit.prevent='selectExistingPrivateKey' class="flex flex-col w-full gap-4 pr-10">
@@ -115,9 +141,10 @@
                         <x-forms.textarea required placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key"
                             id="privateKey" />
                         @if ($privateKeyType === 'create')
-                        <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
-                        <span class="font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's ~/.ssh/authorized_keys
-                            file.</span>
+                            <x-forms.textarea rows="7" readonly label="Public Key" id="publicKey" />
+                            <span class="font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
+                                ~/.ssh/authorized_keys
+                                file.</span>
                         @endif
                         <x-forms.button type="submit">Save</x-forms.button>
                     </form>
@@ -182,7 +209,8 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="installDocker" onclick="installDocker.showModal()">
+                    <x-forms.button class="justify-center box" wire:click="installDocker"
+                        onclick="installDocker.showModal()">
                         Let's do
                         it!</x-forms.button>
                 </x-slot:actions>
@@ -233,12 +261,14 @@
                     @endif
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="createNewProject">Let's create a new one!</x-forms.button>
+                    <x-forms.button class="justify-center box" wire:click="createNewProject">Let's create a new
+                        one!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
                             <form wire:submit.prevent='selectExistingProject'
                                 class="flex flex-col w-full gap-4 lg:w-96">
-                                <x-forms.select label="Existing projects" class="w-96" id='selectedExistingProject'>
+                                <x-forms.select label="Existing projects" class="w-96"
+                                    id='selectedExistingProject'>
                                     @foreach ($projects as $project)
                                         <option wire:key="{{ $loop->index }}" value="{{ $project->id }}">
                                             {{ $project->name }}</option>

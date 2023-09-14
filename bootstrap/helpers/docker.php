@@ -91,7 +91,7 @@ function generateApplicationContainerName(string $uuid, int $pull_request_id = 0
 {
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        return $uuid . '-pr-' . $pull_request_id . '-' . $now;
+        return $uuid . '-pr-' . $pull_request_id;
     } else {
         return $uuid . '-' . $now;
     }

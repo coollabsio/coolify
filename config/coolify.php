@@ -8,4 +8,5 @@ return [
     'dev_webhook' => env('SERVEO_URL'),
     'base_config_path' => env('BASE_CONFIG_PATH', '/data/coolify'),
     'helper_image' => env('HELPER_IMAGE', 'ghcr.io/coollabsio/coolify-helper:latest'),
+    'ssh_auth_sock' => env('SSH_AUTH_SOCK', '/tmp/coolify-ssh-agent.sock'),
 ];

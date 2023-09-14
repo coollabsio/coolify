@@ -2,9 +2,8 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\ApplicationContainerStatusJob;
+use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
-use App\Notifications\Application\StatusChanged;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -22,10 +21,11 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new ApplicationContainerStatusJob(
-            application: $this->application,
-        ));
+        dispatch_sync(new ContainerStatusJob($this->application->destination->server));
         $this->application->refresh();
+        $this->application->previews->each(function ($preview) {
+            $preview->refresh();
+        });
     }
 
     public function force_deploy_without_cache()

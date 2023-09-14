@@ -8,7 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {
-    public function __invoke(Server $server): Activity
+    public function __invoke(Server $server, bool $async = true): Activity|string
     {
         $proxy_path = get_proxy_path();
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
@@ -26,8 +26,7 @@ class StartProxy
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
-
-        $activity = remote_process([
+        $commands = [
             "echo '####### Creating required Docker networks...'",
             ...$create_networks_command,
             "cd $proxy_path",
@@ -44,8 +43,13 @@ class StartProxy
             "echo '####### Starting coolify-proxy...'",
             'docker compose up -d --remove-orphans',
             "echo '####### Proxy installed successfully...'"
-        ], $server);
-
-        return $activity;
+        ];
+        if (!$async) {
+            instant_remote_process($commands, $server);
+            return 'OK';
+        } else {
+            $activity = remote_process($commands, $server);
+            return $activity;
+        }
     }
 }

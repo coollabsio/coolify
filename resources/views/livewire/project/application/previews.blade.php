@@ -48,10 +48,10 @@
         @endif
     </div>
     @if ($application->previews->count() > 0)
-        <h4 class="py-4" wire:poll.10000ms='previewRefresh'>Deployed Previews</h4>
+        <h4 class="py-4">Deployed Previews</h4>
         <div class="flex gap-6 ">
             @foreach ($application->previews as $preview)
-                <div class="flex flex-col p-4 bg-coolgray-200 " x-init="$wire.loadStatus('{{ data_get($preview, 'pull_request_id') }}')">
+                <div class="flex flex-col p-4 bg-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
                         @if (data_get($preview, 'status') === 'running')
                             <x-status.running />

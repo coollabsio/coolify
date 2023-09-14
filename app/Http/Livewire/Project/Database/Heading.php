@@ -3,8 +3,7 @@
 namespace App\Http\Livewire\Project\Database;
 
 use App\Actions\Database\StartPostgresql;
-use App\Jobs\DatabaseContainerStatusJob;
-use App\Notifications\Application\StatusChanged;
+use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
 class Heading extends Component
@@ -25,9 +24,7 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new DatabaseContainerStatusJob(
-            database: $this->database,
-        ));
+        dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
     }
 

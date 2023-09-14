@@ -116,7 +116,7 @@ Route::post('/source/github/events', function () {
             $applications = $applications->where('git_branch', $base_branch)->get();
         }
         if ($applications->isEmpty()) {
-            return response('Nothing to do. No applications found.');
+            return response("Nothing to do. No applications found with branch '$base_branch'.");
         }
         foreach ($applications as $application) {
             $isFunctional = $application->destination->server->isFunctional();
@@ -178,6 +178,7 @@ Route::post('/source/github/events', function () {
             }
         }
     } catch (Exception $e) {
+        ray($e->getMessage());
         return general_error_handler(err: $e);
     }
 });

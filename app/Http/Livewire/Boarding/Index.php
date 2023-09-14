@@ -53,12 +53,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerHost = 'coolify-testing-host';
         }
     }
-    public function welcome() {
+    public function explanation() {
         if (isCloud()) {
             return $this->setServerType('remote');
         }
         $this->currentState = 'select-server-type';
     }
+
     public function restartBoarding()
     {
         if ($this->createdServer) {

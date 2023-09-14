@@ -7,6 +7,7 @@ use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -14,7 +15,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 
-class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique
+class ProxyContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

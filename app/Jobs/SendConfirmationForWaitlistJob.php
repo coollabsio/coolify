@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\InstanceSettings;
 use App\Models\Waitlist;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Mail\Message;
@@ -13,7 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Mail;
 
-class SendConfirmationForWaitlistJob implements ShouldQueue
+class SendConfirmationForWaitlistJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

@@ -56,7 +56,7 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable!');
             } else {
-                $this->emit('error', 'Server is not rachable');
+                $this->emit('error', 'Server is not reachable');
                 return;
             }
             if ($dockerVersion) {
@@ -88,17 +88,11 @@ class Form extends Component
     public function submit()
     {
         $this->validate();
-        // $validation = Validator::make($this->server->toArray(), [
-        //     'ip' => [
-        //         'ip'
-        //     ],
-        // ]);
-        // if ($validation->fails()) {
-        //     foreach ($validation->errors()->getMessages() as $key => $value) {
-        //         $this->addError("server.{$key}", $value[0]);
-        //     }
-        //     return;
-        // }
+        $uniqueIPs = Server::all()->pluck('ip')->toArray();
+        if (in_array($this->server->ip, $uniqueIPs)) {
+            $this->emit('error', 'IP address is already in use by another team.');
+            return;
+        }
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
         $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
         $this->server->settings->save();

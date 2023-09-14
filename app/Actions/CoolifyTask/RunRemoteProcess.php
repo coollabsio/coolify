@@ -10,9 +10,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Spatie\Activitylog\Models\Activity;
 
-const TIMEOUT = 3600;
-const IDLE_TIMEOUT = 3600;
-
 class RunRemoteProcess
 {
     public Activity $activity;
@@ -76,8 +73,7 @@ class RunRemoteProcess
         $this->time_start = hrtime(true);
 
         $status = ProcessStatus::IN_PROGRESS;
-
-        $processResult = Process::timeout(TIMEOUT)->idleTimeout(IDLE_TIMEOUT)->run($this->getCommand(), $this->handleOutput(...));
+        $processResult = processWithEnv()->forever()->run($this->getCommand(), $this->handleOutput(...));
 
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
@@ -108,11 +104,10 @@ class RunRemoteProcess
     {
         $user = $this->activity->getExtraProperty('user');
         $server_ip = $this->activity->getExtraProperty('server_ip');
-        $private_key_location = $this->activity->getExtraProperty('private_key_location');
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
 
-        return generate_ssh_command($private_key_location, $server_ip, $user, $port, $command);
+        return generateSshCommand($server_ip, $user, $port, $command);
     }
 
     protected function handleOutput(string $type, string $output)

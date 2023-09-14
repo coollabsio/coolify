@@ -105,6 +105,14 @@ class Server extends BaseModel
         })->flatten();
     }
 
+    public function previews() {
+        return $this->destinations()->map(function ($standaloneDocker) {
+            return $standaloneDocker->applications->map(function ($application) {
+                return $application->previews;
+            })->flatten();
+        })->flatten();
+    }
+
     public function destinations()
     {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();

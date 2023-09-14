@@ -53,7 +53,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
-            $mail->subject("✅New version is deployed of {$this->application_name}");
+            $mail->subject("✅ New version is deployed of {$this->application_name}");
         } else {
             $fqdn = $this->preview->fqdn;
             $mail->subject("✅ Pull request #{$pull_request_id} of {$this->application_name} deployed successfully");
