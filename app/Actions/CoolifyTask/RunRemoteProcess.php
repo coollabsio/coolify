@@ -73,7 +73,7 @@ class RunRemoteProcess
         $this->time_start = hrtime(true);
 
         $status = ProcessStatus::IN_PROGRESS;
-        $processResult = Process::forever()->run($this->getCommand(), $this->handleOutput(...));
+        $processResult = processWithEnv()->forever()->run($this->getCommand(), $this->handleOutput(...));
 
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
@@ -104,11 +104,10 @@ class RunRemoteProcess
     {
         $user = $this->activity->getExtraProperty('user');
         $server_ip = $this->activity->getExtraProperty('server_ip');
-        $private_key_location = $this->activity->getExtraProperty('private_key_location');
         $port = $this->activity->getExtraProperty('port');
         $command = $this->activity->getExtraProperty('command');
 
-        return generate_ssh_command($private_key_location, $server_ip, $user, $port, $command);
+        return generateSshCommand($server_ip, $user, $port, $command);
     }
 
     protected function handleOutput(string $type, string $output)

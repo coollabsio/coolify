@@ -14,6 +14,7 @@ class ShowPrivateKey extends Component
     public function setPrivateKey($newPrivateKeyId)
     {
         try {
+            refresh_server_connection($this->server->privateKey);
             $oldPrivateKeyId = $this->server->private_key_id;
             $this->server->update([
                 'private_key_id' => $newPrivateKeyId
@@ -26,7 +27,7 @@ class ShowPrivateKey extends Component
                 'private_key_id' => $oldPrivateKeyId
             ]);
             $this->server->refresh();
-             refresh_server_connection($this->server->privateKey);
+            refresh_server_connection($this->server->privateKey);
             return general_error_handler($e, that: $this);
         }
     }

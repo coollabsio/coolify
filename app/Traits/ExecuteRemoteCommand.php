@@ -28,9 +28,8 @@ trait ExecuteRemoteCommand
         $ip = data_get($this->server, 'ip');
         $user = data_get($this->server, 'user');
         $port = data_get($this->server, 'port');
-        $private_key_location = get_private_key_for_server($this->server);
 
-        $commandsText->each(function ($single_command) use ($private_key_location, $ip, $user, $port) {
+        $commandsText->each(function ($single_command) use ($ip, $user, $port) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
                 throw new \RuntimeException('Command is not set');
@@ -39,8 +38,8 @@ trait ExecuteRemoteCommand
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $this->save = data_get($single_command, 'save');
 
-            $remote_command = generate_ssh_command($private_key_location, $ip, $user, $port, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
+            $remote_command = generateSshCommand( $ip, $user, $port, $command);
+            $process =  processWithEnv()->timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
                 $output = Str::of($output)->trim();
                 $new_log_entry = [
                     'command' => $command,

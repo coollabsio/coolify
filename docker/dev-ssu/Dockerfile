@@ -24,4 +24,4 @@ RUN echo "alias mfs='php artisan migrate:fresh --seed'" >>/etc/bash.bashrc
 RUN echo "alias cda='composer dump-autoload'" >>/etc/bash.bashrc
 RUN echo "alias run='./scripts/run'" >>/etc/bash.bashrc
 
-# COPY --chmod=755 docker/dev-ssu/etc/s6-overlay/ /etc/s6-overlay/
+COPY --chmod=755  docker/dev-ssu/etc/s6-overlay/ /etc/s6-overlay/
