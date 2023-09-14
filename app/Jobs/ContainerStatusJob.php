@@ -3,10 +3,12 @@
 namespace App\Jobs;
 
 use App\Actions\Proxy\StartProxy;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
 use App\Notifications\Server\Unreachable;
+use Arr;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -69,6 +71,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypt
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
+            $previews = $this->server->previews();
             if ($this->server->isProxyShouldRun()) {
                 $foundProxyContainer = $containers->filter(function ($value, $key) {
                     return data_get($value, 'Name') === '/coolify-proxy';
@@ -78,12 +81,148 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypt
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
                 }
             }
+            $foundApplications = [];
+            $foundApplicationPreviews = [];
+            $foundDatabases = [];
+            foreach ($containers as $container) {
+                $containerStatus = data_get($container, 'State.Status');
+                $labels = data_get($container, 'Config.Labels');
+                $labels = Arr::undot(format_docker_labels_to_json($labels));
+                $labelId = data_get($labels, 'coolify.applicationId');
+                ray($labelId);
+                if ($labelId) {
+                    if (str_contains($labelId,'-pr-')) {
+                        $previewId = (int) Str::after($labelId, '-pr-');
+                        $applicationId = (int) Str::before($labelId, '-pr-');
+                        $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id',$previewId)->first();
+                        if ($preview) {
+                            $foundApplicationPreviews[] = $preview->id;
+                            $statusFromDb = $preview->status;
+                            if ($statusFromDb !== $containerStatus) {
+                                $preview->update(['status' => $containerStatus]);
+                            }
+                        } else {
+                            //Notify user that this container should not be there.
+                        }
+                    } else {
+                        $application = $applications->where('id', $labelId)->first();
+                        if ($application) {
+                            $foundApplications[] = $application->id;
+                            $statusFromDb = $application->status;
+                            if ($statusFromDb !== $containerStatus) {
+                                $application->update(['status' => $containerStatus]);
+                            }
+                        } else {
+                            //Notify user that this container should not be there.
+                        }
+                    }
+                } else {
+                    $uuid = data_get($labels, 'com.docker.compose.service');
+                    if ($uuid) {
+                        $database = $databases->where('uuid', $uuid)->first();
+                        if ($database) {
+                            $foundDatabases[] = $database->id;
+                            $statusFromDb = $database->status;
+                            if ($statusFromDb !== $containerStatus) {
+                                $database->update(['status' => $containerStatus]);
+                            }
+                        } else {
+                            // Notify user that this container should not be there.
+                        }
+                    }
+                }
+
+            }
+            $notRunningApplications = $applications->pluck('id')->diff($foundApplications);
+            foreach($notRunningApplications as $applicationId) {
+                $application = $applications->where('id', $applicationId)->first();
+                if ($application->status === 'exited') {
+                    continue;
+                }
+                $application->update(['status' => 'exited']);
+
+                $name = data_get($application, 'name');
+                $fqdn = data_get($application, 'fqdn');
+
+                $containerName = $name ? "$name ($fqdn)" : $fqdn;
+
+                $project = data_get($application, 'environment.project');
+                $environment = data_get($application, 'environment');
+
+                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $application->uuid;
+
+                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+            }
+            $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
+            foreach ($notRunningApplicationPreviews as $previewId) {
+                $preview = $previews->where('id', $previewId)->first();
+                if ($preview->status === 'exited') {
+                    continue;
+                }
+                $preview->update(['status' => 'exited']);
+
+                $name = data_get($preview, 'name');
+                $fqdn = data_get($preview, 'fqdn');
+
+                $containerName = $name ? "$name ($fqdn)" : $fqdn;
+
+                $project = data_get($preview, 'application.environment.project');
+                $environment = data_get($preview, 'application.environment');
+
+                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $preview->application->uuid;
+                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+            }
+            $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
+            foreach($notRunningDatabases as $database) {
+                $database = $databases->where('id', $database)->first();
+                if ($database->status === 'exited') {
+                    continue;
+                }
+                $database->update(['status' => 'exited']);
+
+                   $name = data_get($database, 'name');
+                $fqdn = data_get($database, 'fqdn');
+
+                $containerName = $name;
+
+                $project = data_get($database, 'environment.project');
+                $environment = data_get($database, 'environment');
+
+                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/database/" . $database->uuid;
+                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+            }
+
+
+
+
+
+
+
+
+
+
+
+
+            return;
             foreach ($applications as $application) {
                 $uuid = data_get($application, 'uuid');
-                $foundContainer = $containers->filter(function ($value, $key) use ($uuid) {
-                    return Str::startsWith(data_get($value, 'Name'), "/$uuid");
+                $id = data_get($application, 'id');
+                $foundContainer = $containers->filter(function ($value, $key) use ($id, $uuid) {
+                    $labels = data_get($value, 'Config.Labels');
+                    $labels = Arr::undot(format_docker_labels_to_json($labels));
+                    $labelId = data_get($labels, 'coolify.applicationId');
+                    if ($labelId == $id) {
+                        return $value;
+                    }
+                    $isPR = Str::startsWith(data_get($value, 'Name'), "/$uuid");
+                    $isPR = Str::contains(data_get($value, 'Name'), "-pr-");
+                    if ($isPR) {
+                        ray('is pr');
+                        return false;
+                    }
+                    return $value;
                 })->first();
-
+                ray($foundContainer);
                 if ($foundContainer) {
                     $containerStatus = data_get($foundContainer, 'State.Status');
                     $databaseStatus = data_get($application, 'status');
@@ -103,6 +242,19 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypt
                         $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
                     }
                 }
+                $previews = $application->previews;
+                foreach ($previews as $preview) {
+                    $foundContainer = $containers->filter(function ($value, $key) use ($id, $uuid, $preview) {
+                        $labels = data_get($value, 'Config.Labels');
+                        $labels = Arr::undot(format_docker_labels_to_json($labels));
+                        $labelId = data_get($labels, 'coolify.applicationId');
+                        if ($labelId == "$id-pr-{$preview->id}") {
+                            return $value;
+                        }
+                        return Str::startsWith(data_get($value, 'Name'), "/$uuid-pr-{$preview->id}");
+                    })->first();
+                }
+
             }
             foreach ($databases as $database) {
                 $uuid = data_get($database, 'uuid');

@@ -119,6 +119,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($containers->count() > 0) {
             $this->currently_running_container_name = data_get($containers[0], 'Names');
         }
+        if ($this->pull_request_id !== 0 && $this->pull_request_id !== null) {
+            $this->currently_running_container_name = $this->container_name;
+        }
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -296,7 +299,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->rolling_update();
+        $this->stop_running_container();
+        $this->execute_remote_command(
+            ["echo -n 'Starting preview deployment.'"],
+            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+        );
     }
 
     private function prepare_builder_image()
@@ -576,10 +583,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function set_labels_for_applications()
     {
+
+        $appId = $this->application->id;
+        if ($this->pull_request_id !== 0) {
+            $appId = $appId . '-pr-' . $this->pull_request_id;
+        }
         $labels = [];
         $labels[] = 'coolify.managed=true';
         $labels[] = 'coolify.version=' . config('version');
-        $labels[] = 'coolify.applicationId=' . $this->application->id;
+        $labels[] = 'coolify.applicationId=' . $appId;
         $labels[] = 'coolify.type=application';
         $labels[] = 'coolify.name=' . $this->application->name;
         if ($this->pull_request_id !== 0) {

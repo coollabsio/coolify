@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Jobs\ApplicationContainerStatusJob;
+use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Illuminate\Support\Collection;
@@ -21,14 +22,6 @@ class Previews extends Component
     {
         $this->pull_requests = collect();
         $this->parameters = get_route_parameters();
-    }
-
-    public function loadStatus($pull_request_id)
-    {
-        dispatch(new ApplicationContainerStatusJob(
-            application: $this->application,
-            pullRequestId: $pull_request_id
-        ));
     }
 
     public function load_prs()
