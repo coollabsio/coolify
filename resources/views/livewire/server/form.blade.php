@@ -35,11 +35,7 @@
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
-                @if ($server->id === 0)
-                    <x-forms.input id="server.ip" label="IP Address" required />
-                @else
-                    <x-forms.input id="server.ip" label="IP Address" readonly required />
-                @endif
+                <x-forms.input id="server.ip" label="IP Address" required />
                 <div class="flex gap-2">
                     <x-forms.input id="server.user" label="User" required />
                     <x-forms.input type="number" id="server.port" label="Port" required />
@@ -52,15 +48,15 @@
             </x-forms.button>
         @endif
         @if ($server->settings->is_reachable && !$server->settings->is_usable && $server->id !== 0)
-            <x-forms.button class="mt-8 mb-4 box" onclick="installDocker.showModal()"
-                wire:click.prevent='installDocker' isHighlighted>
+            <x-forms.button class="mt-8 mb-4 box" onclick="installDocker.showModal()" wire:click.prevent='installDocker'
+                isHighlighted>
                 Install Docker Engine 24.0
             </x-forms.button>
         @endif
         @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
-                <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
-                    helper="Disk cleanup job will be executed if disk usage is more than this number." />
+            <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
+                helper="Disk cleanup job will be executed if disk usage is more than this number." />
         @endif
     </form>
     <h2 class="pt-4">Danger Zone</h2>
