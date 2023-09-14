@@ -19,7 +19,7 @@ class Help extends Component
     ];
     public function mount()
     {
-        $this->path = Route::current()->uri();
+        $this->path = Route::current()?->uri() ?? null;
         if (isDev()) {
             $this->description = "I'm having trouble with {$this->path}";
             $this->subject = "Help with {$this->path}";
