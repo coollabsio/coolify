@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
+use App\Actions\Proxy\SaveConfigurationSync;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;

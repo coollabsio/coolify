@@ -2,8 +2,6 @@
 
 namespace App\Http\Livewire\Project\Application;
 
-use App\Jobs\ApplicationContainerStatusJob;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use Illuminate\Support\Collection;
