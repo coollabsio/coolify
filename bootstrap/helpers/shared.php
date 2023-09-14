@@ -276,6 +276,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
             [],
             fn (Message $message) => $message
                 ->to($email)
+                ->replyTo($email)
                 ->cc($cc)
                 ->subject($mail->subject)
                 ->html((string) $mail->render())

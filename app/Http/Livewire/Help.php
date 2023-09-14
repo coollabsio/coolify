@@ -28,7 +28,7 @@ class Help extends Component
     public function submit()
     {
         try {
-            $this->rateLimit(1, 60);
+            // $this->rateLimit(1, 1);
             $this->validate();
             $subscriptionType = auth()->user()?->subscription?->type() ?? 'Free';
             $debug = "Route: {$this->path}";
@@ -41,7 +41,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP - {$subscriptionType}]: {$this->subject}");
-            send_user_an_email($mail, auth()->user()?->email, 'hi@coollabs.io');
+            send_user_an_email($mail,  auth()->user()?->email, 'hi@coollabs.io');
             $this->emit('success', 'Your message has been sent successfully. We will get in touch with you as soon as possible.');
         } catch (\Throwable $e) {
             return general_error_handler($e, $this);
