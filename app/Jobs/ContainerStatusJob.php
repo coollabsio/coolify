@@ -19,7 +19,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Str;
 
-class ContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypted
+class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -89,7 +89,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypt
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
                 $labelId = data_get($labels, 'coolify.applicationId');
-                ray($labelId);
                 if ($labelId) {
                     if (str_contains($labelId,'-pr-')) {
                         $previewId = (int) Str::after($labelId, '-pr-');
