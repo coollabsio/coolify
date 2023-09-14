@@ -17,10 +17,10 @@ use App\Notifications\Application\DeploymentSuccess;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
-use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -28,10 +28,8 @@ use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 use Throwable;
 use Visus\Cuid2\Cuid2;
-use Yosymfony\Toml\Toml;
-use Yosymfony\Toml\TomlArray;
 
-class ApplicationDeploymentJob implements ShouldQueue
+class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ExecuteRemoteCommand;
 
@@ -49,7 +47,6 @@ class ApplicationDeploymentJob implements ShouldQueue
     private GithubApp|GitlabApp $source;
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
-    private string $private_key_location;
     private ApplicationPreview|null $preview = null;
 
     private string $container_name;
@@ -92,7 +89,7 @@ class ApplicationDeploymentJob implements ShouldQueue
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
-        $this->private_key_location = save_private_key_for_server($this->server);
+        addPrivateKeyToSshAgent($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn

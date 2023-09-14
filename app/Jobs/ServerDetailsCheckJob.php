@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -12,7 +13,7 @@ use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Str;
 
-class ServerDetailsCheckJob implements ShouldQueue, ShouldBeUnique
+class ServerDetailsCheckJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 

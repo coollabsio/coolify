@@ -6,13 +6,14 @@ use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Notifications\Application\StatusChanged;
 use Illuminate\Bus\Queueable;
+use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique
+class ApplicationContainerStatusJob implements ShouldQueue, ShouldBeUnique, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
