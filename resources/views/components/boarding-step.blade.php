@@ -14,12 +14,12 @@
         </div>
         @endif
     </div>
-    @if($explanation)
+    @isset($explanation)
     <div class="col-span-1">
         <h1 class="pb-8 font-bold">Explanation</h1>
         <div class="space-y-4">
             {{$explanation}}
         </div>
     </div>
-    @endif
+    @endisset
 </div>
