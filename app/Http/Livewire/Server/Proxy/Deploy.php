@@ -22,7 +22,7 @@ class Deploy extends Component
             $this->server->proxy->last_applied_settings &&
             $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
         ) {
-            resolve(SaveConfigurationSync::class)($this->server, $this->proxy_settings);
+            resolve(SaveConfigurationSync::class)($this->server);
         }
 
         $activity = resolve(StartProxy::class)($this->server);
