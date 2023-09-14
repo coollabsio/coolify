@@ -54,7 +54,7 @@ function removePrivateKeyFromSshAgent(Server $server)
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
     }
-    Process::run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
+    processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
 }
 function addPrivateKeyToSshAgent(Server $server, bool $onlyRemove = false)
 {
@@ -62,7 +62,7 @@ function addPrivateKeyToSshAgent(Server $server, bool $onlyRemove = false)
         throw new \Exception("Server {$server->name} does not have a private key");
     }
     // ray('adding key', $server->privateKey->private_key);
-    Process::run("echo '{$server->privateKey->private_key}' | ssh-add -q -");
+    processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -q -");
 }
 
 function generateSshCommand(string $server_ip, string $user, string $port, string $command, bool $isMux = true)
