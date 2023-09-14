@@ -47,9 +47,6 @@ function getEndDate()
 
 function isSubscriptionActive()
 {
-    if (auth()->user()->isAdminFromSession()) {
-        return true;
-    }
     if (!isCloud()) {
         return false;
     }
