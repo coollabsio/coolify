@@ -28,7 +28,7 @@ class Help extends Component
     public function submit()
     {
         try {
-            // $this->rateLimit(1, 1);
+            $this->rateLimit(1, 60);
             $this->validate();
             $subscriptionType = auth()->user()?->subscription?->type() ?? 'Free';
             $debug = "Route: {$this->path}";
