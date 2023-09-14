@@ -132,7 +132,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $this->deploy();
                 }
             }
-            if ($this->application->fqdn) dispatch(new ProxyContainerStatusJob($this->server));
+            if ($this->server->isProxyShouldRun()) {
+                dispatch(new ContainerStatusJob($this->server));
+            }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
         } catch (Exception $e) {
             ray($e);
@@ -267,6 +269,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                             "echo 'Rolling update completed.'"
                         ],
                     );
+                    $this->application->update(['status' => 'running']);
                     break;
                 }
                 $counter++;

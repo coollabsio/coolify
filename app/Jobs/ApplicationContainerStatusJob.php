@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Notifications\Application\StatusChanged;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;

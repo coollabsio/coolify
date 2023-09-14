@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Settings;
 
-use App\Jobs\ProxyContainerStatusJob;
+use App\Jobs\ContainerStatusJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
@@ -124,7 +124,7 @@ class Configuration extends Component
                 ];
             }
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
-            dispatch(new ProxyContainerStatusJob($this->server));
+            dispatch(new ContainerStatusJob($this->server));
         }
     }
 

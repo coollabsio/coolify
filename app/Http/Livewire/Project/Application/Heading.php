@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Jobs\ApplicationContainerStatusJob;
+use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use App\Notifications\Application\StatusChanged;
 use Livewire\Component;
@@ -22,9 +23,8 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new ApplicationContainerStatusJob(
-            application: $this->application,
-        ));
+        ray($this->application->destination->server);
+        dispatch_sync(new ContainerStatusJob($this->application->destination->server));
         $this->application->refresh();
     }
 

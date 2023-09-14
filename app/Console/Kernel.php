@@ -2,21 +2,15 @@
 
 namespace App\Console;
 
-use App\Enums\ProxyTypes;
-use App\Jobs\ApplicationContainerStatusJob;
 use App\Jobs\CheckResaleLicenseJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
-use App\Jobs\DatabaseContainerStatusJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceAutoUpdateJob;
-use App\Jobs\ProxyContainerStatusJob;
-use App\Jobs\ServerDetailsCheckJob;
-use App\Models\Application;
+use App\Jobs\ContainerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
-use App\Models\StandalonePostgresql;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -25,15 +19,14 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         if (isDev()) {
-            $schedule->job(new ServerDetailsCheckJob(Server::find(0)))->everyTenMinutes()->onOneServer();
+            // $schedule->job(new ContainerStatusJob(Server::find(0)))->everyTenMinutes()->onOneServer();
             // $schedule->command('horizon:snapshot')->everyMinute();
             // $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
             // $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $this->instance_auto_update($schedule);
             // $this->check_scheduled_backups($schedule);
-            // $this->check_resources($schedule);
-            // $this->check_proxies($schedule);
+            $this->check_resources($schedule);
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTenMinutes()->onOneServer();
@@ -42,26 +35,15 @@ class Kernel extends ConsoleKernel
             $this->instance_auto_update($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
-            $this->check_proxies($schedule);
-        }
-    }
-    private function check_proxies($schedule)
-    {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->whereNotNull('proxy.type')->where('proxy.type', '!=', ProxyTypes::NONE->value);
-        foreach ($servers as $server) {
-            $schedule->job(new ProxyContainerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
     private function check_resources($schedule)
     {
-        $applications = Application::all();
-        foreach ($applications as $application) {
-            $schedule->job(new ApplicationContainerStatusJob($application))->everyMinute()->onOneServer();
-        }
+        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
+        ray($servers);
 
-        $postgresqls = StandalonePostgresql::all();
-        foreach ($postgresqls as $postgresql) {
-            $schedule->job(new DatabaseContainerStatusJob($postgresql))->everyMinute()->onOneServer();
+        foreach ($servers as $server) {
+            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
