@@ -52,7 +52,7 @@ jobs:
             push: true
             tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:next-aarch64
   merge-manifest:
-      runs-on: [self-hosted, x64]
+      runs-on: ubuntu-latest
       permissions:
         contents: read
         packages: write
