@@ -56,7 +56,7 @@ function removePrivateKeyFromSshAgent(Server $server)
     }
     processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
 }
-function addPrivateKeyToSshAgent(Server $server, bool $onlyRemove = false)
+function addPrivateKeyToSshAgent(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
