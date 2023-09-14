@@ -78,7 +78,7 @@ class User extends Authenticatable implements SendsEmail
         if ($is_part_of_root_team && $is_admin_of_root_team) {
             return true;
         }
-        $role = $teams->where('id', auth()->user()->id)->first()->pivot->role;
+        $role = $teams->where('id', session('currentTeam')->id)->first()->pivot->role;
         return $role === 'admin' || $role === 'owner';
     }
 

@@ -2,6 +2,7 @@
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -60,7 +61,7 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (!$team) {
-        $team = Team::find(currentTeam()->id);
+        $team = User::find(auth()->user()->id)->teams->first();
     }
     Cache::forget('team:' . auth()->user()->id);
     Cache::remember('team:' . auth()->user()->id, 3600, function() use ($team) {
