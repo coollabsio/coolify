@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use App\Models\InstanceSettings;
+use App\Models\User;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Sentry\Laravel\Integration;
 use Sentry\State\Scope;
@@ -56,8 +57,8 @@ class Handler extends ExceptionHandler
                 function (Scope $scope) {
                     $scope->setUser(
                         [
-                            'id' => config('sentry.server_name'),
-                            'email' => auth()->user()->email
+                            'email' => auth()->user()->email,
+                            'instanceAdmin' => User::find(0)->email
                         ]
                     );
                 }
