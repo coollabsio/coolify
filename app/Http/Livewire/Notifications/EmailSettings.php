@@ -62,6 +62,7 @@ class EmailSettings extends Component
                 'team.smtp_from_name' => 'required',
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -81,6 +82,7 @@ class EmailSettings extends Component
             $this->team->smtp_enabled = false;
             $this->team->resend_enabled = false;
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -110,6 +112,7 @@ class EmailSettings extends Component
     public function saveModel()
     {
         $this->team->save();
+        refreshSession();
         $this->emit('success', 'Settings saved.');
     }
     public function submit()
@@ -127,6 +130,7 @@ class EmailSettings extends Component
                 'team.smtp_timeout' => 'nullable',
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
@@ -143,6 +147,7 @@ class EmailSettings extends Component
                 'team.resend_api_key' => 'required'
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->team->resend_enabled = false;

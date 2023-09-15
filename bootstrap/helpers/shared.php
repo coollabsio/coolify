@@ -62,7 +62,7 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (!$team) {
-        if (auth()->user()->currentTeam()) {
+        if (auth()->user()?->currentTeam()) {
             $team = Team::find(auth()->user()->currentTeam()->id);
         } else {
             $team = User::find(auth()->user()->id)->teams->first();
