@@ -49,20 +49,23 @@ function remote_process(
     ])();
 }
 
-function removePrivateKeyFromSshAgent(Server $server)
-{
-    if (data_get($server, 'privateKey.private_key') === null) {
-        throw new \Exception("Server {$server->name} does not have a private key");
-    }
-    processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
-}
+// function removePrivateKeyFromSshAgent(Server $server)
+// {
+//     if (data_get($server, 'privateKey.private_key') === null) {
+//         throw new \Exception("Server {$server->name} does not have a private key");
+//     }
+//     // processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
+// }
 function addPrivateKeyToSshAgent(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
     }
-    // ray('adding key', $server->privateKey->private_key);
-    processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -q -");
+    $sshKeyFileLocation = "id.root@{$server->uuid}";
+    Storage::disk('ssh-keys')->makeDirectory('.');
+    Storage::disk('ssh-mux')->makeDirectory('.');
+    Storage::disk('ssh-keys')->put($sshKeyFileLocation, $server->privateKey->private_key);
+    return '/var/www/html/storage/app/ssh/keys/' . $sshKeyFileLocation;
 }
 
 function generateSshCommand(string $server_ip, string $user, string $port, string $command, bool $isMux = true)
@@ -71,7 +74,7 @@ function generateSshCommand(string $server_ip, string $user, string $port, strin
     if (!$server) {
         throw new \Exception("Server with ip {$server_ip} not found");
     }
-    addPrivateKeyToSshAgent($server);
+    $privateKeyLocation = addPrivateKeyToSshAgent($server);
     $timeout = config('constants.ssh.command_timeout');
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
@@ -83,7 +86,8 @@ function generateSshCommand(string $server_ip, string $user, string $port, strin
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
-    $ssh_command .= '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+    $ssh_command .= "-i {$privateKeyLocation} "
+        . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         . '-o PasswordAuthentication=no '
         . "-o ConnectTimeout=$connectionTimeout "
         . "-o ServerAliveInterval=$serverInterval "
@@ -97,28 +101,28 @@ function generateSshCommand(string $server_ip, string $user, string $port, strin
     // ray($ssh_command);
     return $ssh_command;
 }
-function processWithEnv()
-{
-    return Process::env(['SSH_AUTH_SOCK' => config('coolify.ssh_auth_sock')]);
-}
-function instantCommand(string $command, $throwError = true)
-{
-    $process = processWithEnv()->run($command);
-    $output = trim($process->output());
-    $exitCode = $process->exitCode();
-    if ($exitCode !== 0) {
-        if (!$throwError) {
-            return null;
-        }
-        throw new \RuntimeException($process->errorOutput(), $exitCode);
-    }
-    return $output;
-}
+// function processWithEnv()
+// {
+//     return Process::env(['SSH_AUTH_SOCK' => config('coolify.ssh_auth_sock')]);
+// }
+// function instantCommand(string $command, $throwError = true)
+// {
+//     $process = Process::run($command);
+//     $output = trim($process->output());
+//     $exitCode = $process->exitCode();
+//     if ($exitCode !== 0) {
+//         if (!$throwError) {
+//             return null;
+//         }
+//         throw new \RuntimeException($process->errorOutput(), $exitCode);
+//     }
+//     return $output;
+// }
 function instant_remote_process(array $command, Server $server, $throwError = true, $repeat = 1)
 {
     $command_string = implode("\n", $command);
     $ssh_command = generateSshCommand($server->ip, $server->user, $server->port, $command_string);
-    $process =  processWithEnv()->run($ssh_command);
+    $process = Process::run($ssh_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
@@ -169,14 +173,9 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
 function refresh_server_connection(PrivateKey $private_key)
 {
     foreach ($private_key->servers as $server) {
-        // Delete the old ssh mux file to force a new one to be created
         Storage::disk('ssh-mux')->delete($server->muxFilename());
-        // check if user is authenticated
-        // if (currentTeam()->id) {
-        //     currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
-        // }
     }
-    removePrivateKeyFromSshAgent($server);
+    // removePrivateKeyFromSshAgent($server);
 }
 
 function validateServer(Server $server)

@@ -39,7 +39,7 @@ trait ExecuteRemoteCommand
             $this->save = data_get($single_command, 'save');
 
             $remote_command = generateSshCommand( $ip, $user, $port, $command);
-            $process =  processWithEnv()->timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
+            $process =  Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
                 $output = Str::of($output)->trim();
                 $new_log_entry = [
                     'command' => $command,

@@ -21,7 +21,6 @@ services:
       SSL_MODE: "off"
       AUTORUN_LARAVEL_STORAGE_LINK: "false"
       AUTORUN_LARAVEL_MIGRATION: "false"
-      SSH_AUTH_SOCK: "/tmp/coolify-ssh-agent.sock"
     volumes:
       - .:/var/www/html/:cached
   postgres:

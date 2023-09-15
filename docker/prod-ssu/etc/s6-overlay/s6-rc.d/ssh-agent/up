@@ -1,5 +1,0 @@
-#!/usr/bin/execlineb -P
-foreground {
-  s6-sleep 5
-  su - webuser -c "ssh-agent -a /tmp/coolify-ssh-agent.sock"
-}

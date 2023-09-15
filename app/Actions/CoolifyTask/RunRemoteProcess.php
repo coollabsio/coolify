@@ -73,7 +73,7 @@ class RunRemoteProcess
         $this->time_start = hrtime(true);
 
         $status = ProcessStatus::IN_PROGRESS;
-        $processResult = processWithEnv()->forever()->run($this->getCommand(), $this->handleOutput(...));
+        $processResult = Process::forever()->run($this->getCommand(), $this->handleOutput(...));
 
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
