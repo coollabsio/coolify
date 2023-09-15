@@ -28,7 +28,7 @@ class Form extends Component
         try {
             $this->team->save();
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 }

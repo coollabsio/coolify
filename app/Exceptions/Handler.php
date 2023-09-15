@@ -45,8 +45,11 @@ class Handler extends ExceptionHandler
     public function register(): void
     {
         $this->reportable(function (Throwable $e) {
+            if (isDev()) {
+                return;
+            }
             $this->settings = InstanceSettings::get();
-            if ($this->settings->do_not_track || isDev()) {
+            if ($this->settings->do_not_track) {
                 return;
             }
             app('sentry')->configureScope(

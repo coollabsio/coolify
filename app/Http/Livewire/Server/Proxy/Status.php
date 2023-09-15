@@ -24,7 +24,7 @@ class Status extends Component
                 $this->emit('proxyStatusUpdated');
             }
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e);
+            return handleError($e);
         }
     }
     public function getProxyStatusWithNoti()

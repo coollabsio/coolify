@@ -177,7 +177,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
-                $this->execute_in_builder("echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
+                executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
             ],
         );
         $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
@@ -302,7 +302,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->stop_running_container();
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
-            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
         );
     }
 
@@ -324,16 +324,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "hidden" => true,
             ],
             [
-                "command" => $this->execute_in_builder("mkdir -p {$this->workdir}")
+                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
             ],
         );
     }
 
-    private function execute_in_builder(string $command)
-    {
-        return "docker exec {$this->deployment_uuid} bash -c '{$command}'";
-        // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
-    }
+
 
     private function clone_repository()
     {
@@ -345,7 +341,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->importing_git_repository()
             ],
             [
-                $this->execute_in_builder("cd {$this->workdir} && git rev-parse HEAD"),
+                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git rev-parse HEAD"),
                 "hidden" => true,
                 "save" => "git_commit_sha"
             ],
@@ -372,13 +368,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
                     $git_clone_command = $this->set_git_import_settings($git_clone_command);
 
-                    $commands->push($this->execute_in_builder($git_clone_command));
+                    $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
                 } else {
                     $github_access_token = generate_github_installation_token($this->source);
-                    $commands->push($this->execute_in_builder("git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}"));
+                    $commands->push(executeInDocker($this->deployment_uuid, "git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}"));
                 }
                 if ($this->pull_request_id !== 0) {
-                    $commands->push($this->execute_in_builder("cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
+                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
                 }
                 return $commands->implode(' && ');
             }
@@ -388,10 +384,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->workdir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
-                $this->execute_in_builder("mkdir -p /root/.ssh"),
-                $this->execute_in_builder("echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
-                $this->execute_in_builder("chmod 600 /root/.ssh/id_rsa"),
-                $this->execute_in_builder($git_clone_command)
+                executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
+                executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
+                executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
+                executeInDocker($this->deployment_uuid, $git_clone_command)
             ]);
             return $commands->implode(' && ');
         }
@@ -414,7 +410,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function cleanup_git()
     {
         $this->execute_remote_command(
-            [$this->execute_in_builder("rm -fr {$this->workdir}/.git")],
+            [executeInDocker($this->deployment_uuid, "rm -fr {$this->workdir}/.git")],
         );
     }
 
@@ -425,8 +421,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "echo -n 'Generating nixpacks configuration.'",
             ],
             [$this->nixpacks_build_cmd()],
-            [$this->execute_in_builder("cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
-            [$this->execute_in_builder("rm -f {$this->workdir}/.nixpacks/Dockerfile")]
+            [executeInDocker($this->deployment_uuid, "cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
+            [executeInDocker($this->deployment_uuid, "rm -f {$this->workdir}/.nixpacks/Dockerfile")]
         );
     }
 
@@ -444,7 +440,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
         }
         $nixpacks_command .= " {$this->workdir}";
-        return $this->execute_in_builder($nixpacks_command);
+        return executeInDocker($this->deployment_uuid, $nixpacks_command);
     }
 
     private function generate_env_variables()
@@ -522,7 +518,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
-        $this->execute_remote_command([$this->execute_in_builder("echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
     }
 
     private function generate_local_persistent_volumes()
@@ -679,7 +675,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -706,18 +702,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             }");
             $this->execute_remote_command(
                 [
-                    $this->execute_in_builder("echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
                 ],
                 [
-                    $this->execute_in_builder("echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
+                    executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]
             );
         } else {
             $this->execute_remote_command([
-                $this->execute_in_builder("docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
@@ -727,7 +723,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($this->currently_running_container_name) {
             $this->execute_remote_command(
                 ["echo -n 'Removing old version of your application.'"],
-                [$this->execute_in_builder("docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
             );
         }
     }
@@ -736,7 +732,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->execute_remote_command(
             ["echo -n 'Rolling update started.'"],
-            [$this->execute_in_builder("docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
         );
     }
 
@@ -759,7 +755,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function add_build_env_variables_to_dockerfile()
     {
         $this->execute_remote_command([
-            $this->execute_in_builder("cat {$this->workdir}/Dockerfile"), "hidden" => true, "save" => 'dockerfile'
+            executeInDocker($this->deployment_uuid, "cat {$this->workdir}/Dockerfile"), "hidden" => true, "save" => 'dockerfile'
         ]);
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
@@ -768,7 +764,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
-            $this->execute_in_builder("echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile"),
+            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile"),
             "hidden" => true
         ]);
     }

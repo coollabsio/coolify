@@ -30,14 +30,14 @@ return [
      *
      * Minimum: 3000 (in milliseconds)
      */
-    'duration' => 5000,
+    'duration' => 1500,
 
     /**
      * The horizontal position of each toast.
      *
      * Supported: "center", "left" or "right"
      */
-    'position' => 'right',
+    'position' => 'center',
 
     /**
      * Whether messages passed as translation keys should be translated automatically.

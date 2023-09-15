@@ -36,7 +36,7 @@ class InviteLink extends Component
         try {
             $member_emails = currentTeam()->members()->get()->pluck('email');
             if ($member_emails->contains($this->email)) {
-                return general_error_handler(that: $this, customErrorMessage: "$this->email is already a member of " . currentTeam()->name . ".");
+                return handleError(livewire: $this, customErrorMessage: "$this->email is already a member of " . currentTeam()->name . ".");
             }
             $uuid = new Cuid2(32);
             $link = url('/') . config('constants.invitation.link.base_url') . $uuid;
@@ -57,7 +57,7 @@ class InviteLink extends Component
             if (!is_null($invitation)) {
                 $invitationValid = $invitation->isValid();
                 if ($invitationValid) {
-                    return general_error_handler(that: $this, customErrorMessage: "Pending invitation already exists for $this->email.");
+                    return handleError(livewire: $this, customErrorMessage: "Pending invitation already exists for $this->email.");
                 } else {
                     $invitation->delete();
                 }
@@ -91,7 +91,7 @@ class InviteLink extends Component
             if ($e->getCode() === '23505') {
                 $error_message = 'Invitation already sent.';
             }
-            return general_error_handler(err: $e, that: $this, customErrorMessage: $error_message);
+            return handleError(error: $e, livewire: $this, customErrorMessage: $error_message);
         }
     }
 }

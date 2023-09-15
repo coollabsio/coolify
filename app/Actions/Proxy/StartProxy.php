@@ -27,6 +27,10 @@ class StartProxy
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
         $commands = [
+            "command -v lsof >/dev/null || echo '####### Installing lsof...'",
+            "command -v lsof >/dev/null || apt-get update",
+            "command -v lsof >/dev/null || apt install -y lsof",
+            "command -v lsof >/dev/null || command -v fuser >/dev/null || apt install -y psmisc",
             "echo '####### Creating required Docker networks...'",
             ...$create_networks_command,
             "cd $proxy_path",
@@ -35,8 +39,11 @@ class StartProxy
             'docker compose pull',
             "echo '####### Stopping existing coolify-proxy...'",
             'docker compose down -v --remove-orphans',
-            "lsof -nt -i:80 | xargs -r kill -9",
-            "lsof -nt -i:443 | xargs -r kill -9",
+            "command -v lsof >/dev/null && lsof -nt -i:80 | xargs -r kill -9",
+            "command -v lsof >/dev/null && lsof -nt -i:443 | xargs -r kill -9",
+            "command -v fuser >/dev/null && fuser -k 80/tcp",
+            "command -v fuser >/dev/null && fuser -k 443/tcp",
+            "command -v fuser >/dev/null || command -v lsof >/dev/null || echo '####### Could not kill existing processes listening on port 80 & 443. Please stop the process holding these ports...'",
             "systemctl disable nginx > /dev/null 2>&1 || true",
             "systemctl disable apache2 > /dev/null 2>&1 || true",
             "systemctl disable apache > /dev/null 2>&1 || true",

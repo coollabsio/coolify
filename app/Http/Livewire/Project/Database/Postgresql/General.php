@@ -5,6 +5,7 @@ namespace App\Http\Livewire\Project\Database\Postgresql;
 use App\Models\StandalonePostgresql;
 use Exception;
 use Livewire\Component;
+
 use function Aws\filter;
 
 class General extends Component
@@ -73,9 +74,9 @@ class General extends Component
             }
             $this->getDbUrl();
             $this->database->save();
-        } catch(Exception $e) {
+        } catch(\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
 
     }
@@ -140,7 +141,7 @@ class General extends Component
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');
         } catch (Exception $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 }

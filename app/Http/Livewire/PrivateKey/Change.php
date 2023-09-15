@@ -25,8 +25,8 @@ class Change extends Component
     {
         try {
             $this->public_key = $this->private_key->publicKey();
-        }catch(\Exception $e) {
-            return general_error_handler(err: $e, that: $this);
+        }catch(\Throwable $e) {
+            return handleError($e, $this);
         }
     }
     public function delete()
@@ -39,7 +39,7 @@ class Change extends Component
             }
             $this->emit('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 
@@ -50,7 +50,7 @@ class Change extends Component
             $this->private_key->save();
             refresh_server_connection($this->private_key);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 }

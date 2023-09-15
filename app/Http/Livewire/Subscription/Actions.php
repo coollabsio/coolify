@@ -31,7 +31,7 @@ class Actions extends Component
                 $this->emit('reloadWindow', 5000);
             }
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function resume()
@@ -66,7 +66,7 @@ class Actions extends Component
                 $this->emit('reloadWindow', 5000);
             }
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function stripeCustomerPortal() {

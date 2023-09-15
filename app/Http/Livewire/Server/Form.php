@@ -51,12 +51,12 @@ class Form extends Component
     public function validateServer()
     {
         try {
-            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server);
+            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server, true);
             if ($uptime) {
                 $this->uptime = $uptime;
-                $this->emit('success', 'Server is reachable!');
+                $this->emit('success', 'Server is reachable.');
             } else {
-                $this->emit('error', 'Server is not reachable');
+                $this->emit('error', 'Server is not reachable.');
                 return;
             }
             if ($dockerVersion) {
@@ -64,10 +64,10 @@ class Form extends Component
                 $this->emit('proxyStatusUpdated');
                 $this->emit('success', 'Docker Engine 23+ is installed!');
             } else {
-                $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
+                $this->emit('error', 'No Docker Engine or older than 23 version installed.');
             }
         } catch (\Throwable $e) {
-            return general_error_handler($e, that: $this);
+            return handleError($e, $this, customErrorMessage: "Server is not reachable: ");
         }
     }
 
@@ -82,7 +82,7 @@ class Form extends Component
             $this->server->delete();
             return redirect()->route('server.all');
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
     public function submit()

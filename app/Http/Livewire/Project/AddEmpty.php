@@ -29,7 +29,7 @@ class AddEmpty extends Component
             ]);
             return redirect()->route('project.show', $project->uuid);
         } catch (\Throwable $e) {
-            general_error_handler($e, $this);
+            return handleError($e, $this);
         } finally {
             $this->name = '';
         }

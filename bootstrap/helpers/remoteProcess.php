@@ -36,12 +36,10 @@ function remote_process(
 
     return resolve(PrepareCoolifyTask::class, [
         'remoteProcessArgs' => new CoolifyTaskArgs(
-            server_ip: $server->ip,
+            server_uuid: $server->uuid,
             command: <<<EOT
                 {$command_string}
                 EOT,
-            port: $server->port,
-            user: $server->user,
             type: $type,
             type_uuid: $type_uuid,
             model: $model,
@@ -66,15 +64,14 @@ function addPrivateKeyToSshAgent(Server $server)
     Storage::disk('ssh-keys')->makeDirectory('.');
     Storage::disk('ssh-mux')->makeDirectory('.');
     Storage::disk('ssh-keys')->put($sshKeyFileLocation, $server->privateKey->private_key);
-    return '/var/www/html/storage/app/ssh/keys/' . $sshKeyFileLocation;
+    $location = '/var/www/html/storage/app/ssh/keys/' . $sshKeyFileLocation;
+    return $location;
 }
 
-function generateSshCommand(string $server_ip, string $user, string $port, string $command, bool $isMux = true)
+function generateSshCommand(Server $server, string $command, bool $isMux = true)
 {
-    $server = Server::where('ip', $server_ip)->first();
-    if (!$server) {
-        throw new \Exception("Server with ip {$server_ip} not found");
-    }
+    $user = $server->user;
+    $port = $server->port;
     $privateKeyLocation = addPrivateKeyToSshAgent($server);
     $timeout = config('constants.ssh.command_timeout');
     $connectionTimeout = config('constants.ssh.connection_timeout');
@@ -95,27 +92,21 @@ function generateSshCommand(string $server_ip, string $user, string $port, strin
         . '-o RequestTTY=no '
         . '-o LogLevel=ERROR '
         . "-p {$port} "
-        . "{$user}@{$server_ip} "
+        . "{$user}@{$server->ip} "
         . " 'bash -se' << \\$delimiter" . PHP_EOL
         . $command . PHP_EOL
         . $delimiter;
     // ray($ssh_command);
     return $ssh_command;
 }
-function instant_remote_process(array $command, Server $server, $throwError = true, $repeat = 1)
+function instant_remote_process(array $command, Server $server, $throwError = true)
 {
     $command_string = implode("\n", $command);
-    $ssh_command = generateSshCommand($server->ip, $server->user, $server->port, $command_string);
+    $ssh_command = generateSshCommand($server, $command_string);
     $process = Process::run($ssh_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {
-        if ($repeat > 1) {
-            ray("repeat: ", $repeat);
-            Sleep::for(200)->milliseconds();
-            return instant_remote_process($command, $server, $throwError, $repeat - 1);
-        }
-        // ray('ERROR OCCURED: ' . $process->errorOutput());
         if (!$throwError) {
             return null;
         }
@@ -161,11 +152,10 @@ function refresh_server_connection(PrivateKey $private_key)
     }
 }
 
-function validateServer(Server $server)
+function validateServer(Server $server, bool $throwError = false)
 {
     try {
-        refresh_server_connection($server->privateKey);
-        $uptime = instant_remote_process(['uptime'], $server, false);
+        $uptime = instant_remote_process(['uptime'], $server, $throwError);
         if (!$uptime) {
             $server->settings->is_reachable = false;
             return [
@@ -175,7 +165,7 @@ function validateServer(Server $server)
         }
         $server->settings->is_reachable = true;
 
-        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $server, false);
+        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $server, $throwError);
         if (!$dockerVersion) {
             $dockerVersion = null;
             return [
@@ -183,9 +173,8 @@ function validateServer(Server $server)
                 "dockerVersion" => null,
             ];
         }
-        $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
-        if ($majorDockerVersion <= 22) {
-            $dockerVersion = null;
+        $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
+        if (is_null($dockerVersion)) {
             $server->settings->is_usable = false;
         } else {
             $server->settings->is_usable = true;

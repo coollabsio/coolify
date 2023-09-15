@@ -35,7 +35,7 @@ class Heading extends Component
 
     public function stop()
     {
-        remote_process(
+        instant_remote_process(
             ["docker rm -f {$this->database->uuid}"],
             $this->database->destination->server
         );
@@ -45,7 +45,7 @@ class Heading extends Component
         }
         $this->database->status = 'stopped';
         $this->database->save();
-        $this->emit('refresh');
+        $this->check_status();
         // $this->database->environment->project->team->notify(new StatusChanged($this->database));
     }
 

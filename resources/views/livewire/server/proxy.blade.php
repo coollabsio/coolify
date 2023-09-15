@@ -55,19 +55,19 @@
             @else
                 <div>
                     <h2>Proxy</h2>
-                    <div class="subtitle ">Select a proxy you would like to use on this server.</div>
-                    <div class="flex gap-2">
-                        <x-forms.button class="w-32 box" wire:click="select_proxy('NONE')">
+                    <div class="subtitle">Select a proxy you would like to use on this server.</div>
+                    <div class="grid gap-4">
+                        <x-forms.button class="box" wire:click="select_proxy('NONE')">
                             Custom (None)
                         </x-forms.button>
-                        <x-forms.button class="w-32 box" wire:click="select_proxy('TRAEFIK_V2')">
+                        <x-forms.button class="box" wire:click="select_proxy('TRAEFIK_V2')">
                             Traefik
                             v2
                         </x-forms.button>
-                        <x-forms.button disabled class="w-32 box">
+                        <x-forms.button disabled class="box">
                             Nginx
                         </x-forms.button>
-                        <x-forms.button disabled class="w-32 box">
+                        <x-forms.button disabled class="box">
                             Caddy
                         </x-forms.button>
                     </div>

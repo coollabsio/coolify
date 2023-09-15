@@ -69,12 +69,34 @@ function refreshSession(?Team $team = null): void
         }
     }
     Cache::forget('team:' . auth()->user()->id);
-    Cache::remember('team:' . auth()->user()->id, 3600, function() use ($team) {
+    Cache::remember('team:' . auth()->user()->id, 3600, function () use ($team) {
         return $team;
     });
     session(['currentTeam' => $team]);
 }
-function general_error_handler(Throwable | null $err = null, $that = null, $isJson = false, $customErrorMessage = null): mixed
+function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
+{
+    ray('handleError');
+    if ($error instanceof Throwable) {
+        $message = $error->getMessage();
+    } else {
+        $message = null;
+    }
+    if ($customErrorMessage) {
+        $message = $customErrorMessage . ' ' . $message;
+    }
+    if ($error instanceof TooManyRequestsException) {
+        if (isset($livewire)) {
+            return $livewire->emit('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
+        }
+        return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
+    }
+    if (isset($livewire)) {
+        return $livewire->emit('error', $message);
+    }
+    throw new RuntimeException($message);
+}
+function general_error_handler(Throwable $err, Livewire\Component $that = null, $isJson = false, $customErrorMessage = null): mixed
 {
     try {
         ray($err);
@@ -95,7 +117,7 @@ function general_error_handler(Throwable | null $err = null, $that = null, $isJs
             }
             throw new Exception($customErrorMessage ?? $err->getMessage());
         }
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         if ($that) {
             return $that->emit('error', $customErrorMessage ?? $e->getMessage());
         } elseif ($isJson) {
@@ -122,7 +144,7 @@ function get_latest_version_of_coolify(): string
         $response = Http::get('https://cdn.coollabs.io/coolify/versions.json');
         $versions = $response->json();
         return data_get($versions, 'coolify.v4.version');
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         //throw $e;
         ray($e->getMessage());
         return '0.0.0';
@@ -321,7 +343,8 @@ function setNotificationChannels($notifiable, $event)
     }
     return $channels;
 }
-function parseEnvFormatToArray($env_file_contents) {
+function parseEnvFormatToArray($env_file_contents)
+{
     $env_array = array();
     $lines = explode("\n", $env_file_contents);
     foreach ($lines as $line) {
@@ -334,8 +357,7 @@ function parseEnvFormatToArray($env_file_contents) {
             $value = substr($line, $equals_pos + 1);
             if (substr($value, 0, 1) === '"' && substr($value, -1) === '"') {
                 $value = substr($value, 1, -1);
-            }
-            elseif (substr($value, 0, 1) === "'" && substr($value, -1) === "'") {
+            } elseif (substr($value, 0, 1) === "'" && substr($value, -1) === "'") {
                 $value = substr($value, 1, -1);
             }
             $env_array[$key] = $value;

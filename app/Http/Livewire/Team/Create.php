@@ -32,7 +32,7 @@ class Create extends Component
             refreshSession();
             return redirect()->route('team.index');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 }

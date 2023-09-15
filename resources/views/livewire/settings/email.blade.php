@@ -31,60 +31,51 @@
         </div>
     </form>
     <div class="flex flex-col gap-4">
-        <details class="border rounded collapse border-coolgray-500 collapse-arrow ">
-            <summary class="text-xl collapse-title">
-                <div>SMTP Server</div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave id="settings.smtp_enabled" label="Enabled" />
-                </div>
-            </summary>
-            <div class="collapse-content">
-                <form wire:submit.prevent='submit' class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            <x-forms.input required id="settings.smtp_host" placeholder="smtp.mailgun.org"
-                                label="Host" />
-                            <x-forms.input required id="settings.smtp_port" placeholder="587" label="Port" />
-                            <x-forms.input id="settings.smtp_encryption" helper="If SMTP uses SSL, set it to 'tls'."
-                                placeholder="tls" label="Encryption" />
-                        </div>
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            <x-forms.input id="settings.smtp_username" label="SMTP Username" />
-                            <x-forms.input id="settings.smtp_password" type="password" label="SMTP Password" />
-                            <x-forms.input id="settings.smtp_timeout" helper="Timeout value for sending emails."
-                                label="Timeout" />
-                        </div>
-                    </div>
-                    <div class="flex justify-end gap-4 pt-6">
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </div>
-                </form>
+        <div class="p-4 border border-coolgray-500">
+            <h3>SMTP Server</h3>
+            <div class="w-32">
+                <x-forms.checkbox instantSave id="settings.smtp_enabled" label="Enabled" />
             </div>
-        </details>
-        <details class="border rounded collapse border-coolgray-500 collapse-arrow">
-            <summary class="text-xl collapse-title">
-                <div>Resend</div>
-                <div class="w-32">
-                    <x-forms.checkbox instantSave='instantSaveResend' id="settings.resend_enabled" label="Enabled" />
+            <form wire:submit.prevent='submit' class="flex flex-col">
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col w-full gap-2 xl:flex-row">
+                        <x-forms.input required id="settings.smtp_host" placeholder="smtp.mailgun.org" label="Host" />
+                        <x-forms.input required id="settings.smtp_port" placeholder="587" label="Port" />
+                        <x-forms.input id="settings.smtp_encryption" helper="If SMTP uses SSL, set it to 'tls'."
+                            placeholder="tls" label="Encryption" />
+                    </div>
+                    <div class="flex flex-col w-full gap-2 xl:flex-row">
+                        <x-forms.input id="settings.smtp_username" label="SMTP Username" />
+                        <x-forms.input id="settings.smtp_password" type="password" label="SMTP Password" />
+                        <x-forms.input id="settings.smtp_timeout" helper="Timeout value for sending emails."
+                            label="Timeout" />
+                    </div>
                 </div>
-            </summary>
-            <div class="collapse-content">
-                <form wire:submit.prevent='submitResend' class="flex flex-col">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col w-full gap-2 xl:flex-row">
-                            <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key"
-                                label="Host" />
-                        </div>
-                    </div>
-                    <div class="flex justify-end gap-4 pt-6">
-                        <x-forms.button type="submit">
-                            Save
-                        </x-forms.button>
-                    </div>
-                </form>
+                <div class="flex justify-end gap-4 pt-6">
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+            </form>
+        </div>
+        <div class="p-4 border border-coolgray-500">
+            <h3>Resend</h3>
+            <div class="w-32">
+                <x-forms.checkbox instantSave='instantSaveResend' id="settings.resend_enabled" label="Enabled" />
             </div>
-        </details>
+            <form wire:submit.prevent='submitResend' class="flex flex-col">
+                <div class="flex flex-col gap-4">
+                    <div class="flex flex-col w-full gap-2 xl:flex-row">
+                        <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key" required
+                            label="Host" />
+                    </div>
+                </div>
+                <div class="flex justify-end gap-4 pt-6">
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>

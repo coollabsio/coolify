@@ -5,6 +5,7 @@ namespace App\Actions\CoolifyTask;
 use App\Enums\ActivityTypes;
 use App\Enums\ProcessStatus;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Models\Server;
 use Illuminate\Process\ProcessResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
@@ -94,7 +95,7 @@ class RunRemoteProcess
         ]);
         $this->activity->save();
         if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
-            throw new \RuntimeException($processResult->errorOutput());
+            throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
         }
 
         return $processResult;
@@ -102,12 +103,11 @@ class RunRemoteProcess
 
     protected function getCommand(): string
     {
-        $user = $this->activity->getExtraProperty('user');
-        $server_ip = $this->activity->getExtraProperty('server_ip');
-        $port = $this->activity->getExtraProperty('port');
+        $server_uuid = $this->activity->getExtraProperty('server_uuid');
         $command = $this->activity->getExtraProperty('command');
+        $server = Server::whereUuid($server_uuid)->firstOrFail();
 
-        return generateSshCommand($server_ip, $user, $port, $command);
+        return generateSshCommand($server, $command);
     }
 
     protected function handleOutput(string $type, string $output)

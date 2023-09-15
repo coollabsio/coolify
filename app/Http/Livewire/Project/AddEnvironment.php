@@ -32,7 +32,7 @@ class AddEnvironment extends Component
                 'environment_name' => $environment->name,
             ]);
         } catch (\Throwable $e) {
-            general_error_handler($e, $this);
+            handleError($e, $this);
         } finally {
             $this->name = '';
         }

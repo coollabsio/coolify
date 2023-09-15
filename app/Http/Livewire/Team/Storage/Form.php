@@ -33,7 +33,7 @@ class Form extends Component
             $this->storage->testConnection();
             return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 
@@ -43,7 +43,7 @@ class Form extends Component
             $this->storage->delete();
             return redirect()->route('team.storages.all');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 
@@ -56,7 +56,7 @@ class Form extends Component
             $this->storage->save();
             $this->emit('success', 'Storage settings saved.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 }

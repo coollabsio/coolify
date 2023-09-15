@@ -28,14 +28,14 @@ class ShowPrivateKey extends Component
             ]);
             $this->server->refresh();
             refresh_server_connection($this->server->privateKey);
-            return general_error_handler($e, that: $this);
+            return handleError($e, $this);
         }
     }
 
     public function checkConnection()
     {
         try {
-            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server);
+            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server, true);
             if ($uptime) {
                 $this->emit('success', 'Server is reachable with this private key.');
             } else {
@@ -48,7 +48,7 @@ class ShowPrivateKey extends Component
                 $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
             }
         } catch (\Throwable $e) {
-            throw new \Exception($e->getMessage());
+            return handleError($e, $this);
         }
     }
 

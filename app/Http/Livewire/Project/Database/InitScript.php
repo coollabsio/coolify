@@ -36,7 +36,7 @@ class InitScript extends Component
             $this->script['filename'] = $this->filename;
             $this->emitUp('save_init_script', $this->script);
         } catch (Exception $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 

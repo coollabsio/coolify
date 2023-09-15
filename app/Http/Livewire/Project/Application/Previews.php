@@ -30,7 +30,7 @@ class Previews extends Component
             $this->pull_requests = $data->sortBy('number')->values();
         } catch (\Throwable $e) {
             $this->rate_limit_remaining = 0;
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 
@@ -59,7 +59,7 @@ class Previews extends Component
                 'environment_name' => $this->parameters['environment_name'],
             ]);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 
@@ -79,7 +79,7 @@ class Previews extends Component
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();
             $this->application->refresh();
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 
