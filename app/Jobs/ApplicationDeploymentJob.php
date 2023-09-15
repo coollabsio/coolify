@@ -652,7 +652,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_healthcheck_commands()
     {
-        if ($this->application->dockerfile) {
+        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile') {
             // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
             return 'exit 0';
         }

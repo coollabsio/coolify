@@ -4,13 +4,15 @@ namespace App\Http\Livewire\PrivateKey;
 
 use App\Models\PrivateKey;
 use Livewire\Component;
+use phpseclib3\Crypt\PublicKeyLoader;
 
 class Create extends Component
 {
-    public string|null $from = null;
+    public ?string $from = null;
     public string $name;
-    public string|null $description = null;
+    public ?string $description = null;
     public string $value;
+    public ?string $publicKey = null;
     protected $rules = [
         'name' => 'required|string',
         'value' => 'required|string',
@@ -20,6 +22,23 @@ class Create extends Component
         'value' => 'private Key',
     ];
 
+    public function generateNewKey()
+    {
+        $this->name = generate_random_name();
+        $this->description = 'Created by Coolify';
+        ['private' => $this->value, 'public' => $this->publicKey] = generateSSHKey();
+    }
+    public function updated($updateProperty)
+    {
+        if ($updateProperty === 'value') {
+            try {
+                $this->publicKey = PublicKeyLoader::load($this->$updateProperty)->getPublicKey()->toString('OpenSSH',['comment' => '']);
+            } catch (\Throwable $e) {
+                $this->publicKey = "Invalid private key";
+            }
+        }
+        $this->validateOnly($updateProperty);
+    }
     public function createPrivateKey()
     {
         $this->validate();

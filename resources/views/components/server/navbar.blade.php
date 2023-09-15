@@ -1,4 +1,5 @@
 <div class="pb-6">
+        <livewire:server.proxy.modal :server="$server" />
     <div class="flex items-center gap-2">
         <h1>Server</h1>
         @if ($server->settings->is_reachable)

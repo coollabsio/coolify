@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Team;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Member extends Component
@@ -24,6 +25,10 @@ class Member extends Component
     public function remove()
     {
         $this->member->teams()->detach(currentTeam());
+        Cache::forget("team:{$this->member->id}");
+        Cache::remember('team:' . $this->member->id, 3600, function() {
+            return $this->member->teams()->first();
+        });
         $this->emit('reloadWindow');
     }
 }

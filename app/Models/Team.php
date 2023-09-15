@@ -19,6 +19,13 @@ class Team extends Model implements SendsDiscord, SendsEmail
         'resend_api_key' => 'encrypted',
     ];
 
+    protected static function booted()
+    {
+        static::saved(function () {
+            refreshSession();
+        });
+    }
+
     public function routeNotificationForDiscord()
     {
         return data_get($this, 'discord_webhook_url', null);

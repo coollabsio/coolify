@@ -13,7 +13,10 @@ class Show extends Component
     public function mount()
     {
         try {
-            $this->server = Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail();
+            $this->server = Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->first();
+            if (is_null($this->server)) {
+                return redirect()->route('server.all');
+            }
         } catch (\Throwable $e) {
             return general_error_handler(err: $e, that: $this);
         }

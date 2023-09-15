@@ -44,6 +44,7 @@ class PricingPlans extends Component
             return;
         }
         $payload = [
+            'billing_address_collection' => 'required',
             'client_reference_id' => auth()->user()->id . ':' . currentTeam()->id,
             'line_items' => [[
                 'price' => $priceId,

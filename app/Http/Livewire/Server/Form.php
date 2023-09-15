@@ -88,7 +88,9 @@ class Form extends Component
     public function submit()
     {
         $this->validate();
-        $uniqueIPs = Server::all()->pluck('ip')->toArray();
+        $uniqueIPs = Server::all()->reject(function (Server $server) {
+            return $server->id === $this->server->id;
+        })->pluck('ip')->toArray();
         if (in_array($this->server->ip, $uniqueIPs)) {
             $this->emit('error', 'IP address is already in use by another team.');
             return;

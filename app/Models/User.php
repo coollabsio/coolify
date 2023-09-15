@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
-use Cache;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -61,7 +61,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function isAdmin()
     {
-        return $this->pivot->role === 'admin' || $this->pivot->role === 'owner';
+        return data_get($this->pivot,'role') === 'admin' || data_get($this->pivot,'role') === 'owner';
     }
 
     public function isAdminFromSession()
@@ -78,7 +78,8 @@ class User extends Authenticatable implements SendsEmail
         if ($is_part_of_root_team && $is_admin_of_root_team) {
             return true;
         }
-        $role = $teams->where('id', auth()->user()->id)->first()->pivot->role;
+        $team = $teams->where('id', session('currentTeam')->id)->first();
+        $role = data_get($team,'pivot.role');
         return $role === 'admin' || $role === 'owner';
     }
 

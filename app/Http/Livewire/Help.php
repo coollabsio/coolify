@@ -19,7 +19,7 @@ class Help extends Component
     ];
     public function mount()
     {
-        $this->path = Route::current()->uri();
+        $this->path = Route::current()?->uri() ?? null;
         if (isDev()) {
             $this->description = "I'm having trouble with {$this->path}";
             $this->subject = "Help with {$this->path}";
@@ -41,7 +41,7 @@ class Help extends Component
                 ]
             );
             $mail->subject("[HELP - {$subscriptionType}]: {$this->subject}");
-            send_user_an_email($mail, 'hi@coollabs.io', auth()->user()?->email);
+            send_user_an_email($mail,  auth()->user()?->email, 'hi@coollabs.io');
             $this->emit('success', 'Your message has been sent successfully. We will get in touch with you as soon as possible.');
         } catch (\Throwable $e) {
             return general_error_handler($e, $this);

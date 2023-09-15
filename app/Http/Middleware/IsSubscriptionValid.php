@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Illuminate\Support\Str;
 
 class IsSubscriptionValid
 {
@@ -31,6 +32,9 @@ class IsSubscriptionValid
         if (!isSubscriptionActive() && !isSubscriptionOnGracePeriod()) {
             // ray('SubscriptionValid Middleware');
             if (!in_array($request->path(), allowedPathsForUnsubscribedAccounts())) {
+                if (Str::startsWith($request->path(), 'invitations')) {
+                    return $next($request);
+                }
                 return redirect('subscription');
             } else {
                 return $next($request);

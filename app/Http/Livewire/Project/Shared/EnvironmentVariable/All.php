@@ -5,7 +5,7 @@ namespace App\Http\Livewire\Project\Shared\EnvironmentVariable;
 use App\Models\EnvironmentVariable;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
-use Str;
+use Illuminate\Support\Str;
 
 class All extends Component
 {

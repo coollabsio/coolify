@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\TeamInvitation;
 use App\Models\Waitlist;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -32,7 +33,12 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique, ShouldBeE
         } catch (\Throwable $e) {
             send_internal_notification('CleanupInstanceStuffsJob failed with error: ' . $e->getMessage());
             ray($e->getMessage());
-            throw $e;
+        }
+        try {
+            $this->cleanup_invitation_link();
+        } catch (\Throwable $e) {
+            send_internal_notification('CleanupInstanceStuffsJob failed with error: ' . $e->getMessage());
+            ray($e->getMessage());
         }
     }
 
@@ -41,6 +47,13 @@ class CleanupInstanceStuffsJob implements ShouldQueue, ShouldBeUnique, ShouldBeE
         $waitlist = Waitlist::whereVerified(false)->where('created_at', '<', now()->subMinutes(config('constants.waitlist.expiration')))->get();
         foreach ($waitlist as $item) {
             $item->delete();
+        }
+    }
+    private function cleanup_invitation_link()
+    {
+        $invitation = TeamInvitation::all();
+        foreach ($invitation as $item) {
+            $item->isValid();
         }
     }
 }

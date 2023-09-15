@@ -16,10 +16,7 @@ class CheckConfigurationSync
 
         if ($reset || is_null($proxy_configuration)) {
             $proxy_configuration = Str::of(generate_default_proxy_configuration($server))->trim()->value;
-            resolve(SaveConfigurationSync::class)($server, $proxy_configuration);
-            return $proxy_configuration;
         }
-
         return $proxy_configuration;
     }
 }

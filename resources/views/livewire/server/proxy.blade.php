@@ -1,16 +1,6 @@
 <div>
     @if ($server->isFunctional())
         @if (data_get($server,'proxy.type'))
-        <x-modal submitWireAction="proxyStatusUpdated" modalId="startProxy">
-            <x-slot:modalBody>
-                <livewire:activity-monitor header="Proxy Startup Logs" />
-            </x-slot:modalBody>
-            <x-slot:modalSubmit>
-                <x-forms.button onclick="startProxy.close()" type="submit">
-                    Close
-                </x-forms.button>
-            </x-slot:modalSubmit>
-        </x-modal>
             <div x-init="$wire.loadProxyConfiguration">
                 @if ($selectedProxy === 'TRAEFIK_V2')
                     <form wire:submit.prevent='submit'>

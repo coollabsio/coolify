@@ -1,3 +1,4 @@
+
 <div class="flex gap-2" x-init="$wire.getProxyStatus">
     @if ($server->proxy->status === 'running')
         <x-status.running text="Proxy Running" />

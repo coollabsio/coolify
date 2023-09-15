@@ -12,7 +12,6 @@ class Delete extends Component
         $currentTeam = currentTeam();
         $currentTeam->delete();
 
-        $team = auth()->user()->teams()->first();
         $currentTeam->members->each(function ($user) use ($currentTeam) {
             if ($user->id === auth()->user()->id) {
                 return;

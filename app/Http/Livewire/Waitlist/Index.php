@@ -6,7 +6,7 @@ use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\User;
 use App\Models\Waitlist;
 use Livewire\Component;
-use Str;
+use Illuminate\Support\Str;
 
 class Index extends Component
 {

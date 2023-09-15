@@ -2,6 +2,7 @@
 
 use App\Models\InstanceSettings;
 use App\Models\Team;
+use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
@@ -10,6 +11,7 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -60,7 +62,11 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (!$team) {
-        $team = Team::find(currentTeam()->id);
+        if (auth()->user()->currentTeam()) {
+            $team = Team::find(auth()->user()->currentTeam()->id);
+        } else {
+            $team = User::find(auth()->user()->id)->teams->first();
+        }
     }
     Cache::forget('team:' . auth()->user()->id);
     Cache::remember('team:' . auth()->user()->id, 3600, function() use ($team) {
@@ -275,6 +281,7 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
             [],
             fn (Message $message) => $message
                 ->to($email)
+                ->replyTo($email)
                 ->cc($cc)
                 ->subject($mail->subject)
                 ->html((string) $mail->render())

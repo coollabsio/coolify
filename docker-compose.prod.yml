@@ -64,7 +64,6 @@ services:
       - LEMON_SQUEEZY_BASIC_PLAN_IDS
       - LEMON_SQUEEZY_PRO_PLAN_IDS
       - LEMON_SQUEEZY_ULTIMATE_PLAN_IDS
-      - SSH_AUTH_SOCK="/tmp/coolify-ssh-agent.sock"
     ports:
       - "${APP_PORT:-8000}:80"
     expose:

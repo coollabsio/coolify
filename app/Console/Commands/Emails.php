@@ -24,7 +24,7 @@ use Illuminate\Console\Command;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Mail;
-use Str;
+use Illuminate\Support\Str;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
@@ -62,7 +62,7 @@ class Emails extends Command
                 'application-status-changed' => 'Application - Status Changed',
                 'backup-success' => 'Database - Backup Success',
                 'backup-failed' => 'Database - Backup Failed',
-                'invitation-link' => 'Invitation Link',
+                // 'invitation-link' => 'Invitation Link',
                 'waitlist-invitation-link' => 'Waitlist Invitation Link',
                 'waitlist-confirmation' => 'Waitlist Confirmation',
                 'realusers-before-trial' => 'REAL - Registered Users Before Trial without Subscription',
@@ -141,20 +141,20 @@ class Emails extends Command
                 $this->mail = (new BackupSuccess($backup, $db))->toMail();
                 $this->sendEmail();
                 break;
-            case 'invitation-link':
-                $user = User::all()->first();
-                $invitation = TeamInvitation::whereEmail($user->email)->first();
-                if (!$invitation) {
-                    $invitation = TeamInvitation::create([
-                        'uuid' => Str::uuid(),
-                        'email' => $user->email,
-                        'team_id' => 1,
-                        'link' => 'http://example.com',
-                    ]);
-                }
-                $this->mail = (new InvitationLink($user))->toMail();
-                $this->sendEmail();
-                break;
+            // case 'invitation-link':
+            //     $user = User::all()->first();
+            //     $invitation = TeamInvitation::whereEmail($user->email)->first();
+            //     if (!$invitation) {
+            //         $invitation = TeamInvitation::create([
+            //             'uuid' => Str::uuid(),
+            //             'email' => $user->email,
+            //             'team_id' => 1,
+            //             'link' => 'http://example.com',
+            //         ]);
+            //     }
+            //     $this->mail = (new InvitationLink($user))->toMail();
+            //     $this->sendEmail();
+            //     break;
             case 'waitlist-invitation-link':
                 $this->mail = new MailMessage();
                 $this->mail->view('emails.waitlist-invitation', [

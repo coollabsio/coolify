@@ -9,7 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
-use Str;
+use Illuminate\Support\Str;
 
 class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
 {
