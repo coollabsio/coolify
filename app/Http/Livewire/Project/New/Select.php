@@ -41,7 +41,7 @@ class Select extends Component
     //         instantCommand("psql {$this->existingPostgresqlUrl} -c 'SELECT 1'");
     //         $this->emit('success', 'Successfully connected to the database.');
     //     } catch (\Throwable $e) {
-    //         return general_error_handler($e, $this);
+    //         return handleError($e, $this);
     //     }
     // }
     public function setType(string $type)

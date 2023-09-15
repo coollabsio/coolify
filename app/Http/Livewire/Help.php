@@ -44,7 +44,7 @@ class Help extends Component
             send_user_an_email($mail,  auth()->user()?->email, 'hi@coollabs.io');
             $this->emit('success', 'Your message has been sent successfully. We will get in touch with you as soon as possible.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function render()

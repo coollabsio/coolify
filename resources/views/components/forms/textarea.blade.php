@@ -30,7 +30,7 @@
         </label>
     @endif
     <textarea placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
-        @if ($realtimeValidation) wire:model.debounce.500ms="{{ $id }}"
+        @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
         wire:model.defer={{ $value ?? $id }}
         wire:dirty.class="input-warning"@endif

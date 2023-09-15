@@ -4,8 +4,6 @@ namespace App\Notifications\Application;
 
 use App\Models\Application;
 use App\Models\ApplicationPreview;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -18,13 +16,14 @@ class DeploymentFailed extends Notification implements ShouldQueue
 
     public $tries = 5;
     public Application $application;
-    public string $deployment_uuid;
     public ?ApplicationPreview $preview = null;
 
+    public string $deployment_uuid;
     public string $application_name;
-    public ?string $deployment_url = null;
     public string $project_uuid;
     public string $environment_name;
+
+    public ?string $deployment_url = null;
     public ?string $fqdn = null;
 
     public function __construct(Application $application, string $deployment_uuid, ?ApplicationPreview $preview = null)

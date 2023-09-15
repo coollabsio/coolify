@@ -2,8 +2,7 @@
 
 namespace App\Notifications\Application;
 
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
+use App\Models\Application;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -15,13 +14,14 @@ class StatusChanged extends Notification implements ShouldQueue
     use Queueable;
 
     public $tries = 5;
-    public $application;
 
+    public Application $application;
     public string $application_name;
-    public string|null $application_url = null;
     public string $project_uuid;
     public string $environment_name;
-    public string|null $fqdn;
+
+    public ?string $application_url = null;
+    public ?string $fqdn;
 
     public function __construct($application)
     {

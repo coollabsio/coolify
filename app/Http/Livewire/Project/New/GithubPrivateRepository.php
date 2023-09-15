@@ -165,7 +165,7 @@ class GithubPrivateRepository extends Component
                 'project_uuid' => $project->uuid,
             ]);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 

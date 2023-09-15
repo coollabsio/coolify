@@ -3,16 +3,20 @@
 namespace App\Http\Livewire\PrivateKey;
 
 use App\Models\PrivateKey;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Livewire\Component;
 use phpseclib3\Crypt\PublicKeyLoader;
 
 class Create extends Component
 {
-    public ?string $from = null;
+    use WithRateLimiting;
     public string $name;
-    public ?string $description = null;
     public string $value;
+
+    public ?string $from = null;
+    public ?string $description = null;
     public ?string $publicKey = null;
+
     protected $rules = [
         'name' => 'required|string',
         'value' => 'required|string',
@@ -24,9 +28,14 @@ class Create extends Component
 
     public function generateNewKey()
     {
-        $this->name = generate_random_name();
-        $this->description = 'Created by Coolify';
-        ['private' => $this->value, 'public' => $this->publicKey] = generateSSHKey();
+        try {
+            $this->rateLimit(10);
+            $this->name = generate_random_name();
+            $this->description = 'Created by Coolify';
+            ['private' => $this->value, 'public' => $this->publicKey] = generateSSHKey();
+        } catch(\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
     public function updated($updateProperty)
     {
@@ -34,7 +43,11 @@ class Create extends Component
             try {
                 $this->publicKey = PublicKeyLoader::load($this->$updateProperty)->getPublicKey()->toString('OpenSSH',['comment' => '']);
             } catch (\Throwable $e) {
-                $this->publicKey = "Invalid private key";
+                if ($this->$updateProperty === "") {
+                    $this->publicKey = "";
+                } else {
+                    $this->publicKey = "Invalid private key";
+                }
             }
         }
         $this->validateOnly($updateProperty);
@@ -58,7 +71,7 @@ class Create extends Component
             }
             return redirect()->route('security.private-key.show', ['private_key_uuid' => $private_key->uuid]);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 }

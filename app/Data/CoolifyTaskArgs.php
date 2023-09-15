@@ -12,10 +12,8 @@ use Spatie\LaravelData\Data;
 class CoolifyTaskArgs extends Data
 {
     public function __construct(
-        public string  $server_ip,
+        public string  $server_uuid,
         public string  $command,
-        public int     $port,
-        public string  $user,
         public string  $type,
         public ?string $type_uuid = null,
         public ?Model  $model = null,

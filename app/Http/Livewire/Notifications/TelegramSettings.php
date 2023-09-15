@@ -52,6 +52,7 @@ class TelegramSettings extends Component
     public function saveModel()
     {
         $this->team->save();
+        refreshSession();
         $this->emit('success', 'Settings saved.');
     }
 

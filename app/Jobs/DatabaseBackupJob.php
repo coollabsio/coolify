@@ -18,7 +18,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
-use Throwable;
 use Illuminate\Support\Str;
 
 class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
@@ -117,7 +116,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
 
             $this->backup_status = 'success';
             $this->team->notify(new BackupSuccess($this->backup, $this->database));
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             $this->backup_status = 'failed';
             $this->add_to_backup_output($e->getMessage());
             ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());

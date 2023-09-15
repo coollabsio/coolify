@@ -59,6 +59,18 @@ function format_docker_envs_to_json($rawOutput)
         return collect([]);
     }
 }
+function checkMinimumDockerEngineVersion($dockerVersion) {
+    $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
+    if ($majorDockerVersion <= 22) {
+        $dockerVersion = null;
+    }
+    return $dockerVersion;
+}
+function executeInDocker(string $containerId, string $command)
+{
+    return "docker exec {$containerId} bash -c '{$command}'";
+    // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
+}
 
 function getApplicationContainerStatus(Application $application) {
     $server = data_get($application,'destination.server');

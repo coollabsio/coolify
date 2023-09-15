@@ -58,6 +58,42 @@
                 }
             }
 
+            function revive() {
+                if (checkHealthInterval) return true;
+                console.log('Checking server\'s health...')
+                checkHealthInterval = setInterval(() => {
+                    fetch('/api/health')
+                        .then(response => {
+                            if (response.ok) {
+                                Toaster.success('Coolify is back online. Reloading...')
+                                if (checkHealthInterval) clearInterval(checkHealthInterval);
+                                setTimeout(() => {
+                                    window.location.reload();
+                                }, 5000)
+                            } else {
+                                console.log('Waiting for server to come back from dead...');
+                            }
+                        })
+                }, 2000);
+            }
+
+            function upgrade() {
+                if (checkIfIamDeadInterval) return true;
+                console.log('Update initiated.')
+                checkIfIamDeadInterval = setInterval(() => {
+                    fetch('/api/health')
+                        .then(response => {
+                            if (response.ok) {
+                                console.log('It\'s alive. Waiting for server to be dead...');
+                            } else {
+                                Toaster.success('Update done, restarting Coolify!')
+                                console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
+                                if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
+                                revive();
+                            }
+                        })
+                }, 2000);
+            }
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text);
                 Livewire.emit('success', 'Copied to clipboard.');

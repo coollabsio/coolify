@@ -14,6 +14,6 @@
         </x-forms.button>
     </form>
     <div class="container w-full pt-10 mx-auto">
-        <livewire:activity-monitor header="Logs" />
+        <livewire:activity-monitor header="Command output" />
     </div>
 </div>

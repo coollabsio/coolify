@@ -11,6 +11,9 @@ use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\Team;
+use App\Models\User;
+use DB;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
@@ -19,6 +22,18 @@ class ProductionSeeder extends Seeder
 {
     public function run(): void
     {
+        // Fix for 4.0.0-beta.37
+        if (User::find(0) !== null && Team::find(0) !== null) {
+            if (DB::table('team_user')->where('user_id', 0)->first() === null) {
+                DB::table('team_user')->insert([
+                    'user_id' => 0,
+                    'team_id' => 0,
+                    'role' => 'owner',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        }
         if (InstanceSettings::find(0) == null) {
             InstanceSettings::create([
                 'id' => 0

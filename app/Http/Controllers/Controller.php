@@ -14,7 +14,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Throwable;
 
 class Controller extends BaseController
 {
@@ -153,7 +152,7 @@ class Controller extends BaseController
             } else {
                 abort(401);
             }
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             ray($e->getMessage());
             throw $e;
         }
@@ -172,7 +171,7 @@ class Controller extends BaseController
             }
             $invitation->delete();
             return redirect()->route('team.index');
-        } catch (Throwable $e) {
+        } catch (\Throwable $e) {
             throw $e;
         }
     }

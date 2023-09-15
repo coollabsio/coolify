@@ -27,8 +27,9 @@ class Form extends Component
         $this->validate();
         try {
             $this->team->save();
+            refreshSession();
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 }

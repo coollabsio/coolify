@@ -51,7 +51,7 @@ class Email extends Component
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function submitResend() {
@@ -64,7 +64,7 @@ class Email extends Component
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->settings->resend_enabled = false;
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function instantSaveResend() {
@@ -72,7 +72,7 @@ class Email extends Component
             $this->settings->smtp_enabled = false;
             $this->submitResend();
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function instantSave()
@@ -81,7 +81,7 @@ class Email extends Component
             $this->settings->resend_enabled = false;
             $this->submit();
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 
@@ -100,7 +100,7 @@ class Email extends Component
             $this->settings->save();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 

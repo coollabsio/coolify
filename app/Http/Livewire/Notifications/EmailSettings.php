@@ -62,9 +62,10 @@ class EmailSettings extends Component
                 'team.smtp_from_name' => 'required',
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function sendTestNotification()
@@ -81,9 +82,10 @@ class EmailSettings extends Component
             $this->team->smtp_enabled = false;
             $this->team->resend_enabled = false;
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 
@@ -94,7 +96,7 @@ class EmailSettings extends Component
             $this->submitResend();
         } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function instantSave()
@@ -104,12 +106,13 @@ class EmailSettings extends Component
             $this->submit();
         } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function saveModel()
     {
         $this->team->save();
+        refreshSession();
         $this->emit('success', 'Settings saved.');
     }
     public function submit()
@@ -127,10 +130,11 @@ class EmailSettings extends Component
                 'team.smtp_timeout' => 'nullable',
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function submitResend()
@@ -143,10 +147,11 @@ class EmailSettings extends Component
                 'team.resend_api_key' => 'required'
             ]);
             $this->team->save();
+            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->team->resend_enabled = false;
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
     public function copyFromInstanceSettings()

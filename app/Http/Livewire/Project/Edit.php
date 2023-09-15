@@ -20,7 +20,7 @@ class Edit extends Component
             $this->project->save();
             $this->emit('saved');
         } catch (\Throwable $e) {
-            return general_error_handler($e, $this);
+            return handleError($e, $this);
         }
     }
 }

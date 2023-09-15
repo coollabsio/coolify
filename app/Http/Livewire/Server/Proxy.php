@@ -56,7 +56,7 @@ class Proxy extends Component
             setup_default_redirect_404(redirect_url: $this->server->proxy->redirect_url, server: $this->server);
             $this->emit('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e);
+            return handleError($e);
         }
     }
 
@@ -65,7 +65,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server, true);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e);
+            return handleError($e);
         }
     }
 
@@ -75,7 +75,7 @@ class Proxy extends Component
             ray('loadProxyConfiguration');
             $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e);
+            return handleError($e);
         }
     }
 }

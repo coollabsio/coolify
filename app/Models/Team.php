@@ -21,9 +21,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
 
     protected static function booted()
     {
-        static::saved(function () {
-            refreshSession();
-        });
+        // static::saved(function () {
+        //     refreshSession();
+        // });
     }
 
     public function routeNotificationForDiscord()

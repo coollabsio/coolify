@@ -118,7 +118,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'application_uuid' => $application->uuid,
             ]);
         } catch (\Throwable $e) {
-            return general_error_handler(err: $e, that: $this);
+            return handleError($e, $this);
         }
     }
 

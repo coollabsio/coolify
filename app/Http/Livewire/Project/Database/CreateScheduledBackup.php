@@ -43,7 +43,7 @@ class CreateScheduledBackup extends Component
             ]);
             $this->emit('refreshScheduledBackups');
         } catch (\Throwable $e) {
-            general_error_handler($e, $this);
+            handleError($e, $this);
         } finally {
             $this->frequency = '';
             $this->save_s3 = true;

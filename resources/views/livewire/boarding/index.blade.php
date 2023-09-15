@@ -182,7 +182,7 @@
                                 placeholder="Username to connect to your server. Default is root." label="Username"
                                 id="remoteServerUser" />
                         </div>
-                        <x-forms.button type="submit">Save</x-forms.button>
+                        <x-forms.button type="submit">Check Connection</x-forms.button>
                     </form>
                 </x-slot:actions>
                 <x-slot:explanation>
