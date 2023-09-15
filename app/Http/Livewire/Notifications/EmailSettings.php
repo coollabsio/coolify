@@ -110,9 +110,6 @@ class EmailSettings extends Component
     public function saveModel()
     {
         $this->team->save();
-        if (is_a($this->team, Team::class)) {
-            refreshSession();
-        }
         $this->emit('success', 'Settings saved.');
     }
     public function submit()
@@ -141,10 +138,11 @@ class EmailSettings extends Component
         try {
             $this->resetErrorBag();
             $this->validate([
+                'team.smtp_from_address' => 'required|email',
+                'team.smtp_from_name' => 'required',
                 'team.resend_api_key' => 'required'
             ]);
             $this->team->save();
-            refreshSession();
             $this->emit('success', 'Settings saved successfully.');
         } catch (\Throwable $e) {
             $this->team->resend_enabled = false;

@@ -62,7 +62,11 @@ function showBoarding(): bool
 function refreshSession(?Team $team = null): void
 {
     if (!$team) {
-        $team = User::find(auth()->user()->id)->teams->first();
+        if (auth()->user()->currentTeam()) {
+            $team = Team::find(auth()->user()->currentTeam()->id);
+        } else {
+            $team = User::find(auth()->user()->id)->teams->first();
+        }
     }
     Cache::forget('team:' . auth()->user()->id);
     Cache::remember('team:' . auth()->user()->id, 3600, function() use ($team) {
