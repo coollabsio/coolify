@@ -1,4 +1,5 @@
 <div>
+    <x-forms.button class="mb-4" wire:click="generateNewKey">Generate new SSH key for me</x-forms.button>
     <form class="flex flex-col gap-2" wire:submit.prevent='createPrivateKey'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
@@ -6,11 +7,10 @@
         </div>
         <x-forms.textarea realtimeValidation id="value" rows="10"
             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" label="Private Key" required />
-        <x-forms.button wire:click="generateNewKey">Generate new SSH key for me</x-forms.button>
-        <x-forms.textarea id="publicKey" rows="6" readonly label="Public Key" />
-        <span class="font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
+        <x-forms.input id="publicKey" readonly label="Public Key" />
+        <span class="pt-2 pb-4 font-bold text-warning">ACTION REQUIRED: Copy the 'Public Key' to your server's
             ~/.ssh/authorized_keys
-            file.</span>
+            file</span>
         <x-forms.button type="submit">
             Save Private Key
         </x-forms.button>
