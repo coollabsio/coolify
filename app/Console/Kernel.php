@@ -21,7 +21,7 @@ class Kernel extends ConsoleKernel
         if (isDev()) {
             // $schedule->job(new ContainerStatusJob(Server::find(0)))->everyTenMinutes()->onOneServer();
             // $schedule->command('horizon:snapshot')->everyMinute();
-            // $schedule->job(new CleanupInstanceStuffsJob)->everyMinute();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly();
             // $schedule->job(new DockerCleanupJob)->everyOddHour();
             // $this->instance_auto_update($schedule);
@@ -29,7 +29,7 @@ class Kernel extends ConsoleKernel
             $this->check_resources($schedule);
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
-            $schedule->job(new CleanupInstanceStuffsJob)->everyTenMinutes()->onOneServer();
+            $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
             $schedule->job(new DockerCleanupJob)->everyTenMinutes()->onOneServer();
             $this->instance_auto_update($schedule);

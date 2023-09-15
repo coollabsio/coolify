@@ -3,21 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\InstanceSettings;
-use App\Models\Project;
 use App\Models\S3Storage;
 use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
-use Auth;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Foundation\Validation\ValidatesRequests;
 use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Throwable;
-use Str;
-
 
 class Controller extends BaseController
 {
@@ -35,8 +32,15 @@ class Controller extends BaseController
                 return redirect()->route('login');
             }
             if (Hash::check($password, $user->password)) {
+                $invitation = TeamInvitation::whereEmail($email);
+                if ($invitation->exists()) {
+                    $team = $invitation->first()->team;
+                    $user->teams()->attach($team->id, ['role' => $invitation->first()->role]);
+                    $invitation->delete();
+                } else {
+                    $team = $user->teams()->first();
+                }
                 Auth::login($user);
-                $team = $user->teams()->first();
                 session(['currentTeam' => $team]);
                 return redirect()->route('dashboard');
             }
@@ -137,24 +141,20 @@ class Controller extends BaseController
         try {
             $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
             $user = User::whereEmail($invitation->email)->firstOrFail();
-            if (is_null(auth()->user())) {
-                return redirect()->route('login');
-            }
             if (auth()->user()->id !== $user->id) {
                 abort(401);
             }
-
-            $createdAt = $invitation->created_at;
-            $diff = $createdAt->diffInMinutes(now());
-            if ($diff <= config('constants.invitation.link.expiration')) {
+            $invitationValid = $invitation->isValid();
+            if ($invitationValid) {
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
+                refreshSession($invitation->team);
                 $invitation->delete();
                 return redirect()->route('team.index');
             } else {
-                $invitation->delete();
                 abort(401);
             }
         } catch (Throwable $e) {
+            ray($e->getMessage());
             throw $e;
         }
     }

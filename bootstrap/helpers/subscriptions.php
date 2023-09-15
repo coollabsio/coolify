@@ -56,7 +56,7 @@ function isSubscriptionActive()
     }
     $subscription = $team?->subscription;
 
-    if (!$subscription) {
+    if (is_null($subscription)) {
         return false;
     }
     if (isLemon()) {
