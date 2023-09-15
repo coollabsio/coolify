@@ -30,9 +30,12 @@
         </label>
     @endif
     <textarea placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
-        wire:model.defer={{ $id }} @disabled($disabled) @readonly($readonly) @required($required)
-        id="{{ $id }}" name="{{ $name }}" name={{ $id }} wire:model.defer={{ $value ?? $id }}
-        wire:dirty.class="input-warning"></textarea>
+        @if ($realtimeValidation) wire:model.debounce.500ms="{{ $id }}"
+        @else
+        wire:model.defer={{ $value ?? $id }}
+        wire:dirty.class="input-warning"@endif
+        @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}" name="{{ $name }}"
+        name={{ $id }}  ></textarea>
     @error($id)
         <label class="label">
             <span class="text-red-500 label-text-alt">{{ $message }}</span>
