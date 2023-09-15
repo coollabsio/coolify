@@ -75,7 +75,6 @@ function getApplicationContainerStatus(Application $application) {
 }
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    // check_server_connection($server);
     $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
     if (!$container) {
         return 'exited';

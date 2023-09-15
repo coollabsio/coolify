@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Sleep;
 use Spatie\Activitylog\Models\Activity;
+use Illuminate\Support\Str;
 
 function remote_process(
     array   $command,
@@ -101,23 +102,6 @@ function generateSshCommand(string $server_ip, string $user, string $port, strin
     // ray($ssh_command);
     return $ssh_command;
 }
-// function processWithEnv()
-// {
-//     return Process::env(['SSH_AUTH_SOCK' => config('coolify.ssh_auth_sock')]);
-// }
-// function instantCommand(string $command, $throwError = true)
-// {
-//     $process = Process::run($command);
-//     $output = trim($process->output());
-//     $exitCode = $process->exitCode();
-//     if ($exitCode !== 0) {
-//         if (!$throwError) {
-//             return null;
-//         }
-//         throw new \RuntimeException($process->errorOutput(), $exitCode);
-//     }
-//     return $output;
-// }
 function instant_remote_process(array $command, Server $server, $throwError = true, $repeat = 1)
 {
     $command_string = implode("\n", $command);
@@ -175,7 +159,6 @@ function refresh_server_connection(PrivateKey $private_key)
     foreach ($private_key->servers as $server) {
         Storage::disk('ssh-mux')->delete($server->muxFilename());
     }
-    // removePrivateKeyFromSshAgent($server);
 }
 
 function validateServer(Server $server)
@@ -217,29 +200,6 @@ function validateServer(Server $server)
         throw $e;
     } finally {
         if (data_get($server, 'settings')) $server->settings->save();
-    }
-}
-
-function check_server_connection(Server $server)
-{
-    try {
-        refresh_server_connection($server->privateKey);
-        instant_remote_process(['uptime'], $server);
-        $server->unreachable_count = 0;
-        $server->settings->is_reachable = true;
-    } catch (\Throwable $e) {
-        if ($server->unreachable_count == 2) {
-            $server->team->notify(new NotReachable($server));
-            $server->settings->is_reachable = false;
-            $server->settings->save();
-        } else {
-            $server->unreachable_count += 1;
-        }
-
-        throw $e;
-    } finally {
-        $server->settings->save();
-        $server->save();
     }
 }
 
