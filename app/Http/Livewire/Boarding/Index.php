@@ -89,7 +89,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (!$this->createdServer) {
                 return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            return $this->validateServer();
+            return $this->validateServer('localhost');
         } elseif ($type === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->privateKeys->count() > 0) {
@@ -185,7 +185,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         $this->validateServer();
     }
-    public function validateServer()
+    public function validateServer(?string $type = null)
     {
         try {
             $customErrorMessage = "Server is not reachable:";
@@ -197,24 +197,30 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 throw new \Exception('No Docker Engine or older than 23 version installed.');
             }
             $customErrorMessage = "Cannot create Server or Private Key. Please try again.";
-            $createdPrivateKey = PrivateKey::create([
-                'name' => $this->privateKeyName,
-                'description' => $this->privateKeyDescription,
-                'private_key' => $this->privateKey,
-                'team_id' => currentTeam()->id
-            ]);
-            $server = Server::create([
-                'name' => $this->remoteServerName,
-                'ip' => $this->remoteServerHost,
-                'port' => $this->remoteServerPort,
-                'user' => $this->remoteServerUser,
-                'description' => $this->remoteServerDescription,
-                'private_key_id' => $createdPrivateKey->id,
-                'team_id' => currentTeam()->id,
-            ]);
-            $server->settings->is_reachable = true;
-            $server->settings->is_usable = true;
-            $server->settings->save();
+            if ($type !== 'localhost') {
+                $createdPrivateKey = PrivateKey::create([
+                    'name' => $this->privateKeyName,
+                    'description' => $this->privateKeyDescription,
+                    'private_key' => $this->privateKey,
+                    'team_id' => currentTeam()->id
+                ]);
+                $server = Server::create([
+                    'name' => $this->remoteServerName,
+                    'ip' => $this->remoteServerHost,
+                    'port' => $this->remoteServerPort,
+                    'user' => $this->remoteServerUser,
+                    'description' => $this->remoteServerDescription,
+                    'private_key_id' => $createdPrivateKey->id,
+                    'team_id' => currentTeam()->id,
+                ]);
+                $server->settings->is_reachable = true;
+                $server->settings->is_usable = true;
+                $server->settings->save();
+            } else {
+                $this->createdServer->settings->update([
+                    'is_reachable' => true,
+                ]);
+            }
             $this->getProxyType();
         } catch (\Throwable $e) {
             return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
