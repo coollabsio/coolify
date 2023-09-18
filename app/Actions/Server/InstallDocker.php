@@ -8,7 +8,7 @@ use App\Models\Team;
 
 class InstallDocker
 {
-    public function __invoke(Server $server, Team $team)
+    public function __invoke(Server $server)
     {
         $dockerVersion = '24.0';
         $config = base64_encode('{
@@ -19,7 +19,7 @@ class InstallDocker
             }
           }');
         $found = StandaloneDocker::where('server_id', $server->id);
-        if ($found->count() == 0) {
+        if ($found->count() == 0 && $server->id) {
             StandaloneDocker::create([
                 'name' => 'coolify',
                 'network' => 'coolify',

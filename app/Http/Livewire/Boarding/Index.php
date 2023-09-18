@@ -232,7 +232,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function installDocker()
     {
-        $activity = resolve(InstallDocker::class)($this->createdServer, currentTeam());
+        $activity = resolve(InstallDocker::class)($this->createdServer);
         $this->emit('newMonitorActivity', $activity->id);
         $this->currentState = 'select-proxy';
     }
