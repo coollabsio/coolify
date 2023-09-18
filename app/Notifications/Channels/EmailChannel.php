@@ -21,7 +21,6 @@ class EmailChannel
             }
 
             $mailMessage = $notification->toMail($notifiable);
-            throw new Exception('EmailChannel is disabled');
             Mail::send(
                 [],
                 [],
