@@ -2,9 +2,8 @@
 
 namespace App\Http\Livewire\Server;
 
-use App\Actions\Proxy\CheckConfigurationSync;
-use App\Actions\Proxy\SaveConfigurationSync;
-use App\Enums\ProxyTypes;
+use App\Actions\Proxy\CheckConfiguration;
+use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -48,8 +47,7 @@ class Proxy extends Component
     public function submit()
     {
         try {
-            resolve(SaveConfigurationSync::class)($this->server);
-
+            SaveConfiguration::run($this->server);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
 
@@ -63,7 +61,7 @@ class Proxy extends Component
     public function reset_proxy_configuration()
     {
         try {
-            $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server, true);
+            $this->proxy_settings = CheckConfiguration::run($this->server, true);
         } catch (\Throwable $e) {
             return handleError($e);
         }
@@ -72,8 +70,7 @@ class Proxy extends Component
     public function loadProxyConfiguration()
     {
         try {
-            ray('loadProxyConfiguration');
-            $this->proxy_settings = resolve(CheckConfigurationSync::class)($this->server);
+            $this->proxy_settings = CheckConfiguration::run($this->server);
         } catch (\Throwable $e) {
             return handleError($e);
         }
