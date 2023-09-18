@@ -39,6 +39,10 @@ class Index extends Component
     public ?Project $createdProject = null;
 
     public bool $dockerInstallationStarted = false;
+
+    public string $localhostPublicKey;
+    public bool $localhostReachable = true;
+
     public function mount()
     {
         $this->privateKeyName = generate_random_name();
@@ -94,6 +98,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (!$this->createdServer) {
                 return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
+            $this->localhostPublicKey = $this->createdServer->privateKey->publicKey();
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
@@ -188,7 +193,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->save();
         $this->validateServer();
     }
-    public function validateServer(?string $type = null)
+    public function validateServer()
     {
         try {
             $customErrorMessage = "Server is not reachable:";
@@ -199,7 +204,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->createdServer->settings->update([
                 'is_reachable' => true,
             ]);
+        } catch (\Throwable $e) {
+            $this->localhostReachable = false;
+            return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
+        }
 
+        try {
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
