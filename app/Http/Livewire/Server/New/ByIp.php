@@ -26,7 +26,7 @@ class ByIp extends Component
     protected $rules = [
         'name' => 'required|string',
         'description' => 'nullable|string',
-        'ip' => 'required|ip',
+        'ip' => 'required',
         'user' => 'required|string',
         'port' => 'required|integer',
     ];
