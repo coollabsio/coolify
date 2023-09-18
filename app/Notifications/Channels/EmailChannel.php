@@ -6,6 +6,7 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
+use Log;
 
 class EmailChannel
 {
@@ -19,6 +20,7 @@ class EmailChannel
         }
 
         $mailMessage = $notification->toMail($notifiable);
+        Log::info("Sending email to: " . implode(', ', $recepients) . " with subject: {$mailMessage->subject}");
         Mail::send(
             [],
             [],
