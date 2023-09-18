@@ -69,14 +69,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function restartBoarding()
     {
-        // if ($this->selectedServerType !== 'localhost') {
-        //     if ($this->createdServer) {
-        //         $this->createdServer->delete();
-        //     }
-        //     if ($this->createdPrivateKey) {
-        //         $this->createdPrivateKey->delete();
-        //     }
-        // }
         return redirect()->route('boarding');
     }
     public function skipBoarding()

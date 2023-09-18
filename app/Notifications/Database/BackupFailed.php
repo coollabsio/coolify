@@ -3,8 +3,6 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
-use App\Notifications\Channels\DiscordChannel;
-use App\Notifications\Channels\EmailChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -14,7 +12,7 @@ class BackupFailed extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 5;
+    public $tries = 1;
     public string $name;
     public string $frequency;
 
