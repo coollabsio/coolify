@@ -7,7 +7,7 @@ use App\Models\StandaloneDocker;
 
 class InstallDocker
 {
-    public function __invoke(Server $server, bool $instant = false)
+    public function __invoke(Server $server)
     {
         $dockerVersion = '24.0';
         $config = base64_encode('{
@@ -54,9 +54,6 @@ class InstallDocker
                 "docker network create --attachable coolify >/dev/null 2>&1 || true",
                 "echo '####### Done!'"
             ];
-        }
-        if ($instant) {
-            return instant_remote_process($command, $server);
         }
         return remote_process($command, $server);
     }

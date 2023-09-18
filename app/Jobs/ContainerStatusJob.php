@@ -86,7 +86,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
                 }
             } else {
-                ray($foundProxyContainer);
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
             }
@@ -198,94 +197,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/database/" . $database->uuid;
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
-
-
-
-
-
-
-
-
-
-
-
-
-            return;
-            foreach ($applications as $application) {
-                $uuid = data_get($application, 'uuid');
-                $id = data_get($application, 'id');
-                $foundContainer = $containers->filter(function ($value, $key) use ($id, $uuid) {
-                    $labels = data_get($value, 'Config.Labels');
-                    $labels = Arr::undot(format_docker_labels_to_json($labels));
-                    $labelId = data_get($labels, 'coolify.applicationId');
-                    if ($labelId == $id) {
-                        return $value;
-                    }
-                    $isPR = Str::startsWith(data_get($value, 'Name'), "/$uuid");
-                    $isPR = Str::contains(data_get($value, 'Name'), "-pr-");
-                    if ($isPR) {
-                        return false;
-                    }
-                    return $value;
-                })->first();
-                if ($foundContainer) {
-                    $containerStatus = data_get($foundContainer, 'State.Status');
-                    $databaseStatus = data_get($application, 'status');
-                    if ($containerStatus !== $databaseStatus) {
-                        $application->update(['status' => $containerStatus]);
-                    }
-                } else {
-                    $databaseStatus = data_get($application, 'status');
-                    if ($databaseStatus !== 'exited') {
-                        $application->update(['status' => 'exited']);
-                        $name = data_get($application, 'name');
-                        $fqdn = data_get($application, 'fqdn');
-                        $containerName = $name ? "$name ($fqdn)" : $fqdn;
-                        $project = data_get($application, 'environment.project');
-                        $environment = data_get($application, 'environment');
-                        $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $application->uuid;
-                        $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
-                    }
-                }
-                $previews = $application->previews;
-                foreach ($previews as $preview) {
-                    $foundContainer = $containers->filter(function ($value, $key) use ($id, $uuid, $preview) {
-                        $labels = data_get($value, 'Config.Labels');
-                        $labels = Arr::undot(format_docker_labels_to_json($labels));
-                        $labelId = data_get($labels, 'coolify.applicationId');
-                        if ($labelId == "$id-pr-{$preview->id}") {
-                            return $value;
-                        }
-                        return Str::startsWith(data_get($value, 'Name'), "/$uuid-pr-{$preview->id}");
-                    })->first();
-                }
-            }
-            foreach ($databases as $database) {
-                $uuid = data_get($database, 'uuid');
-                $foundContainer = $containers->filter(function ($value, $key) use ($uuid) {
-                    return Str::startsWith(data_get($value, 'Name'), "/$uuid");
-                })->first();
-
-                if ($foundContainer) {
-                    $containerStatus = data_get($foundContainer, 'State.Status');
-                    $databaseStatus = data_get($database, 'status');
-                    if ($containerStatus !== $databaseStatus) {
-                        $database->update(['status' => $containerStatus]);
-                    }
-                } else {
-                    $databaseStatus = data_get($database, 'status');
-                    if ($databaseStatus !== 'exited') {
-                        $database->update(['status' => 'exited']);
-                        $name = data_get($database, 'name');
-                        $containerName = $name;
-                        $project = data_get($database, 'environment.project');
-                        $environment = data_get($database, 'environment');
-                        $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/database/" . $database->uuid;
-                        $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
-                    }
-                }
-            }
-            // TODO Monitor other containers not managed by Coolify
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());

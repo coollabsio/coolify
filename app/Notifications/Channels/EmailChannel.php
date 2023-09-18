@@ -6,27 +6,34 @@ use Exception;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Mail;
+use Log;
 
 class EmailChannel
 {
     public function send(SendsEmail $notifiable, Notification $notification): void
     {
-        $this->bootConfigs($notifiable);
-        $recepients = $notifiable->getRecepients($notification);
+        try {
+            $this->bootConfigs($notifiable);
+            $recepients = $notifiable->getRecepients($notification);
+            ray($recepients);
+            if (count($recepients) === 0) {
+                throw new Exception('No email recipients found');
+            }
 
-        if (count($recepients) === 0) {
-            throw new Exception('No email recipients found');
+            $mailMessage = $notification->toMail($notifiable);
+            Mail::send(
+                [],
+                [],
+                fn (Message $message) => $message
+                    ->to($recepients)
+                    ->subject($mailMessage->subject)
+                    ->html((string)$mailMessage->render())
+            );
+        } catch (Exception $e) {
+            ray($e->getMessage());
+            send_internal_notification("EmailChannel error: {$e->getMessage()}. Failed to send email to: " . implode(', ', $recepients) . " with subject: {$mailMessage->subject}");
+            throw $e;
         }
-
-        $mailMessage = $notification->toMail($notifiable);
-        Mail::send(
-            [],
-            [],
-            fn (Message $message) => $message
-                ->to($recepients)
-                ->subject($mailMessage->subject)
-                ->html((string)$mailMessage->render())
-        );
     }
 
     private function bootConfigs($notifiable): void

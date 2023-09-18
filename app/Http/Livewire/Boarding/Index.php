@@ -9,7 +9,6 @@ use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 
 class Index extends Component
 {
@@ -40,8 +39,8 @@ class Index extends Component
 
     public bool $dockerInstallationStarted = false;
 
-    public string $localhostPublicKey;
-    public bool $localhostReachable = true;
+    public string $serverPublicKey;
+    public bool $serverReachable = true;
 
     public function mount()
     {
@@ -70,14 +69,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function restartBoarding()
     {
-        // if ($this->selectedServerType !== 'localhost') {
-        //     if ($this->createdServer) {
-        //         $this->createdServer->delete();
-        //     }
-        //     if ($this->createdPrivateKey) {
-        //         $this->createdPrivateKey->delete();
-        //     }
-        // }
         return redirect()->route('boarding');
     }
     public function skipBoarding()
@@ -98,7 +89,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             if (!$this->createdServer) {
                 return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
-            $this->localhostPublicKey = $this->createdServer->privateKey->publicKey();
+            $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
@@ -123,6 +114,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
+        $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
         $this->validateServer();
     }
     public function getProxyType()
@@ -201,11 +193,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
             instant_remote_process(['uptime'], $this->createdServer, true);
 
-            $this->createdServer->settings->update([
+            $this->createdServer->settings()->update([
                 'is_reachable' => true,
             ]);
         } catch (\Throwable $e) {
-            $this->localhostReachable = false;
+            $this->serverReachable = false;
             return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
         }
 
@@ -216,8 +208,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
                 $this->currentState = 'install-docker';
                 throw new \Exception('Docker version is not supported or not installed.');
             }
-            $this->dockerInstalledOrSkipped();
+            $this->createdServer->settings()->update([
+                'is_usable' => true,
+            ]);
+            $this->getProxyType();
         } catch (\Throwable $e) {
+            $this->dockerInstallationStarted = false;
             return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
         }
     }
@@ -229,10 +225,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function dockerInstalledOrSkipped()
     {
-        $this->createdServer->settings->update([
-            'is_usable' => true,
-        ]);
-        $this->getProxyType();
+        $this->validateServer();
     }
     public function selectProxy(string|null $proxyType = null)
     {

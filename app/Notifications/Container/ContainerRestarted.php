@@ -12,7 +12,7 @@ class ContainerRestarted extends Notification implements ShouldQueue
 {
     use Queueable;
 
-    public $tries = 5;
+    public $tries = 1;
 
 
     public function __construct(public string $name, public Server $server, public ?string $url = null)

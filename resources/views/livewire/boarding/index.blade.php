@@ -50,13 +50,13 @@
                     <x-forms.button class="justify-center box" wire:target="setServerType('remote')"
                         wire:click="setServerType('remote')">Remote Server
                     </x-forms.button>
-                    @if (!$localhostReachable)
+                    @if (!$serverReachable)
                         Localhost is not reachable with the following public key.
                         <br /> <br />
                         Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
-                        <x-forms.input readonly id="localhostPublicKey"></x-forms.input>
+                        <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="box" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
                         </x-forms.button>
@@ -130,6 +130,17 @@
                             <x-forms.button type="submit">Use this Server</x-forms.button>
                         </form>
                     </div>
+                    @if (!$serverReachable)
+                    This server is not reachable with the following public key.
+                    <br /> <br />
+                    Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
+                    'root' or skip the boarding process and add a new private key manually to Coolify and to the
+                    server.
+                    <x-forms.input readonly id="serverPublicKey"></x-forms.input>
+                    <x-forms.button class="box" wire:target="validateServer"
+                        wire:click="validateServer">Check again
+                    </x-forms.button>
+                @endif
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>Private Keys are used to connect to a remote server through a secure shell, called SSH.</p>
@@ -214,10 +225,10 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
+                    @if ($dockerInstallationStarted)
                     <x-forms.button class="justify-center box" wire:click="installDocker"
                         onclick="installDocker.showModal()">
                         Let's do it!</x-forms.button>
-                    @if ($dockerInstallationStarted)
                         <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
                             Next</x-forms.button>
                     @endif

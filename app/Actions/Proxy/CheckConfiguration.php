@@ -16,8 +16,11 @@ class CheckConfiguration
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
 
-        if ($reset || is_null($proxy_configuration)) {
+        if ($reset || !$proxy_configuration || is_null($proxy_configuration)) {
             $proxy_configuration = Str::of(generate_default_proxy_configuration($server))->trim()->value;
+        }
+        if (!$proxy_configuration || is_null($proxy_configuration)) {
+            throw new \Exception("Could not generate proxy configuration");
         }
         return $proxy_configuration;
     }

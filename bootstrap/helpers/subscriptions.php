@@ -138,5 +138,6 @@ function allowedPathsForBoardingAccounts()
         ...allowedPathsForUnsubscribedAccounts(),
         'boarding',
         'livewire/message/boarding.index',
+        'livewire/message/activity-monitor'
     ];
 }
