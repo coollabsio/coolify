@@ -41,17 +41,15 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     }
 
     private function checkServerConnection() {
-        ray("Checking server connection to {$this->server->ip}");
         $uptime = instant_remote_process(['uptime'], $this->server, false);
         if (!is_null($uptime)) {
-            ray('Server is up');
             return true;
         }
     }
     public function handle(): void
     {
         try {
-            ray()->clearAll();
+            // ray()->clearAll();
             $serverUptimeCheckNumber = 0;
             $serverUptimeCheckNumberMax = 5;
             while (true) {
@@ -216,12 +214,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $isPR = Str::startsWith(data_get($value, 'Name'), "/$uuid");
                     $isPR = Str::contains(data_get($value, 'Name'), "-pr-");
                     if ($isPR) {
-                        ray('is pr');
                         return false;
                     }
                     return $value;
                 })->first();
-                ray($foundContainer);
                 if ($foundContainer) {
                     $containerStatus = data_get($foundContainer, 'State.Status');
                     $databaseStatus = data_get($application, 'status');

@@ -2,6 +2,8 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Spatie\Activitylog\Models\Activity;
@@ -10,6 +12,15 @@ class StartProxy
 {
     public function __invoke(Server $server, bool $async = true): Activity|string
     {
+        $proxyType = data_get($server,'proxy.type');
+        if ($proxyType === 'none') {
+            return 'OK';
+        }
+        if (is_null($proxyType)) {
+            $server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+            $server->proxy->status = ProxyStatus::EXITED->value;
+            $server->save();
+        }
         $proxy_path = get_proxy_path();
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
@@ -38,12 +49,12 @@ class StartProxy
             "echo '####### Pulling docker image...'",
             'docker compose pull',
             "echo '####### Stopping existing coolify-proxy...'",
-            'docker compose down -v --remove-orphans',
-            "command -v lsof >/dev/null && lsof -nt -i:80 | xargs -r kill -9",
-            "command -v lsof >/dev/null && lsof -nt -i:443 | xargs -r kill -9",
-            "command -v fuser >/dev/null && fuser -k 80/tcp",
-            "command -v fuser >/dev/null && fuser -k 443/tcp",
+            "docker compose down -v --remove-orphans > /dev/null 2>&1 || true",
             "command -v fuser >/dev/null || command -v lsof >/dev/null || echo '####### Could not kill existing processes listening on port 80 & 443. Please stop the process holding these ports...'",
+            "command -v lsof >/dev/null && lsof -nt -i:80 | xargs -r kill -9 || true",
+            "command -v lsof >/dev/null && lsof -nt -i:443 | xargs -r kill -9 || true",
+            "command -v fuser >/dev/null && fuser -k 80/tcp || true",
+            "command -v fuser >/dev/null && fuser -k 443/tcp || true",
             "systemctl disable nginx > /dev/null 2>&1 || true",
             "systemctl disable apache2 > /dev/null 2>&1 || true",
             "systemctl disable apache > /dev/null 2>&1 || true",
