@@ -6,11 +6,13 @@ use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
+use Lorisleiva\Actions\Concerns\AsAction;
 use Spatie\Activitylog\Models\Activity;
 
 class StartProxy
 {
-    public function __invoke(Server $server, bool $async = true): Activity|string
+    use AsAction;
+    public function handle(Server $server, bool $async = true): Activity|string
     {
         $proxyType = data_get($server,'proxy.type');
         if ($proxyType === 'none') {

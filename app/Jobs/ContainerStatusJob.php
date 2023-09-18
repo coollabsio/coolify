@@ -82,7 +82,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             })->first();
             if (!$foundProxyContainer) {
                 if ($this->server->isProxyShouldRun()) {
-                    resolve(StartProxy::class)($this->server, false);
+                    StartProxy::run($this->server, false);
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
                 }
             } else {
