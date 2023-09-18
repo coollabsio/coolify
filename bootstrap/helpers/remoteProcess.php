@@ -7,15 +7,13 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
-use App\Notifications\Server\NotReachable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Sleep;
-use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
     array   $command,
@@ -110,11 +108,28 @@ function instant_remote_process(array $command, Server $server, $throwError = tr
         if (!$throwError) {
             return null;
         }
-        throw new \RuntimeException($process->errorOutput(), $exitCode);
+        return excludeCertainErrors($process->errorOutput(), $exitCode);
     }
     return $output;
 }
-
+function excludeCertainErrors(string $errorOutput, ?int $exitCode = null) {
+    $ignoredErrors = collect([
+        'Permission denied (publickey',
+        'Could not resolve hostname',
+    ]);
+    $ignored = false;
+    foreach ($ignoredErrors as $ignoredError)  {
+        if (Str::contains($errorOutput, $ignoredError)) {
+            $ignored = true;
+            break;
+        }
+    }
+    if ($ignored) {
+        // TODO: Create new exception and disable in sentry
+        throw new \RuntimeException($errorOutput, $exitCode);
+    }
+    throw new \RuntimeException($errorOutput, $exitCode);
+}
 function decode_remote_command_output(?ApplicationDeploymentQueue $application_deployment_queue = null): Collection
 {
     $application = Application::find(data_get($application_deployment_queue, 'application_id'));

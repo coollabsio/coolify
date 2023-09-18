@@ -51,7 +51,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         try {
             // ray()->clearAll();
             $serverUptimeCheckNumber = 0;
-            $serverUptimeCheckNumberMax = 5;
+            $serverUptimeCheckNumberMax = 3;
             while (true) {
                 if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                     $this->server->settings()->update(['is_reachable' => false]);
@@ -64,6 +64,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $serverUptimeCheckNumber++;
                 sleep(5);
+            }
+            $containers = instant_remote_process(["docker container ls -q"], $this->server);
+            if (!$containers) {
+                return;
             }
             $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server);
             $containers = format_docker_command_output_to_json($containers);

@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
+use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -18,9 +19,7 @@ class Status extends Component
     {
         try {
             if ($this->server->isFunctional()) {
-                $container = getContainerStatus(server: $this->server, container_id: 'coolify-proxy');
-                $this->server->proxy->status = $container;
-                $this->server->save();
+                dispatch_sync(new ContainerStatusJob($this->server));
                 $this->emit('proxyStatusUpdated');
             }
         } catch (\Throwable $e) {

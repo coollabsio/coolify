@@ -48,10 +48,16 @@
             </x-forms.button>
         @endif
         @if ($server->settings->is_reachable && !$server->settings->is_usable && $server->id !== 0)
-            <x-forms.button class="mt-8 mb-4 box" onclick="installDocker.showModal()" wire:click.prevent='installDocker'
-                isHighlighted>
-                Install Docker Engine 24.0
-            </x-forms.button>
+            @if ($dockerInstallationStarted)
+                <x-forms.button class="mt-8 mb-4 box" wire:click.prevent='validateServer'>
+                    Validate Server
+                </x-forms.button>
+            @else
+                <x-forms.button class="mt-8 mb-4 box" onclick="installDocker.showModal()"
+                    wire:click.prevent='installDocker' isHighlighted>
+                    Install Docker Engine 24.0
+                </x-forms.button>
+            @endif
         @endif
         @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
