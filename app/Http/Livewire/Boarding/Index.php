@@ -38,6 +38,7 @@ class Index extends Component
     public ?int $selectedExistingProject = null;
     public ?Project $createdProject = null;
 
+    public bool $dockerInstallationStarted = false;
     public function mount()
     {
         $this->privateKeyName = generate_random_name();
@@ -65,14 +66,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function restartBoarding()
     {
-        if ($this->selectedServerType !== 'localhost') {
-            if ($this->createdServer) {
-                $this->createdServer->delete();
-            }
-            if ($this->createdPrivateKey) {
-                $this->createdPrivateKey->delete();
-            }
-        }
+        // if ($this->selectedServerType !== 'localhost') {
+        //     if ($this->createdServer) {
+        //         $this->createdServer->delete();
+        //     }
+        //     if ($this->createdPrivateKey) {
+        //         $this->createdPrivateKey->delete();
+        //     }
+        // }
         return redirect()->route('boarding');
     }
     public function skipBoarding()
@@ -118,8 +119,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->validateServer();
-        $this->getProxyType();
-        $this->getProjects();
     }
     public function getProxyType()
     {
@@ -132,6 +131,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function selectExistingPrivateKey()
     {
+        $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->currentState = 'create-server';
     }
     public function createNewServer()
@@ -154,6 +154,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'privateKeyName' => 'required',
             'privateKey' => 'required',
         ]);
+        $this->createdPrivateKey = PrivateKey::create([
+            'name' => $this->privateKeyName,
+            'description' => $this->privateKeyDescription,
+            'private_key' => $this->privateKey,
+            'team_id' => currentTeam()->id
+        ]);
+        $this->createdPrivateKey->save();
         $this->currentState = 'create-server';
     }
     public function saveServer()
@@ -165,28 +172,20 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'remoteServerUser' => 'required',
         ]);
         $this->privateKey = formatPrivateKey($this->privateKey);
-        $this->createdPrivateKey = new PrivateKey();
-        $this->createdPrivateKey->private_key = $this->privateKey;
-        $this->createdPrivateKey->name = $this->privateKeyName;
-        $this->createdPrivateKey->description = $this->privateKeyDescription;
-        $this->createdPrivateKey->team_id = currentTeam()->id;
         $foundServer = Server::whereIp($this->remoteServerHost)->first();
         if ($foundServer) {
             return $this->emit('error', 'IP address is already in use by another team.');
         }
-        $this->createdServer = new Server();
-        $this->createdServer->uuid = (string)new Cuid2(7);
-        $this->createdServer->name = $this->remoteServerName;
-        $this->createdServer->ip = $this->remoteServerHost;
-        $this->createdServer->port = $this->remoteServerPort;
-        $this->createdServer->user = $this->remoteServerUser;
-        $this->createdServer->description = $this->remoteServerDescription;
-        $this->createdServer->privateKey = $this->createdPrivateKey;
-        $this->createdServer->team_id = currentTeam()->id;
-
-        ray($this->createdServer);
-
-
+        $this->createdServer = Server::create([
+            'name' => $this->remoteServerName,
+            'ip' => $this->remoteServerHost,
+            'port' => $this->remoteServerPort,
+            'user' => $this->remoteServerUser,
+            'description' => $this->remoteServerDescription,
+            'private_key_id' => $this->createdPrivateKey->id,
+            'team_id' => currentTeam()->id,
+        ]);
+        $this->createdServer->save();
         $this->validateServer();
     }
     public function validateServer(?string $type = null)
@@ -194,47 +193,36 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         try {
             $customErrorMessage = "Server is not reachable:";
             config()->set('coolify.mux_enabled', false);
+
             instant_remote_process(['uptime'], $this->createdServer, true);
+
+            $this->createdServer->settings->update([
+                'is_reachable' => true,
+            ]);
+
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
-                throw new \Exception('No Docker Engine or older than 23 version installed.');
+                $this->currentState = 'install-docker';
+                throw new \Exception('Docker version is not supported or not installed.');
             }
-            $customErrorMessage = "Cannot create Server or Private Key. Please try again.";
-            if ($type !== 'localhost') {
-                $createdPrivateKey = PrivateKey::create([
-                    'name' => $this->privateKeyName,
-                    'description' => $this->privateKeyDescription,
-                    'private_key' => $this->privateKey,
-                    'team_id' => currentTeam()->id
-                ]);
-                $server = Server::create([
-                    'name' => $this->remoteServerName,
-                    'ip' => $this->remoteServerHost,
-                    'port' => $this->remoteServerPort,
-                    'user' => $this->remoteServerUser,
-                    'description' => $this->remoteServerDescription,
-                    'private_key_id' => $createdPrivateKey->id,
-                    'team_id' => currentTeam()->id,
-                ]);
-                $server->settings->is_reachable = true;
-                $server->settings->is_usable = true;
-                $server->settings->save();
-            } else {
-                $this->createdServer->settings->update([
-                    'is_reachable' => true,
-                ]);
-            }
-            $this->getProxyType();
+            $this->dockerInstalledOrSkipped();
         } catch (\Throwable $e) {
             return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
         }
     }
     public function installDocker()
     {
+        $this->dockerInstallationStarted = true;
         $activity = resolve(InstallDocker::class)($this->createdServer);
         $this->emit('newMonitorActivity', $activity->id);
-        $this->currentState = 'select-proxy';
+    }
+    public function dockerInstalledOrSkipped()
+    {
+        $this->createdServer->settings->update([
+            'is_usable' => true,
+        ]);
+        $this->getProxyType();
     }
     public function selectProxy(string|null $proxyType = null)
     {
