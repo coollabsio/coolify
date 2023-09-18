@@ -67,7 +67,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 sleep(5);
             }
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
-            ray($containers);
             if (!$containers) {
                 return;
             }
