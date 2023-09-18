@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
-use App\Actions\Proxy\SaveConfigurationSync;
+use App\Actions\Proxy\SaveConfiguration;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
@@ -13,20 +13,25 @@ class Deploy extends Component
     public $proxy_settings = null;
     protected $listeners = ['proxyStatusUpdated'];
 
-    public function proxyStatusUpdated() {
+    public function proxyStatusUpdated()
+    {
         $this->server->refresh();
     }
     public function startProxy()
     {
-        if (
-            $this->server->proxy->last_applied_settings &&
-            $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
-        ) {
-            resolve(SaveConfigurationSync::class)($this->server);
-        }
+        try {
+            if (
+                $this->server->proxy->last_applied_settings &&
+                $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
+            ) {
+                SaveConfiguration::run($this->server);
+            }
 
-        $activity = resolve(StartProxy::class)($this->server);
-        $this->emit('newMonitorActivity', $activity->id);
+            $activity = resolve(StartProxy::class)($this->server);
+            $this->emit('newMonitorActivity', $activity->id);
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
     }
 
     public function stop()

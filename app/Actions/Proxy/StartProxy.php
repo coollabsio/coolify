@@ -32,8 +32,10 @@ class StartProxy
             return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
         });
 
-        $configuration = resolve(CheckConfigurationSync::class)($server);
-
+        $configuration = CheckConfiguration::run($server);
+        if (!$configuration) {
+            throw new \Exception("Configuration is not synced");
+        }
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();

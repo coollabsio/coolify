@@ -23,9 +23,12 @@
                         <x-highlighted text="Self-hosting with superpowers!" /></span>
                 </x-slot:question>
                 <x-slot:explanation>
-                    <p><x-highlighted text="Task automation:" /> You do not to manage your servers too much. Coolify do it for you.</p>
-                    <p><x-highlighted text="No vendor lock-in:" /> All configurations are stored on your server, so everything works without Coolify (except integrations and automations).</p>
-                    <p><x-highlighted text="Monitoring:" />You will get notified on your favourite platform (Discord, Telegram, Email, etc.) when something goes wrong, or an action needed from your side.</p>
+                    <p><x-highlighted text="Task automation:" /> You do not to manage your servers too much. Coolify do
+                        it for you.</p>
+                    <p><x-highlighted text="No vendor lock-in:" /> All configurations are stored on your server, so
+                        everything works without Coolify (except integrations and automations).</p>
+                    <p><x-highlighted text="Monitoring:" />You will get notified on your favourite platform (Discord,
+                        Telegram, Email, etc.) when something goes wrong, or an action needed from your side.</p>
                 </x-slot:explanation>
                 <x-slot:actions>
                     <x-forms.button class="justify-center box" wire:click="explanation">Next
@@ -194,16 +197,6 @@
     </div>
     <div>
         @if ($currentState === 'install-docker')
-            <x-modal modalId="installDocker">
-                <x-slot:modalBody>
-                    <livewire:activity-monitor header="Docker Installation Logs" />
-                </x-slot:modalBody>
-                <x-slot:modalSubmit>
-                    <x-forms.button onclick="installDocker.close()" type="submit">
-                        Close
-                    </x-forms.button>
-                </x-slot:modalSubmit>
-            </x-modal>
             <x-boarding-step title="Install Docker">
                 <x-slot:question>
                     Could not find Docker Engine on your server. Do you want me to install it for you?
@@ -211,8 +204,11 @@
                 <x-slot:actions>
                     <x-forms.button class="justify-center box" wire:click="installDocker"
                         onclick="installDocker.showModal()">
-                        Let's do
-                        it!</x-forms.button>
+                        Let's do it!</x-forms.button>
+                    @if ($dockerInstallationStarted)
+                        <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
+                            Next</x-forms.button>
+                    @endif
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able

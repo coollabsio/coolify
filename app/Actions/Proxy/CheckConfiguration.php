@@ -2,12 +2,14 @@
 
 namespace App\Actions\Proxy;
 
+use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Server;
 use Illuminate\Support\Str;
 
-class CheckConfigurationSync
+class CheckConfiguration
 {
-    public function __invoke(Server $server, bool $reset = false)
+    use AsAction;
+    public function handle(Server $server, bool $reset = false)
     {
         $proxy_path = get_proxy_path();
         $proxy_configuration = instant_remote_process([

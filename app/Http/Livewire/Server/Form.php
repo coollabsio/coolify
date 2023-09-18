@@ -15,6 +15,7 @@ class Form extends Component
     public $dockerVersion;
     public string|null $wildcard_domain = null;
     public int $cleanup_after_percentage;
+    public bool $dockerInstallationStarted = false;
 
     protected $rules = [
         'server.name' => 'required|min:6',
@@ -44,7 +45,8 @@ class Form extends Component
 
     public function installDocker()
     {
-        $activity = resolve(InstallDocker::class)($this->server, currentTeam());
+        $this->dockerInstallationStarted = true;
+        $activity = resolve(InstallDocker::class)($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
 
@@ -56,7 +58,10 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable.');
             } else {
+                ray($this->uptime);
+
                 $this->emit('error', 'Server is not reachable.');
+
                 return;
             }
             if ($dockerVersion) {

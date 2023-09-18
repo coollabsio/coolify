@@ -4,11 +4,10 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use App\Models\StandaloneDocker;
-use App\Models\Team;
 
 class InstallDocker
 {
-    public function __invoke(Server $server, Team $team)
+    public function __invoke(Server $server, bool $instant = false)
     {
         $dockerVersion = '24.0';
         $config = base64_encode('{
@@ -19,15 +18,16 @@ class InstallDocker
             }
           }');
         $found = StandaloneDocker::where('server_id', $server->id);
-        if ($found->count() == 0) {
+        if ($found->count() == 0 && $server->id) {
             StandaloneDocker::create([
                 'name' => 'coolify',
                 'network' => 'coolify',
                 'server_id' => $server->id,
             ]);
         }
-        if (isDev()) {
-            return remote_process([
+
+        if (isDev() && $server->id === 0) {
+            $command = [
                 "echo '####### Installing Prerequisites...'",
                 "sleep 1",
                 "echo '####### Installing/updating Docker Engine...'",
@@ -35,9 +35,9 @@ class InstallDocker
                 "sleep 4",
                 "echo '####### Restarting Docker Engine...'",
                 "ls -l /tmp"
-            ], $server);
+            ];
         } else {
-            return remote_process([
+            $command = [
                 "echo '####### Installing Prerequisites...'",
                 "command -v jq >/dev/null || apt-get update",
                 "command -v jq >/dev/null || apt install -y jq",
@@ -53,7 +53,11 @@ class InstallDocker
                 "echo '####### Creating default Docker network (coolify)...'",
                 "docker network create --attachable coolify >/dev/null 2>&1 || true",
                 "echo '####### Done!'"
-            ], $server);
+            ];
         }
+        if ($instant) {
+            return instant_remote_process($command, $server);
+        }
+        return remote_process($command, $server);
     }
 }

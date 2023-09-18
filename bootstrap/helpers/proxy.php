@@ -96,7 +96,7 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
     $traefik_default_redirect_file = "$traefik_dynamic_conf_path/default_redirect_404.yaml";
     ray($redirect_url);
     if (empty($redirect_url)) {
-        remote_process([
+        instant_remote_process([
             "rm -f $traefik_default_redirect_file",
         ], $server);
     } else {
@@ -157,7 +157,7 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
 
         $base64 = base64_encode($yaml);
         ray("mkdir -p $traefik_dynamic_conf_path");
-        remote_process([
+        instant_remote_process([
             "mkdir -p $traefik_dynamic_conf_path",
             "echo '$base64' | base64 -d > $traefik_default_redirect_file",
         ], $server);
