@@ -15,6 +15,7 @@ class Index extends Component
 {
     public string $currentState = 'welcome';
 
+    public ?string $selectedServerType = null;
     public ?Collection $privateKeys = null;
     public ?int $selectedExistingPrivateKey = null;
     public ?string $privateKeyType = null;
@@ -64,11 +65,13 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function restartBoarding()
     {
-        if ($this->createdServer) {
-            $this->createdServer->delete();
-        }
-        if ($this->createdPrivateKey) {
-            $this->createdPrivateKey->delete();
+        if ($this->selectedServerType !== 'localhost') {
+            if ($this->createdServer) {
+                $this->createdServer->delete();
+            }
+            if ($this->createdPrivateKey) {
+                $this->createdPrivateKey->delete();
+            }
         }
         return redirect()->route('boarding');
     }
@@ -84,13 +87,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function setServerType(string $type)
     {
-        if ($type === 'localhost') {
+        $this->selectedServerType = $type;
+        if ($this->selectedServerType === 'localhost') {
             $this->createdServer = Server::find(0);
             if (!$this->createdServer) {
                 return $this->emit('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
             return $this->validateServer('localhost');
-        } elseif ($type === 'remote') {
+        } elseif ($this->selectedServerType === 'remote') {
             $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->privateKeys->count() > 0) {
                 $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
@@ -156,7 +160,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->validate([
             'remoteServerName' => 'required',
-            'remoteServerHost' => 'required|ip',
+            'remoteServerHost' => 'required',
             'remoteServerPort' => 'required|integer',
             'remoteServerUser' => 'required',
         ]);
