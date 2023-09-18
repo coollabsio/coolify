@@ -20,7 +20,7 @@ class EmailChannel
         }
 
         $mailMessage = $notification->toMail($notifiable);
-        Log::info("Sending email to: " . implode(', ', $recepients) . " with subject: {$mailMessage->subject}");
+        ray("Sending email to: " . implode(', ', $recepients) . " with subject: {$mailMessage->subject}");
         Mail::send(
             [],
             [],
