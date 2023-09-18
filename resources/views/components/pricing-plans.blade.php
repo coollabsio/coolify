@@ -243,7 +243,7 @@
                 </div>
             </div>
             <div class="p-4 mt-10 rounded">
-                <div class="flex items-start gap-4 text-xl tracking-tight">Need offical support for
+                <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>
                         <a class="font-bold text-white hover:no-underline"
