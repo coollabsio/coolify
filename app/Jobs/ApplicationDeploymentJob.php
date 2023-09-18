@@ -89,7 +89,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
-        addPrivateKeyToSshAgent($this->server);
+        savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
         // Set preview fqdn

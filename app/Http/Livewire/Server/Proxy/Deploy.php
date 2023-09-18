@@ -27,7 +27,7 @@ class Deploy extends Component
                 SaveConfiguration::run($this->server);
             }
 
-            $activity = resolve(StartProxy::class)($this->server);
+            $activity = StartProxy::run($this->server);
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e);

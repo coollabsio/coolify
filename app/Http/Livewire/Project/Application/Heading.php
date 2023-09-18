@@ -68,10 +68,11 @@ class Heading extends Component
                     ["docker rm -f {$containerName}"],
                     $this->application->destination->server
                 );
-                $this->application->status = 'stopped';
+                $this->application->status = 'exited';
                 $this->application->save();
                 // $this->application->environment->project->team->notify(new StatusChanged($this->application));
             }
         }
+        $this->application->refresh();
     }
 }

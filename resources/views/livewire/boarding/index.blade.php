@@ -46,9 +46,21 @@
                     <x-forms.button class="justify-center box" wire:target="setServerType('localhost')"
                         wire:click="setServerType('localhost')">Localhost
                     </x-forms.button>
+
                     <x-forms.button class="justify-center box" wire:target="setServerType('remote')"
                         wire:click="setServerType('remote')">Remote Server
                     </x-forms.button>
+                    @if (!$localhostReachable)
+                        Localhost is not reachable with the following public key.
+                        <br /> <br />
+                        Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
+                        'root' or skip the boarding process and add a new private key manually to Coolify and to the
+                        server.
+                        <x-forms.input readonly id="localhostPublicKey"></x-forms.input>
+                        <x-forms.button class="box" wire:target="setServerType('localhost')"
+                            wire:click="setServerType('localhost')">Check again
+                        </x-forms.button>
+                    @endif
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>Servers are the main building blocks, as they will host your applications, databases,

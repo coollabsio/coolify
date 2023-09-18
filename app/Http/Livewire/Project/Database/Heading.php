@@ -43,7 +43,7 @@ class Heading extends Component
             stopPostgresProxy($this->database);
             $this->database->is_public = false;
         }
-        $this->database->status = 'stopped';
+        $this->database->status = 'exited';
         $this->database->save();
         $this->check_status();
         // $this->database->environment->project->team->notify(new StatusChanged($this->database));

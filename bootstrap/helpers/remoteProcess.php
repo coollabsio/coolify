@@ -53,7 +53,7 @@ function remote_process(
 //     }
 //     // processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
 // }
-function addPrivateKeyToSshAgent(Server $server)
+function savePrivateKeyToFs(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
@@ -70,7 +70,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
 {
     $user = $server->user;
     $port = $server->port;
-    $privateKeyLocation = addPrivateKeyToSshAgent($server);
+    $privateKeyLocation = savePrivateKeyToFs($server);
     $timeout = config('constants.ssh.command_timeout');
     $connectionTimeout = config('constants.ssh.connection_timeout');
     $serverInterval = config('constants.ssh.server_interval');
