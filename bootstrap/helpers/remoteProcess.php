@@ -18,12 +18,14 @@ use Spatie\Activitylog\Contracts\Activity;
 function remote_process(
     array   $command,
     Server  $server,
-    string  $type = ActivityTypes::INLINE->value,
+    ?string  $type = null,
     ?string $type_uuid = null,
     ?Model  $model = null,
     bool    $ignore_errors = false,
 ): Activity {
-
+    if (is_null($type)) {
+        $type = ActivityTypes::INLINE->value;
+    }
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
