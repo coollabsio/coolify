@@ -5,7 +5,7 @@
             + Add New GitHub App
         </x-forms.button>
     </div>
-    <div class="pb-4 ">Deploy any public or private git repositories through a GitHub App.</div>
+    <div class="pb-4">Deploy any public or private git repositories through a GitHub App.</div>
     @if ($github_apps->count() !== 0)
         <div class="flex flex-col gap-2 pt-10">
             @if ($current_step === 'github_apps')
@@ -15,34 +15,21 @@
                 </ul>
                 <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
                     @foreach ($github_apps as $ghapp)
-                        @if ($selected_github_app_id == $ghapp->id)
-                            <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
-                                wire:key="{{ $ghapp->id }}">
-                                <div class="flex gap-4 mx-6">
-                                    <div class="group-hover:text-white">
-                                        {{ $ghapp->name }}
-                                    </div>
-                                    <div>{{ $ghapp->http_url }}</div>
-                                    <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                        class="loading loading-xs text-warning loading-spinner"></span>
-                                </div>
-                            </div>
-                        @else
-                            <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
-                                wire:click.prevent="loadRepositories({{ $ghapp->id }})"
-                                wire:key="{{ $ghapp->id }}">
+                        <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
+                            wire:click.prevent="loadRepositories({{ $ghapp->id }})" wire:key="{{ $ghapp->id }}">
+                            <div class="flex mr-4">
                                 <div class="flex flex-col mx-6">
                                     <div class="group-hover:text-white">
                                         {{ data_get($ghapp, 'name') }}
                                     </div>
                                     <div class="text-xs text-gray-400 group-hover:text-white">
                                         {{ data_get($ghapp, 'html_url') }}</div>
-                                    <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
-                                        class="">Loading...</span>
+
                                 </div>
+                                <span wire:target="loadRepositories({{ $ghapp->id }})" wire:loading.delay
+                                    class="loading loading-xs text-warning loading-spinner"></span>
                             </div>
-                        @endif
+                        </div>
                     @endforeach
                 </div>
             @endif
@@ -66,9 +53,14 @@
                                 @endif
                             @endforeach
                         </x-forms.select>
-                        <x-forms.button wire:click.prevent="loadBranches"> Check
-                            repository
-                        </x-forms.button>
+                        <x-forms.button wire:click.prevent="loadBranches"> Load Repository Details </x-forms.button>
+                        <a target="_blank" class="flex hover:no-underline"
+                            href="{{ get_installation_path($github_app) }}">
+                            <x-forms.button>
+                                Change Repositories on GitHub
+                                <x-external-link />
+                            </x-forms.button>
+                        </a>
                     </div>
                 @else
                     <div>No repositories found. Check your GitHub App configuration.</div>
