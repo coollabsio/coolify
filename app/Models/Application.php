@@ -20,6 +20,8 @@ class Application extends BaseModel
         static::deleting(function ($application) {
             $application->settings()->delete();
             $application->persistentStorages()->delete();
+            $application->environment_variables()->delete();
+            $application->environment_variables_preview()->delete();
         });
     }
 
