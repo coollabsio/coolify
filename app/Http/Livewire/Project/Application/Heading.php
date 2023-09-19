@@ -21,7 +21,7 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new ContainerStatusJob($this->application->destination->server));
+        dispatch(new ContainerStatusJob($this->application->destination->server));
         $this->application->refresh();
         $this->application->previews->each(function ($preview) {
             $preview->refresh();

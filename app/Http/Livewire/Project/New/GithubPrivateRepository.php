@@ -9,8 +9,8 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
-use Route;
 
 class GithubPrivateRepository extends Component
 {
@@ -40,21 +40,6 @@ class GithubPrivateRepository extends Component
     public string|null $publish_directory = null;
     protected int $page = 1;
 
-    // public function saveFromRedirect(string $route, ?Collection $parameters = null){
-    //     session()->forget('from');
-    //     if (!$parameters || $parameters->count() === 0) {
-    //         $parameters = $this->parameters;
-    //     }
-    //     $parameters = collect($parameters) ?? collect([]);
-    //     $queries = collect($this->query) ?? collect([]);
-    //     $parameters = $parameters->merge($queries);
-    //     session(['from'=> [
-    //         'back'=> $this->currentRoute,
-    //         'route' => $route,
-    //         'parameters' => $parameters
-    //     ]]);
-    //     return redirect()->route($route);
-    // }
 
     public function mount()
     {
@@ -158,6 +143,13 @@ class GithubPrivateRepository extends Component
             ]);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
+
+            $application->fqdn = "http://{$application->uuid}.{$destination->server->ip}.sslip.io";
+            if (isDev()) {
+                $application->fqdn = "http://{$application->uuid}.127.0.0.1.sslip.io";
+            }
+            $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
+            $application->save();
 
             redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,

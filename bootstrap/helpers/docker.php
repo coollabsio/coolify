@@ -1,11 +1,15 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 
-function getCurrentApplicationContainerStatus(Server $server, int $id): Collection {
+function getCurrentApplicationContainerStatus(Server $server, int $id): Collection
+{
     $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
     if (!$containers) {
         return collect([]);
@@ -26,7 +30,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
 }
 
-function format_docker_labels_to_json(string|Array $rawOutput): Collection
+function format_docker_labels_to_json(string|array $rawOutput): Collection
 {
     if (is_array($rawOutput)) {
         return collect($rawOutput);
@@ -59,7 +63,8 @@ function format_docker_envs_to_json($rawOutput)
         return collect([]);
     }
 }
-function checkMinimumDockerEngineVersion($dockerVersion) {
+function checkMinimumDockerEngineVersion($dockerVersion)
+{
     $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
     if ($majorDockerVersion <= 22) {
         $dockerVersion = null;
@@ -72,8 +77,9 @@ function executeInDocker(string $containerId, string $command)
     // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
 }
 
-function getApplicationContainerStatus(Application $application) {
-    $server = data_get($application,'destination.server');
+function getApplicationContainerStatus(Application $application)
+{
+    $server = data_get($application, 'destination.server');
     $id = $application->id;
     if (!$server) {
         return 'exited';
@@ -98,13 +104,13 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
     return data_get($container[0], 'State.Status', 'exited');
 }
 
-function generateApplicationContainerName(string $uuid, int $pull_request_id = 0)
+function generateApplicationContainerName(Application $application)
 {
     $now = now()->format('Hisu');
-    if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        return $uuid . '-pr-' . $pull_request_id;
+    if ($application->pull_request_id !== 0 && $application->pull_request_id !== null) {
+        return $application->uuid . '-pr-' . $application->pull_request_id;
     } else {
-        return $uuid . '-' . $now;
+        return $application->uuid . '-' . $now;
     }
 }
 function get_port_from_dockerfile($dockerfile): int
@@ -122,4 +128,75 @@ function get_port_from_dockerfile($dockerfile): int
         return (int)$found_exposed_port->value();
     }
     return 80;
+}
+
+function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null)
+{
+
+    $pull_request_id = data_get($preview, 'pull_request_id', 0);
+    $container_name = generateApplicationContainerName($application);
+    $appId = $application->id;
+    if ($pull_request_id !== 0) {
+        $appId = $appId . '-pr-' . $application->pull_request_id;
+    }
+    $labels = [];
+    $labels[] = 'coolify.managed=true';
+    $labels[] = 'coolify.version=' . config('version');
+    $labels[] = 'coolify.applicationId=' . $appId;
+    $labels[] = 'coolify.type=application';
+    $labels[] = 'coolify.name=' . $application->name;
+    if ($pull_request_id !== 0) {
+        $labels[] = 'coolify.pullRequestId=' . $pull_request_id;
+    }
+    if ($application->fqdn) {
+        if ($pull_request_id !== 0) {
+            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+        } else {
+            $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
+        }
+        if ($application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
+            $labels[] = 'traefik.enable=true';
+            foreach ($domains as $domain) {
+                $url = Url::fromString($domain);
+                $host = $url->getHost();
+                $path = $url->getPath();
+                $schema = $url->getScheme();
+                $slug = Str::slug($host . $path);
+
+                $http_label = "{$container_name}-{$slug}-http";
+                $https_label = "{$container_name}-{$slug}-https";
+
+                if ($schema === 'https') {
+                    // Set labels for https
+                    $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                    $labels[] = "traefik.http.routers.{$https_label}.entryPoints=https";
+                    $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
+                    if ($path !== '/') {
+                        $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
+                        $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
+                    }
+
+                    $labels[] = "traefik.http.routers.{$https_label}.tls=true";
+                    $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
+
+                    // Set labels for http (redirect to https)
+                    $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                    $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
+                    if ($application->settings->is_force_https_enabled) {
+                        $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
+                    }
+                } else {
+                    // Set labels for http
+                    $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                    $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
+                    $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
+                    if ($path !== '/') {
+                        $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
+                        $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
+                    }
+                }
+            }
+        }
+    }
+    return $labels;
 }

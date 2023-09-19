@@ -226,7 +226,7 @@ class Application extends BaseModel
     }
     public function git_based(): bool
     {
-        if ($this->dockerfile || $this->build_pack === 'dockerfile') {
+        if ($this->dockerfile || $this->build_pack === 'dockerfile' || $this->dockercompose || $this->build_pack === 'dockercompose') {
             return false;
         }
         return true;

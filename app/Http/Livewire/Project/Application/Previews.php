@@ -72,7 +72,7 @@ class Previews extends Component
     public function stop(int $pull_request_id)
     {
         try {
-            $container_name = generateApplicationContainerName($this->application->uuid, $pull_request_id);
+            $container_name = generateApplicationContainerName($this->application);
             ray('Stopping container: ' . $container_name);
 
             instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);

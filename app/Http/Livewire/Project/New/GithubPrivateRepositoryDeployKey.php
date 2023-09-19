@@ -112,6 +112,13 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
+            $application->fqdn = "http://{$application->uuid}.{$destination->server->ip}.sslip.io";
+            if (isDev()) {
+                $application->fqdn = "http://{$application->uuid}.127.0.0.1.sslip.io";
+            }
+            $application->name = generate_random_name($application->uuid);
+            $application->save();
+
             return redirect()->route('project.application.configuration', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,

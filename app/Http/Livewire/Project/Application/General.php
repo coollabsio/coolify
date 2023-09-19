@@ -7,12 +7,14 @@ use App\Models\InstanceSettings;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
 class General extends Component
 {
     public string $applicationId;
 
     public Application $application;
+    public ?array $services = null;
     public string $name;
     public string|null $fqdn;
     public string $git_repository;
@@ -31,6 +33,7 @@ class General extends Component
     public bool $is_auto_deploy_enabled;
     public bool $is_force_https_enabled;
 
+
     protected $rules = [
         'application.name' => 'required',
         'application.description' => 'nullable',
@@ -48,6 +51,9 @@ class General extends Component
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
         'application.dockerfile' => 'nullable',
+        'application.dockercompose_raw' => 'nullable',
+        'application.dockercompose' => 'nullable',
+        'application.service_configurations.*' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -66,6 +72,9 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
         'application.dockerfile' => 'Dockerfile',
+        'application.dockercompose_raw' => 'Docker Compose (raw)',
+        'application.dockercompose' => 'Docker Compose',
+
     ];
 
     public function instantSave()
@@ -108,6 +117,9 @@ class General extends Component
         $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
+        if (data_get($this->application, 'dockercompose_raw')) {
+            $this->services = data_get(Yaml::parse($this->application->dockercompose_raw), 'services');
+        }
     }
 
     public function generateGlobalRandomDomain()
@@ -136,16 +148,16 @@ class General extends Component
 
     public function submit()
     {
-        ray($this->application);
         try {
-            $this->validate();
-            if (data_get($this->application,'fqdn')) {
+            ray($this->application->service_configurations);
+            // $this->validate();
+            if (data_get($this->application, 'fqdn')) {
                 $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                     return Str::of($domain)->trim()->lower();
                 });
                 $this->application->fqdn = $domains->implode(',');
             }
-            if ($this->application->dockerfile) {
+            if (data_get($this->application, 'dockerfile')) {
                 $port = get_port_from_dockerfile($this->application->dockerfile);
                 if ($port) {
                     $this->application->ports_exposes = $port;
@@ -156,6 +168,10 @@ class General extends Component
             }
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
+            }
+            if (data_get($this->application, 'dockercompose_raw')) {
+                $details = generateServiceFromTemplate($this->application->dockercompose_raw, $this->application);
+                $this->application->dockercompose = data_get($details, 'dockercompose');
             }
             $this->application->save();
             $this->emit('success', 'Application settings updated!');

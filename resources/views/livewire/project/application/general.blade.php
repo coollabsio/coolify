@@ -27,11 +27,22 @@
                 @endif
             </div>
             <div class="flex items-end gap-2">
-                <x-forms.select id="application.build_pack" label="Build Pack" required>
-                    <option value="nixpacks">Nixpacks</option>
-                    <option value="dockerfile">Dockerfile</option>
-                    <option disabled value="compose">Compose</option>
-                </x-forms.select>
+                @if ($application->build_pack === 'dockerfile')
+                    <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
+                        <option value="dockerfile">Dockerfile</option>
+                    </x-forms.select>
+                @elseif ($application->build_pack === 'dockercompose')
+                    <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
+                        <option selected value="dockercompose">Docker Compose</option>
+                    </x-forms.select>
+                @else
+                    <x-forms.select id="application.build_pack" label="Build Pack" required>
+                        <option value="nixpacks">Nixpacks</option>
+                        <option value="dockerfile">Dockerfile</option>
+                        <option disabled value="dockercompose">Docker Compose</option>
+                    </x-forms.select>
+                @endif
+
             </div>
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
@@ -47,7 +58,6 @@
                     <x-forms.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
                     <x-forms.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
                 </div>
-
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
                         helper="Directory to use as root. Useful for monorepos. WIP" disabled />
@@ -61,6 +71,19 @@
             @endif
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
+            @endif
+            @if ($application->dockercompose_raw)
+                <h3>Services </h3>
+                @foreach ($services as $serviceName => $service)
+                    <x-forms.input id="application.service_configurations.{{$serviceName}}.fqdn" label="{{ $serviceName }} FQDN">
+                    </x-forms.input>
+                @endforeach
+                {{-- <x-forms.textarea label="Docker Compose (Raw)" id="application.dockercompose_raw" rows="16">
+                </x-forms.textarea> --}}
+                {{-- <x-forms.textarea readonly helper="Added all required fields" label="Docker Compose (Coolified)"
+                    id="application.dockercompose" rows="6">
+                </x-forms.textarea> --}}
+
             @endif
 
             <h3>Network</h3>

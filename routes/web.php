@@ -7,12 +7,11 @@ use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index;
-use App\Http\Livewire\Boarding\Server as BoardingServer;
 use App\Http\Livewire\Dashboard;
-use App\Http\Livewire\Help;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
+use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -23,11 +22,16 @@ use App\Models\SwarmDocker;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
+Route::get('/test', function () {
+    $template = Storage::get('templates/docker-compose.yaml');
+    return generateServiceFromTemplate($template, Application::find(1));
+});
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         $arrayOfRequest = $request->only(Fortify::email());

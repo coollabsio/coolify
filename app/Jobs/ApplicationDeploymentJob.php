@@ -88,7 +88,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
+        $this->container_name = generateApplicationContainerName($this->application);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
@@ -128,6 +128,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
+            } else if($this->application->dockercompose) {
+                $this->deploy_docker_compose();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();
@@ -165,6 +167,37 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             );
         }
+    }
+    private function deploy_docker_compose() {
+        $dockercompose_base64 = base64_encode($this->application->dockercompose);
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->name}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$dockercompose_base64' | base64 -d > $this->workdir/docker-compose.yaml")
+            ],
+        );
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+        $this->save_environment_variables();
+        $this->start_by_compose_file();
+    }
+    private function save_environment_variables() {
+        $envs = collect([]);
+        foreach ($this->application->environment_variables as $env) {
+            $envs->push($env->key . '=' . $env->value);
+        }
+        $envs_base64 = base64_encode($envs->implode("\n"));
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
+            ],
+        );
+
     }
     private function deploy_simple_dockerfile()
     {
@@ -475,7 +508,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
-                    'labels' => $this->set_labels_for_applications(),
+                    'labels' => generateLabelsApplication($this->application, $this->preview),
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,

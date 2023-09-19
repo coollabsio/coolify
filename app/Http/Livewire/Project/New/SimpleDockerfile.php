@@ -59,8 +59,14 @@ CMD ["nginx", "-g", "daemon off;"]
             'source_id' => 0,
             'source_type' => GithubApp::class
         ]);
+
+        $fqdn  = "http://{$application->uuid}.{$destination->server->ip}.sslip.io";
+        if (isDev()) {
+            $fqdn = "http://{$application->uuid}.127.0.0.1.sslip.io";
+        }
         $application->update([
-            'name' => 'dockerfile-' . $application->id
+            'name' => 'dockerfile-' . $application->uuid,
+            'fqdn' => $fqdn
         ]);
 
         redirect()->route('project.application.configuration', [

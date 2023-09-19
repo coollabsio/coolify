@@ -151,10 +151,12 @@ function get_latest_version_of_coolify(): string
     }
 }
 
-function generate_random_name(): string
+function generate_random_name(?string $cuid = null): string
 {
     $generator = All::create();
-    $cuid = new Cuid2(7);
+    if (is_null($cuid)) {
+        $cuid = new Cuid2(7);
+    }
     return Str::kebab("{$generator->getName()}-$cuid");
 }
 function generateSSHKey()
@@ -173,9 +175,11 @@ function formatPrivateKey(string $privateKey)
     }
     return $privateKey;
 }
-function generate_application_name(string $git_repository, string $git_branch): string
+function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
-    $cuid = new Cuid2(7);
+    if (is_null($cuid)) {
+        $cuid = new Cuid2(7);
+    }
     return Str::kebab("$git_repository:$git_branch-$cuid");
 }
 
