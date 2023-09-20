@@ -14,6 +14,10 @@ class LocalPersistentVolume extends Model
     {
         return $this->morphTo();
     }
+    public function service()
+    {
+        return $this->morphTo();
+    }
 
     public function standalone_postgresql()
     {

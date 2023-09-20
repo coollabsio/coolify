@@ -130,7 +130,64 @@ function get_port_from_dockerfile($dockerfile): int
     return 80;
 }
 
-function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null)
+function defaultLabels($id, $name, $pull_request_id = 0)
+{
+    $labels = collect([]);
+    $labels->push('coolify.managed=true');
+    $labels->push('coolify.version=' . config('version'));
+    $labels->push('coolify.applicationId=' . $id);
+    $labels->push('coolify.type=application');
+    $labels->push('coolify.name=' . $name);
+    if ($pull_request_id !== 0) {
+        $labels->push('coolify.pullRequestId=' . $pull_request_id);
+    }
+    return $labels;
+}
+function fqdnLabelsForTraefik($domain, $container_name, $is_force_https_enabled)
+{
+    $labels = collect([]);
+    $labels->push('traefik.enable=true');
+    $url = Url::fromString($domain);
+    $host = $url->getHost();
+    $path = $url->getPath();
+    $schema = $url->getScheme();
+    $slug = Str::slug($host . $path);
+
+    $http_label = "{$container_name}-{$slug}-http";
+    $https_label = "{$container_name}-{$slug}-https";
+
+    if ($schema === 'https') {
+        // Set labels for https
+        $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+        $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
+        $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
+        if ($path !== '/') {
+            $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix");
+            $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+        }
+
+        $labels->push("traefik.http.routers.{$https_label}.tls=true");
+        $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+
+        // Set labels for http (redirect to https)
+        $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+        $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+        if ($is_force_https_enabled) {
+            $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+        }
+    } else {
+        // Set labels for http
+        $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+        $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+        $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
+        if ($path !== '/') {
+            $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
+            $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+        }
+    }
+    return $labels;
+}
+function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
 {
 
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
@@ -139,15 +196,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     if ($pull_request_id !== 0) {
         $appId = $appId . '-pr-' . $application->pull_request_id;
     }
-    $labels = [];
-    $labels[] = 'coolify.managed=true';
-    $labels[] = 'coolify.version=' . config('version');
-    $labels[] = 'coolify.applicationId=' . $appId;
-    $labels[] = 'coolify.type=application';
-    $labels[] = 'coolify.name=' . $application->name;
-    if ($pull_request_id !== 0) {
-        $labels[] = 'coolify.pullRequestId=' . $pull_request_id;
-    }
+    $labels = collect([]);
+    $labels = $labels->merge(defaultLabels($appId, $container_name, $pull_request_id));
     if ($application->fqdn) {
         if ($pull_request_id !== 0) {
             $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
@@ -155,48 +205,48 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         if ($application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
-            $labels[] = 'traefik.enable=true';
             foreach ($domains as $domain) {
-                $url = Url::fromString($domain);
-                $host = $url->getHost();
-                $path = $url->getPath();
-                $schema = $url->getScheme();
-                $slug = Str::slug($host . $path);
+                $labels = $labels->merge(fqdnLabelsForTraefik($domain, $container_name, $application->settings->is_force_https_enabled));
+                // $url = Url::fromString($domain);
+                // $host = $url->getHost();
+                // $path = $url->getPath();
+                // $schema = $url->getScheme();
+                // $slug = Str::slug($host . $path);
 
-                $http_label = "{$container_name}-{$slug}-http";
-                $https_label = "{$container_name}-{$slug}-https";
+                // $http_label = "{$container_name}-{$slug}-http";
+                // $https_label = "{$container_name}-{$slug}-https";
 
-                if ($schema === 'https') {
-                    // Set labels for https
-                    $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                    $labels[] = "traefik.http.routers.{$https_label}.entryPoints=https";
-                    $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
-                    if ($path !== '/') {
-                        $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
-                        $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
-                    }
+                // if ($schema === 'https') {
+                //     // Set labels for https
+                //     $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                //     $labels[] = "traefik.http.routers.{$https_label}.entryPoints=https";
+                //     $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
+                //     if ($path !== '/') {
+                //         $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
+                //         $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
+                //     }
 
-                    $labels[] = "traefik.http.routers.{$https_label}.tls=true";
-                    $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
+                //     $labels[] = "traefik.http.routers.{$https_label}.tls=true";
+                //     $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
 
-                    // Set labels for http (redirect to https)
-                    $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                    $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                    if ($application->settings->is_force_https_enabled) {
-                        $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
-                    }
-                } else {
-                    // Set labels for http
-                    $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                    $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                    $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
-                    if ($path !== '/') {
-                        $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
-                        $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
-                    }
-                }
+                //     // Set labels for http (redirect to https)
+                //     $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                //     $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
+                //     if ($application->settings->is_force_https_enabled) {
+                //         $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
+                //     }
+                // } else {
+                //     // Set labels for http
+                //     $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
+                //     $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
+                //     $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
+                //     if ($path !== '/') {
+                //         $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
+                //         $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
+                //     }
+                // }
             }
         }
     }
-    return $labels;
+    return $labels->all();
 }

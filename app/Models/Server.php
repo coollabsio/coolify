@@ -76,6 +76,9 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function proxyType() {
+        return $this->proxy->get('type');
+    }
     public function scopeWithProxy(): Builder
     {
         return $this->proxy->modelScope();

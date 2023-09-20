@@ -10,3 +10,16 @@ const VALID_CRON_STRINGS = [
     'yearly' => '0 0 1 1 *',
 ];
 const RESTART_MODE = 'unless-stopped';
+
+const DATABASE_DOCKER_IMAGES = [
+    'mysql',
+    'mariadb',
+    'postgres',
+    'mongo',
+    'redis',
+    'memcached',
+    'couchdb',
+    'neo4j',
+    'influxdb',
+    'clickhouse'
+];

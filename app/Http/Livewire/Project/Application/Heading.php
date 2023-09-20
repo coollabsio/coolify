@@ -64,7 +64,7 @@ class Heading extends Component
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containerName) {
-                remote_process(
+                instant_remote_process(
                     ["docker rm -f {$containerName}"],
                     $this->application->destination->server
                 );

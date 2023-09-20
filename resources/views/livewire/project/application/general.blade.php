@@ -12,38 +12,40 @@
                 <x-forms.input id="application.name" label="Name" required />
                 <x-forms.input id="application.description" label="Description" />
             </div>
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
-                    helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
-                @if ($wildcard_domain)
-                    @if ($global_wildcard_domain)
-                        <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
-                        </x-forms.button>
+            @if ($services->count() === 0)
+                <div class="flex items-end gap-2">
+                    <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                        helper="You can specify one domain with path or more with comma.<br><span class='text-helper'>Example</span>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3" />
+                    @if ($wildcard_domain)
+                        @if ($global_wildcard_domain)
+                            <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
+                            </x-forms.button>
+                        @endif
+                        @if ($server_wildcard_domain)
+                            <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
+                            </x-forms.button>
+                        @endif
                     @endif
-                    @if ($server_wildcard_domain)
-                        <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
-                        </x-forms.button>
+                </div>
+                <div class="flex items-end gap-2">
+                    @if ($application->build_pack === 'dockerfile')
+                        <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
+                            <option value="dockerfile">Dockerfile</option>
+                        </x-forms.select>
+                    @elseif ($application->build_pack === 'dockercompose')
+                        <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
+                            <option selected value="dockercompose">Docker Compose</option>
+                        </x-forms.select>
+                    @else
+                        <x-forms.select id="application.build_pack" label="Build Pack" required>
+                            <option value="nixpacks">Nixpacks</option>
+                            <option value="dockerfile">Dockerfile</option>
+                            <option disabled value="dockercompose">Docker Compose</option>
+                        </x-forms.select>
                     @endif
-                @endif
-            </div>
-            <div class="flex items-end gap-2">
-                @if ($application->build_pack === 'dockerfile')
-                    <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
-                        <option value="dockerfile">Dockerfile</option>
-                    </x-forms.select>
-                @elseif ($application->build_pack === 'dockercompose')
-                    <x-forms.select disabled id="application.build_pack" label="Build Pack" required>
-                        <option selected value="dockercompose">Docker Compose</option>
-                    </x-forms.select>
-                @else
-                    <x-forms.select id="application.build_pack" label="Build Pack" required>
-                        <option value="nixpacks">Nixpacks</option>
-                        <option value="dockerfile">Dockerfile</option>
-                        <option disabled value="dockercompose">Docker Compose</option>
-                    </x-forms.select>
-                @endif
 
-            </div>
+                </div>
+            @endif
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>
@@ -72,31 +74,38 @@
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
-            @if ($application->dockercompose_raw)
-                <h3>Services </h3>
+            @if ($services->count() > 0)
+                <h3>Services</h3>
                 @foreach ($services as $serviceName => $service)
-                    <x-forms.input id="application.service_configurations.{{$serviceName}}.fqdn" label="{{ $serviceName }} FQDN">
-                    </x-forms.input>
+                    @if (!data_get($service, 'is_database'))
+                        <h4>{{ Str::headline($serviceName) }}</h4>
+                        <div class="flex gap-2">
+                            <x-forms.input id="service_configurations.{{ $serviceName }}.fqdn" label="FQDN">
+                            </x-forms.input>
+                            {{-- <x-forms.input id="service_configurations.{{ $serviceName }}.port"
+                            label="{{ Str::headline($serviceName) }} Port">
+                        </x-forms.input> --}}
+                        </div>
+                    @endif
                 @endforeach
-                {{-- <x-forms.textarea label="Docker Compose (Raw)" id="application.dockercompose_raw" rows="16">
-                </x-forms.textarea> --}}
-                {{-- <x-forms.textarea readonly helper="Added all required fields" label="Docker Compose (Coolified)"
+                <x-forms.textarea label="Docker Compose (Raw)" id="application.dockercompose_raw" rows="16">
+                </x-forms.textarea>
+                <x-forms.textarea readonly helper="Added all required fields" label="Docker Compose (Coolified)"
                     id="application.dockercompose" rows="6">
-                </x-forms.textarea> --}}
-
+                </x-forms.textarea>
+            @else
+                <h3>Network</h3>
+                <div class="flex flex-col gap-2 xl:flex-row">
+                    @if ($application->settings->is_static)
+                        <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
+                    @else
+                        <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes"
+                            required helper="A comma separated list of ports you would like to expose for the proxy." />
+                    @endif
+                    <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
+                        helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
+                </div>
             @endif
-
-            <h3>Network</h3>
-            <div class="flex flex-col gap-2 xl:flex-row">
-                @if ($application->settings->is_static)
-                    <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
-                @else
-                    <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes" required
-                        helper="A comma separated list of ports you would like to expose for the proxy." />
-                @endif
-                <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
-            </div>
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">

@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
@@ -14,7 +15,7 @@ class General extends Component
     public string $applicationId;
 
     public Application $application;
-    public ?array $services = null;
+    public Collection $services;
     public string $name;
     public string|null $fqdn;
     public string $git_repository;
@@ -33,6 +34,7 @@ class General extends Component
     public bool $is_auto_deploy_enabled;
     public bool $is_force_https_enabled;
 
+    public array $service_configurations = [];
 
     protected $rules = [
         'application.name' => 'required',
@@ -54,6 +56,8 @@ class General extends Component
         'application.dockercompose_raw' => 'nullable',
         'application.dockercompose' => 'nullable',
         'application.service_configurations.*' => 'nullable',
+        'service_configurations.*.fqdn' => 'nullable|url',
+        'service_configurations.*.port' => 'integer',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -74,6 +78,8 @@ class General extends Component
         'application.dockerfile' => 'Dockerfile',
         'application.dockercompose_raw' => 'Docker Compose (raw)',
         'application.dockercompose' => 'Docker Compose',
+        'service_configurations.*.fqdn' => 'FQDN',
+        'service_configurations.*.port' => 'Port',
 
     ];
 
@@ -95,8 +101,8 @@ class General extends Component
         $this->application->settings->save();
         $this->application->save();
         $this->application->refresh();
-        $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
+        $this->emit('success', 'Application settings updated!');
     }
 
     protected function checkWildCardDomain()
@@ -109,6 +115,7 @@ class General extends Component
 
     public function mount()
     {
+        $this->services = $this->application->services();
         $this->is_static = $this->application->settings->is_static;
         $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
         $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
@@ -117,8 +124,8 @@ class General extends Component
         $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
-        if (data_get($this->application, 'dockercompose_raw')) {
-            $this->services = data_get(Yaml::parse($this->application->dockercompose_raw), 'services');
+        if (data_get($this->application, 'service_configurations')) {
+            $this->service_configurations = $this->application->service_configurations;
         }
     }
 
@@ -149,8 +156,8 @@ class General extends Component
     public function submit()
     {
         try {
-            ray($this->application->service_configurations);
-            // $this->validate();
+            $this->application->service_configurations = $this->service_configurations;
+            $this->validate();
             if (data_get($this->application, 'fqdn')) {
                 $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                     return Str::of($domain)->trim()->lower();
@@ -170,7 +177,7 @@ class General extends Component
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
             if (data_get($this->application, 'dockercompose_raw')) {
-                $details = generateServiceFromTemplate($this->application->dockercompose_raw, $this->application);
+                $details = generateServiceFromTemplate( $this->application);
                 $this->application->dockercompose = data_get($details, 'dockercompose');
             }
             $this->application->save();

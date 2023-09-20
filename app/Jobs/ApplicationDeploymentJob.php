@@ -73,6 +73,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
 
+        $isService = $this->application->services()->count() > 0;
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
@@ -128,7 +129,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
-            } else if($this->application->dockercompose) {
+            } else if ($this->application->services()->count() > 0) {
                 $this->deploy_docker_compose();
             } else {
                 if ($this->pull_request_id !== 0) {
@@ -168,7 +169,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         }
     }
-    private function deploy_docker_compose() {
+    private function deploy_docker_compose()
+    {
         $dockercompose_base64 = base64_encode($this->application->dockercompose);
         $this->execute_remote_command(
             [
@@ -184,9 +186,26 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
         $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
         $this->save_environment_variables();
-        $this->start_by_compose_file();
+        $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id);
+        if ($containers->count() > 0) {
+            foreach ($containers as $container) {
+                $containerName = data_get($container, 'Names');
+                if ($containerName) {
+                    instant_remote_process(
+                        ["docker rm -f {$containerName}"],
+                        $this->application->destination->server
+                    );
+                }
+            }
+        }
+
+        $this->execute_remote_command(
+            ["echo -n 'Starting services (could take a while)...'"],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
+        );
     }
-    private function save_environment_variables() {
+    private function save_environment_variables()
+    {
         $envs = collect([]);
         foreach ($this->application->environment_variables as $env) {
             $envs->push($env->key . '=' . $env->value);
@@ -197,7 +216,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
             ],
         );
-
     }
     private function deploy_simple_dockerfile()
     {

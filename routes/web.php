@@ -6,12 +6,12 @@ use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
-use App\Http\Livewire\Boarding\Index;
+use App\Http\Livewire\Boarding\Index as BoardingIndex;
+use App\Http\Livewire\Service\Index as ServiceIndex;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
-use App\Models\Application;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
 use App\Models\InstanceSettings;
@@ -28,10 +28,6 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
-Route::get('/test', function () {
-    $template = Storage::get('templates/docker-compose.yaml');
-    return generateServiceFromTemplate($template, Application::find(1));
-});
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         $arrayOfRequest = $request->only(Fortify::email());
@@ -88,6 +84,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups.all');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups/{backup_uuid}', [DatabaseController::class, 'executions'])->name('project.database.backups.executions');
+
+    // Services
+    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -109,7 +108,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/boarding', Index::class)->name('boarding');
+    Route::get('/boarding', BoardingIndex::class)->name('boarding');
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });

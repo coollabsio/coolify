@@ -53,5 +53,14 @@
                 </div>
             </a>
         @endforeach
+        @foreach ($environment->services->sortBy('name') as $service)
+        <a class="box group"
+            href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
+            <div class="flex flex-col mx-6">
+                <div class=" group-hover:text-white">{{ $service->name }}</div>
+                <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
+            </div>
+        </a>
+    @endforeach
     </div>
 </x-layout>

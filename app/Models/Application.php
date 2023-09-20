@@ -4,12 +4,17 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
+use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Str;
 
 class Application extends BaseModel
 {
     protected $guarded = [];
-
+    protected $casts = [
+        'service_configurations' => 'array',
+    ];
     protected static function booted()
     {
         static::created(function ($application) {
