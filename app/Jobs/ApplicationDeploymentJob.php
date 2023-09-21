@@ -73,7 +73,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
 
-        $isService = $this->application->services()->count() > 0;
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
@@ -129,8 +128,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
-            } else if ($this->application->services()->count() > 0) {
-                $this->deploy_docker_compose();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();

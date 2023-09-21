@@ -21,23 +21,29 @@ use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
 
+function base_configuration_dir(): string
+{
+    return '/data/coolify';
+}
 function application_configuration_dir(): string
 {
-    return '/data/coolify/applications';
+    return base_configuration_dir() . "/applications";
 }
-
+function service_configuration_dir(): string
+{
+    return base_configuration_dir() . "/services";
+}
 function database_configuration_dir(): string
 {
-    return '/data/coolify/databases';
+    return base_configuration_dir() . "/databases";
 }
 function database_proxy_dir($uuid): string
 {
-    return "/data/coolify/databases/$uuid/proxy";
+    return base_configuration_dir() . "/databases/$uuid/proxy";
 }
-
 function backup_dir(): string
 {
-    return '/data/coolify/backups';
+    return base_configuration_dir() . "/backups";
 }
 
 function generate_readme_file(string $name, string $updated_at): string

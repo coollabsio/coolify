@@ -40,8 +40,6 @@ class DockerCompose extends Component
       - database__connection__user=$SERVICE_USER_MYSQL
       - database__connection__password=$SERVICE_PASSWORD_MYSQL
       - database__connection__database=${MYSQL_DATABASE-ghost}
-    ports:
-      - "2368"
     depends_on:
       - mysql
   mysql:
@@ -62,93 +60,25 @@ class DockerCompose extends Component
         $this->validate([
             'dockercompose' => 'required'
         ]);
-        $destination_uuid = $this->query['destination'];
-        $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
-        if (!$destination) {
-            $destination = SwarmDocker::where('uuid', $destination_uuid)->first();
-        }
-        if (!$destination) {
-            throw new \Exception('Destination not found. What?!');
-        }
-        $destination_class = $destination->getMorphClass();
+        $server_id = $this->query['server_id'];
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
-        $service = new Service();
-        $service->uuid = (string) new Cuid2(7);
-        $service->name = 'service-' . new Cuid2(7);
-        $service->docker_compose_raw = $this->dockercompose;
-        $service->environment_id = $environment->id;
-        $service->destination_id = $destination->id;
-        $service->destination_type = $destination_class;
-        $service->save();
-        $service->parse(saveIt: true);
+
+        $service = Service::create([
+            'name' => 'service' . Str::random(10),
+            'docker_compose_raw' => $this->dockercompose,
+            'environment_id' => $environment->id,
+            'server_id' => (int) $server_id,
+        ]);
+        $service->name = "service-$service->uuid";
+
+        $service->parse(isNew: true);
 
         return redirect()->route('project.service', [
             'service_uuid' => $service->uuid,
             'environment_name' => $environment->name,
             'project_uuid' => $project->uuid,
         ]);
-        // $compose = data_get($parsedService, 'docker_compose');
-        // $service->docker_compose = $compose;
-        // $shouldDefine = data_get($parsedService, 'should_define', collect([]));
-        // if ($shouldDefine->count() > 0) {
-        //     $envs = data_get($shouldDefine, 'envs', []);
-        //     foreach($envs as $env) {
-        //         ray($env);
-        //         $variableName = Str::of($env)->before('=');
-        //         $variableValue = Str::of($env)->after('=');
-        //         ray($variableName, $variableValue);
-        //     }
-        // }
-        // foreach ($services as $serviceName => $serviceDetails) {
-        //     if (data_get($serviceDetails,'is_database')) {
-        //         $serviceDatabase = new ServiceDatabase();
-        //         $serviceDatabase->name = $serviceName . '-' . $service->uuid;
-        //         $serviceDatabase->service_id = $service->id;
-        //         $serviceDatabase->save();
-        //     } else {
-        //         $serviceApplication = new ServiceApplication();
-        //         $serviceApplication->name = $serviceName . '-' . $service->uuid;
-        //         $serviceApplication->fqdn =
-        //         $serviceApplication->service_id = $service->id;
-        //         $serviceApplication->save();
-        //     }
-        // }
-
-        // ray($details);
-        // $envs = data_get($details, 'envs', []);
-        // if ($envs->count() > 0) {
-        //     foreach ($envs as $env) {
-        //         $key = Str::of($env)->before('=');
-        //         $value = Str::of($env)->after('=');
-        //         EnvironmentVariable::create([
-        //             'key' => $key,
-        //             'value' => $value,
-        //             'is_build_time' => false,
-        //             'service_id' => $service->id,
-        //             'is_preview' => false,
-        //         ]);
-        //     }
-        // }
-        // $volumes = data_get($details, 'volumes', []);
-        // if ($volumes->count() > 0) {
-        //     foreach ($volumes as $volume => $mount_path) {
-        //         LocalPersistentVolume::create([
-        //             'name' => $volume,
-        //             'mount_path' => $mount_path,
-        //             'resource_id' => $service->id,
-        //             'resource_type' => $service->getMorphClass(),
-        //             'is_readonly' => false
-        //         ]);
-        //     }
-        // }
-        // $dockercompose_coolified = data_get($details, 'dockercompose', '');
-        // $service->update([
-        //     'docker_compose' => $dockercompose_coolified,
-        // ]);
-
-
-
     }
 }

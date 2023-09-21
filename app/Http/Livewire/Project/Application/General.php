@@ -34,7 +34,6 @@ class General extends Component
     public bool $is_auto_deploy_enabled;
     public bool $is_force_https_enabled;
 
-    public array $service_configurations = [];
 
     protected $rules = [
         'application.name' => 'required',
@@ -55,9 +54,6 @@ class General extends Component
         'application.dockerfile' => 'nullable',
         'application.dockercompose_raw' => 'nullable',
         'application.dockercompose' => 'nullable',
-        'application.service_configurations.*' => 'nullable',
-        'service_configurations.*.fqdn' => 'nullable|url',
-        'service_configurations.*.port' => 'integer',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -78,8 +74,6 @@ class General extends Component
         'application.dockerfile' => 'Dockerfile',
         'application.dockercompose_raw' => 'Docker Compose (raw)',
         'application.dockercompose' => 'Docker Compose',
-        'service_configurations.*.fqdn' => 'FQDN',
-        'service_configurations.*.port' => 'Port',
 
     ];
 
@@ -115,7 +109,6 @@ class General extends Component
 
     public function mount()
     {
-        $this->services = $this->application->services();
         $this->is_static = $this->application->settings->is_static;
         $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
         $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
@@ -124,9 +117,6 @@ class General extends Component
         $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
         $this->checkWildCardDomain();
-        if (data_get($this->application, 'service_configurations')) {
-            $this->service_configurations = $this->application->service_configurations;
-        }
     }
 
     public function generateGlobalRandomDomain()
@@ -156,7 +146,6 @@ class General extends Component
     public function submit()
     {
         try {
-            $this->application->service_configurations = $this->service_configurations;
             $this->validate();
             if (data_get($this->application, 'fqdn')) {
                 $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {

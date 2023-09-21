@@ -83,6 +83,7 @@ class Select extends Component
             'environment_name' => $this->parameters['environment_name'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
+            'server_id' => $this->server_id,
         ]);
     }
 

@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->string('name');
 
+            $table->string('status')->default('exited');
+
             $table->string('ports_exposes')->nullable();
             $table->string('ports_mappings')->nullable();
 

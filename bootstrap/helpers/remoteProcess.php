@@ -33,7 +33,6 @@ function remote_process(
             throw new \Exception("User is not part of the team that owns this server");
         }
     }
-
     return resolve(PrepareCoolifyTask::class, [
         'remoteProcessArgs' => new CoolifyTaskArgs(
             server_uuid: $server->uuid,

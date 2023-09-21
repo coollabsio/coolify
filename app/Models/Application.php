@@ -12,9 +12,7 @@ use Illuminate\Support\Str;
 class Application extends BaseModel
 {
     protected $guarded = [];
-    protected $casts = [
-        'service_configurations' => 'array',
-    ];
+
     protected static function booted()
     {
         static::created(function ($application) {

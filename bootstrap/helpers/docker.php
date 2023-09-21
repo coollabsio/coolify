@@ -130,13 +130,14 @@ function get_port_from_dockerfile($dockerfile): int
     return 80;
 }
 
-function defaultLabels($id, $name, $pull_request_id = 0)
+function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application')
 {
+    ray($type);
     $labels = collect([]);
     $labels->push('coolify.managed=true');
     $labels->push('coolify.version=' . config('version'));
-    $labels->push('coolify.applicationId=' . $id);
-    $labels->push('coolify.type=application');
+    $labels->push("coolify." . $type . "Id=" . $id);
+    $labels->push("coolify.type=$type");
     $labels->push('coolify.name=' . $name);
     if ($pull_request_id !== 0) {
         $labels->push('coolify.pullRequestId=' . $pull_request_id);

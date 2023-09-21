@@ -14,14 +14,9 @@ class StartProxy
     use AsAction;
     public function handle(Server $server, bool $async = true): Activity|string
     {
-        $proxyType = data_get($server,'proxy.type');
+        $proxyType = $server->proxyType();
         if ($proxyType === 'none') {
             return 'OK';
-        }
-        if (is_null($proxyType)) {
-            $server->proxy->type = ProxyTypes::TRAEFIK_V2->value;
-            $server->proxy->status = ProxyStatus::EXITED->value;
-            $server->save();
         }
         $proxy_path = get_proxy_path();
         $networks = collect($server->standaloneDockers)->map(function ($docker) {

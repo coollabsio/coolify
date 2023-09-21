@@ -21,9 +21,9 @@ class StandaloneDocker extends BaseModel
         return $this->belongsTo(Server::class);
     }
 
-    public function service()
+    public function services()
     {
-        return $this->belongsTo(Service::class, 'destination');
+        return $this->morphMany(Service::class, 'destination');
     }
 
     public function attachedTo()
