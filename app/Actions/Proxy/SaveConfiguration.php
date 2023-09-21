@@ -10,9 +10,11 @@ class SaveConfiguration
 {
     use AsAction;
 
-    public function handle(Server $server)
+    public function handle(Server $server, ?string $proxy_settings = null)
     {
-        $proxy_settings = CheckConfiguration::run($server, true);
+        if (is_null($proxy_settings)) {
+            $proxy_settings = CheckConfiguration::run($server, true);
+        }
         $proxy_path = get_proxy_path();
         $docker_compose_yml_base64 = base64_encode($proxy_settings);
 

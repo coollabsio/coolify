@@ -20,13 +20,6 @@ class Deploy extends Component
     public function startProxy()
     {
         try {
-            if (
-                $this->server->proxy->last_applied_settings &&
-                $this->server->proxy->last_saved_settings !== $this->server->proxy->last_applied_settings
-            ) {
-                SaveConfiguration::run($this->server);
-            }
-
             $activity = StartProxy::run($this->server);
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Throwable $e) {

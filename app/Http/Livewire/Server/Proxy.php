@@ -47,7 +47,7 @@ class Proxy extends Component
     public function submit()
     {
         try {
-            SaveConfiguration::run($this->server);
+            SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
 
