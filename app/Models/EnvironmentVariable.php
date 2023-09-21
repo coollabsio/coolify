@@ -44,9 +44,12 @@ class EnvironmentVariable extends Model
         );
     }
 
-    private function get_environment_variables(string $environment_variable): string|null
+    private function get_environment_variables(?string $environment_variable = null): string|null
     {
         // $team_id = currentTeam()->id;
+        if (!$environment_variable) {
+            return null;
+        }
         $environment_variable = trim(decrypt($environment_variable));
         if (Str::startsWith($environment_variable, '{{') && Str::endsWith($environment_variable, '}}') && Str::contains($environment_variable, 'global.')) {
             $variable = Str::after($environment_variable, 'global.');

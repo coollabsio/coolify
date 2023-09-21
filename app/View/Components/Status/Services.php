@@ -16,31 +16,7 @@ class Services extends Component
         public Service $service,
         public string $complexStatus = 'exited',
     ) {
-        $foundRunning = false;
-        $isDegraded = false;
-        $applications = $service->applications;
-        $databases = $service->databases;
-        foreach ($applications as $application) {
-            if ($application->status === 'running') {
-                $foundRunning = true;
-            } else {
-                $isDegraded = true;
-            }
-        }
-        foreach ($databases as $database) {
-            if ($database->status === 'running') {
-                $foundRunning = true;
-            } else {
-                $isDegraded = true;
-            }
-        }
-        if ($foundRunning && !$isDegraded) {
-            $this->complexStatus = 'running';
-        } else if ($foundRunning && $isDegraded) {
-            $this->complexStatus = 'degraded';
-        } else if (!$foundRunning && $isDegraded) {
-            $this->complexStatus = 'exited';
-        }
+        $this->complexStatus = serviceStatus($service);
     }
 
     /**

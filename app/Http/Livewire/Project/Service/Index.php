@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\Service;
 
 use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Illuminate\Support\Collection;
@@ -15,7 +16,7 @@ class Index extends Component
     public array $parameters;
     public array $query;
     public Collection $services;
-
+    protected $listeners = ['serviceStatusUpdated'];
     protected $rules = [
         'services.*.fqdn' => 'nullable',
     ];
@@ -39,11 +40,14 @@ class Index extends Component
     {
         return view('livewire.project.service.index')->layout('layouts.app');
     }
+    public function serviceStatusUpdated() {
+        ray('serviceStatusUpdated');
+        $this->check_status();
+    }
     public function check_status()
     {
         dispatch_sync(new ContainerStatusJob($this->service->server));
         $this->service->refresh();
-
     }
     public function submit()
     {
@@ -75,5 +79,9 @@ class Index extends Component
         $this->service->parse();
         $activity = StartService::run($this->service);
         $this->emit('newMonitorActivity', $activity->id);
+    }
+    public function stop() {
+        StopService::run($this->service);
+        $this->service->refresh();
     }
 }

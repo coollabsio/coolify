@@ -23,7 +23,7 @@ class StartService
         }
         $commands[] = "docker compose pull";
         $commands[] = "docker compose up -d";
-        $commands[] = "docker network connect $service->uuid coolify-proxy";
+        $commands[] = "docker network connect $service->uuid coolify-proxy 2>/dev/null || true";
         $activity = remote_process($commands, $service->server);
         return $activity;
     }
