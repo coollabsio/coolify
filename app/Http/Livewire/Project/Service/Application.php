@@ -15,6 +15,7 @@ class Application extends Component
     ];
     public function render()
     {
+        ray($this->application->fileStorages()->get());
         return view('livewire.project.service.application');
     }
     public function submit()

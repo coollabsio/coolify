@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 
 class Service extends BaseModel
 {
@@ -84,7 +85,11 @@ class Service extends BaseModel
         ray('parsing');
         // ray()->clearAll();
         if ($this->docker_compose_raw) {
-            $yaml = Yaml::parse($this->docker_compose_raw);
+            try {
+                $yaml = Yaml::parse($this->docker_compose_raw);
+            } catch (\Exception $e) {
+                throw new \Exception($e->getMessage());
+            }
 
             $composeVolumes = collect(data_get($yaml, 'volumes', []));
             $composeNetworks = collect(data_get($yaml, 'networks', []));
@@ -173,6 +178,26 @@ class Service extends BaseModel
                 if ($serviceVolumes->count() > 0) {
                     LocalPersistentVolume::whereResourceId($savedService->id)->whereResourceType(get_class($savedService))->delete();
                     foreach ($serviceVolumes as $volume) {
+                        if (is_string($volume) && Str::startsWith($volume, './')) {
+                            // Local file
+                            $fsPath = Str::before($volume, ':');
+                            $volumePath = Str::of($volume)->after(':')->beforeLast(':');
+                            ray($fsPath, $volumePath);
+                            LocalFileVolume::updateOrCreate(
+                                [
+                                    'mount_path' => $volumePath,
+                                    'resource_id' => $savedService->id,
+                                    'resource_type' => get_class($savedService)
+                                ],
+                                [
+                                    'fs_path' => $fsPath,
+                                    'mount_path' => $volumePath,
+                                    'resource_id' => $savedService->id,
+                                    'resource_type' => get_class($savedService)
+                                ]
+                            );
+                            continue;
+                        }
                         if (is_string($volume)) {
                             $volumeName = Str::before($volume, ':');
                             $volumePath = Str::after($volume, ':');
@@ -352,7 +377,7 @@ class Service extends BaseModel
                                 } else {
                                     $number = 0;
                                 }
-                                $fqdn = data_get($fqdns, $number);
+                                $fqdn = getOnlyFqdn(data_get($fqdns, $number, $fqdns->first()));
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $fqdn) {
                                     $envValue = Str::of($envValue)->replace($value, $fqdn);
@@ -361,9 +386,15 @@ class Service extends BaseModel
                                 $service['environment'] = $environments->toArray();
                             }
                         } else if ($variableName->startsWith('SERVICE_URL')) {
-                            ray('url');
                             if ($fqdns) {
-                                $url = Str::of($fqdns)->after('https://')->before('/');
+                                $number = Str::of($variableName)->after('SERVICE_URL')->afterLast('_')->value();
+                                if (is_numeric($number)) {
+                                    $number = (int) $number - 1;
+                                } else {
+                                    $number = 0;
+                                }
+                                $fqdn = getOnlyFqdn(data_get($fqdns, $number, $fqdns->first()));
+                                $url = Url::fromString($fqdn)->getHost();
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $url) {
                                     $envValue = Str::of($envValue)->replace($value, $url);
