@@ -17,15 +17,29 @@ class Service extends BaseModel
     protected static function booted()
     {
         static::deleted(function ($service) {
+            $storagesToDelete = collect([]);
             foreach($service->applications()->get() as $application) {
+                $storages = $application->persistentStorages()->get();
+                foreach ($storages as $storage) {
+                    $storagesToDelete->push($storage);
+                }
                 $application->persistentStorages()->delete();
             }
             foreach($service->databases()->get() as $database) {
+                $storages = $database->persistentStorages()->get();
+                foreach ($storages as $storage) {
+                    $storagesToDelete->push($storage);
+                }
                 $database->persistentStorages()->delete();
             }
             $service->environment_variables()->delete();
             $service->applications()->delete();
             $service->databases()->delete();
+            if ($storagesToDelete->count() > 0) {
+                $storagesToDelete->each(function ($storage) use ($service) {
+                    instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
+                });
+            }
         });
     }
     public function type()

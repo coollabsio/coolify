@@ -4,10 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
-use Symfony\Component\Yaml\Yaml;
-use Illuminate\Support\Str;
 
 class Application extends BaseModel
 {
@@ -22,6 +19,10 @@ class Application extends BaseModel
         });
         static::deleting(function ($application) {
             $application->settings()->delete();
+            $storages =  $application->persistentStorages()->get();
+            foreach ($storages as $storage) {
+                instant_remote_process(["docker volume rm -f $storage->name"], $application->destination->server);
+            }
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
