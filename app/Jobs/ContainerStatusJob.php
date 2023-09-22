@@ -147,7 +147,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
-                    ray('Service label id: ' . $serviceLabelId);
                     $coolifyName = data_get($labels, 'coolify.name');
                     $serviceName = Str::of($coolifyName)->before('-');
                     $serviceUuid = Str::of($coolifyName)->after('-');
