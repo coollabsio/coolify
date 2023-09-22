@@ -37,6 +37,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private int $application_deployment_queue_id;
 
+    private bool $newVersionIsHealthy = false;
     private ApplicationDeploymentQueue $application_deployment_queue;
     private Application $application;
     private string $deployment_uuid;
@@ -315,7 +316,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ],
                 );
                 if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
+                    $this->newVersionIsHealthy = true;
                     $this->execute_remote_command(
+                        [
+                            "echo 'New version of your application is healthy.'"
+                        ],
                         [
                             "echo 'Rolling update completed.'"
                         ],
@@ -524,7 +529,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
                     'labels' => generateLabelsApplication($this->application, $this->preview),
-                    'expose' => $ports,
+                    // 'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
                     ],
@@ -632,15 +637,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             return 'exit 0';
         }
         if (!$this->application->health_check_port) {
-            $this->application->health_check_port = $this->application->ports_exposes_array[0];
+            $health_check_port = $this->application->ports_exposes_array[0];
+        } else {
+            $health_check_port = $this->application->health_check_port;
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null"
             ];
         } else {
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/"
             ];
         }
         return implode(' ', $generated_healthchecks_commands);
@@ -700,10 +707,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function stop_running_container()
     {
         if ($this->currently_running_container_name) {
-            $this->execute_remote_command(
-                ["echo -n 'Removing old version of your application.'"],
-                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
-            );
+            if ($this->newVersionIsHealthy) {
+                $this->execute_remote_command(
+                    ["echo -n 'Removing old version of your application.'"],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    ["echo -n 'New version is not healthy, rolling back to the old version.'"],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
+                );
+            }
         }
     }
 

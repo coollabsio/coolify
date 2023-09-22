@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Service;
+use Illuminate\Support\Str;
 
 function replaceRegex(?string $name = null)
 {
@@ -22,14 +23,14 @@ function serviceStatus(Service $service)
     $applications = $service->applications;
     $databases = $service->databases;
     foreach ($applications as $application) {
-        if ($application->status === 'running') {
+        if (Str::of($application->status)->startsWith('running')) {
             $foundRunning = true;
         } else {
             $isDegraded = true;
         }
     }
     foreach ($databases as $database) {
-        if ($database->status === 'running') {
+        if (Str::of($database->status)->startsWith('running')) {
             $foundRunning = true;
         } else {
             $isDegraded = true;

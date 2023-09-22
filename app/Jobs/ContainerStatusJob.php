@@ -99,6 +99,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
             foreach ($containers as $container) {
                 $containerStatus = data_get($container, 'State.Status');
+                $containerHealth = data_get($container, 'State.Health.Status','unhealthy');
+                $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
                 $labelId = data_get($labels, 'coolify.applicationId');
@@ -145,6 +147,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
+                    ray('Service label id: ' . $serviceLabelId);
                     $coolifyName = data_get($labels, 'coolify.name');
                     $serviceName = Str::of($coolifyName)->before('-');
                     $serviceUuid = Str::of($coolifyName)->after('-');

@@ -26,6 +26,9 @@
                     Deployments
                 </a>
             @endif
+            <a :class="activeTab === 'health' && 'text-white'"
+            @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Health Checks
+        </a>
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
@@ -57,6 +60,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'health'">
+                <livewire:project.shared.health-checks :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'rollback'">
                 <livewire:project.application.rollback :application="$application" />

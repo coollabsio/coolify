@@ -1,7 +1,7 @@
-@if ($status === 'running')
-    <x-status.running />
-@elseif($status === 'restarting')
-    <x-status.restarting />
+@if (Str::of($status)->startsWith('running'))
+    <x-status.running :status="$status" />
+@elseif(Str::of($status)->startsWith('restarting'))
+    <x-status.restarting :status="$status" />
 @else
-    <x-status.stopped />
+    <x-status.stopped :status="$status" />
 @endif
