@@ -83,6 +83,7 @@ function refreshSession(?Team $team = null): void
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
     ray('handleError');
+    ray($error);
     if ($error instanceof Throwable) {
         $message = $error->getMessage();
     } else {
@@ -100,6 +101,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     if (isset($livewire)) {
         return $livewire->emit('error', $message);
     }
+
     throw new RuntimeException($message);
 }
 function general_error_handler(Throwable $err, Livewire\Component $that = null, $isJson = false, $customErrorMessage = null): mixed

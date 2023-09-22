@@ -78,7 +78,7 @@ class StandaloneDocker extends Component
 
     private function createNetworkAndAttachToProxy()
     {
-        instant_remote_process(['docker network create --attachable ' . $this->network], $this->server, throwError: false);
-        instant_remote_process(["docker network connect $this->network coolify-proxy"], $this->server, throwError: false);
+        $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+        instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
     }
 }

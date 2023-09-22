@@ -90,7 +90,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
                 $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                instant_remote_process([$connectProxyToDockerNetworks], $this->server, false);
+                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
             $foundApplications = [];
             $foundApplicationPreviews = [];
