@@ -14,21 +14,12 @@ class StartProxy
     use AsAction;
     public function handle(Server $server, bool $async = true): Activity|string
     {
+        $commands = collect([]);
         $proxyType = $server->proxyType();
         if ($proxyType === 'none') {
             return 'OK';
         }
         $proxy_path = get_proxy_path();
-        $networks = collect($server->standaloneDockers)->map(function ($docker) {
-            return $docker['network'];
-        })->unique();
-        if ($networks->count() === 0) {
-            $networks = collect(['coolify']);
-        }
-        $create_networks_command = $networks->map(function ($network) {
-            return "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1";
-        });
-
         $configuration = CheckConfiguration::run($server);
         if (!$configuration) {
             throw new \Exception("Configuration is not synced");
@@ -36,13 +27,12 @@ class StartProxy
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
-        $commands = [
+
+        $commands = $commands->merge([
             "command -v lsof >/dev/null || echo '####### Installing lsof...'",
             "command -v lsof >/dev/null || apt-get update",
             "command -v lsof >/dev/null || apt install -y lsof",
             "command -v lsof >/dev/null || command -v fuser >/dev/null || apt install -y psmisc",
-            "echo '####### Creating required Docker networks...'",
-            ...$create_networks_command,
             "cd $proxy_path",
             "echo '####### Creating Docker Compose file...'",
             "echo '####### Pulling docker image...'",
@@ -60,7 +50,8 @@ class StartProxy
             "echo '####### Starting coolify-proxy...'",
             'docker compose up -d --remove-orphans || docker-compose up -d --remove-orphans',
             "echo '####### Proxy installed successfully...'"
-        ];
+        ]);
+        $commands = $commands->merge(connectProxyToNetworks($server));
         if (!$async) {
             instant_remote_process($commands, $server);
             return 'OK';

@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
-    array   $command,
+    Collection|array   $command,
     Server  $server,
     ?string  $type = null,
     ?string $type_uuid = null,
@@ -25,6 +25,9 @@ function remote_process(
 ): Activity {
     if (is_null($type)) {
         $type = ActivityTypes::INLINE->value;
+    }
+    if ($command instanceof Collection) {
+        $command = $command->toArray();
     }
     $command_string = implode("\n", $command);
     if (auth()->user()) {
@@ -98,8 +101,11 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     // ray($ssh_command);
     return $ssh_command;
 }
-function instant_remote_process(array $command, Server $server, $throwError = true)
+function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
 {
+    if ($command instanceof Collection) {
+        $command = $command->toArray();
+    }
     $command_string = implode("\n", $command);
     $ssh_command = generateSshCommand($server, $command_string);
     $process = Process::run($ssh_command);

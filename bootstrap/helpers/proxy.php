@@ -10,7 +10,23 @@ function get_proxy_path()
     $proxy_path = "$base_path/proxy";
     return $proxy_path;
 }
+function connectProxyToNetworks(Server $server) {
+    $networks = collect($server->standaloneDockers)->map(function ($docker) {
+        return $docker['network'];
+    })->unique();
+    if ($networks->count() === 0) {
+        $networks = collect(['coolify']);
+    }
+    $commands = $networks->map(function ($network) {
+        return [
+            "echo '####### Connecting coolify-proxy to $network network...'",
+            "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null 2>&1 || docker network create --attachable $network > /dev/null 2>&1",
+            "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+        ];
+    });
 
+    return $commands->flatten();
+}
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();

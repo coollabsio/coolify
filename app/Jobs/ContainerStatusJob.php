@@ -89,11 +89,14 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
+                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+                instant_remote_process([$connectProxyToDockerNetworks], $this->server, false);
             }
             $foundApplications = [];
             $foundApplicationPreviews = [];
             $foundDatabases = [];
             $foundServices = [];
+
             foreach ($containers as $container) {
                 $containerStatus = data_get($container, 'State.Status');
                 $labels = data_get($container, 'Config.Labels');
@@ -179,7 +182,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                         $db->update(['status' => 'exited']);
                     }
                 }
-            }
+        }
             $exitedServices = $exitedServices->unique('id');
             ray($exitedServices);
             // ray($exitedServices);
@@ -201,7 +204,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
             //     $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             // }
-
 
             $notRunningApplications = $applications->pluck('id')->diff($foundApplications);
             foreach ($notRunningApplications as $applicationId) {
