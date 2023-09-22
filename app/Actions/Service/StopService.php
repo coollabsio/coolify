@@ -20,6 +20,6 @@ class StopService
             instant_remote_process(["docker rm -f {$db->name}-{$service->uuid}"], $service->server);
             $db->update(['status' => 'exited']);
         }
-        instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy 2>/dev/null"], $service->server);
+        instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy 2>/dev/null"], $service->server, false);
     }
 }

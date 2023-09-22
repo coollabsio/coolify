@@ -10,5 +10,6 @@
     </div>
     <div class="flex gap-2">
         <x-forms.input label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
+        <x-forms.input label="Description" id="database.description"></x-forms.input>
     </div>
 </form>

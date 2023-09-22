@@ -11,6 +11,7 @@ class Database extends Component
     public ServiceDatabase $database;
     protected $rules = [
         'database.human_name' => 'nullable',
+        'database.description' => 'nullable',
     ];
     public function render()
     {

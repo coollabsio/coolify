@@ -9,9 +9,9 @@
         <a target="_blank" href="{{ $application->documentation() }}">Documentation <x-external-link /></a>
     </div>
     <div class="flex gap-2">
-        <x-forms.input label="Name" id="application.human_name" placeholder="Name"></x-forms.input>
-        @if (isset($application->fqdn))
-            <x-forms.input label="FQDN" required id="application.fqdn"></x-forms.input>
-        @endisset
-</div>
+        <x-forms.input label="Name" id="application.human_name" placeholder="Human readable name"></x-forms.input>
+        <x-forms.input label="Description" id="application.description"></x-forms.input>
+        <x-forms.input placeholder="https://app.coolify.io" label="Domains" required
+            id="application.fqdn"></x-forms.input>
+    </div>
 </form>

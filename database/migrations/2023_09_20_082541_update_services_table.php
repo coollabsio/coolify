@@ -12,6 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('services', function (Blueprint $table) {
+            $table->longText('description')->nullable();
             $table->longText('docker_compose_raw');
             $table->longText('docker_compose')->nullable();
 
@@ -24,6 +25,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('services', function (Blueprint $table) {
+            $table->dropColumn('description');
             $table->dropColumn('docker_compose_raw');
             $table->dropColumn('docker_compose');
         });

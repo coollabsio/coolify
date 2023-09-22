@@ -12,6 +12,20 @@
                 <x-forms.input id="application.name" label="Name" required />
                 <x-forms.input id="application.description" label="Description" />
             </div>
+            <div class="flex items-end gap-2">
+                <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                    helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
+                @if ($wildcard_domain)
+                    @if ($global_wildcard_domain)
+                        <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
+                        </x-forms.button>
+                    @endif
+                    @if ($server_wildcard_domain)
+                        <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
+                        </x-forms.button>
+                    @endif
+                @endif
+            </div>
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>
@@ -46,7 +60,7 @@
                     <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
                 @else
                     <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes" required
-                        helper="A comma separated list of ports you would like to expose for the proxy." />
+                        helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck endpoint. Be sure to set this correctly." />
                 @endif
                 <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />

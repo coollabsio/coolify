@@ -79,7 +79,7 @@ class ByIp extends Component
             $server->settings->save();
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }

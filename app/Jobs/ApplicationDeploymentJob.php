@@ -96,7 +96,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
             if ($this->application->fqdn) {
-                $preview_fqdn = data_get($this->preview, 'fqdn');
+                $preview_fqdn = getOnlyFqdn(data_get($this->preview, 'fqdn'));
                 $template = $this->application->preview_url_template;
                 $url = Url::fromString($this->application->fqdn);
                 $host = $url->getHost();
@@ -623,75 +623,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $environment_variables->push("PORT={$ports[0]}");
         }
         return $environment_variables->all();
-    }
-
-    private function set_labels_for_applications()
-    {
-
-        $appId = $this->application->id;
-        if ($this->pull_request_id !== 0) {
-            $appId = $appId . '-pr-' . $this->pull_request_id;
-        }
-        $labels = [];
-        $labels[] = 'coolify.managed=true';
-        $labels[] = 'coolify.version=' . config('version');
-        $labels[] = 'coolify.applicationId=' . $appId;
-        $labels[] = 'coolify.type=application';
-        $labels[] = 'coolify.name=' . $this->application->name;
-        if ($this->pull_request_id !== 0) {
-            $labels[] = 'coolify.pullRequestId=' . $this->pull_request_id;
-        }
-        if ($this->application->fqdn) {
-            if ($this->pull_request_id !== 0) {
-                $domains = Str::of(data_get($this->preview, 'fqdn'))->explode(',');
-            } else {
-                $domains = Str::of(data_get($this->application, 'fqdn'))->explode(',');
-            }
-            if ($this->application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
-                $labels[] = 'traefik.enable=true';
-                foreach ($domains as $domain) {
-                    $url = Url::fromString($domain);
-                    $host = $url->getHost();
-                    $path = $url->getPath();
-                    $schema = $url->getScheme();
-                    $slug = Str::slug($host . $path);
-
-                    $http_label = "{$this->container_name}-{$slug}-http";
-                    $https_label = "{$this->container_name}-{$slug}-https";
-
-                    if ($schema === 'https') {
-                        // Set labels for https
-                        $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$https_label}.entryPoints=https";
-                        $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
-                        if ($path !== '/') {
-                            $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
-                            $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
-                        }
-
-                        $labels[] = "traefik.http.routers.{$https_label}.tls=true";
-                        $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
-
-                        // Set labels for http (redirect to https)
-                        $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                        if ($this->application->settings->is_force_https_enabled) {
-                            $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
-                        }
-                    } else {
-                        // Set labels for http
-                        $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                        $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
-                        if ($path !== '/') {
-                            $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
-                            $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
-                        }
-                    }
-                }
-            }
-        }
-        return $labels;
     }
 
     private function generate_healthcheck_commands()

@@ -38,7 +38,7 @@ class Danger extends Component
                 'environment_name' => $this->parameters['environment_name']
             ]);
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }

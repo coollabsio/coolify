@@ -10,6 +10,7 @@ class Application extends Component
     public ServiceApplication $application;
     protected $rules = [
         'application.human_name' => 'nullable',
+        'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
     ];
     public function render()

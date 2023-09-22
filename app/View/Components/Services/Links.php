@@ -7,6 +7,7 @@ use Closure;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
 use Illuminate\View\Component;
+use Illuminate\Support\Str;
 
 class Links extends Component
 {
@@ -15,7 +16,23 @@ class Links extends Component
     {
         $this->links = collect([]);
         $service->applications()->get()->map(function ($application) {
-            $this->links->push($application->fqdn);
+            if ($application->fqdn) {
+                $fqdns = collect(Str::of($application->fqdn)->explode(','));
+                $fqdns->map(function ($fqdn) {
+                    $this->links->push(getOnlyFqdn($fqdn));
+                });
+            }
+            if ($application->ports) {
+                $portsCollection = collect(Str::of($application->ports)->explode(','));
+                $portsCollection->map(function ($port) {
+                    if (Str::of($port)->contains(':')) {
+                        $hostPort = Str::of($port)->before(':');
+                    } else {
+                        $hostPort = $port;
+                    }
+                    $this->links->push(base_url(withPort:false) . ":{$hostPort}");
+                });
+            }
         });
     }
 

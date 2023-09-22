@@ -2,11 +2,7 @@
 
 namespace App\Http\Livewire\Project\Service;
 
-use App\Actions\Service\StartService;
-use App\Actions\Service\StopService;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
-use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Index extends Component
@@ -18,6 +14,8 @@ class Index extends Component
     protected $rules = [
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
+        'service.name' => 'required',
+        'service.description' => 'required',
     ];
 
     public function mount()
@@ -35,6 +33,14 @@ class Index extends Component
         $this->service->parse();
         $this->service->refresh();
         $this->emit('refreshEnvs');
+    }
+    public function submit() {
+        try {
+            $this->validate();
+            $this->service->save();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
 }

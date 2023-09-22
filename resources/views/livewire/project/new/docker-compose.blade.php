@@ -6,8 +6,15 @@
             <h2>Docker Compose</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
-        <x-services.explanation />
-        <x-forms.textarea rows="20" id="dockercompose"
+        <x-forms.textarea label="Docker Compose file"
+            helper="
+    You can use these variables in your Docker Compose file and Coolify will generate default values or replace them with the values you set on the UI forms.<br>
+    <br>
+    - SERVICE_FQDN_*: FQDN - could be changable from the UI. (example: SERVICE_FQDN_GHOST)<br>
+    - SERVICE_URL_*: URL parsed from FQDN - could be changable from the UI. (example: SERVICE_URL_GHOST)<br>
+    - SERVICE_USER_*: Generated user, not encrypted in database (example: SERVICE_USER_MYSQL)<br>
+    - SERVICE_PASSWORD_*: Generated password, encrypted in database (example: SERVICE_PASSWORD_MYSQL)<br>"
+            rows="20" id="dockercompose"
             placeholder='services:
   ghost:
     documentation: https://ghost.org/docs/config

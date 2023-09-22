@@ -18,14 +18,14 @@ class Service extends BaseModel
     {
         static::deleted(function ($service) {
             $storagesToDelete = collect([]);
-            foreach($service->applications()->get() as $application) {
+            foreach ($service->applications()->get() as $application) {
                 $storages = $application->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
                 }
                 $application->persistentStorages()->delete();
             }
-            foreach($service->databases()->get() as $database) {
+            foreach ($service->databases()->get() as $database) {
                 $storages = $database->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
@@ -81,6 +81,7 @@ class Service extends BaseModel
     }
     public function parse(bool $isNew = false): Collection
     {
+        ray('parsing');
         // ray()->clearAll();
         if ($this->docker_compose_raw) {
             $yaml = Yaml::parse($this->docker_compose_raw);
@@ -136,39 +137,43 @@ class Service extends BaseModel
                         $savedService = $this->databases()->whereName($serviceName)->first();
                     } else {
                         $savedService = $this->applications()->whereName($serviceName)->first();
-                        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-                            if (isDev()) {
-                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
-                            }
+                        if (data_get($savedService, 'fqdn')) {
+                            $defaultUsableFqdn = data_get($savedService, 'fqdn', null);
                         } else {
-                            $defaultUsableFqdn = null;
+                            if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
+                                if (isDev()) {
+                                    $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+                                }
+                            }
                         }
                         $savedService->fqdn = $defaultUsableFqdn;
                         $savedService->save();
                     }
                 }
-                $fqdn = data_get($savedService, 'fqdn');
+                $fqdns = data_get($savedService, 'fqdn');
+                if ($fqdns) {
+                    $fqdns = collect(Str::of($fqdns)->explode(','));
+                }
+                ray($fqdns);
                 // Collect ports
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $ports->put($serviceName, $servicePorts);
-                if ($isNew) {
-                    $ports = collect([]);
-                    if ($servicePorts->count() > 0) {
-                        foreach ($servicePorts as $sport) {
-                            if (is_string($sport)) {
-                                $ports->push($sport);
-                            }
-                            if (is_array($sport)) {
-                                $target = data_get($sport, 'target');
-                                $published = data_get($sport, 'published');
-                                $ports->push("$target:$published");
-                            }
+                $collectedPorts = collect([]);
+                if ($servicePorts->count() > 0) {
+                    foreach ($servicePorts as $sport) {
+                        if (is_string($sport) || is_numeric($sport)) {
+                            $collectedPorts->push($sport);
+                        }
+                        if (is_array($sport)) {
+                            $target = data_get($sport, 'target');
+                            $published = data_get($sport, 'published');
+                            $collectedPorts->push("$target:$published");
                         }
                     }
-                    // $savedService->ports_exposes = $ports->implode(',');
-                    // $savedService->save();
                 }
+                $savedService->ports = $collectedPorts->implode(',');
+                $savedService->save();
                 // Collect volumes
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 if ($serviceVolumes->count() > 0) {
@@ -336,7 +341,14 @@ class Service extends BaseModel
                                 ]);
                             }
                         } else if ($variableName->startsWith('SERVICE_FQDN')) {
-                            if ($fqdn) {
+                            if ($fqdns) {
+                                $number = Str::of($variableName)->after('SERVICE_FQDN')->afterLast('_')->value();
+                                if (is_numeric($number)) {
+                                    $number = (int) $number - 1;
+                                } else {
+                                    $number = 0;
+                                }
+                                $fqdn = data_get($fqdns, $number);
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $fqdn) {
                                     $envValue = Str::of($envValue)->replace($value, $fqdn);
@@ -345,8 +357,9 @@ class Service extends BaseModel
                                 $service['environment'] = $environments->toArray();
                             }
                         } else if ($variableName->startsWith('SERVICE_URL')) {
-                            if ($fqdn) {
-                                $url = Str::of($fqdn)->after('https://')->before('/');
+                            ray('url');
+                            if ($fqdns) {
+                                $url = Str::of($fqdns)->after('https://')->before('/');
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $url) {
                                     $envValue = Str::of($envValue)->replace($value, $url);
@@ -362,8 +375,8 @@ class Service extends BaseModel
                     $labels = collect([]);
                     $labels = $labels->merge(defaultLabels($this->id, $container_name, type: 'service'));
                     if (!$isDatabase) {
-                        if ($fqdn) {
-                            $labels = $labels->merge(fqdnLabelsForTraefik($fqdn, $container_name, true));
+                        if ($fqdns) {
+                            $labels = $labels->merge(fqdnLabelsForTraefik($fqdns, $container_name, true));
                         }
                     }
                     data_set($service, 'labels', $labels->toArray());

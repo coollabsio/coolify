@@ -13,9 +13,9 @@
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
             @endif
-            <a :class="activeTab === 'destination' && 'text-white'"
-                @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
-                href="#">Destination
+            <a :class="activeTab === 'server' && 'text-white'"
+                @click.prevent="activeTab = 'server'; window.location.hash = 'server'"
+                href="#">Server
             </a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
@@ -49,7 +49,7 @@
                     <livewire:project.application.source :application="$application" />
                 </div>
             @endif
-            <div x-cloak x-show="activeTab === 'destination'">
+            <div x-cloak x-show="activeTab === 'server'">
                 <livewire:project.shared.destination :destination="$application->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">

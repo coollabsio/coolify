@@ -23,7 +23,7 @@ class Deploy extends Component
             $activity = StartProxy::run($this->server);
             $this->emit('newMonitorActivity', $activity->id);
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 

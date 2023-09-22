@@ -52,8 +52,6 @@ class General extends Component
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
         'application.dockerfile' => 'nullable',
-        'application.dockercompose_raw' => 'nullable',
-        'application.dockercompose' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -72,8 +70,6 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
         'application.dockerfile' => 'Dockerfile',
-        'application.dockercompose_raw' => 'Docker Compose (raw)',
-        'application.dockercompose' => 'Docker Compose',
 
     ];
 
@@ -164,10 +160,6 @@ class General extends Component
             }
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
-            }
-            if (data_get($this->application, 'dockercompose_raw')) {
-                $details = generateServiceFromTemplate( $this->application);
-                $this->application->dockercompose = data_get($details, 'dockercompose');
             }
             $this->application->save();
             $this->emit('success', 'Application settings updated!');

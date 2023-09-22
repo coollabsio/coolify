@@ -16,8 +16,11 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->string('name');
             $table->string('human_name')->nullable();
+            $table->longText('description')->nullable();
 
             $table->string('fqdn')->unique()->nullable();
+            $table->longText('ports')->nullable();
+            $table->longText('exposes')->nullable();
 
             $table->string('status')->default('exited');
 

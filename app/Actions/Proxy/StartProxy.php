@@ -2,8 +2,6 @@
 
 namespace App\Actions\Proxy;
 
-use App\Enums\ProxyStatus;
-use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;

@@ -20,6 +20,7 @@ use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
+use Spatie\Url\Url;
 
 function base_configuration_dir(): string
 {
@@ -239,7 +240,12 @@ function base_ip(): string
     }
     return "localhost";
 }
-
+function getOnlyFqdn(String $fqdn) {
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    $scheme = $url->getScheme();
+    return "$scheme://$host";
+}
 /**
  * If fqdn is set, return it, otherwise return public ip.
  */

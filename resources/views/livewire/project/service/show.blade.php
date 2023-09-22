@@ -2,6 +2,10 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
+            <a class="{{ request()->routeIs('project.service') ? 'text-white' : '' }}"
+                href="{{ route('project.service', [...$parameters, 'service_name' => null]) }}">
+                <button><- Back</button>
+            </a>
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             <a :class="activeTab === 'storages' && 'text-white'"
