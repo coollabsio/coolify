@@ -170,40 +170,32 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     if (in_array("$service->id-$app->name", $foundServices)) {
                         continue;
                     } else {
-                        $exitedServices->push($service);
-                        $app->update(['status' => 'exited']);
+                        $exitedServices->push($app);
                     }
                 }
                 foreach ($dbs as $db) {
                     if (in_array("$service->id-$db->name", $foundServices)) {
                         continue;
                     } else {
-                        $exitedServices->push($service);
-                        $db->update(['status' => 'exited']);
+                        $exitedServices->push($db);
                     }
                 }
-        }
+            }
             $exitedServices = $exitedServices->unique('id');
-            ray($exitedServices);
-            // ray($exitedServices);
-            // foreach ($serviceIds as $serviceId) {
-            //     $service = $services->where('id', $serviceId)->first();
-            //     if ($service->status === 'exited') {
-            //         continue;
-            //     }
+            foreach ($exitedServices as $exitedService) {
+                if ($exitedService->status === 'exited') {
+                    continue;
+                }
+                $name = data_get($exitedService, 'name');
+                $fqdn = data_get($exitedService, 'fqdn');
+                $containerName = $name ? "$name ($fqdn)" : $fqdn;
+                $project = data_get($service, 'environment.project');
+                $environment = data_get($service, 'environment');
 
-            //     $name = data_get($service, 'name');
-            //     $fqdn = data_get($service, 'fqdn');
-
-            //     $containerName = $name ? "$name ($fqdn)" : $fqdn;
-
-            //     $project = data_get($service, 'environment.project');
-            //     $environment = data_get($service, 'environment');
-
-            //     $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/service/" . $service->uuid;
-
-            //     $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
-            // }
+                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/service/" . $service->uuid;
+                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $exitedService->update(['status' => 'exited']);
+            }
 
             $notRunningApplications = $applications->pluck('id')->diff($foundApplications);
             foreach ($notRunningApplications as $applicationId) {

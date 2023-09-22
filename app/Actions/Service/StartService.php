@@ -18,6 +18,7 @@ class StartService
         $docker_compose_base64 = base64_encode($service->docker_compose);
         $commands[] = "echo $docker_compose_base64 | base64 -d > docker-compose.yml";
         $envs = $service->environment_variables()->get();
+        $commands[] = "rm -f .env || true";
         foreach ($envs as $env) {
             $commands[] = "echo '{$env->key}={$env->value}' >> .env";
         }

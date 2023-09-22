@@ -15,11 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->string('name');
+            $table->string('human_name')->nullable();
 
             $table->string('status')->default('exited');
-
-            $table->string('ports_exposes')->nullable();
-            $table->string('ports_mappings')->nullable();
 
             $table->foreignId('service_id');
             $table->timestamps();

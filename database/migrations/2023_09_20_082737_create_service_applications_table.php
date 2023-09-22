@@ -15,23 +15,9 @@ return new class extends Migration
             $table->id();
             $table->string('uuid')->unique();
             $table->string('name');
+            $table->string('human_name')->nullable();
 
             $table->string('fqdn')->unique()->nullable();
-
-            $table->string('ports_exposes')->nullable();
-            $table->string('ports_mappings')->nullable();
-
-            $table->string('health_check_path')->default('/');
-            $table->string('health_check_port')->nullable();
-            $table->string('health_check_host')->default('localhost');
-            $table->string('health_check_method')->default('GET');
-            $table->integer('health_check_return_code')->default(200);
-            $table->string('health_check_scheme')->default('http');
-            $table->string('health_check_response_text')->nullable();
-            $table->integer('health_check_interval')->default(5);
-            $table->integer('health_check_timeout')->default(5);
-            $table->integer('health_check_retries')->default(10);
-            $table->integer('health_check_start_period')->default(5);
 
             $table->string('status')->default('exited');
 

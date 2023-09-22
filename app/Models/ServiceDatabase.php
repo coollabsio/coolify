@@ -9,4 +9,12 @@ class ServiceDatabase extends BaseModel
     use HasFactory;
     protected $guarded = [];
 
+    public function type()
+    {
+        return 'service';
+    }
+    public function persistentStorages()
+    {
+        return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
 }

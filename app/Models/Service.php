@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use App\Enums\ProxyTypes;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -14,27 +13,26 @@ class Service extends BaseModel
 {
     use HasFactory;
     protected $guarded = [];
-    public function persistentStorages()
-    {
-        return $this->morphMany(LocalPersistentVolume::class, 'resource');
-    }
-    public function portsMappingsArray(): Attribute
-    {
-        return Attribute::make(
-            get: fn () => is_null($this->ports_mappings)
-                ? []
-                : explode(',', $this->ports_mappings),
 
-        );
-    }
-    public function portsExposesArray(): Attribute
+    protected static function booted()
     {
-        return Attribute::make(
-            get: fn () => is_null($this->ports_exposes)
-                ? []
-                : explode(',', $this->ports_exposes)
-        );
+        static::deleted(function ($service) {
+            foreach($service->applications()->get() as $application) {
+                $application->persistentStorages()->delete();
+            }
+            foreach($service->databases()->get() as $database) {
+                $database->persistentStorages()->delete();
+            }
+            $service->environment_variables()->delete();
+            $service->applications()->delete();
+            $service->databases()->delete();
+        });
     }
+    public function type()
+    {
+        return 'service';
+    }
+
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
@@ -47,10 +45,10 @@ class Service extends BaseModel
     {
         return $this->belongsTo(Environment::class);
     }
-    public function server() {
+    public function server()
+    {
         return $this->belongsTo(Server::class);
     }
-
     public function byName(string $name)
     {
         $app = $this->applications()->whereName($name)->first();
@@ -70,7 +68,6 @@ class Service extends BaseModel
     public function parse(bool $isNew = false): Collection
     {
         // ray()->clearAll();
-        ray('Service parse');
         if ($this->docker_compose_raw) {
             $yaml = Yaml::parse($this->docker_compose_raw);
 
@@ -138,8 +135,8 @@ class Service extends BaseModel
                             }
                         }
                     }
-                    $savedService->ports_exposes = $ports->implode(',');
-                    $savedService->save();
+                    // $savedService->ports_exposes = $ports->implode(',');
+                    // $savedService->save();
                 }
                 // Collect volumes
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
@@ -158,17 +155,38 @@ class Service extends BaseModel
                             return $key == $volumeName;
                         });
                         if (!$volumeExists) {
-                            if (!Str::startsWith($volumeName, '/')) {
+                            if (Str::startsWith($volumeName, '/')) {
+                                $volumes->put($volumeName, $volumePath);
+                                LocalPersistentVolume::updateOrCreate(
+                                    [
+                                        'mount_path' => $volumePath,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ],
+                                    [
+                                        'name' => Str::slug($volumeName, '-'),
+                                        'mount_path' => $volumePath,
+                                        'host_path' => $volumeName,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ]
+                                );
+                            } else {
                                 $composeVolumes->put($volumeName, null);
-                            }
-                            $volumes->put($volumeName, $volumePath);
-                            if ($isNew) {
-                                LocalPersistentVolume::create([
-                                    'name' => $volumeName,
-                                    'mount_path' => $volumePath,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
-                                ]);
+                                LocalPersistentVolume::updateOrCreate(
+                                    [
+                                        'mount_path' => $volumePath,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ],
+                                    [
+                                        'name' => $volumeName,
+                                        'mount_path' => $volumePath,
+                                        'host_path' => null,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ]
+                                );
                             }
                         }
                     }
@@ -229,25 +247,26 @@ class Service extends BaseModel
                                 }
                                 if (!$envs->has($nakedName->value())) {
                                     $envs->put($nakedName->value(), $nakedValue->value());
-                                    if ($isNew) {
-                                        EnvironmentVariable::create([
-                                            'key' => $nakedName->value(),
-                                            'value' => $nakedValue->value(),
-                                            'is_build_time' => false,
-                                            'service_id' => $this->id,
-                                            'is_preview' => false,
-                                        ]);
-                                    }
+                                    EnvironmentVariable::updateOrCreate([
+                                        'key' => $nakedName->value(),
+                                        'service_id' => $this->id,
+                                    ], [
+                                        'value' => $nakedValue->value(),
+                                        'is_build_time' => false,
+                                        'service_id' => $this->id,
+                                        'is_preview' => false,
+                                    ]);
                                 }
                             } else {
                                 if (!$envs->has($nakedName->value())) {
                                     $envs->put($nakedName->value(), null);
-                                    if ($isNew) {
+                                    $envExists = EnvironmentVariable::where('service_id', $this->id)->where('key', $nakedName->value())->exists();
+                                    if (!$envExists) {
                                         EnvironmentVariable::create([
                                             'key' => $nakedName->value(),
                                             'value' => null,
-                                            'is_build_time' => false,
                                             'service_id' => $this->id,
+                                            'is_build_time' => false,
                                             'is_preview' => false,
                                         ]);
                                     }
@@ -259,31 +278,31 @@ class Service extends BaseModel
                         $generatedValue = null;
                         if ($variableName->startsWith('SERVICE_USER')) {
                             $generatedValue = Str::random(10);
-                            if ($isNew) {
-                                if (!$envs->has($variableName->value())) {
-                                    $envs->put($variableName->value(), $generatedValue);
-                                    EnvironmentVariable::create([
-                                        'key' => $variableName->value(),
-                                        'value' => $generatedValue,
-                                        'is_build_time' => false,
-                                        'service_id' => $this->id,
-                                        'is_preview' => false,
-                                    ]);
-                                }
+                            if (!$envs->has($variableName->value())) {
+                                $envs->put($variableName->value(), $generatedValue);
+                                EnvironmentVariable::updateOrCreate([
+                                    'key' => $variableName->value(),
+                                    'service_id' => $this->id,
+                                ], [
+                                    'value' => $generatedValue,
+                                    'is_build_time' => false,
+                                    'service_id' => $this->id,
+                                    'is_preview' => false,
+                                ]);
                             }
                         } else if ($variableName->startsWith('SERVICE_PASSWORD')) {
                             $generatedValue = Str::password(symbols: false);
-                            if ($isNew) {
-                                if (!$envs->has($variableName->value())) {
-                                    $envs->put($variableName->value(), $generatedValue);
-                                    EnvironmentVariable::create([
-                                        'key' => $variableName->value(),
-                                        'value' => $generatedValue,
-                                        'is_build_time' => false,
-                                        'service_id' => $this->id,
-                                        'is_preview' => false,
-                                    ]);
-                                }
+                            if (!$envs->has($variableName->value())) {
+                                $envs->put($variableName->value(), $generatedValue);
+                                EnvironmentVariable::updateOrCreate([
+                                    'key' => $variableName->value(),
+                                    'service_id' => $this->id,
+                                ], [
+                                    'value' => $generatedValue,
+                                    'is_build_time' => false,
+                                    'service_id' => $this->id,
+                                    'is_preview' => false,
+                                ]);
                             }
                         } else if ($variableName->startsWith('SERVICE_FQDN')) {
                             if ($fqdn) {
@@ -324,20 +343,6 @@ class Service extends BaseModel
                 data_forget($service, 'documentation');
                 return $service;
             });
-            // $services = $services->map(function ($service, $serviceName) {
-            //     $dependsOn = collect(data_get($service, 'depends_on', []));
-            //     $dependsOn = $dependsOn->map(function ($value) {
-            //         return "$value-{$this->uuid}";
-            //     });
-            //     data_set($service, 'depends_on', $dependsOn->toArray());
-            //     return $service;
-            // });
-            // $renamedServices = collect([]);
-            // collect($services)->map(function ($service, $serviceName) use ($renamedServices) {
-            //     $newServiceName = "$serviceName-$this->uuid";
-            //     $renamedServices->put($newServiceName, $service);
-            // });
-
             $finalServices = [
                 'version' => $dockerComposeVersion,
                 'services' => $services->toArray(),

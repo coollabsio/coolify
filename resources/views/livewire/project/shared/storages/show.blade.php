@@ -6,8 +6,11 @@
                 reversible. <br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    <form wire:submit.prevent='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
-        @if ($storage->is_readonly)
+    @if ($isReadOnly)
+    <span class="text-warning">Please modify storage layout in your Compose file.</span>
+    @endif
+    <form wire:submit.prevent='submit' class="flex flex-col gap-2 pt-4 xl:items-end xl:flex-row">
+        @if ($isReadOnly)
             <x-forms.input id="storage.name" label="Name" required readonly />
             <x-forms.input id="storage.host_path" label="Source Path" readonly />
             <x-forms.input id="storage.mount_path" label="Destination Path" required readonly />
@@ -15,7 +18,7 @@
                 <x-forms.button type="submit" disabled>
                     Update
                 </x-forms.button>
-                <x-forms.button isError isModal modalId="{{ $modalId }}" disabled>
+                <x-forms.button isError isModal modalId="{{ $modalId }}">
                     Delete
                 </x-forms.button>
             </div>

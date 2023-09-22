@@ -8,6 +8,7 @@ use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index as BoardingIndex;
 use App\Http\Livewire\Project\Service\Index as ServiceIndex;
+use App\Http\Livewire\Project\Service\Show as ServiceShow;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
@@ -86,6 +87,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Services
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service');
+    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
 });
 
 Route::middleware(['auth'])->group(function () {

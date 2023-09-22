@@ -31,7 +31,6 @@ class Add extends Component
 
     public function submit()
     {
-        ray('submitting');
         $this->validate();
         $this->emitUp('submit', [
             'key' => $this->key,

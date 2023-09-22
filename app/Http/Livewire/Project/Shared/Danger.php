@@ -19,13 +19,24 @@ class Danger extends Component
 
     public function delete()
     {
-        $destination = $this->resource->destination->getMorphClass()::where('id', $this->resource->destination->id)->first();
-
-        instant_remote_process(["docker rm -f {$this->resource->uuid}"], $destination->server);
-        $this->resource->delete();
-        return redirect()->route('project.resources', [
-            'project_uuid' => $this->parameters['project_uuid'],
-            'environment_name' => $this->parameters['environment_name']
-        ]);
+        try {
+            if ($this->resource->type() === 'service') {
+                $server = $this->resource->server;
+            } else {
+                $destination = data_get($this->resource, 'destination');
+                if ($destination) {
+                    $destination = $this->resource->destination->getMorphClass()::where('id', $this->resource->destination->id)->first();
+                    $server = $destination->server;
+                }
+            }
+            instant_remote_process(["docker rm -f {$this->resource->uuid}"], $server);
+            $this->resource->delete();
+            return redirect()->route('project.resources', [
+                'project_uuid' => $this->parameters['project_uuid'],
+                'environment_name' => $this->parameters['environment_name']
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e);
+        }
     }
 }

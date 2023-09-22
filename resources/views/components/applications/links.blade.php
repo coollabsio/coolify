@@ -1,18 +1,20 @@
 <div class="group">
-    <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Links
+    <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Open Application
         <x-chevron-down />
     </label>
 
     <div class="absolute hidden group-hover:block">
         <ul tabindex="0" class="relative -ml-24 text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
-            <li>
-                <a target="_blank"
-                    class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
-                    href="{{ $application->gitBranchLocation }}">
-                    <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
-                    Git Repository
-                </a>
-            </li>
+            @if (data_get($application, 'gitBrancLocation'))
+                <li>
+                    <a target="_blank"
+                        class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
+                        href="{{ $application->gitBranchLocation }}">
+                        <x-git-icon git="{{ $application->source?->getMorphClass() }}" />
+                        Git Repository
+                    </a>
+                </li>
+            @endif
             @if (data_get($application, 'fqdn'))
                 @foreach (Str::of(data_get($application, 'fqdn'))->explode(',') as $fqdn)
                     <li>
@@ -31,7 +33,7 @@
                     </li>
                 @endforeach
             @endif
-            @if (data_get($application, 'previews')->count() > 0)
+            @if (data_get($application, 'previews', collect([]))->count() > 0)
                 @foreach (data_get($application, 'previews') as $preview)
                     @if (data_get($preview, 'fqdn'))
                         <li>

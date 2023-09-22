@@ -132,7 +132,6 @@ function get_port_from_dockerfile($dockerfile): int
 
 function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application')
 {
-    ray($type);
     $labels = collect([]);
     $labels->push('coolify.managed=true');
     $labels->push('coolify.version=' . config('version'));
