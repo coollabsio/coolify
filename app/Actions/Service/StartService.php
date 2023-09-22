@@ -12,6 +12,7 @@ class StartService
     {
         $workdir = service_configuration_dir() . "/{$service->uuid}";
         $commands[] = "echo '####### Starting service {$service->name} on {$service->server->name}.'";
+        $commands[] = "echo '####### Pulling images.'";
         $commands[] = "mkdir -p $workdir";
         $commands[] = "cd $workdir";
 
@@ -22,7 +23,6 @@ class StartService
         foreach ($envs as $env) {
             $commands[] = "echo '{$env->key}={$env->value}' >> .env";
         }
-        $commands[] = "echo '####### Pulling images.'";
         $commands[] = "docker compose pull --quiet";
         $commands[] = "echo '####### Starting containers.'";
         $commands[] = "docker compose up -d >/dev/null 2>&1";

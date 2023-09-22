@@ -117,15 +117,10 @@ class Service extends BaseModel
                             'service_id' => $this->id
                         ]);
                     } else {
-                        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-                            if (isDev()) {
-                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
-                            }
-                        } else {
-                            $defaultUsableFqdn = null;
+                        $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
+                        if (isDev()) {
+                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
                         }
-
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
                             'fqdn' => $defaultUsableFqdn,
@@ -155,7 +150,6 @@ class Service extends BaseModel
                 if ($fqdns) {
                     $fqdns = collect(Str::of($fqdns)->explode(','));
                 }
-                ray($fqdns);
                 // Collect ports
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $ports->put($serviceName, $servicePorts);

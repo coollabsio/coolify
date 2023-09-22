@@ -157,7 +157,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             $foundServices[] = "$foundService->id-$serviceName";
                             $statusFromDb = $foundService->status;
                             if ($statusFromDb !== $containerStatus) {
-                                ray('Updating status: ' . $containerStatus);
+                                // ray('Updating status: ' . $containerStatus);
                                 $foundService->update(['status' => $containerStatus]);
                             }
                         }
@@ -169,14 +169,14 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $apps = $service->applications()->get();
                 $dbs = $service->databases()->get();
                 foreach ($apps as $app) {
-                    if (in_array("$service->id-$app->name", $foundServices)) {
+                    if (in_array("$app->id-$app->name", $foundServices)) {
                         continue;
                     } else {
                         $exitedServices->push($app);
                     }
                 }
                 foreach ($dbs as $db) {
-                    if (in_array("$service->id-$db->name", $foundServices)) {
+                    if (in_array("$db->id-$db->name", $foundServices)) {
                         continue;
                     } else {
                         $exitedServices->push($db);
