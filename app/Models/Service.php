@@ -313,7 +313,12 @@ class Service extends BaseModel
                         $variableName = Str::of(replaceVariables(Str::of($value)));
                         $generatedValue = null;
                         if ($variableName->startsWith('SERVICE_USER')) {
-                            $generatedValue = Str::random(10);
+                            $variableDefined = EnvironmentVariable::whereServiceId($this->id)->where('key', $variableName->value())->first();
+                            if (!$variableDefined) {
+                                $generatedValue = Str::random(10);
+                            } else {
+                                $generatedValue = $variableDefined->value;
+                            }
                             if (!$envs->has($variableName->value())) {
                                 $envs->put($variableName->value(), $generatedValue);
                                 EnvironmentVariable::updateOrCreate([
@@ -327,7 +332,12 @@ class Service extends BaseModel
                                 ]);
                             }
                         } else if ($variableName->startsWith('SERVICE_PASSWORD')) {
-                            $generatedValue = Str::password(symbols: false);
+                            $variableDefined = EnvironmentVariable::whereServiceId($this->id)->where('key', $variableName->value())->first();
+                            if (!$variableDefined) {
+                                $generatedValue = Str::password(symbols: false);
+                            } else {
+                                $generatedValue = $variableDefined->value;
+                            }
                             if (!$envs->has($variableName->value())) {
                                 $envs->put($variableName->value(), $generatedValue);
                                 EnvironmentVariable::updateOrCreate([
