@@ -11,7 +11,7 @@ class StartService
     public function handle(Service $service)
     {
         $workdir = service_configuration_dir() . "/{$service->uuid}";
-        $commands[] = "echo 'Starting service {$service->name} on {$service->server->name}'";
+        $commands[] = "echo 'Starting service {$service->name} on {$service->server->name}.'";
         $commands[] = "mkdir -p $workdir";
         $commands[] = "cd $workdir";
 
@@ -22,8 +22,11 @@ class StartService
         foreach ($envs as $env) {
             $commands[] = "echo '{$env->key}={$env->value}' >> .env";
         }
+        $commands[] = "echo 'Pulling images and starting containers...'";
         $commands[] = "docker compose pull";
         $commands[] = "docker compose up -d";
+        $commands[] = "echo 'Waiting for containers to start...'";
+        $commands[] = "sleep 5";
         $commands[] = "docker network connect $service->uuid coolify-proxy 2>/dev/null || true";
         $activity = remote_process($commands, $service->server);
         return $activity;

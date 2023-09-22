@@ -2,10 +2,11 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a :class="activeTab === 'service-stack' && 'text-white'"
-                @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'" href="#">Service Stack</a>
-                <a :class="activeTab === 'compose' && 'text-white'"
+            <a :class="activeTab === 'compose' && 'text-white'"
                 @click.prevent="activeTab = 'compose'; window.location.hash = 'compose'" href="#">Compose File</a>
+            <a :class="activeTab === 'service-stack' && 'text-white'"
+                @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'"
+                href="#">Service Stack</a>
             <a :class="activeTab === 'environment-variables' && 'text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
@@ -57,11 +58,14 @@
 
                         </div>
                     </div>
+                    <x-services.explanation />
+
                     <div x-cloak x-show="raw">
                         <x-forms.textarea rows="20" id="service.docker_compose_raw">
                         </x-forms.textarea>
                     </div>
                     <div x-cloak x-show="raw === false">
+
                         <x-forms.textarea readonly rows="20" id="service.docker_compose">
                         </x-forms.textarea>
                     </div>

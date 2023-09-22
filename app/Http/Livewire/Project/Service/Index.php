@@ -33,6 +33,7 @@ class Index extends Component
     public function save() {
         $this->service->save();
         $this->service->parse();
+        $this->service->refresh();
         $this->emit('refreshEnvs');
     }
 

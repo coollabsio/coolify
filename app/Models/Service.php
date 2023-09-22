@@ -98,6 +98,8 @@ class Service extends BaseModel
             $services = collect($services)->map(function ($service, $serviceName) use ($composeVolumes, $composeNetworks, $definedNetwork, $envs, $volumes, $ports, $isNew) {
                 $container_name = "$serviceName-{$this->uuid}";
                 $isDatabase = false;
+                $serviceVariables = collect(data_get($service, 'environment', []));
+
                 // Decide if the service is a database
                 $image = data_get($service, 'image');
                 if ($image) {
@@ -114,10 +116,15 @@ class Service extends BaseModel
                             'service_id' => $this->id
                         ]);
                     } else {
-                        $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-                        if (isDev()) {
-                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+                        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
+                            if (isDev()) {
+                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+                            }
+                        } else {
+                            $defaultUsableFqdn = null;
                         }
+
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
                             'fqdn' => $defaultUsableFqdn,
@@ -129,6 +136,16 @@ class Service extends BaseModel
                         $savedService = $this->databases()->whereName($serviceName)->first();
                     } else {
                         $savedService = $this->applications()->whereName($serviceName)->first();
+                        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
+                            if (isDev()) {
+                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+                            }
+                        } else {
+                            $defaultUsableFqdn = null;
+                        }
+                        $savedService->fqdn = $defaultUsableFqdn;
+                        $savedService->save();
                     }
                 }
                 $fqdn = data_get($savedService, 'fqdn');
@@ -155,6 +172,7 @@ class Service extends BaseModel
                 // Collect volumes
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 if ($serviceVolumes->count() > 0) {
+                    LocalPersistentVolume::whereResourceId($savedService->id)->whereResourceType(get_class($savedService))->delete();
                     foreach ($serviceVolumes as $volume) {
                         if (is_string($volume)) {
                             $volumeName = Str::before($volume, ':');
@@ -189,7 +207,7 @@ class Service extends BaseModel
                                 $composeVolumes->put($volumeName, null);
                                 LocalPersistentVolume::updateOrCreate(
                                     [
-                                        'mount_path' => $volumePath,
+                                        'name' => $volumeName,
                                         'resource_id' => $savedService->id,
                                         'resource_type' => get_class($savedService)
                                     ],
@@ -234,7 +252,6 @@ class Service extends BaseModel
 
 
                 // Get variables from the service
-                $serviceVariables = collect(data_get($service, 'environment', []));
                 foreach ($serviceVariables as $variable) {
                     $value = Str::after($variable, '=');
                     if (!Str::startsWith($value, '$SERVICE_') && !Str::startsWith($value, '${SERVICE_') && Str::startsWith($value, '$')) {

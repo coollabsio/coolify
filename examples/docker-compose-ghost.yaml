@@ -1,6 +1,6 @@
 services:
   ghost:
-    documentation: https://docs.ghost.org/docs/config
+    documentation: https://ghost.org/docs/config
     image: ghost:5
     volumes:
       - ghost-content-data:/var/lib/ghost/content

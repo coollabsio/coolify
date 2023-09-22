@@ -2,20 +2,10 @@
 
 namespace App\Http\Livewire\Project\New;
 
-use App\Models\Application;
-use App\Models\EnvironmentVariable;
-use App\Models\GithubApp;
-use App\Models\LocalPersistentVolume;
 use App\Models\Project;
 use App\Models\Service;
-use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Livewire\Component;
-use Visus\Cuid2\Cuid2;
 use Illuminate\Support\Str;
-use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
@@ -29,7 +19,7 @@ class DockerCompose extends Component
         if (isDev()) {
             $this->dockercompose = 'services:
   ghost:
-    documentation: https://docs.ghost.org/docs/config
+    documentation: https://ghost.org/docs/config
     image: ghost:5
     volumes:
       - ghost-content-data:/var/lib/ghost/content
