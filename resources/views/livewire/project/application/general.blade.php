@@ -60,7 +60,7 @@
                     <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
                 @else
                     <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes" required
-                        helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck endpoint. Be sure to set this correctly." />
+                        helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Health Check menu. Be sure to set this correctly." />
                 @endif
                 <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
