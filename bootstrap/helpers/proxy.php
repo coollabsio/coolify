@@ -106,12 +106,11 @@ function generate_default_proxy_configuration(Server $server)
 
 function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
-    ray('called');
     $traefik_dynamic_conf_path = get_proxy_path() . "/dynamic";
     $traefik_default_redirect_file = "$traefik_dynamic_conf_path/default_redirect_404.yaml";
-    ray($redirect_url);
     if (empty($redirect_url)) {
         instant_remote_process([
+            "mkdir -p $traefik_dynamic_conf_path",
             "rm -f $traefik_default_redirect_file",
         ], $server);
     } else {
@@ -171,7 +170,6 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
             $yaml;
 
         $base64 = base64_encode($yaml);
-        ray("mkdir -p $traefik_dynamic_conf_path");
         instant_remote_process([
             "mkdir -p $traefik_dynamic_conf_path",
             "echo '$base64' | base64 -d > $traefik_default_redirect_file",

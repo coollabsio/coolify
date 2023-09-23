@@ -31,7 +31,7 @@ class StartProxy
             "command -v lsof >/dev/null || apt-get update",
             "command -v lsof >/dev/null || apt install -y lsof",
             "command -v lsof >/dev/null || command -v fuser >/dev/null || apt install -y psmisc",
-            "cd $proxy_path",
+            "mkdir -p $proxy_path && cd $proxy_path",
             "echo '####### Creating Docker Compose file...'",
             "echo '####### Pulling docker image...'",
             'docker compose pull || docker-compose pull',
