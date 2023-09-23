@@ -1,5 +1,9 @@
 FROM serversideup/php:8.2-fpm-nginx
 
+ARG TARGETPLATFORM
+# https://github.com/cloudflare/cloudflared/releases
+ARG CLOUDFLARED_VERSION=2023.8.2
+
 ARG POSTGRES_VERSION=15
 RUN apt-get update
 # Postgres version requirements
@@ -13,15 +17,23 @@ RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
 RUN apt-get install -y php-pgsql openssh-client git git-lfs jq lsof
-
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
+COPY --chmod=755 docker/dev-ssu/etc/s6-overlay/ /etc/s6-overlay/
 
 COPY docker/dev-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
 
 RUN echo "alias ll='ls -al'" >>/etc/bash.bashrc
 RUN echo "alias a='php artisan'" >>/etc/bash.bashrc
-RUN echo "alias mfs='php artisan migrate:fresh --seed'" >>/etc/bash.bashrc
-RUN echo "alias cda='composer dump-autoload'" >>/etc/bash.bashrc
-RUN echo "alias run='./scripts/run'" >>/etc/bash.bashrc
 
-COPY --chmod=755  docker/dev-ssu/etc/s6-overlay/ /etc/s6-overlay/
+RUN mkdir -p /usr/local/bin
+
+RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/amd64' ]]; then \
+    echo 'amd64' && \
+    curl -sSL https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
+    ;fi"
+
+RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
+    echo 'arm64' && \
+    curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
+    ;fi"
+

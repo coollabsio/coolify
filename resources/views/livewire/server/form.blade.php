@@ -41,6 +41,10 @@
                     <x-forms.input type="number" id="server.port" label="Port" required />
                 </div>
             </div>
+            <div class="w-64">
+                <x-forms.checkbox instantSave helper="If you are using Cloudflare Tunnels, enable this"
+                    id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
+            </div>
         </div>
         @if (!$server->settings->is_reachable)
             <x-forms.button class="mt-8 mb-4 box" wire:click.prevent='validateServer'>

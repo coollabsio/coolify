@@ -23,6 +23,7 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
+        'server.settings.is_cloudflare_tunnel' => 'required',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required',
         'wildcard_domain' => 'nullable|url',
@@ -33,6 +34,7 @@ class Form extends Component
         'server.ip' => 'ip',
         'server.user' => 'user',
         'server.port' => 'port',
+        'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'
     ];
@@ -42,7 +44,9 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-
+    public function instantSave() {
+        $this->server->settings->save();
+    }
     public function installDocker()
     {
         $this->dockerInstallationStarted = true;

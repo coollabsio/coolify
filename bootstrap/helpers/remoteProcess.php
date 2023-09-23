@@ -85,6 +85,9 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     if ($isMux && config('coolify.mux_enabled')) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
+    if (data_get($server,'settings.is_cloudflare_tunnel')) {
+        $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $ssh_command .= "-i {$privateKeyLocation} "
         . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
@@ -98,7 +101,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
         . " 'bash -se' << \\$delimiter" . PHP_EOL
         . $command . PHP_EOL
         . $delimiter;
-    // ray($ssh_command);
+    ray($ssh_command);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
