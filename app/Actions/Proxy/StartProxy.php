@@ -27,16 +27,16 @@ class StartProxy
         $server->save();
 
         $commands = $commands->merge([
+            "apt-get update > /dev/null 2>&1 || true",
             "command -v lsof >/dev/null || echo '####### Installing lsof...'",
-            "command -v lsof >/dev/null || apt-get update",
             "command -v lsof >/dev/null || apt install -y lsof",
             "command -v lsof >/dev/null || command -v fuser >/dev/null || apt install -y psmisc",
             "mkdir -p $proxy_path && cd $proxy_path",
             "echo '####### Creating Docker Compose file...'",
             "echo '####### Pulling docker image...'",
-            'docker compose pull || docker-compose pull',
+            'docker compose pull',
             "echo '####### Stopping existing coolify-proxy...'",
-            "docker compose down -v --remove-orphans > /dev/null 2>&1 || docker-compose down -v --remove-orphans > /dev/null 2>&1 || true",
+            "docker compose down -v --remove-orphans > /dev/null 2>&1",
             "command -v fuser >/dev/null || command -v lsof >/dev/null || echo '####### Could not kill existing processes listening on port 80 & 443. Please stop the process holding these ports...'",
             "command -v lsof >/dev/null && lsof -nt -i:80 | xargs -r kill -9 || true",
             "command -v lsof >/dev/null && lsof -nt -i:443 | xargs -r kill -9 || true",
@@ -46,7 +46,7 @@ class StartProxy
             "systemctl disable apache2 > /dev/null 2>&1 || true",
             "systemctl disable apache > /dev/null 2>&1 || true",
             "echo '####### Starting coolify-proxy...'",
-            'docker compose up -d --remove-orphans || docker-compose up -d --remove-orphans',
+            'docker compose up -d --remove-orphans',
             "echo '####### Proxy installed successfully...'"
         ]);
         $commands = $commands->merge(connectProxyToNetworks($server));
