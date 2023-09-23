@@ -17,7 +17,7 @@ class Select extends Component
     public string $type;
     public string $server_id;
     public string $destination_uuid;
-    public Countable|array|Server $servers;
+    public Countable|array|Server $servers = [];
     public Collection|array $standaloneDockers = [];
     public Collection|array $swarmDockers = [];
     public array $parameters;
