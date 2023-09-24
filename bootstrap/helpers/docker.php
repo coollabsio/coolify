@@ -147,7 +147,7 @@ function fqdnLabelsForTraefik(Collection $domains, $container_name, $is_force_ht
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
-    foreach($domains as $domain) {
+    foreach ($domains as $domain) {
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
@@ -216,9 +216,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         } else {
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
-        if ($application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
-            $labels = $labels->merge(fqdnLabelsForTraefik($domains, $container_name, $application->settings->is_force_https_enabled));
-        }
+        // Add Traefik labels no matter which proxy is selected
+        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $container_name, $application->settings->is_force_https_enabled));
     }
     return $labels->all();
 }
