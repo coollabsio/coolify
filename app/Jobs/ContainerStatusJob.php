@@ -74,8 +74,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
-            // $services = $this->server->services();
-            $services = collect([]);
+            $services = $this->server->services();
             $previews = $this->server->previews();
 
             /// Check if proxy is running
