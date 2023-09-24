@@ -1,5 +1,10 @@
 <x-layout>
-    <h1>Sources</h1>
+    <div class="flex items-start gap-2">
+        <h1>Sources</h1>
+        <a class="text-white hover:no-underline" href="{{ route('source.new') }}">
+            <x-forms.button class="btn">+ Add</x-forms.button>
+        </a>
+    </div>
     <div class="subtitle ">All Sources</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($sources as $source)
