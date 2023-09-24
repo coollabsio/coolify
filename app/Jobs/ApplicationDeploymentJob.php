@@ -284,9 +284,20 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function rolling_update()
     {
-        $this->start_by_compose_file();
-        $this->health_check();
-        $this->stop_running_container();
+        if (count($this->application->ports_mappings_array) > 0){
+            $this->execute_remote_command(
+                ["echo -n 'Application has ports mapped to the host system, rolling update is not supported. Stopping current container.'"],
+            );
+            $this->stop_running_container(force: true);
+            $this->start_by_compose_file();
+        } else {
+            $this->execute_remote_command(
+                ["echo -n 'Rolling update started.'"],
+            );
+            $this->start_by_compose_file();
+            $this->health_check();
+            $this->stop_running_container();
+        }
     }
     private function health_check()
     {
@@ -704,10 +715,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
     }
 
-    private function stop_running_container()
+    private function stop_running_container(bool $force = false)
     {
         if ($this->currently_running_container_name) {
-            if ($this->newVersionIsHealthy) {
+            if ($this->newVersionIsHealthy || $force) {
                 $this->execute_remote_command(
                     ["echo -n 'Removing old version of your application.'"],
                     [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
@@ -724,7 +735,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         $this->execute_remote_command(
-            ["echo -n 'Rolling update started.'"],
+            ["echo -n 'Starting application (could take a while).'"],
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
         );
     }
