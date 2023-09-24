@@ -258,7 +258,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
         } catch (\Throwable $e) {
-            // send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
+            send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
             throw $e;
         }
