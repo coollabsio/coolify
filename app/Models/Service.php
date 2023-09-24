@@ -377,7 +377,7 @@ class Service extends BaseModel
                                 } else {
                                     $number = 0;
                                 }
-                                $fqdn = getOnlyFqdn(data_get($fqdns, $number, $fqdns->first()));
+                                $fqdn = getFqdnWithoutPort(data_get($fqdns, $number, $fqdns->first()));
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $fqdn) {
                                     $envValue = Str::of($envValue)->replace($value, $fqdn);
@@ -393,7 +393,7 @@ class Service extends BaseModel
                                 } else {
                                     $number = 0;
                                 }
-                                $fqdn = getOnlyFqdn(data_get($fqdns, $number, $fqdns->first()));
+                                $fqdn = getFqdnWithoutPort(data_get($fqdns, $number, $fqdns->first()));
                                 $url = Url::fromString($fqdn)->getHost();
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $url) {

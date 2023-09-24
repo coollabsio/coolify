@@ -19,7 +19,7 @@
                 @foreach (Str::of(data_get($application, 'fqdn'))->explode(',') as $fqdn)
                     <li>
                         <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
-                            target="_blank" href="{{ getOnlyFqdn($fqdn) }}">
+                            target="_blank" href="{{ getFqdnWithoutPort($fqdn) }}">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
@@ -28,7 +28,7 @@
                                 <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
                                 <path
                                     d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
-                            </svg>{{ getOnlyFqdn($fqdn) }}
+                            </svg>{{ getFqdnWithoutPort($fqdn) }}
                         </a>
                     </li>
                 @endforeach
@@ -38,7 +38,7 @@
                     @if (data_get($preview, 'fqdn'))
                         <li>
                             <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
-                                target="_blank" href="{{ getOnlyFqdn(data_get($preview, 'fqdn')) }}">
+                                target="_blank" href="{{ getFqdnWithoutPort(data_get($preview, 'fqdn')) }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
                                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                     stroke-linejoin="round">

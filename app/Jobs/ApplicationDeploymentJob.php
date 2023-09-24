@@ -97,7 +97,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
             if ($this->application->fqdn) {
-                $preview_fqdn = getOnlyFqdn(data_get($this->preview, 'fqdn'));
+                $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
                 $template = $this->application->preview_url_template;
                 $url = Url::fromString($this->application->fqdn);
                 $host = $url->getHost();

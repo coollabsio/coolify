@@ -241,12 +241,13 @@ function base_ip(): string
     }
     return "localhost";
 }
-function getOnlyFqdn(String $fqdn)
+function getFqdnWithoutPort(String $fqdn)
 {
     $url = Url::fromString($fqdn);
     $host = $url->getHost();
     $scheme = $url->getScheme();
-    return "$scheme://$host";
+    $path = $url->getPath();
+    return "$scheme://$host$path";
 }
 /**
  * If fqdn is set, return it, otherwise return public ip.
