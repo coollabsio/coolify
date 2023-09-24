@@ -26,6 +26,14 @@
                     @endif
                 @endif
             </div>
+            @if (!$application->dockerfile)
+                <div class="flex items-end gap-2">
+                    <x-forms.select id="application.build_pack" label="Build Pack" required>
+                        <option value="nixpacks">Nixpacks</option>
+                        <option value="dockerfile">Dockerfile</option>
+                    </x-forms.select>
+                </div>
+            @endif
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>
@@ -54,6 +62,7 @@
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
+
             <h3>Network</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
                 @if ($application->settings->is_static)
@@ -63,7 +72,7 @@
                         helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
                 @endif
                 <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
-                    helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><span class='inline-block font-bold text-warning'>Example</span>3000:3000,3002:3002" />
+                    helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
             </div>
         </div>
         <h3>Advanced</h3>

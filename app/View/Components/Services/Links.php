@@ -19,7 +19,7 @@ class Links extends Component
             if ($application->fqdn) {
                 $fqdns = collect(Str::of($application->fqdn)->explode(','));
                 $fqdns->map(function ($fqdn) {
-                    $this->links->push(getOnlyFqdn($fqdn));
+                    $this->links->push(getFqdnWithoutPort($fqdn));
                 });
             }
             if ($application->ports) {
