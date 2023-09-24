@@ -21,7 +21,7 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch_sync(new ContainerStatusJob($this->application->destination->server));
+        dispatch(new ContainerStatusJob($this->application->destination->server));
         $this->application->refresh();
         $this->application->previews->each(function ($preview) {
             $preview->refresh();
@@ -64,7 +64,7 @@ class Heading extends Component
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
             if ($containerName) {
-                remote_process(
+                instant_remote_process(
                     ["docker rm -f {$containerName}"],
                     $this->application->destination->server
                 );

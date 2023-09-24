@@ -53,12 +53,12 @@
             @foreach ($application->previews as $preview)
                 <div class="flex flex-col p-4 bg-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
-                        @if (data_get($preview, 'status') === 'running')
-                            <x-status.running />
-                        @elseif (data_get($preview, 'status') === 'restarting')
-                            <x-status.restarting />
+                        @if (Str::of(data_get($preview, 'status'))->startsWith('running'))
+                            <x-status.running :status="$status" />
+                        @elseif(Str::of(data_get($preview, 'status'))->startsWith('restarting'))
+                            <x-status.restarting :status="$status" />
                         @else
-                            <x-status.stopped />
+                            <x-status.stopped :status="$status" />
                         @endif
                         @if (data_get($preview, 'status') !== 'exited')
                             | <a target="_blank" href="{{ data_get($preview, 'fqdn') }}">Open Preview

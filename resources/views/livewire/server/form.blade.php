@@ -23,7 +23,7 @@
         @if (!$server->isFunctional())
             You can't use this server until it is validated.
         @else
-            Server validated.
+            Server is reachable and validated.
         @endif
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex flex-col w-full gap-2 lg:flex-row">
@@ -40,6 +40,10 @@
                     <x-forms.input id="server.user" label="User" required />
                     <x-forms.input type="number" id="server.port" label="Port" required />
                 </div>
+            </div>
+            <div class="w-64">
+                <x-forms.checkbox instantSave helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                    id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
             </div>
         </div>
         @if (!$server->settings->is_reachable)

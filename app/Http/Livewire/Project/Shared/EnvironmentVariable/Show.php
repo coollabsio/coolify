@@ -10,7 +10,9 @@ class Show extends Component
 {
     public $parameters;
     public ModelsEnvironmentVariable $env;
-    public string|null $modalId = null;
+    public ?string $modalId = null;
+    public string $type;
+
     protected $rules = [
         'env.key' => 'required|string',
         'env.value' => 'required|string',
@@ -37,6 +39,7 @@ class Show extends Component
         $this->validate();
         $this->env->save();
         $this->emit('success', 'Environment variable updated successfully.');
+        $this->emit('refreshEnvs');
     }
 
     public function delete()

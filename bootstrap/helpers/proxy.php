@@ -10,7 +10,22 @@ function get_proxy_path()
     $proxy_path = "$base_path/proxy";
     return $proxy_path;
 }
-
+function connectProxyToNetworks(Server $server) {
+    $networks = collect($server->standaloneDockers)->map(function ($docker) {
+        return $docker['network'];
+    })->unique();
+    if ($networks->count() === 0) {
+        $networks = collect(['coolify']);
+    }
+    $commands = $networks->map(function ($network) {
+        return [
+            "echo '####### Connecting coolify-proxy to $network network...'",
+            "docker network ls --format '{{.Name}}' | grep '^$network$' || docker network create --attachable $network >/dev/null",
+            "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+        ];
+    });
+    return $commands->flatten();
+}
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();
@@ -91,12 +106,11 @@ function generate_default_proxy_configuration(Server $server)
 
 function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
-    ray('called');
     $traefik_dynamic_conf_path = get_proxy_path() . "/dynamic";
     $traefik_default_redirect_file = "$traefik_dynamic_conf_path/default_redirect_404.yaml";
-    ray($redirect_url);
     if (empty($redirect_url)) {
         instant_remote_process([
+            "mkdir -p $traefik_dynamic_conf_path",
             "rm -f $traefik_default_redirect_file",
         ], $server);
     } else {
@@ -156,7 +170,6 @@ function setup_default_redirect_404(string|null $redirect_url, Server $server)
             $yaml;
 
         $base64 = base64_encode($yaml);
-        ray("mkdir -p $traefik_dynamic_conf_path");
         instant_remote_process([
             "mkdir -p $traefik_dynamic_conf_path",
             "echo '$base64' | base64 -d > $traefik_default_redirect_file",

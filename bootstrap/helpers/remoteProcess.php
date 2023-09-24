@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 use Spatie\Activitylog\Contracts\Activity;
 
 function remote_process(
-    array   $command,
+    Collection|array   $command,
     Server  $server,
     ?string  $type = null,
     ?string $type_uuid = null,
@@ -26,6 +26,9 @@ function remote_process(
     if (is_null($type)) {
         $type = ActivityTypes::INLINE->value;
     }
+    if ($command instanceof Collection) {
+        $command = $command->toArray();
+    }
     $command_string = implode("\n", $command);
     if (auth()->user()) {
         $teams = auth()->user()->teams->pluck('id');
@@ -33,7 +36,6 @@ function remote_process(
             throw new \Exception("User is not part of the team that owns this server");
         }
     }
-
     return resolve(PrepareCoolifyTask::class, [
         'remoteProcessArgs' => new CoolifyTaskArgs(
             server_uuid: $server->uuid,
@@ -83,6 +85,9 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     if ($isMux && config('coolify.mux_enabled')) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
+    if (data_get($server,'settings.is_cloudflare_tunnel')) {
+        $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
+    }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $ssh_command .= "-i {$privateKeyLocation} "
         . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
@@ -99,8 +104,11 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     // ray($ssh_command);
     return $ssh_command;
 }
-function instant_remote_process(array $command, Server $server, $throwError = true)
+function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
 {
+    if ($command instanceof Collection) {
+        $command = $command->toArray();
+    }
     $command_string = implode("\n", $command);
     $ssh_command = generateSshCommand($server, $command_string);
     $process = Process::run($ssh_command);

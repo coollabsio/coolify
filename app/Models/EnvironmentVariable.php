@@ -33,18 +33,23 @@ class EnvironmentVariable extends Model
             }
         });
     }
-
+    public function service() {
+        return $this->belongsTo(Service::class);
+    }
     protected function value(): Attribute
     {
         return Attribute::make(
-            get: fn (string $value) => $this->get_environment_variables($value),
-            set: fn (string $value) => $this->set_environment_variables($value),
+            get: fn (?string $value = null) => $this->get_environment_variables($value),
+            set: fn (?string $value = null) => $this->set_environment_variables($value),
         );
     }
 
-    private function get_environment_variables(string $environment_variable): string|null
+    private function get_environment_variables(?string $environment_variable = null): string|null
     {
         // $team_id = currentTeam()->id;
+        if (!$environment_variable) {
+            return null;
+        }
         $environment_variable = trim(decrypt($environment_variable));
         if (Str::startsWith($environment_variable, '{{') && Str::endsWith($environment_variable, '}}') && Str::contains($environment_variable, 'global.')) {
             $variable = Str::after($environment_variable, 'global.');
@@ -57,8 +62,11 @@ class EnvironmentVariable extends Model
         return $environment_variable;
     }
 
-    private function set_environment_variables(string $environment_variable): string|null
+    private function set_environment_variables(?string $environment_variable = null): string|null
     {
+        if (is_null($environment_variable) && $environment_variable == '') {
+            return null;
+        }
         $environment_variable = trim($environment_variable);
         return encrypt($environment_variable);
     }
@@ -69,4 +77,5 @@ class EnvironmentVariable extends Model
             set: fn (string $value) => Str::of($value)->trim(),
         );
     }
+
 }

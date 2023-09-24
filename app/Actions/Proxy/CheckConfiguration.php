@@ -13,6 +13,7 @@ class CheckConfiguration
     {
         $proxy_path = get_proxy_path();
         $proxy_configuration = instant_remote_process([
+            "mkdir -p $proxy_path",
             "cat $proxy_path/docker-compose.yml",
         ], $server, false);
 

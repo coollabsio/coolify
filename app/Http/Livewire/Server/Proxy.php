@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
 use Livewire\Component;
+use Illuminate\Support\Str;
 
 class Proxy extends Component
 {
@@ -47,14 +48,14 @@ class Proxy extends Component
     public function submit()
     {
         try {
-            SaveConfiguration::run($this->server);
+            SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
 
             setup_default_redirect_404(redirect_url: $this->server->proxy->redirect_url, server: $this->server);
             $this->emit('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -63,7 +64,7 @@ class Proxy extends Component
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server, true);
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 
@@ -71,8 +72,14 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server);
+            if (Str::of($this->proxy_settings)->contains('--api.dashboard=true') && Str::of($this->proxy_settings)->contains('--api.insecure=true')) {
+                $this->emit('traefikDashboardAvailable', true);
+            } else {
+                $this->emit('traefikDashboardAvailable', false);
+            }
+
         } catch (\Throwable $e) {
-            return handleError($e);
+            return handleError($e, $this);
         }
     }
 }

@@ -3,7 +3,7 @@
     <livewire:project.database.heading :database="$database" />
     <x-modal modalId="startDatabase">
         <x-slot:modalBody>
-            <livewire:activity-monitor header="Startup Logs" />
+            <livewire:activity-monitor header="Database Startup Logs" />
         </x-slot:modalBody>
         <x-slot:modalSubmit>
             <x-forms.button onclick="startDatabase.close()" type="submit">

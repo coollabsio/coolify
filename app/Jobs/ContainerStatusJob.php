@@ -8,7 +8,6 @@ use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
 use App\Notifications\Server\Unreachable;
-use Arr;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -17,6 +16,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
@@ -74,6 +74,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
+            $services = $this->server->services();
             $previews = $this->server->previews();
 
             /// Check if proxy is running
@@ -88,12 +89,18 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
+                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
             $foundApplications = [];
             $foundApplicationPreviews = [];
             $foundDatabases = [];
+            $foundServices = [];
+
             foreach ($containers as $container) {
                 $containerStatus = data_get($container, 'State.Status');
+                $containerHealth = data_get($container, 'State.Health.Status','unhealthy');
+                $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
                 $labelId = data_get($labels, 'coolify.applicationId');
@@ -138,7 +145,60 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                         }
                     }
                 }
+                $serviceLabelId = data_get($labels, 'coolify.serviceId');
+                if ($serviceLabelId) {
+                    $coolifyName = data_get($labels, 'coolify.name');
+                    $serviceName = Str::of($coolifyName)->before('-');
+                    $serviceUuid = Str::of($coolifyName)->after('-');
+                    $service = $services->where('uuid', $serviceUuid)->first();
+                    if ($service) {
+                        $foundService = $service->byName($serviceName);
+                        if ($foundService) {
+                            $foundServices[] = "$foundService->id-$serviceName";
+                            $statusFromDb = $foundService->status;
+                            if ($statusFromDb !== $containerStatus) {
+                                // ray('Updating status: ' . $containerStatus);
+                                $foundService->update(['status' => $containerStatus]);
+                            }
+                        }
+                    }
+                }
             }
+            $exitedServices = collect([]);
+            foreach ($services->get() as $service) {
+                $apps = $service->applications()->get();
+                $dbs = $service->databases()->get();
+                foreach ($apps as $app) {
+                    if (in_array("$app->id-$app->name", $foundServices)) {
+                        continue;
+                    } else {
+                        $exitedServices->push($app);
+                    }
+                }
+                foreach ($dbs as $db) {
+                    if (in_array("$db->id-$db->name", $foundServices)) {
+                        continue;
+                    } else {
+                        $exitedServices->push($db);
+                    }
+                }
+            }
+            $exitedServices = $exitedServices->unique('id');
+            foreach ($exitedServices as $exitedService) {
+                if ($exitedService->status === 'exited') {
+                    continue;
+                }
+                $name = data_get($exitedService, 'name');
+                $fqdn = data_get($exitedService, 'fqdn');
+                $containerName = $name ? "$name ($fqdn)" : $fqdn;
+                $project = data_get($service, 'environment.project');
+                $environment = data_get($service, 'environment');
+
+                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/service/" . $service->uuid;
+                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $exitedService->update(['status' => 'exited']);
+            }
+
             $notRunningApplications = $applications->pluck('id')->diff($foundApplications);
             foreach ($notRunningApplications as $applicationId) {
                 $application = $applications->where('id', $applicationId)->first();

@@ -16,8 +16,7 @@ return new class extends Migration
             $table->string('uuid')->unique();
             $table->string('name');
 
-            $table->morphs('destination');
-
+            $table->foreignId('server_id')->nullable();
             $table->foreignId('environment_id');
             $table->timestamps();
         });

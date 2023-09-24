@@ -4,15 +4,18 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Symfony\Component\Yaml\Yaml;
 
 class General extends Component
 {
     public string $applicationId;
 
     public Application $application;
+    public Collection $services;
     public string $name;
     public string|null $fqdn;
     public string $git_repository;
@@ -30,6 +33,7 @@ class General extends Component
     public bool $is_preview_deployments_enabled;
     public bool $is_auto_deploy_enabled;
     public bool $is_force_https_enabled;
+
 
     protected $rules = [
         'application.name' => 'required',
@@ -66,6 +70,7 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
         'application.dockerfile' => 'Dockerfile',
+
     ];
 
     public function instantSave()
@@ -86,8 +91,8 @@ class General extends Component
         $this->application->settings->save();
         $this->application->save();
         $this->application->refresh();
-        $this->emit('success', 'Application settings updated!');
         $this->checkWildCardDomain();
+        $this->emit('success', 'Application settings updated!');
     }
 
     protected function checkWildCardDomain()
@@ -136,16 +141,15 @@ class General extends Component
 
     public function submit()
     {
-        ray($this->application);
         try {
             $this->validate();
-            if (data_get($this->application,'fqdn')) {
+            if (data_get($this->application, 'fqdn')) {
                 $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                     return Str::of($domain)->trim()->lower();
                 });
                 $this->application->fqdn = $domains->implode(',');
             }
-            if ($this->application->dockerfile) {
+            if (data_get($this->application, 'dockerfile')) {
                 $port = get_port_from_dockerfile($this->application->dockerfile);
                 if ($port) {
                     $this->application->ports_exposes = $port;

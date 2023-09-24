@@ -1,11 +1,15 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 
-function getCurrentApplicationContainerStatus(Server $server, int $id): Collection {
+function getCurrentApplicationContainerStatus(Server $server, int $id): Collection
+{
     $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
     if (!$containers) {
         return collect([]);
@@ -26,7 +30,7 @@ function format_docker_command_output_to_json($rawOutput): Collection
         ->map(fn ($outputLine) => json_decode($outputLine, true, flags: JSON_THROW_ON_ERROR));
 }
 
-function format_docker_labels_to_json(string|Array $rawOutput): Collection
+function format_docker_labels_to_json(string|array $rawOutput): Collection
 {
     if (is_array($rawOutput)) {
         return collect($rawOutput);
@@ -59,7 +63,8 @@ function format_docker_envs_to_json($rawOutput)
         return collect([]);
     }
 }
-function checkMinimumDockerEngineVersion($dockerVersion) {
+function checkMinimumDockerEngineVersion($dockerVersion)
+{
     $majorDockerVersion = Str::of($dockerVersion)->before('.')->value();
     if ($majorDockerVersion <= 22) {
         $dockerVersion = null;
@@ -72,8 +77,9 @@ function executeInDocker(string $containerId, string $command)
     // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
 }
 
-function getApplicationContainerStatus(Application $application) {
-    $server = data_get($application,'destination.server');
+function getApplicationContainerStatus(Application $application)
+{
+    $server = data_get($application, 'destination.server');
     $id = $application->id;
     if (!$server) {
         return 'exited';
@@ -98,13 +104,13 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
     return data_get($container[0], 'State.Status', 'exited');
 }
 
-function generateApplicationContainerName(string $uuid, int $pull_request_id = 0)
+function generateApplicationContainerName(Application $application)
 {
     $now = now()->format('Hisu');
-    if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        return $uuid . '-pr-' . $pull_request_id;
+    if ($application->pull_request_id !== 0 && $application->pull_request_id !== null) {
+        return $application->uuid . '-pr-' . $application->pull_request_id;
     } else {
-        return $uuid . '-' . $now;
+        return $application->uuid . '-' . $now;
     }
 }
 function get_port_from_dockerfile($dockerfile): int
@@ -122,4 +128,97 @@ function get_port_from_dockerfile($dockerfile): int
         return (int)$found_exposed_port->value();
     }
     return 80;
+}
+
+function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application')
+{
+    $labels = collect([]);
+    $labels->push('coolify.managed=true');
+    $labels->push('coolify.version=' . config('version'));
+    $labels->push("coolify." . $type . "Id=" . $id);
+    $labels->push("coolify.type=$type");
+    $labels->push('coolify.name=' . $name);
+    if ($pull_request_id !== 0) {
+        $labels->push('coolify.pullRequestId=' . $pull_request_id);
+    }
+    return $labels;
+}
+function fqdnLabelsForTraefik(Collection $domains, $container_name, $is_force_https_enabled)
+{
+    $labels = collect([]);
+    $labels->push('traefik.enable=true');
+    foreach($domains as $domain) {
+        $url = Url::fromString($domain);
+        $host = $url->getHost();
+        $path = $url->getPath();
+        $schema = $url->getScheme();
+        $port = $url->getPort();
+        $slug = Str::slug($host . $path);
+
+        $http_label = "{$container_name}-{$slug}-http";
+        $https_label = "{$container_name}-{$slug}-https";
+
+        if ($schema === 'https') {
+            // Set labels for https
+            $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+            $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
+            $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
+            if ($port) {
+                $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
+                $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
+            }
+            if ($path !== '/') {
+                $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix");
+                $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+            }
+
+            $labels->push("traefik.http.routers.{$https_label}.tls=true");
+            $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+
+            // Set labels for http (redirect to https)
+            $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+            $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+            if ($is_force_https_enabled) {
+                $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+            }
+        } else {
+            // Set labels for http
+            $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+            $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+            $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
+            if ($port) {
+                $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
+                $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
+            }
+            if ($path !== '/') {
+                $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
+                $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+            }
+        }
+    }
+
+    return $labels;
+}
+function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
+{
+
+    $pull_request_id = data_get($preview, 'pull_request_id', 0);
+    $container_name = generateApplicationContainerName($application);
+    $appId = $application->id;
+    if ($pull_request_id !== 0) {
+        $appId = $appId . '-pr-' . $application->pull_request_id;
+    }
+    $labels = collect([]);
+    $labels = $labels->merge(defaultLabels($appId, $container_name, $pull_request_id));
+    if ($application->fqdn) {
+        if ($pull_request_id !== 0) {
+            $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
+        } else {
+            $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
+        }
+        if ($application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
+            $labels = $labels->merge(fqdnLabelsForTraefik($domains, $container_name, $application->settings->is_force_https_enabled));
+        }
+    }
+    return $labels->all();
 }

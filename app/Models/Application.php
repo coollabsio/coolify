@@ -19,7 +19,13 @@ class Application extends BaseModel
         });
         static::deleting(function ($application) {
             $application->settings()->delete();
+            $storages =  $application->persistentStorages()->get();
+            foreach ($storages as $storage) {
+                instant_remote_process(["docker volume rm -f $storage->name"], $application->destination->server);
+            }
             $application->persistentStorages()->delete();
+            $application->environment_variables()->delete();
+            $application->environment_variables_preview()->delete();
         });
     }
 
@@ -224,7 +230,7 @@ class Application extends BaseModel
     }
     public function git_based(): bool
     {
-        if ($this->dockerfile || $this->build_pack === 'dockerfile') {
+        if ($this->dockerfile || $this->build_pack === 'dockerfile' || $this->dockercompose || $this->build_pack === 'dockercompose') {
             return false;
         }
         return true;

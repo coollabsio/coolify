@@ -23,6 +23,7 @@ class Form extends Component
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
+        'server.settings.is_cloudflare_tunnel' => 'required',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_part_of_swarm' => 'required',
         'wildcard_domain' => 'nullable|url',
@@ -33,6 +34,7 @@ class Form extends Component
         'server.ip' => 'ip',
         'server.user' => 'user',
         'server.port' => 'port',
+        'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'
     ];
@@ -42,7 +44,11 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-
+    public function instantSave() {
+        refresh_server_connection($this->server->privateKey);
+        $this->validateServer();
+        $this->server->settings->save();
+    }
     public function installDocker()
     {
         $this->dockerInstallationStarted = true;
@@ -58,21 +64,19 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable.');
             } else {
-                ray($this->uptime);
-
                 $this->emit('error', 'Server is not reachable.');
-
                 return;
             }
             if ($dockerVersion) {
                 $this->dockerVersion = $dockerVersion;
-                $this->emit('proxyStatusUpdated');
                 $this->emit('success', 'Docker Engine 23+ is installed!');
             } else {
                 $this->emit('error', 'No Docker Engine or older than 23 version installed.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this, customErrorMessage: "Server is not reachable: ");
+        } finally {
+            $this->emit('proxyStatusUpdated');
         }
     }
 

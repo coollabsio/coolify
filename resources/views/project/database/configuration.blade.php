@@ -3,7 +3,7 @@
     <livewire:project.database.heading :database="$database" />
     <x-modal modalId="startDatabase">
         <x-slot:modalBody>
-            <livewire:activity-monitor header="Startup Logs" />
+            <livewire:activity-monitor header="Database Startup Logs" />
         </x-slot:modalBody>
         <x-slot:modalSubmit>
             <x-forms.button onclick="startDatabase.close()" type="submit">
@@ -19,9 +19,9 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'destination' && 'text-white'"
-                @click.prevent="activeTab = 'destination'; window.location.hash = 'destination'"
-                href="#">Destination
+            <a :class="activeTab === 'server' && 'text-white'"
+                @click.prevent="activeTab = 'server'; window.location.hash = 'server'"
+                href="#">Server
             </a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
@@ -43,7 +43,7 @@
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$database" />
             </div>
-            <div x-cloak x-show="activeTab === 'destination'">
+            <div x-cloak x-show="activeTab === 'server'">
                 <livewire:project.shared.destination :destination="$database->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">

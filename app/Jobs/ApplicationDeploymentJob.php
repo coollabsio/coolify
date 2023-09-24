@@ -37,6 +37,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private int $application_deployment_queue_id;
 
+    private bool $newVersionIsHealthy = false;
     private ApplicationDeploymentQueue $application_deployment_queue;
     private Application $application;
     private string $deployment_uuid;
@@ -88,7 +89,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generateApplicationContainerName($this->application->uuid, $this->pull_request_id);
+        $this->container_name = generateApplicationContainerName($this->application);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
@@ -96,7 +97,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
             if ($this->application->fqdn) {
-                $preview_fqdn = data_get($this->preview, 'fqdn');
+                $preview_fqdn = getOnlyFqdn(data_get($this->preview, 'fqdn'));
                 $template = $this->application->preview_url_template;
                 $url = Url::fromString($this->application->fqdn);
                 $host = $url->getHost();
@@ -165,6 +166,54 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             );
         }
+    }
+    private function deploy_docker_compose()
+    {
+        $dockercompose_base64 = base64_encode($this->application->dockercompose);
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->name}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$dockercompose_base64' | base64 -d > $this->workdir/docker-compose.yaml")
+            ],
+        );
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+        $this->save_environment_variables();
+        $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id);
+        if ($containers->count() > 0) {
+            foreach ($containers as $container) {
+                $containerName = data_get($container, 'Names');
+                if ($containerName) {
+                    instant_remote_process(
+                        ["docker rm -f {$containerName}"],
+                        $this->application->destination->server
+                    );
+                }
+            }
+        }
+
+        $this->execute_remote_command(
+            ["echo -n 'Starting services (could take a while)...'"],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
+        );
+    }
+    private function save_environment_variables()
+    {
+        $envs = collect([]);
+        foreach ($this->application->environment_variables as $env) {
+            $envs->push($env->key . '=' . $env->value);
+        }
+        $envs_base64 = base64_encode($envs->implode("\n"));
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
+            ],
+        );
     }
     private function deploy_simple_dockerfile()
     {
@@ -246,7 +295,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $counter = 0;
             $this->execute_remote_command(
                 [
-                    "echo 'Waiting for health check to pass on the new version of your application.'"
+                    "echo 'Waiting for healthcheck to pass on the new version of your application.'"
                 ],
             );
             while ($counter < $this->application->health_check_retries) {
@@ -263,11 +312,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 );
                 $this->execute_remote_command(
                     [
-                        "echo 'New version health check status: {$this->saved_outputs->get('health_check')}'"
+                        "echo 'New version healthcheck status: {$this->saved_outputs->get('health_check')}'"
                     ],
                 );
                 if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
+                    $this->newVersionIsHealthy = true;
                     $this->execute_remote_command(
+                        [
+                            "echo 'New version of your application is healthy.'"
+                        ],
                         [
                             "echo 'Rolling update completed.'"
                         ],
@@ -475,8 +528,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
-                    'labels' => $this->set_labels_for_applications(),
-                    'expose' => $ports,
+                    'labels' => generateLabelsApplication($this->application, $this->preview),
+                    // 'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
                     ],
@@ -577,75 +630,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         return $environment_variables->all();
     }
 
-    private function set_labels_for_applications()
-    {
-
-        $appId = $this->application->id;
-        if ($this->pull_request_id !== 0) {
-            $appId = $appId . '-pr-' . $this->pull_request_id;
-        }
-        $labels = [];
-        $labels[] = 'coolify.managed=true';
-        $labels[] = 'coolify.version=' . config('version');
-        $labels[] = 'coolify.applicationId=' . $appId;
-        $labels[] = 'coolify.type=application';
-        $labels[] = 'coolify.name=' . $this->application->name;
-        if ($this->pull_request_id !== 0) {
-            $labels[] = 'coolify.pullRequestId=' . $this->pull_request_id;
-        }
-        if ($this->application->fqdn) {
-            if ($this->pull_request_id !== 0) {
-                $domains = Str::of(data_get($this->preview, 'fqdn'))->explode(',');
-            } else {
-                $domains = Str::of(data_get($this->application, 'fqdn'))->explode(',');
-            }
-            if ($this->application->destination->server->proxy->type === ProxyTypes::TRAEFIK_V2->value) {
-                $labels[] = 'traefik.enable=true';
-                foreach ($domains as $domain) {
-                    $url = Url::fromString($domain);
-                    $host = $url->getHost();
-                    $path = $url->getPath();
-                    $schema = $url->getScheme();
-                    $slug = Str::slug($host . $path);
-
-                    $http_label = "{$this->container_name}-{$slug}-http";
-                    $https_label = "{$this->container_name}-{$slug}-https";
-
-                    if ($schema === 'https') {
-                        // Set labels for https
-                        $labels[] = "traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$https_label}.entryPoints=https";
-                        $labels[] = "traefik.http.routers.{$https_label}.middlewares=gzip";
-                        if ($path !== '/') {
-                            $labels[] = "traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix";
-                            $labels[] = "traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}";
-                        }
-
-                        $labels[] = "traefik.http.routers.{$https_label}.tls=true";
-                        $labels[] = "traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt";
-
-                        // Set labels for http (redirect to https)
-                        $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                        if ($this->application->settings->is_force_https_enabled) {
-                            $labels[] = "traefik.http.routers.{$http_label}.middlewares=redirect-to-https";
-                        }
-                    } else {
-                        // Set labels for http
-                        $labels[] = "traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)";
-                        $labels[] = "traefik.http.routers.{$http_label}.entryPoints=http";
-                        $labels[] = "traefik.http.routers.{$http_label}.middlewares=gzip";
-                        if ($path !== '/') {
-                            $labels[] = "traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix";
-                            $labels[] = "traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}";
-                        }
-                    }
-                }
-            }
-        }
-        return $labels;
-    }
-
     private function generate_healthcheck_commands()
     {
         if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile') {
@@ -653,15 +637,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             return 'exit 0';
         }
         if (!$this->application->health_check_port) {
-            $this->application->health_check_port = $this->application->ports_exposes_array[0];
+            $health_check_port = $this->application->ports_exposes_array[0];
+        } else {
+            $health_check_port = $this->application->health_check_port;
         }
         if ($this->application->health_check_path) {
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}{$this->application->health_check_path} > /dev/null"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null"
             ];
         } else {
             $generated_healthchecks_commands = [
-                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$this->application->health_check_port}/"
+                "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/"
             ];
         }
         return implode(' ', $generated_healthchecks_commands);
@@ -721,10 +707,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function stop_running_container()
     {
         if ($this->currently_running_container_name) {
-            $this->execute_remote_command(
-                ["echo -n 'Removing old version of your application.'"],
-                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
-            );
+            if ($this->newVersionIsHealthy) {
+                $this->execute_remote_command(
+                    ["echo -n 'Removing old version of your application.'"],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    ["echo -n 'New version is not healthy, rolling back to the old version.'"],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
+                );
+            }
         }
     }
 

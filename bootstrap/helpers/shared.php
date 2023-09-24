@@ -20,24 +20,31 @@ use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
+use Spatie\Url\Url;
 
+function base_configuration_dir(): string
+{
+    return '/data/coolify';
+}
 function application_configuration_dir(): string
 {
-    return '/data/coolify/applications';
+    return base_configuration_dir() . "/applications";
 }
-
+function service_configuration_dir(): string
+{
+    return base_configuration_dir() . "/services";
+}
 function database_configuration_dir(): string
 {
-    return '/data/coolify/databases';
+    return base_configuration_dir() . "/databases";
 }
 function database_proxy_dir($uuid): string
 {
-    return "/data/coolify/databases/$uuid/proxy";
+    return base_configuration_dir() . "/databases/$uuid/proxy";
 }
-
 function backup_dir(): string
 {
-    return '/data/coolify/backups';
+    return base_configuration_dir() . "/backups";
 }
 
 function generate_readme_file(string $name, string $updated_at): string
@@ -77,6 +84,7 @@ function refreshSession(?Team $team = null): void
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
     ray('handleError');
+    ray($error);
     if ($error instanceof Throwable) {
         $message = $error->getMessage();
     } else {
@@ -94,6 +102,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     if (isset($livewire)) {
         return $livewire->emit('error', $message);
     }
+
     throw new RuntimeException($message);
 }
 function general_error_handler(Throwable $err, Livewire\Component $that = null, $isJson = false, $customErrorMessage = null): mixed
@@ -151,10 +160,12 @@ function get_latest_version_of_coolify(): string
     }
 }
 
-function generate_random_name(): string
+function generate_random_name(?string $cuid = null): string
 {
     $generator = All::create();
-    $cuid = new Cuid2(7);
+    if (is_null($cuid)) {
+        $cuid = new Cuid2(7);
+    }
     return Str::kebab("{$generator->getName()}-$cuid");
 }
 function generateSSHKey()
@@ -173,9 +184,11 @@ function formatPrivateKey(string $privateKey)
     }
     return $privateKey;
 }
-function generate_application_name(string $git_repository, string $git_branch): string
+function generate_application_name(string $git_repository, string $git_branch, ?string $cuid = null): string
 {
-    $cuid = new Cuid2(7);
+    if (is_null($cuid)) {
+        $cuid = new Cuid2(7);
+    }
     return Str::kebab("$git_repository:$git_branch-$cuid");
 }
 
@@ -227,7 +240,12 @@ function base_ip(): string
     }
     return "localhost";
 }
-
+function getOnlyFqdn(String $fqdn) {
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    $scheme = $url->getScheme();
+    return "$scheme://$host";
+}
 /**
  * If fqdn is set, return it, otherwise return public ip.
  */

@@ -15,7 +15,7 @@ return [
         ],
     ],
     'limits' => [
-        'trial_period'=> 14,
+        'trial_period'=> 7,
         'server' => [
             'zero' => 0,
             'self-hosted' => 999999999999,

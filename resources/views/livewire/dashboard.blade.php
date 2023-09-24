@@ -35,5 +35,6 @@
             <div class="stat-value">{{ $s3s }}</div>
         </div>
     </div>
+    
     {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
 </div>

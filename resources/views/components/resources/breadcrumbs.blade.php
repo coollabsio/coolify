@@ -38,12 +38,10 @@
                 </svg>
             </div>
         </li>
-        @if ($resource->status === 'running')
-            <x-status.running />
-        @elseif($resource->status === 'restarting')
-            <x-status.restarting />
+        @if ($resource->getMorphClass() == 'App\Models\Service')
+            <x-status.services :service="$resource" />
         @else
-            <x-status.stopped />
+            <x-status.index :status="$resource->status" />
         @endif
     </ol>
 </nav>

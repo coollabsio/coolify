@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\ProxyStatus;
+use App\Enums\ProxyTypes;
 use Illuminate\Database\Eloquent\Builder;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
@@ -76,6 +78,15 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
+    public function proxyType() {
+        $type = $this->proxy->get('type');
+        if (is_null($type)) {
+            $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+            $this->proxy->status = ProxyStatus::EXITED->value;
+            $this->save();
+        }
+        return $this->proxy->get('type');
+    }
     public function scopeWithProxy(): Builder
     {
         return $this->proxy->modelScope();
@@ -103,6 +114,9 @@ class Server extends BaseModel
         return $this->destinations()->map(function ($standaloneDocker) {
             return $standaloneDocker->applications;
         })->flatten();
+    }
+    public function services() {
+        return $this->hasMany(Service::class);
     }
 
     public function previews() {

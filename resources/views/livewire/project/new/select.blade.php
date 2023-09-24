@@ -4,7 +4,7 @@
     <div class="flex flex-col gap-2 pt-10">
         @if ($current_step === 'type')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Source Type</li>
+                <li class="step step-secondary">Select Resource Type</li>
                 <li class="step">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
@@ -52,6 +52,18 @@
                         </div>
                     </div>
                 </div>
+                @if (isDev())
+                    <div class="box group" wire:click="setType('dockercompose')">
+                        <div class="flex flex-col mx-6">
+                            <div class="group-hover:text-white">
+                                Based on a Docker Compose
+                            </div>
+                            <div class="text-xs group-hover:text-white">
+                                You can deploy complex application easily with Docker Compose.
+                            </div>
+                        </div>
+                    </div>
+                @endif
             </div>
             <h2 class="py-4">Databases</h2>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
@@ -83,7 +95,7 @@
         @endif
         @if ($current_step === 'servers')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Source Type</li>
+                <li class="step step-secondary">Select Resource Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
@@ -111,7 +123,7 @@
         @endif
         @if ($current_step === 'destinations')
             <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Source Type</li>
+                <li class="step step-secondary">Select Resource Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>

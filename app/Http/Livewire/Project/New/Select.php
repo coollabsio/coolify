@@ -17,7 +17,7 @@ class Select extends Component
     public string $type;
     public string $server_id;
     public string $destination_uuid;
-    public Countable|array|Server $servers;
+    public Countable|array|Server $servers = [];
     public Collection|array $standaloneDockers = [];
     public Collection|array $swarmDockers = [];
     public array $parameters;
@@ -83,6 +83,7 @@ class Select extends Component
             'environment_name' => $this->parameters['environment_name'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
+            'server_id' => $this->server_id,
         ]);
     }
 

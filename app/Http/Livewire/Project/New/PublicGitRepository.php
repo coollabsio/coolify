@@ -69,12 +69,12 @@ class PublicGitRepository extends Component
     {
         try {
             $this->branch_found = false;
-        $this->validate([
-            'repository_url' => 'required|url'
-        ]);
-        $this->get_git_source();
-        $this->get_branch();
-        $this->selected_branch = $this->git_branch;
+            $this->validate([
+                'repository_url' => 'required|url'
+            ]);
+            $this->get_git_source();
+            $this->get_branch();
+            $this->selected_branch = $this->git_branch;
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -137,7 +137,6 @@ class PublicGitRepository extends Component
             $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('name', $environment_name)->first();
 
-
             $application_init = [
                 'name' => generate_application_name($this->git_repository, $this->git_branch),
                 'git_repository' => $this->git_repository,
@@ -153,8 +152,16 @@ class PublicGitRepository extends Component
             ];
 
             $application = Application::create($application_init);
+
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
+
+            $application->fqdn = "http://{$application->uuid}.{$destination->server->ip}.sslip.io";
+            if (isDev()) {
+                $application->fqdn = "http://{$application->uuid}.127.0.0.1.sslip.io";
+            }
+            $application->name = generate_application_name($this->git_repository, $this->git_branch, $application->uuid);
+            $application->save();
 
             return redirect()->route('project.application.configuration', [
                 'project_uuid' => $project->uuid,

@@ -31,6 +31,7 @@ class StandalonePostgresql extends BaseModel
         static::deleted(function ($database) {
             $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
+            $database->environment_variables()->delete();
             instant_remote_process(['docker volume rm postgres-data-' . $database->uuid], $database->destination->server, false);
         });
     }

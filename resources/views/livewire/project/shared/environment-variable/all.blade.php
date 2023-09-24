@@ -12,7 +12,7 @@
     @if ($view === 'normal')
         @forelse ($resource->environment_variables as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
-                :env="$env" />
+                :env="$env" :type="$resource->type()" />
         @empty
             <div class="text-neutral-500">No environment variables found.</div>
         @endforelse
@@ -23,12 +23,12 @@
             </div>
             @foreach ($resource->environment_variables_preview as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
-                    :env="$env" />
+                    :env="$env" :type="$resource->type()" />
             @endforeach
         @endif
     @else
         <form wire:submit.prevent='saveVariables(false)' class="flex flex-col gap-2">
-            <x-forms.textarea rows=5 class="whitespace-pre-wrap" label="Environment Variables"
+            <x-forms.textarea rows=5 class="whitespace-pre-wrap"
                 id="variables"></x-forms.textarea>
             <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
         </form>

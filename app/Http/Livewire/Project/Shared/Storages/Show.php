@@ -2,13 +2,16 @@
 
 namespace App\Http\Livewire\Project\Shared\Storages;
 
+use App\Models\LocalPersistentVolume;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
 class Show extends Component
 {
-    public $storage;
-    public string|null $modalId = null;
+    public LocalPersistentVolume $storage;
+    public bool $isReadOnly = false;
+    public ?string $modalId = null;
+
     protected $rules = [
         'storage.name' => 'required|string',
         'storage.mount_path' => 'required|string',
