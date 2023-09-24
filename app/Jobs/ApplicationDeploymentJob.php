@@ -295,7 +295,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $counter = 0;
             $this->execute_remote_command(
                 [
-                    "echo 'Waiting for health check to pass on the new version of your application.'"
+                    "echo 'Waiting for healthcheck to pass on the new version of your application.'"
                 ],
             );
             while ($counter < $this->application->health_check_retries) {
@@ -312,7 +312,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 );
                 $this->execute_remote_command(
                     [
-                        "echo 'New version health check status: {$this->saved_outputs->get('health_check')}'"
+                        "echo 'New version healthcheck status: {$this->saved_outputs->get('health_check')}'"
                     ],
                 );
                 if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {

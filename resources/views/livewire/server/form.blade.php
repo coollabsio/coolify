@@ -42,7 +42,7 @@
                 </div>
             </div>
             <div class="w-64">
-                <x-forms.checkbox instantSave helper="If you are using Cloudflare Tunnels, enable this"
+                <x-forms.checkbox instantSave helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare."
                     id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
             </div>
         </div>

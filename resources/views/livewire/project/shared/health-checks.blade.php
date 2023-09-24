@@ -1,6 +1,6 @@
 <form wire:submit.prevent='submit' class="flex flex-col">
     <div class="flex items-center gap-2">
-        <h2>Health Checks</h2>
+        <h2>Healthchecks</h2>
         <x-forms.button type="submit">Save</x-forms.button>
     </div>
     <div class="pb-4">Define how your resource's health should be checked.</div>
