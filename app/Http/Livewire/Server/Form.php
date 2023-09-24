@@ -45,6 +45,8 @@ class Form extends Component
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
     public function instantSave() {
+        refresh_server_connection($this->server->privateKey);
+        $this->validateServer();
         $this->server->settings->save();
     }
     public function installDocker()
@@ -62,21 +64,19 @@ class Form extends Component
                 $this->uptime = $uptime;
                 $this->emit('success', 'Server is reachable.');
             } else {
-                ray($this->uptime);
-
                 $this->emit('error', 'Server is not reachable.');
-
                 return;
             }
             if ($dockerVersion) {
                 $this->dockerVersion = $dockerVersion;
-                $this->emit('proxyStatusUpdated');
                 $this->emit('success', 'Docker Engine 23+ is installed!');
             } else {
                 $this->emit('error', 'No Docker Engine or older than 23 version installed.');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this, customErrorMessage: "Server is not reachable: ");
+        } finally {
+            $this->emit('proxyStatusUpdated');
         }
     }
 

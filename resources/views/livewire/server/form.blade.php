@@ -23,7 +23,7 @@
         @if (!$server->isFunctional())
             You can't use this server until it is validated.
         @else
-            Server validated.
+            Server is reachable and validated.
         @endif
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex flex-col w-full gap-2 lg:flex-row">

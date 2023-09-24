@@ -7,11 +7,11 @@
             </p>
         </x-slot:modalBody>
     </x-modal>
-    @if (is_null(data_get($server, 'proxy.type')) || data_get($server, 'proxy.type') !== 'NONE')
+    @if ($server->isFunctional() && data_get($server, 'proxy.type') !== 'NONE')
         @if (data_get($server, 'proxy.status') !== 'exited')
             <div class="flex gap-4">
                 <button>
-                    <a target="_blank" href="http://{{$server->ip}}:8080">
+                    <a target="_blank" href="http://{{ $server->ip }}:8080">
                         Traefik Dashboard
                         <x-external-link />
                     </a>
