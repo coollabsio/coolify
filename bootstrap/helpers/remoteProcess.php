@@ -189,7 +189,7 @@ function validateServer(Server $server, bool $throwError = false)
             ];
         }
         $server->settings->is_reachable = true;
-
+        instant_remote_process(["docker ps"], $server, $throwError);
         $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $server, $throwError);
         if (!$dockerVersion) {
             $dockerVersion = null;
