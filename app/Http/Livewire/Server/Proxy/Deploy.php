@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
-use App\Actions\Proxy\SaveConfiguration;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
@@ -10,9 +9,16 @@ use Livewire\Component;
 class Deploy extends Component
 {
     public Server $server;
-    public $proxy_settings = null;
-    protected $listeners = ['proxyStatusUpdated'];
+    public bool $traefikDashboardAvailable = false;
+    public ?string $currentRoute = null;
+    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable'];
 
+    public function mount() {
+        $this->currentRoute = request()->route()->getName();
+    }
+    public function traefikDashboardAvailable(bool $data) {
+        $this->traefikDashboardAvailable = $data;
+    }
     public function proxyStatusUpdated()
     {
         $this->server->refresh();

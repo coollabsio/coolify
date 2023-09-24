@@ -6,6 +6,7 @@ use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
 use Livewire\Component;
+use Illuminate\Support\Str;
 
 class Proxy extends Component
 {
@@ -71,6 +72,12 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server);
+            if (Str::of($this->proxy_settings)->contains('--api.dashboard=true') && Str::of($this->proxy_settings)->contains('--api.insecure=true')) {
+                $this->emit('traefikDashboardAvailable', true);
+            } else {
+                $this->emit('traefikDashboardAvailable', false);
+            }
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

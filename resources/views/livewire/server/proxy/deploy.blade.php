@@ -10,12 +10,14 @@
     @if ($server->isFunctional() && data_get($server, 'proxy.type') !== 'NONE')
         @if (data_get($server, 'proxy.status') !== 'exited')
             <div class="flex gap-4">
-                <button>
-                    <a target="_blank" href="http://{{ $server->ip }}:8080">
-                        Traefik Dashboard
-                        <x-external-link />
-                    </a>
-                </button>
+                @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable)
+                    <button>
+                        <a target="_blank" href="http://{{ $server->ip }}:8080">
+                            Traefik Dashboard
+                            <x-external-link />
+                        </a>
+                    </button>
+                @endif
                 <x-forms.button isModal noStyle modalId="stopProxy"
                     class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2"
