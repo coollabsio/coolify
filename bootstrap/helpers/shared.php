@@ -100,7 +100,8 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if (isset($livewire)) {
-        return $livewire->emit('error', $message);
+        $livewire->emit('error', $message);
+        throw new RuntimeException($message);
     }
 
     throw new RuntimeException($message);
@@ -240,7 +241,8 @@ function base_ip(): string
     }
     return "localhost";
 }
-function getOnlyFqdn(String $fqdn) {
+function getOnlyFqdn(String $fqdn)
+{
     $url = Url::fromString($fqdn);
     $host = $url->getHost();
     $scheme = $url->getScheme();
