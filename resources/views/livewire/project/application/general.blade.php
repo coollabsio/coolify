@@ -26,6 +26,14 @@
                     @endif
                 @endif
             </div>
+            @if (!$application->dockerfile)
+                <div class="flex items-end gap-2">
+                    <x-forms.select id="application.build_pack" label="Build Pack" required>
+                        <option value="nixpacks">Nixpacks</option>
+                        <option value="dockerfile">Dockerfile</option>
+                    </x-forms.select>
+                </div>
+            @endif
             @if ($application->settings->is_static)
                 <x-forms.select id="application.static_image" label="Static Image" required>
                     <option value="nginx:alpine">nginx:alpine</option>
@@ -54,6 +62,7 @@
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
+
             <h3>Network</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
                 @if ($application->settings->is_static)
