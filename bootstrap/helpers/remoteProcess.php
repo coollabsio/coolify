@@ -101,7 +101,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
         . " 'bash -se' << \\$delimiter" . PHP_EOL
         . $command . PHP_EOL
         . $delimiter;
-    ray($ssh_command);
+    // ray($ssh_command);
     return $ssh_command;
 }
 function instant_remote_process(Collection|array $command, Server $server, $throwError = true)

@@ -1,12 +1,12 @@
 <div>
     @if ($server->isFunctional())
         <div class="flex gap-2" x-init="$wire.getProxyStatus">
-            @if ($server->proxy->status === 'running')
-                <x-status.running text="Proxy Running" />
-            @elseif ($server->proxy->status === 'restarting')
-                <x-status.restarting text="Proxy Restarting" />
+            @if (data_get($server, 'proxy.status') === 'running')
+                <x-status.running status="Proxy Running" />
+            @elseif (data_get($server, 'proxy.status') === 'restarting')
+                <x-status.restarting status="Proxy Restarting" />
             @else
-                <x-status.stopped text="Proxy Stopped" />
+                <x-status.stopped status="Proxy Stopped" />
             @endif
             <button wire:loading.remove.delay.longer wire:click.prevent='getProxyStatusWithNoti'>
                 <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
