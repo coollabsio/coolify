@@ -9,7 +9,7 @@
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             <a :class="activeTab === 'storages' && 'text-white'"
-                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Persistent Storages
+                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
         </div>
         <div class="w-full pl-8">
