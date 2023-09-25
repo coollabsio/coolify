@@ -13,6 +13,12 @@
             <x-forms.input label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
             <x-forms.input label="Description" id="database.description"></x-forms.input>
         </div>
+        <h3 class="pt-2">Advanced</h3>
+        <div class="w-64">
+            <x-forms.checkbox instantSave label="Ignore from service status"
+                helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
+                id="database.ignore_from_status"></x-forms.checkbox>
+        </div>
     </form>
     @if ($database->fileStorages()->get()->count() > 0)
         <h3 class="py-4">Mounted Files (binds)</h3>

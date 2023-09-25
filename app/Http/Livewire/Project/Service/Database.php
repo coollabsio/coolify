@@ -12,16 +12,22 @@ class Database extends Component
     protected $rules = [
         'database.human_name' => 'nullable',
         'database.description' => 'nullable',
+        'database.ignore_from_status' => 'required|boolean',
+
     ];
     public function render()
     {
         return view('livewire.project.service.database');
+    }
+    public function instantSave() {
+        $this->submit();
     }
     public function submit()
     {
         try {
             $this->validate();
             $this->database->save();
+            $this->emit('success', 'Database saved successfully.');
         } catch (\Throwable $e) {
             ray($e);
         } finally {

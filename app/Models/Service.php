@@ -79,7 +79,8 @@ class Service extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
     }
-    public function workdir() {
+    public function workdir()
+    {
         return service_configuration_dir() . "/{$this->uuid}";
     }
     public function saveComposeConfigs()
@@ -96,6 +97,16 @@ class Service extends BaseModel
             $commands[] = "echo '{$env->key}={$env->value}' >> .env";
         }
         instant_remote_process($commands, $this->server);
+    }
+    private function generateFqdn($serviceVariables, $serviceName)
+    {
+        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
+            if (isDev()) {
+                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+            }
+        }
+        return $defaultUsableFqdn ?? null;
     }
     public function parse(bool $isNew = false): Collection
     {
@@ -132,20 +143,27 @@ class Service extends BaseModel
                         data_set($service, 'is_database', true);
                     }
                 }
-                if ($isNew) {
+                if ($isDatabase) {
+                    $savedService = ServiceDatabase::where([
+                        'name' => $serviceName,
+                        'service_id' => $this->id
+                    ])->first();
+                } else {
+                    $savedService = ServiceApplication::where([
+                        'name' => $serviceName,
+                        'service_id' => $this->id
+                    ])->first();
+                }
+                if ($isNew || is_null($savedService)) {
                     if ($isDatabase) {
                         $savedService = ServiceDatabase::create([
                             'name' => $serviceName,
                             'service_id' => $this->id
                         ]);
                     } else {
-                        $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-                        if (isDev()) {
-                            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
-                        }
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
-                            'fqdn' => $defaultUsableFqdn,
+                            'fqdn' => $this->generateFqdn($serviceVariables, $serviceName),
                             'service_id' => $this->id
                         ]);
                     }
@@ -157,14 +175,9 @@ class Service extends BaseModel
                         if (data_get($savedService, 'fqdn')) {
                             $defaultUsableFqdn = data_get($savedService, 'fqdn', null);
                         } else {
-                            if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-                                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-                                if (isDev()) {
-                                    $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
-                                }
-                            }
+                            $defaultUsableFqdn = $this->generateFqdn($serviceVariables, $serviceName);
                         }
-                        $savedService->fqdn = $defaultUsableFqdn ?? null;
+                        $savedService->fqdn = $defaultUsableFqdn;
                         $savedService->save();
                     }
                 }
@@ -475,7 +488,7 @@ class Service extends BaseModel
                 // Add labels to the service
                 $labels = collect(data_get($service, 'labels', []));
                 $labels = collect([]);
-                $labels = $labels->merge(defaultLabels($this->id, $container_name, type: 'service'));
+                $labels = $labels->merge(defaultLabels($this->id, $container_name, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id));
                 if (!$isDatabase) {
                     if ($fqdns) {
                         $labels = $labels->merge(fqdnLabelsForTraefik($fqdns, $container_name, true));

@@ -76,7 +76,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $databases = $this->server->databases();
             $services = $this->server->services();
             $previews = $this->server->previews();
-
             $this->server->proxyType();
             /// Check if proxy is running
             $foundProxyContainer = $containers->filter(function ($value, $key) {
@@ -149,19 +148,20 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
-                    $coolifyName = data_get($labels, 'coolify.name');
-                    $serviceName = Str::of($coolifyName)->before('-');
-                    $serviceUuid = Str::of($coolifyName)->after('-');
-                    $service = $services->where('uuid', $serviceUuid)->first();
+                    $subType = data_get($labels, 'coolify.service.subType');
+                    $subId = data_get($labels, 'coolify.service.subId');
+                    $service = $services->where('id', $serviceLabelId)->first();
+                    if ($subType === 'application') {
+                        $service =  $service->applications()->where('id', $subId)->first();
+                    } else {
+                        $service =  $service->databases()->where('id', $subId)->first();
+                    }
                     if ($service) {
-                        $foundService = $service->byName($serviceName);
-                        if ($foundService) {
-                            $foundServices[] = "$foundService->id-$serviceName";
-                            $statusFromDb = $foundService->status;
-                            if ($statusFromDb !== $containerStatus) {
-                                // ray('Updating status: ' . $containerStatus);
-                                $foundService->update(['status' => $containerStatus]);
-                            }
+                        $foundServices[] = "$service->id-$service->name";
+                        $statusFromDb = $service->status;
+                        if ($statusFromDb !== $containerStatus) {
+                            // ray('Updating status: ' . $containerStatus);
+                            $service->update(['status' => $containerStatus]);
                         }
                     }
                 }

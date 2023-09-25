@@ -10,15 +10,16 @@ use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
-    public string $dockercompose = '';
+    public string $dockerComposeRaw = '';
     public array $parameters;
     public array $query;
     public function mount()
     {
+
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         if (isDev()) {
-            $this->dockercompose = 'services:
+            $this->dockerComposeRaw = 'services:
   plausible_events_db:
     image: clickhouse/clickhouse-server:23.3.7.5-alpine
     restart: always
@@ -37,9 +38,9 @@ class DockerCompose extends Component
     {
         try {
             $this->validate([
-                'dockercompose' => 'required'
+                'dockerComposeRaw' => 'required'
             ]);
-            $this->dockercompose = Yaml::dump(Yaml::parse($this->dockercompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
             $server_id = $this->query['server_id'];
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
@@ -47,7 +48,7 @@ class DockerCompose extends Component
 
             $service = Service::create([
                 'name' => 'service' . Str::random(10),
-                'docker_compose_raw' => $this->dockercompose,
+                'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => (int) $server_id,
             ]);

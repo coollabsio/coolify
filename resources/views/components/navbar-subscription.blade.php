@@ -1,5 +1,6 @@
 @auth
-    <nav class="fixed h-full overflow-hidden overflow-y-auto scrollbar">
+    <nav class="fixed h-full overflow-hidden overflow-y-auto pt-14 scrollbar">
+        <a href="/" class="fixed top-0 z-50 mx-3 mt-3 cursor-pointer bg-coolgray-100"><img class="transition rounded w-11 h-11" src="{{ asset('coolify-transparent.png') }}"></a>
         <ul class="flex flex-col h-full gap-4 menu flex-nowrap">
             <li title="Dashboard">
                 <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>

@@ -25,6 +25,9 @@ function serviceStatus(Service $service)
     $applications = $service->applications;
     $databases = $service->databases;
     foreach ($applications as $application) {
+        if ($application->ignore_from_status) {
+            continue;
+        }
         if (Str::of($application->status)->startsWith('running')) {
             $foundRunning = true;
         } else {
@@ -32,6 +35,9 @@ function serviceStatus(Service $service)
         }
     }
     foreach ($databases as $database) {
+        if ($database->ignore_from_status) {
+            continue;
+        }
         if (Str::of($database->status)->startsWith('running')) {
             $foundRunning = true;
         } else {

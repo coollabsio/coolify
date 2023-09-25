@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
@@ -41,9 +44,10 @@ class ProjectController extends Controller
 
     public function new()
     {
-        $type = request()->query('type');
+        $services = Cache::get('services', []);
+        $type = Str::of(request()->query('type'));
         $destination_uuid = request()->query('destination');
-        $server = requesT()->query('server');
+        $server_id = request()->query('server');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -61,8 +65,28 @@ class ProjectController extends Controller
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
         }
+        if ($type->startsWith('one-click-service-')) {
+            $oneClickServiceName = $type->after('one-click-service-')->value();
+            $oneClickService = data_get($services, $oneClickServiceName);
+            if ($oneClickService) {
+                $service = Service::create([
+                    'name' => "$oneClickServiceName-" . Str::random(10),
+                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'environment_id' => $environment->id,
+                    'server_id' => (int) $server_id,
+                ]);
+
+                $service->parse(isNew: true);
+
+                return redirect()->route('project.service', [
+                    'service_uuid' => $service->uuid,
+                    'environment_name' => $environment->name,
+                    'project_uuid' => $project->uuid,
+                ]);
+            }
+        }
         return view('project.new', [
-            'type' => $type
+            'type' => $type->value()
         ]);
     }
 

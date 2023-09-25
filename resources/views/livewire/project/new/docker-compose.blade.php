@@ -15,7 +15,7 @@
     - SERVICE_BASE64_64_*: Generated 'base64' string with length of '64' (example: SERVICE_BASE64_64_GHOST, to generate 32 bit: SERVICE_BASE64_32_GHOST)<br>
     - SERVICE_USER_*: Generated user (example: SERVICE_USER_MYSQL)<br>
     - SERVICE_PASSWORD_*: Generated password (example: SERVICE_PASSWORD_MYSQL)<br>"
-            rows="20" id="dockercompose"
+            rows="20" id="dockerComposeRaw"
             placeholder='services:
   ghost:
     documentation: https://ghost.org/docs/config

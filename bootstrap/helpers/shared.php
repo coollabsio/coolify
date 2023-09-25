@@ -100,8 +100,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if (isset($livewire)) {
-        $livewire->emit('error', $message);
-        throw new RuntimeException($message);
+        return $livewire->emit('error', $message);
     }
 
     throw new RuntimeException($message);

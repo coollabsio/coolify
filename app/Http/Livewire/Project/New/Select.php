@@ -3,12 +3,12 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Countable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
-use Route;
+use Illuminate\Support\Str;
 
 class Select extends Component
 {
@@ -21,6 +21,8 @@ class Select extends Component
     public Collection|array $standaloneDockers = [];
     public Collection|array $swarmDockers = [];
     public array $parameters;
+    public Collection|array $services = [];
+    public bool $loadingServices = true;
 
     public ?string $existingPostgresqlUrl = null;
 
@@ -44,6 +46,35 @@ class Select extends Component
     //         return handleError($e, $this);
     //     }
     // }
+    public function loadThings()
+    {
+        $this->loadServices();
+        $this->loadServers();
+    }
+    public function loadServices(bool $forceReload = false)
+    {
+        try {
+            if ($forceReload) {
+                Cache::forget('services');
+            }
+            $cached = Cache::remember('services', 3600, function () {
+                $services = Http::get(config('constants.services.offical'));
+                if ($services->failed()) {
+                    throw new \Exception($services->body());
+                }
+
+                $services = collect($services->json());
+                $this->emit('success', 'Successfully reloaded services from the internet.');
+                return $services;
+            });
+            $this->services = $cached;
+        } catch (\Throwable $e) {
+            ray($e);
+            return handleError($e, $this);
+        } finally {
+            $this->loadingServices = false;
+        }
+    }
     public function setType(string $type)
     {
         $this->type = $type;
@@ -87,7 +118,7 @@ class Select extends Component
         ]);
     }
 
-    public function load_servers()
+    public function loadServers()
     {
         $this->servers = Server::isUsable()->get();
     }

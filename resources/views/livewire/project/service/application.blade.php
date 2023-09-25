@@ -7,13 +7,22 @@
                 <h2>{{ Str::headline($application->name) }}</h2>
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
+            <x-forms.button isError wire:click='delete'>Delete</x-forms.button>
             <a target="_blank" href="{{ $application->documentation() }}">Documentation <x-external-link /></a>
         </div>
-        <div class="flex gap-2">
-            <x-forms.input label="Name" id="application.human_name" placeholder="Human readable name"></x-forms.input>
-            <x-forms.input label="Description" id="application.description"></x-forms.input>
-            <x-forms.input placeholder="https://app.coolify.io" label="Domains"
-                id="application.fqdn"></x-forms.input>
+        <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+                <x-forms.input label="Name" id="application.human_name"
+                    placeholder="Human readable name"></x-forms.input>
+                <x-forms.input label="Description" id="application.description"></x-forms.input>
+            </div>
+            <x-forms.input placeholder="https://app.coolify.io" label="Domains" id="application.fqdn"></x-forms.input>
+        </div>
+        <h3 class="pt-2">Advanced</h3>
+        <div class="w-64">
+            <x-forms.checkbox instantSave label="Ignore from service status"
+                helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
+                id="application.ignore_from_status"></x-forms.checkbox>
         </div>
     </form>
     @if ($fileStorages->count() > 0)

@@ -14,6 +14,9 @@ return [
             'expiration' => 10,
         ],
     ],
+    'services' => [
+        'offical' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+    ],
     'limits' => [
         'trial_period'=> 7,
         'server' => [

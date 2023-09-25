@@ -29,9 +29,17 @@
                     </div>
                 </form>
                 <h2 class="pb-4"> Service Stack </h2>
-                <div class="grid grid-cols-1 gap-2">
-                    @foreach ($service->applications as $application)
-                        <a class="flex flex-col justify-center box"
+                <div class="grid grid-cols-1 gap-2 xl:grid-cols-3 ">
+                    @foreach ($applications as $application)
+                        <a @class([
+                            'border-l border-dashed border-red-500' => Str::of(
+                                $application->status)->contains(['exited']),
+                            'border-l border-dashed border-success' => Str::of(
+                                $application->status)->contains(['running']),
+                            'border-l border-dashed border-warning' => Str::of(
+                                $application->status)->contains(['restarting']),
+                            'flex flex-col justify-center box',
+                        ])
                             href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
                             @if ($application->human_name)
                                 {{ Str::headline($application->human_name) }}
@@ -44,10 +52,19 @@
                             @if ($application->fqdn)
                                 <span class="text-xs">{{ $application->fqdn }}</span>
                             @endif
+                            <div class="text-xs">{{ $application->status }}</div>
                         </a>
                     @endforeach
-                    @foreach ($service->databases as $database)
-                        <a class="flex flex-col justify-center box"
+                    @foreach ($databases as $database)
+                        <a @class([
+                            'border-l border-dashed border-red-500' => Str::of(
+                                $application->status)->contains(['exited']),
+                            'border-l border-dashed border-success' => Str::of(
+                                $application->status)->contains(['running']),
+                            'border-l border-dashed border-warning' => Str::of(
+                                $application->status)->contains(['restarting']),
+                            'flex flex-col justify-center box',
+                        ])
                             href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
                             @if ($database->human_name)
                                 {{ Str::headline($database->human_name) }}
@@ -57,6 +74,7 @@
                             @if ($database->description)
                                 <span class="text-xs">{{ $database->description }}</span>
                             @endif
+                            <div class="text-xs">{{ $application->status }}</div>
                         </a>
                     @endforeach
                 </div>
@@ -90,7 +108,8 @@
                         </x-forms.textarea>
                     </div>
                     <div x-cloak x-show="raw === false">
-                        <x-forms.textarea label="Actual Docker Compose file that will be deployed" readonly rows="20" id="service.docker_compose">
+                        <x-forms.textarea label="Actual Docker Compose file that will be deployed" readonly
+                            rows="20" id="service.docker_compose">
                         </x-forms.textarea>
                     </div>
                 </div>
