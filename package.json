@@ -6,19 +6,19 @@
         "build": "vite build"
     },
     "devDependencies": {
-        "@vitejs/plugin-vue": "4.2.3",
-        "autoprefixer": "10.4.14",
-        "axios": "1.4.0",
-        "laravel-vite-plugin": "0.7.8",
-        "postcss": "8.4.24",
-        "tailwindcss": "3.3.2",
-        "vite": "4.3.9",
+        "@vitejs/plugin-vue": "4.3.4",
+        "autoprefixer": "10.4.16",
+        "axios": "1.5.0",
+        "laravel-vite-plugin": "0.8.0",
+        "postcss": "8.4.30",
+        "tailwindcss": "3.3.3",
+        "vite": "4.4.9",
         "vue": "3.3.4"
     },
     "dependencies": {
-        "@tailwindcss/typography": "0.5.9",
-        "alpinejs": "3.12.2",
-        "daisyui": "3.2.1",
+        "@tailwindcss/typography": "0.5.10",
+        "alpinejs": "3.13.0",
+        "daisyui": "3.7.7",
         "tailwindcss-scrollbar": "0.1.0"
     }
 }

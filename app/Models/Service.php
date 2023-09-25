@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use App\Enums\ProxyTypes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
@@ -80,6 +79,24 @@ class Service extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
     }
+    public function workdir() {
+        return service_configuration_dir() . "/{$this->uuid}";
+    }
+    public function saveComposeConfigs()
+    {
+        $workdir = $this->workdir();
+        $commands[] = "mkdir -p $workdir";
+        $commands[] = "cd $workdir";
+
+        $docker_compose_base64 = base64_encode($this->docker_compose);
+        $commands[] = "echo $docker_compose_base64 | base64 -d > docker-compose.yml";
+        $envs = $this->environment_variables()->get();
+        $commands[] = "rm -f .env || true";
+        foreach ($envs as $env) {
+            $commands[] = "echo '{$env->key}={$env->value}' >> .env";
+        }
+        instant_remote_process($commands, $this->server);
+    }
     public function parse(bool $isNew = false): Collection
     {
         ray('parsing');
@@ -147,7 +164,7 @@ class Service extends BaseModel
                                 }
                             }
                         }
-                        $savedService->fqdn = $defaultUsableFqdn;
+                        $savedService->fqdn = $defaultUsableFqdn ?? null;
                         $savedService->save();
                     }
                 }
@@ -178,33 +195,58 @@ class Service extends BaseModel
                 if ($serviceVolumes->count() > 0) {
                     LocalPersistentVolume::whereResourceId($savedService->id)->whereResourceType(get_class($savedService))->delete();
                     foreach ($serviceVolumes as $volume) {
-                        if (is_string($volume) && Str::startsWith($volume, './')) {
-                            // Local file
-                            $fsPath = Str::before($volume, ':');
-                            $volumePath = Str::of($volume)->after(':')->beforeLast(':');
-                            ray($fsPath, $volumePath);
-                            LocalFileVolume::updateOrCreate(
-                                [
-                                    'mount_path' => $volumePath,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
-                                ],
-                                [
-                                    'fs_path' => $fsPath,
-                                    'mount_path' => $volumePath,
-                                    'resource_id' => $savedService->id,
-                                    'resource_type' => get_class($savedService)
-                                ]
-                            );
-                            continue;
-                        }
                         if (is_string($volume)) {
+                            if (Str::startsWith($volume, './')) {
+                                $fsPath = Str::before($volume, ':');
+                                $volumePath = Str::of($volume)->after(':')->beforeLast(':');
+                                LocalFileVolume::updateOrCreate(
+                                    [
+                                        'mount_path' => $volumePath,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ],
+                                    [
+                                        'fs_path' => $fsPath,
+                                        'mount_path' => $volumePath,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ]
+                                );
+                                $savedService->saveFileVolumes();
+                                continue;
+                            }
                             $volumeName = Str::before($volume, ':');
                             $volumePath = Str::after($volume, ':');
                         }
                         if (is_array($volume)) {
                             $volumeName = data_get($volume, 'source');
                             $volumePath = data_get($volume, 'target');
+                            $volumeContent = data_get($volume, 'content');
+                            if (Str::startsWith($volumeName, './')) {
+                                $payload = [
+                                    'fs_path' => $volumeName,
+                                    'mount_path' => $volumePath,
+
+                                    'resource_id' => $savedService->id,
+                                    'resource_type' => get_class($savedService)
+                                ];
+                                if ($volumeContent) {
+                                    $payload['content'] = $volumeContent;
+                                }
+                                LocalFileVolume::updateOrCreate(
+                                    [
+                                        'mount_path' => $volumePath,
+                                        'resource_id' => $savedService->id,
+                                        'resource_type' => get_class($savedService)
+                                    ],
+                                    $payload
+                                );
+                                if ($volumeContent) {
+                                    $volume = data_forget($volume, 'content');
+                                }
+                                $savedService->saveFileVolumes();
+                                continue;
+                            }
                         }
 
                         $volumeExists = $serviceVolumes->contains(function ($_, $key) use ($volumeName) {
@@ -369,6 +411,31 @@ class Service extends BaseModel
                                     'is_preview' => false,
                                 ]);
                             }
+                        } else if ($variableName->startsWith('SERVICE_BASE64')) {
+                            $variableDefined = EnvironmentVariable::whereServiceId($this->id)->where('key', $variableName->value())->first();
+                            $length = Str::of($variableName)->after('SERVICE_BASE64_')->beforeLast('_')->value();
+                            if (is_numeric($length)) {
+                                $length = (int) $length;
+                            } else {
+                                $length = 1;
+                            }
+                            if (!$variableDefined) {
+                                $generatedValue = base64_encode(Str::password(length: $length, symbols: false));
+                            } else {
+                                $generatedValue = $variableDefined->value;
+                            }
+                            if (!$envs->has($variableName->value())) {
+                                $envs->put($variableName->value(), $generatedValue);
+                                EnvironmentVariable::updateOrCreate([
+                                    'key' => $variableName->value(),
+                                    'service_id' => $this->id,
+                                ], [
+                                    'value' => $generatedValue,
+                                    'is_build_time' => false,
+                                    'service_id' => $this->id,
+                                    'is_preview' => false,
+                                ]);
+                            }
                         } else if ($variableName->startsWith('SERVICE_FQDN')) {
                             if ($fqdns) {
                                 $number = Str::of($variableName)->after('SERVICE_FQDN')->afterLast('_')->value();
@@ -419,6 +486,7 @@ class Service extends BaseModel
                 data_set($service, 'restart', RESTART_MODE);
                 data_set($service, 'container_name', $container_name);
                 data_forget($service, 'documentation');
+                data_forget($service, 'volumes.*.content');
                 return $service;
             });
             $finalServices = [
@@ -427,8 +495,11 @@ class Service extends BaseModel
                 'volumes' => $composeVolumes->toArray(),
                 'networks' => $composeNetworks->toArray(),
             ];
+            data_forget($yaml, 'services.*.volumes.*.content');
+            $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $this->docker_compose = Yaml::dump($finalServices, 10, 2);
             $this->save();
+            $this->saveComposeConfigs();
             $shouldBeDefined = collect([
                 'envs' => $envs,
                 'volumes' => $volumes,

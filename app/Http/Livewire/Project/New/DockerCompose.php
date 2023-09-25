@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\Service;
 use Livewire\Component;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 class DockerCompose extends Component
 {
@@ -18,57 +19,50 @@ class DockerCompose extends Component
         $this->query = request()->query();
         if (isDev()) {
             $this->dockercompose = 'services:
-  ghost:
-    documentation: https://ghost.org/docs/config
-    image: ghost:5
+  plausible_events_db:
+    image: clickhouse/clickhouse-server:23.3.7.5-alpine
+    restart: always
     volumes:
-      - ghost-content-data:/var/lib/ghost/content
-    environment:
-      - url=$SERVICE_FQDN_GHOST
-      - database__client=mysql
-      - database__connection__host=mysql
-      - database__connection__user=$SERVICE_USER_MYSQL
-      - database__connection__password=$SERVICE_PASSWORD_MYSQL
-      - database__connection__database=${MYSQL_DATABASE-ghost}
-    depends_on:
-      - mysql
-  mysql:
-    documentation: https://hub.docker.com/_/mysql
-    image: mysql:8.0
-    volumes:
-      - ghost-mysql-data:/var/lib/mysql
-    environment:
-      - MYSQL_USER=${SERVICE_USER_MYSQL}
-      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
+        - event-data:/var/lib/clickhouse
+        - ./clickhouse/clickhouse-config.xml:/etc/clickhouse-server/config.d/logging.xml:ro
+        - ./clickhouse/clickhouse-user-config.xml:/etc/clickhouse-server/users.d/logging.xml:ro
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
 ';
         }
     }
     public function submit()
     {
-        $this->validate([
-            'dockercompose' => 'required'
-        ]);
-        $server_id = $this->query['server_id'];
+        try {
+            $this->validate([
+                'dockercompose' => 'required'
+            ]);
+            $this->dockercompose = Yaml::dump(Yaml::parse($this->dockercompose), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
+            $server_id = $this->query['server_id'];
 
-        $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
-        $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+            $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
+            $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
-        $service = Service::create([
-            'name' => 'service' . Str::random(10),
-            'docker_compose_raw' => $this->dockercompose,
-            'environment_id' => $environment->id,
-            'server_id' => (int) $server_id,
-        ]);
-        $service->name = "service-$service->uuid";
+            $service = Service::create([
+                'name' => 'service' . Str::random(10),
+                'docker_compose_raw' => $this->dockercompose,
+                'environment_id' => $environment->id,
+                'server_id' => (int) $server_id,
+            ]);
+            $service->name = "service-$service->uuid";
 
-        $service->parse(isNew: true);
+            $service->parse(isNew: true);
 
-        return redirect()->route('project.service', [
-            'service_uuid' => $service->uuid,
-            'environment_name' => $environment->name,
-            'project_uuid' => $project->uuid,
-        ]);
+            return redirect()->route('project.service', [
+                'service_uuid' => $service->uuid,
+                'environment_name' => $environment->name,
+                'project_uuid' => $project->uuid,
+            ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
     }
 }

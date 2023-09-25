@@ -12,14 +12,14 @@
         <div class="flex gap-2">
             <x-forms.input label="Name" id="application.human_name" placeholder="Human readable name"></x-forms.input>
             <x-forms.input label="Description" id="application.description"></x-forms.input>
-            <x-forms.input placeholder="https://app.coolify.io" label="Domains" required
+            <x-forms.input placeholder="https://app.coolify.io" label="Domains"
                 id="application.fqdn"></x-forms.input>
         </div>
     </form>
-    @if ($application->fileStorages()->get()->count() > 0)
-        <h3 class="py-4">File Storages</h3>
+    @if ($fileStorages->count() > 0)
+        <h3 class="py-4">Files</h3>
         <div class="flex flex-col gap-4">
-            @foreach ($application->fileStorages()->get() as $fileStorage)
+            @foreach ($fileStorages->get() as $fileStorage)
                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
             @endforeach
         </div>

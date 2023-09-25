@@ -26,4 +26,12 @@ class ServiceDatabase extends BaseModel
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+    public function saveFileVolumes()
+    {
+        saveFileVolumesHelper($this);
+    }
 }

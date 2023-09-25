@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Symfony\Component\Yaml\Yaml;
 
@@ -30,5 +29,9 @@ class ServiceApplication extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+    public function saveFileVolumes()
+    {
+        saveFileVolumesHelper($this);
     }
 }

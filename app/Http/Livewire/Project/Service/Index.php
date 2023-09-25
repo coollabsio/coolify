@@ -15,7 +15,7 @@ class Index extends Component
         'service.docker_compose_raw' => 'required',
         'service.docker_compose' => 'required',
         'service.name' => 'required',
-        'service.description' => 'required',
+        'service.description' => 'nullable',
     ];
 
     public function mount()
@@ -28,19 +28,23 @@ class Index extends Component
     {
         return view('livewire.project.service.index');
     }
-    public function save() {
+    public function save()
+    {
         $this->service->save();
         $this->service->parse();
         $this->service->refresh();
         $this->emit('refreshEnvs');
+        $this->emit('success', 'Service saved successfully.');
+        $this->service->saveComposeConfigs();
     }
-    public function submit() {
+    public function submit()
+    {
         try {
             $this->validate();
             $this->service->save();
+            $this->emit('success', 'Service saved successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
-
 }
