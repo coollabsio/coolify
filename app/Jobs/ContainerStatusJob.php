@@ -77,11 +77,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $services = $this->server->services();
             $previews = $this->server->previews();
 
+            $this->server->proxyType();
             /// Check if proxy is running
             $foundProxyContainer = $containers->filter(function ($value, $key) {
                 return data_get($value, 'Name') === '/coolify-proxy';
             })->first();
             if (!$foundProxyContainer) {
+                ray('Proxy not found, starting it...');
                 if ($this->server->isProxyShouldRun()) {
                     StartProxy::run($this->server, false);
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
@@ -99,7 +101,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
             foreach ($containers as $container) {
                 $containerStatus = data_get($container, 'State.Status');
-                $containerHealth = data_get($container, 'State.Health.Status','unhealthy');
+                $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
                 $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));

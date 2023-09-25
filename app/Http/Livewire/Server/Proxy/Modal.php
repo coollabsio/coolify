@@ -11,6 +11,8 @@ class Modal extends Component
 
     public function proxyStatusUpdated()
     {
+        $this->server->proxy->set('status', 'running');
+        $this->server->save();
         $this->emit('proxyStatusUpdated');
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Proxy\SaveConfiguration;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Symfony\Component\Yaml\Yaml;
@@ -10,7 +11,8 @@ function get_proxy_path()
     $proxy_path = "$base_path/proxy";
     return $proxy_path;
 }
-function connectProxyToNetworks(Server $server) {
+function connectProxyToNetworks(Server $server)
+{
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
     })->unique();
@@ -20,7 +22,7 @@ function connectProxyToNetworks(Server $server) {
     $commands = $networks->map(function ($network) {
         return [
             "echo '####### Connecting coolify-proxy to $network network...'",
-            "docker network ls --format '{{.Name}}' | grep '^$network$' || docker network create --attachable $network >/dev/null",
+            "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
             "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
         ];
     });
@@ -101,7 +103,9 @@ function generate_default_proxy_configuration(Server $server)
     if (isDev()) {
         $config['services']['traefik']['command'][] = "--log.level=debug";
     }
-    return Yaml::dump($config, 4, 2);
+    $config = Yaml::dump($config, 4, 2);
+    SaveConfiguration::run($server, $config);
+    return $config;
 }
 
 function setup_default_redirect_404(string|null $redirect_url, Server $server)

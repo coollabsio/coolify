@@ -405,17 +405,16 @@ class Service extends BaseModel
                         }
                     }
                 }
-                if ($this->server->proxyType() === ProxyTypes::TRAEFIK_V2->value) {
-                    $labels = collect(data_get($service, 'labels', []));
-                    $labels = collect([]);
-                    $labels = $labels->merge(defaultLabels($this->id, $container_name, type: 'service'));
-                    if (!$isDatabase) {
-                        if ($fqdns) {
-                            $labels = $labels->merge(fqdnLabelsForTraefik($fqdns, $container_name, true));
-                        }
+                // Add labels to the service
+                $labels = collect(data_get($service, 'labels', []));
+                $labels = collect([]);
+                $labels = $labels->merge(defaultLabels($this->id, $container_name, type: 'service'));
+                if (!$isDatabase) {
+                    if ($fqdns) {
+                        $labels = $labels->merge(fqdnLabelsForTraefik($fqdns, $container_name, true));
                     }
-                    data_set($service, 'labels', $labels->toArray());
                 }
+                data_set($service, 'labels', $labels->toArray());
                 data_forget($service, 'is_database');
                 data_set($service, 'restart', RESTART_MODE);
                 data_set($service, 'container_name', $container_name);

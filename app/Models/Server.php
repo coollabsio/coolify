@@ -78,7 +78,8 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
 
-    public function proxyType() {
+    public function proxyType()
+    {
         $type = $this->proxy->get('type');
         if (is_null($type)) {
             $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
@@ -115,11 +116,13 @@ class Server extends BaseModel
             return $standaloneDocker->applications;
         })->flatten();
     }
-    public function services() {
+    public function services()
+    {
         return $this->hasMany(Service::class);
     }
 
-    public function previews() {
+    public function previews()
+    {
         return $this->destinations()->map(function ($standaloneDocker) {
             return $standaloneDocker->applications->map(function ($application) {
                 return $application->previews;
@@ -161,6 +164,9 @@ class Server extends BaseModel
     public function isProxyShouldRun()
     {
         $shouldRun = false;
+        if ($this->proxyType() === ProxyTypes::NONE->value) {
+            return false;
+        }
         foreach ($this->applications() as $application) {
             if (data_get($application, 'fqdn')) {
                 $shouldRun = true;
@@ -175,7 +181,8 @@ class Server extends BaseModel
         }
         return $shouldRun;
     }
-    public function isFunctional() {
+    public function isFunctional()
+    {
         return $this->settings->is_reachable && $this->settings->is_usable;
     }
 }
