@@ -6,9 +6,9 @@ use App\Models\Server;
 use Countable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Livewire\Component;
-use Illuminate\Support\Str;
 
 class Select extends Component
 {
@@ -57,17 +57,27 @@ class Select extends Component
             if ($forceReload) {
                 Cache::forget('services');
             }
-            $cached = Cache::remember('services', 3600, function () {
-                $services = Http::get(config('constants.services.offical'));
-                if ($services->failed()) {
-                    throw new \Exception($services->body());
-                }
+            if (isDev()) {
+                $cached = Cache::remember('services', 3600, function () {
+                    $services = File::get(base_path('examples/service-templates.json'));
+                    $services = collect(json_decode($services));
+                    $this->emit('success', 'Successfully reloaded services from filesystem (development mode).');
+                    return $services;
+                });
+            } else {
+                $cached = Cache::remember('services', 3600, function () {
+                    $services = Http::get(config('constants.services.offical'));
+                    if ($services->failed()) {
+                        throw new \Exception($services->body());
+                    }
 
-                $services = collect($services->json());
-                $this->emit('success', 'Successfully reloaded services from the internet.');
-                return $services;
-            });
+                    $services = collect($services->json());
+                    $this->emit('success', 'Successfully reloaded services from the internet.');
+                    return $services;
+                });
+            }
             $this->services = $cached;
+
         } catch (\Throwable $e) {
             ray($e);
             return handleError($e, $this);

@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Facades\Cache;
 
 class ServiceApplication extends BaseModel
 {
@@ -16,7 +16,10 @@ class ServiceApplication extends BaseModel
     }
     public function documentation()
     {
-        return data_get(Yaml::parse($this->service->docker_compose_raw), "services.{$this->name}.documentation", 'https://coolify.io/docs');
+        $services = Cache::get('services', []);
+        $service = data_get($services, $this->name, []);
+        ray($this->name);
+        return data_get($service, 'documentation', 'https://coolify.io/docs');
     }
     public function service()
     {

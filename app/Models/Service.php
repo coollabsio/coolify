@@ -100,12 +100,13 @@ class Service extends BaseModel
     }
     private function generateFqdn($serviceVariables, $serviceName)
     {
-        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+        // Add sslip.io to the service
+        // if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
             $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
             if (isDev()) {
                 $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
             }
-        }
+        // }
         return $defaultUsableFqdn ?? null;
     }
     public function parse(bool $isNew = false): Collection
@@ -498,7 +499,6 @@ class Service extends BaseModel
                 data_forget($service, 'is_database');
                 data_set($service, 'restart', RESTART_MODE);
                 data_set($service, 'container_name', $container_name);
-                data_forget($service, 'documentation');
                 data_forget($service, 'volumes.*.content');
                 return $service;
             });

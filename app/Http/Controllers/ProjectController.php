@@ -67,7 +67,7 @@ class ProjectController extends Controller
         }
         if ($type->startsWith('one-click-service-')) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
-            $oneClickService = data_get($services, $oneClickServiceName);
+            $oneClickService = data_get($services, "$oneClickServiceName.compose");
             if ($oneClickService) {
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
