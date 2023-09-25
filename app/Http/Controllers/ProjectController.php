@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
@@ -68,6 +69,7 @@ class ProjectController extends Controller
         if ($type->startsWith('one-click-service-')) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
+            $oneClickDotEnvs = collect(data_get($services, "$oneClickServiceName.envs", []));
             if ($oneClickService) {
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
@@ -75,7 +77,17 @@ class ProjectController extends Controller
                     'environment_id' => $environment->id,
                     'server_id' => (int) $server_id,
                 ]);
-
+                if ($oneClickDotEnvs->count() > 0) {
+                    $oneClickDotEnvs->each(function ($value, $key) use ($service) {
+                        EnvironmentVariable::create([
+                            'key' => $key,
+                            'value' => $value,
+                            'service_id' => $service->id,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+                    });
+                }
                 $service->parse(isNew: true);
 
                 return redirect()->route('project.service', [

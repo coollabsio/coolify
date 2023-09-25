@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\User;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,4 +16,24 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/health', function () {
     return 'OK';
+});
+
+Route::middleware(['throttle:5'])->group(function () {
+    Route::get('/unsubscribe/{token}', function() {
+        try {
+            $token = request()->token;
+            $email = decrypt($token);
+            if (!User::whereEmail($email)->exists()) {
+                return redirect('/');
+            }
+            if (User::whereEmail($email)->first()->marketing_emails === false) {
+                return 'You have already unsubscribed from marketing emails.';
+            }
+            User::whereEmail($email)->update(['marketing_emails' => false]);
+            return 'You have been unsubscribed from marketing emails.';
+        } catch (\Throwable $e) {
+            return 'Something went wrong. Please try again or contact support.';
+        }
+
+    })->name('unsubscribe.marketing.emails');
 });

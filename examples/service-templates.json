@@ -6,9 +6,5 @@
     "uptime-kuma": {
         "documentation": "https://github.com/louislam/uptime-kuma",
         "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogbG91aXNsYW0vdXB0aW1lLWt1bWE6MQogICAgdm9sdW1lczoKICAgICAgLSB1cHRpbWUta3VtYTovYXBwL2RhdGEK"
-    },
-    "uptime-kuma-with-database": {
-        "documentation": "https://github.com/louislam/uptime-kuma",
-        "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogbG91aXNsYW0vdXB0aW1lLWt1bWE6MQogICAgdm9sdW1lczoKICAgICAgLSB1cHRpbWUta3VtYTovYXBwL2RhdGEK"
     }
 }
