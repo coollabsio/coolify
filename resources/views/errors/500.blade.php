@@ -7,8 +7,8 @@
             <p class="mt-6 text-base leading-7 text-neutral-300">There has been an error, we are working on it.
             </p>
             @if ($exception->getMessage() !== '')
-                <p class="mt-6 text-xs leading-7 text-left text-red-500">Error: {{ $exception->getMessage() }}
-                </p>
+                <code class="mt-6 text-xs text-left text-red-500">Error: {{ $exception->getMessage() }}
+                </code>
             @endif
             <div class="flex items-center justify-center mt-10 gap-x-6">
                 <a href="/">
