@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('service_databases', function (Blueprint $table) {
             $table->boolean('ignore_from_status')->default(false);
-
+            $table->string('image_tag')->nullable();
         });
     }
 
@@ -24,6 +24,7 @@ return new class extends Migration
     {
         Schema::table('service_databases', function (Blueprint $table) {
             $table->dropColumn('ignore_from_status');
+            $table->dropColumn('image_tag');
         });
     }
 };

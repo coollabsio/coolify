@@ -2,7 +2,6 @@
 
 namespace App\Http\Livewire\Project\Service;
 
-use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
 use Livewire\Component;
 
@@ -12,6 +11,7 @@ class Database extends Component
     protected $rules = [
         'database.human_name' => 'nullable',
         'database.description' => 'nullable',
+        'database.image_tag' => 'required',
         'database.ignore_from_status' => 'required|boolean',
 
     ];

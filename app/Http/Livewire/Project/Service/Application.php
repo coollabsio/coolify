@@ -15,6 +15,7 @@ class Application extends Component
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
         'application.fqdn' => 'nullable',
+        'application.image_tag' => 'required',
         'application.ignore_from_status' => 'required|boolean',
     ];
     public function render()

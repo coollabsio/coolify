@@ -9,9 +9,15 @@
             <x-forms.button type="submit">Save</x-forms.button>
             <a target="_blank" href="{{ $database->documentation() }}">Documentation <x-external-link /></a>
         </div>
-        <div class="flex gap-2">
-            <x-forms.input label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
-            <x-forms.input label="Description" id="database.description"></x-forms.input>
+        <div class="flex flex-col gap-2">
+            <div class="flex gap-2">
+                <x-forms.input label="Name" id="database.human_name" placeholder="Name"></x-forms.input>
+                <x-forms.input label="Description" id="database.description"></x-forms.input>
+            </div>
+            <div class="flex gap-2">
+                <x-forms.input required helper="You can change the image tag you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>" label="Image Tag"
+                    id="database.image_tag"></x-forms.input>
+            </div>
         </div>
         <h3 class="pt-2">Advanced</h3>
         <div class="w-64">

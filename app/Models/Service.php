@@ -139,6 +139,7 @@ class Service extends BaseModel
                 $image = data_get($service, 'image');
                 if ($image) {
                     $imageName = Str::of($image)->before(':');
+                    $imageTag = Str::of($image)->after(':') ?? 'latest';
                     if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
                         $isDatabase = true;
                         data_set($service, 'is_database', true);
@@ -159,12 +160,14 @@ class Service extends BaseModel
                     if ($isDatabase) {
                         $savedService = ServiceDatabase::create([
                             'name' => $serviceName,
+                            'image_tag' => $imageTag,
                             'service_id' => $this->id
                         ]);
                     } else {
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
                             'fqdn' => $this->generateFqdn($serviceVariables, $serviceName),
+                            'image_tag' => $imageTag,
                             'service_id' => $this->id
                         ]);
                     }
@@ -182,6 +185,8 @@ class Service extends BaseModel
                         $savedService->save();
                     }
                 }
+
+                // Set image tag
                 $fqdns = data_get($savedService, 'fqdn');
                 if ($fqdns) {
                     $fqdns = collect(Str::of($fqdns)->explode(','));
@@ -495,6 +500,8 @@ class Service extends BaseModel
                         $labels = $labels->merge(fqdnLabelsForTraefik($fqdns, $container_name, true));
                     }
                 }
+
+
                 data_set($service, 'labels', $labels->toArray());
                 data_forget($service, 'is_database');
                 data_set($service, 'restart', RESTART_MODE);

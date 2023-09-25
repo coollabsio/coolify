@@ -16,7 +16,11 @@
                     placeholder="Human readable name"></x-forms.input>
                 <x-forms.input label="Description" id="application.description"></x-forms.input>
             </div>
-            <x-forms.input placeholder="https://app.coolify.io" label="Domains" id="application.fqdn"></x-forms.input>
+            <div class="flex gap-2">
+                <x-forms.input placeholder="https://app.coolify.io" label="Domains"
+                    id="application.fqdn"></x-forms.input>
+                <x-forms.input required helper="You can change the image tag you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>" label="Image Tag" id="application.image_tag"></x-forms.input>
+            </div>
         </div>
         <h3 class="pt-2">Advanced</h3>
         <div class="w-64">
