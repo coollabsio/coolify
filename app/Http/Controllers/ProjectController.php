@@ -70,8 +70,8 @@ class ProjectController extends Controller
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
-            $oneClickRequiredFqdn = data_get($services, "$oneClickServiceName.generateFqdn", []);
-            $oneClickRequiredFqdn = collect($oneClickRequiredFqdn);
+            $oneClickConfiguration = data_get($services, "$oneClickServiceName.configuration.proxy", []);
+            $oneClickConfiguration = collect($oneClickConfiguration);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
             }
@@ -94,6 +94,9 @@ class ProjectController extends Controller
                         if ($value->contains('SERVICE_PASSWORD')) {
                             $value = Str::of(Str::password(symbols: false));
                         }
+                        if ($value->contains('SERVICE_PASSWORD64')) {
+                            $value = Str::of(Str::password(length: 64, symbols: false));
+                        }
                         if ($value->contains('SERVICE_BASE64')) {
                             $length = Str::of($value)->after('SERVICE_BASE64_')->beforeLast('_')->value();
                             if (is_numeric($length)) {
@@ -112,7 +115,7 @@ class ProjectController extends Controller
                         ]);
                     });
                 }
-                $service->parse(isNew: true, requiredFqdns: $oneClickRequiredFqdn);
+                $service->parse(isNew: true, configuration: $oneClickConfiguration);
 
                 return redirect()->route('project.service', [
                     'service_uuid' => $service->uuid,

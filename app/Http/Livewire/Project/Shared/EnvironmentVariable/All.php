@@ -57,7 +57,6 @@ class All extends Component
             $this->resource->environment_variables()->delete();
         }
         foreach ($variables as $key => $variable) {
-            ray($key, $variable);
             $found = $existingVariables->where('key', $key)->first();
             if ($found) {
                 $found->value = $variable;

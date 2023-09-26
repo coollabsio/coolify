@@ -115,7 +115,7 @@ class Service extends BaseModel
         }
         return "{$server->ip}.sslip.io";
     }
-    private function generateFqdn($serviceVariables, $serviceName, Collection $requiredFqdns)
+    private function generateFqdn($serviceVariables, $serviceName, Collection $configuration)
     {
         // Add sslip.io to the service
         $defaultUsableFqdn = null;
@@ -123,8 +123,8 @@ class Service extends BaseModel
         if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
             $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}";
         }
-        if ($requiredFqdns->count() > 0) {
-            foreach ($requiredFqdns as $requiredFqdn) {
+        if ($configuration->count() > 0) {
+            foreach ($configuration as $requiredFqdn) {
                 $requiredFqdn = (array)$requiredFqdn;
                 $name = data_get($requiredFqdn, 'name');
                 $path = data_get($requiredFqdn, 'path');
@@ -139,10 +139,10 @@ class Service extends BaseModel
         }
         return $defaultUsableFqdn ?? null;
     }
-    public function parse(bool $isNew = false, ?Collection $requiredFqdns = null): Collection
+    public function parse(bool $isNew = false, ?Collection $configuration = null): Collection
     {
-        if (!$requiredFqdns) {
-            $requiredFqdns = collect([]);
+        if (!$configuration) {
+            $configuration = collect([]);
         }
         if ($this->docker_compose_raw) {
             try {
@@ -161,7 +161,7 @@ class Service extends BaseModel
             $envs = collect([]);
             $ports = collect([]);
 
-            $services = collect($services)->map(function ($service, $serviceName) use ($composeVolumes, $composeNetworks, $definedNetwork, $envs, $volumes, $ports, $isNew, $requiredFqdns) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($composeVolumes, $composeNetworks, $definedNetwork, $envs, $volumes, $ports, $isNew, $configuration) {
                 $container_name = "$serviceName-{$this->uuid}";
                 $isDatabase = false;
                 $serviceVariables = collect(data_get($service, 'environment', []));
@@ -207,14 +207,13 @@ class Service extends BaseModel
                     } else {
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
-                            'fqdn' => $this->generateFqdn($serviceVariables, $serviceName, $requiredFqdns),
+                            'fqdn' => $this->generateFqdn($serviceVariables, $serviceName, $configuration),
                             'image' => $image,
                             'service_id' => $this->id
                         ]);
                     }
-                    if ($requiredFqdns->count() > 0) {
-                        $found = false;
-                        foreach ($requiredFqdns as $requiredFqdn) {
+                    if ($configuration->count() > 0) {
+                        foreach ($configuration as $requiredFqdn) {
                             $requiredFqdn = (array)$requiredFqdn;
                             $name = data_get($requiredFqdn, 'name');
                             if ($serviceName === $name) {
@@ -232,7 +231,7 @@ class Service extends BaseModel
                         if (data_get($savedService, 'fqdn')) {
                             $defaultUsableFqdn = data_get($savedService, 'fqdn', null);
                         } else {
-                            $defaultUsableFqdn = $this->generateFqdn($serviceVariables, $serviceName, $requiredFqdns);
+                            $defaultUsableFqdn = $this->generateFqdn($serviceVariables, $serviceName, $configuration);
                         }
                         $savedService->fqdn = $defaultUsableFqdn;
                         $savedService->save();
@@ -389,9 +388,22 @@ class Service extends BaseModel
                 data_set($service, 'networks', $networks);
 
 
+
                 // Get variables from the service
                 foreach ($serviceVariables as $variable) {
                     $value = Str::after($variable, '=');
+                    // if (!Str::of($val)->contains($value)) {
+                    //     EnvironmentVariable::updateOrCreate([
+                    //         'key' => $variable,
+                    //         'service_id' => $this->id,
+                    //     ], [
+                    //         'value' => $val,
+                    //         'is_build_time' => false,
+                    //         'service_id' => $this->id,
+                    //         'is_preview' => false,
+                    //     ]);
+                    //     continue;
+                    // }
                     if (!Str::startsWith($value, '$SERVICE_') && !Str::startsWith($value, '${SERVICE_') && Str::startsWith($value, '$')) {
                         $value = Str::of(replaceVariables(Str::of($value)));
                         $nakedName = $nakedValue = null;
@@ -468,7 +480,11 @@ class Service extends BaseModel
                         } else if ($variableName->startsWith('SERVICE_PASSWORD')) {
                             $variableDefined = EnvironmentVariable::whereServiceId($this->id)->where('key', $variableName->value())->first();
                             if (!$variableDefined) {
-                                $generatedValue = Str::password(symbols: false);
+                                if ($variableName->startsWith('SERVICE_PASSWORD64')) {
+                                    $generatedValue = Str::password(length: 64, symbols: false);
+                                } else {
+                                    $generatedValue = Str::password(symbols: false);
+                                }
                             } else {
                                 $generatedValue = $variableDefined->value;
                             }
