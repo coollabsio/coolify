@@ -14,10 +14,6 @@ class ServiceDatabase extends BaseModel
     {
         return 'service';
     }
-    public function documentation()
-    {
-        return data_get(Yaml::parse($this->service->docker_compose_raw), "services.{$this->name}.documentation", 'https://coolify.io/docs');
-    }
     public function service()
     {
         return $this->belongsTo(Service::class);

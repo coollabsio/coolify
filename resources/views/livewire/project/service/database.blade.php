@@ -7,7 +7,6 @@
                 <h2>{{ Str::headline($database->name) }}</h2>
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
-            <a target="_blank" href="{{ $database->documentation() }}">Documentation <x-external-link /></a>
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">

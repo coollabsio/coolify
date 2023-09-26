@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -47,6 +48,12 @@ class Service extends BaseModel
         return 'service';
     }
 
+    public function documentation()
+    {
+        $services = Cache::get('services', []);
+        $service = data_get($services, Str::of($this->name)->beforeLast('-')->value, []);
+        return data_get($service, 'documentation', 'https://coolify.io/docs');
+    }
     public function applications()
     {
         return $this->hasMany(ServiceApplication::class);
@@ -137,8 +144,6 @@ class Service extends BaseModel
         if (!$requiredFqdns) {
             $requiredFqdns = collect([]);
         }
-        ray('parsing');
-        // ray()->clearAll();
         if ($this->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($this->docker_compose_raw);
@@ -513,7 +518,6 @@ class Service extends BaseModel
                                     $number = 0;
                                 }
                                 $fqdn = getFqdnWithoutPort(data_get($fqdns, $number, $fqdns->first()));
-                                ray($fqdns);
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $fqdn) {
                                     $envValue = Str::of($envValue)->replace($value, $fqdn);

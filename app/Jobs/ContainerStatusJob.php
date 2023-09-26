@@ -74,7 +74,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
-            $services = $this->server->services();
+            $services = $this->server->services()->get();
             $previews = $this->server->previews();
             $this->server->proxyType();
             /// Check if proxy is running
@@ -170,7 +170,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
             }
             $exitedServices = collect([]);
-            foreach ($services->get() as $service) {
+            foreach ($services as $service) {
                 $apps = $service->applications()->get();
                 $dbs = $service->databases()->get();
                 foreach ($apps as $app) {

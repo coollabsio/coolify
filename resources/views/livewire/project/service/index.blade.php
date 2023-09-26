@@ -2,6 +2,7 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
+            <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
             <a :class="activeTab === 'service-stack' && 'text-white'"
                 @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
@@ -21,6 +22,7 @@
                     <div class="flex gap-2">
                         <h2 class="pb-4">Configuration </h2>
                         <x-forms.button type="submit">Save</x-forms.button>
+
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input id="service.name" required label="Service Name"
@@ -40,7 +42,7 @@
                             'border-l border-dashed border-success' => Str::of(
                                 $application->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
-                                $application->status)->contains(['restarting']),
+                                $application->status)->contains(['starting']),
                             'flex flex-col justify-center box',
                         ])
                             href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">

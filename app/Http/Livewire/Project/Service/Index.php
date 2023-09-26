@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\Service;
 
+use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Livewire\Component;
@@ -23,6 +24,7 @@ class Index extends Component
     public function manualRefreshStack() {
         try {
             $this->rateLimit(5);
+            dispatch_sync(new ContainerStatusJob($this->service->server));
             $this->refreshStack();
         } catch(\Throwable $e) {
             return handleError($e, $this);

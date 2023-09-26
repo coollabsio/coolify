@@ -8,7 +8,6 @@
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
             <x-forms.button isError wire:click='delete'>Delete</x-forms.button>
-            <a target="_blank" href="{{ $application->documentation() }}">Documentation <x-external-link /></a>
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">
