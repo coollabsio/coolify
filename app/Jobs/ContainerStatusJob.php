@@ -151,6 +151,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $subType = data_get($labels, 'coolify.service.subType');
                     $subId = data_get($labels, 'coolify.service.subId');
                     $service = $services->where('id', $serviceLabelId)->first();
+                    if (!$service) {
+                        continue;
+                    }
                     if ($subType === 'application') {
                         $service =  $service->applications()->where('id', $subId)->first();
                     } else {

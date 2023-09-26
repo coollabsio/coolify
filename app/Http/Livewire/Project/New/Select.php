@@ -29,6 +29,7 @@ class Select extends Component
     protected $queryString = [
         'server',
     ];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -46,6 +47,7 @@ class Select extends Component
     //         return handleError($e, $this);
     //     }
     // }
+
     public function loadThings()
     {
         $this->loadServices();
@@ -77,7 +79,6 @@ class Select extends Component
                 });
             }
             $this->services = $cached;
-
         } catch (\Throwable $e) {
             ray($e);
             return handleError($e, $this);

@@ -18,7 +18,6 @@ class ServiceApplication extends BaseModel
     {
         $services = Cache::get('services', []);
         $service = data_get($services, $this->name, []);
-        ray($this->name);
         return data_get($service, 'documentation', 'https://coolify.io/docs');
     }
     public function service()

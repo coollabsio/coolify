@@ -15,7 +15,7 @@ class Show extends Component
 
     protected $rules = [
         'env.key' => 'required|string',
-        'env.value' => 'required|string',
+        'env.value' => 'nullable',
         'env.is_build_time' => 'required|boolean',
     ];
     protected $validationAttributes = [

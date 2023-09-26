@@ -28,7 +28,10 @@
                         <x-forms.input id="service.description" label="Description" />
                     </div>
                 </form>
-                <h2 class="pb-4"> Service Stack </h2>
+                <div class="flex gap-2">
+                    <h2 class="pb-4"> Service Stack </h2>
+                    <x-forms.button wire:click='manualRefreshStack'>Refresh</x-forms.button>
+                </div>
                 <div class="grid grid-cols-1 gap-2 xl:grid-cols-3 ">
                     @foreach ($applications as $application)
                         <a @class([
@@ -46,6 +49,9 @@
                             @else
                                 {{ Str::headline($application->name) }}
                             @endif
+                            @if ($application->hasMissingFiles)
+                                <span class="text-xs text-error">(has missing files)</span>
+                            @endif
                             @if ($application->description)
                                 <span class="text-xs">{{ $application->description }}</span>
                             @endif
@@ -58,11 +64,11 @@
                     @foreach ($databases as $database)
                         <a @class([
                             'border-l border-dashed border-red-500' => Str::of(
-                                $application->status)->contains(['exited']),
+                                $database->status)->contains(['exited']),
                             'border-l border-dashed border-success' => Str::of(
-                                $application->status)->contains(['running']),
+                                $database->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
-                                $application->status)->contains(['restarting']),
+                                $database->status)->contains(['restarting']),
                             'flex flex-col justify-center box',
                         ])
                             href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
@@ -71,10 +77,13 @@
                             @else
                                 {{ Str::headline($database->name) }}
                             @endif
+                            @if ($database->hasMissingFiles)
+                                <span class="text-xs text-error">(has missing files)</span>
+                            @endif
                             @if ($database->description)
                                 <span class="text-xs">{{ $database->description }}</span>
                             @endif
-                            <div class="text-xs">{{ $application->status }}</div>
+                            <div class="text-xs">{{ $database->status }}</div>
                         </a>
                     @endforeach
                 </div>

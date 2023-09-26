@@ -17,22 +17,30 @@
                 <x-forms.input label="Description" id="application.description"></x-forms.input>
             </div>
             <div class="flex gap-2">
-                <x-forms.input placeholder="https://app.coolify.io" label="Domains"
-                    id="application.fqdn"></x-forms.input>
-                <x-forms.input required helper="You can change the image tag you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>" label="Image Tag" id="application.image_tag"></x-forms.input>
+                @if ($application->required_fqdn)
+                    <x-forms.input required placeholder="https://app.coolify.io" label="Domains"
+                        id="application.fqdn"></x-forms.input>
+                @else
+                    <x-forms.input placeholder="https://app.coolify.io" label="Domains"
+                        id="application.fqdn"></x-forms.input>
+                @endif
+                <x-forms.input required
+                    helper="You can change the image you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
+                    label="Image" id="application.image"></x-forms.input>
             </div>
         </div>
+
         <h3 class="pt-2">Advanced</h3>
         <div class="w-64">
-            <x-forms.checkbox instantSave label="Ignore from service status"
+            <x-forms.checkbox instantSave label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
-                id="application.ignore_from_status"></x-forms.checkbox>
+                id="application.exclude_from_status"></x-forms.checkbox>
         </div>
     </form>
     @if ($fileStorages->count() > 0)
-        <h3 class="py-4">Files</h3>
+        <h3 class="py-4">Mounted Files (binds)</h3>
         <div class="flex flex-col gap-4">
-            @foreach ($fileStorages->get() as $fileStorage)
+            @foreach ($fileStorages as $fileStorage)
                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
             @endforeach
         </div>

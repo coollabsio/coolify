@@ -9,13 +9,13 @@ class Add extends Component
     public $parameters;
     public bool $is_preview = false;
     public string $key;
-    public string $value;
+    public ?string $value = null;
     public bool $is_build_time = false;
 
     protected $listeners = ['clearAddEnv' => 'clear'];
     protected $rules = [
         'key' => 'required|string',
-        'value' => 'required|string',
+        'value' => 'nullable',
         'is_build_time' => 'required|boolean',
     ];
     protected $validationAttributes = [
@@ -32,6 +32,7 @@ class Add extends Component
     public function submit()
     {
         $this->validate();
+        ray($this->key, $this->value, $this->is_build_time);
         $this->emitUp('submit', [
             'key' => $this->key,
             'value' => $this->value,

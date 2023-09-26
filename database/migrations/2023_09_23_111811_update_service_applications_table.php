@@ -12,8 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('service_applications', function (Blueprint $table) {
-            $table->boolean('ignore_from_status')->default(false);
-            $table->string('image_tag')->nullable();
+            $table->boolean('exclude_from_status')->default(false);
+            $table->boolean('required_fqdn')->default(false);
+            $table->string('image')->nullable();
         });
     }
 
@@ -23,8 +24,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('service_applications', function (Blueprint $table) {
-            $table->dropColumn('ignore_from_status');
-            $table->dropColumn('image_tag');
+            $table->dropColumn('exclude_from_status');
+            $table->dropColumn('required_fqdn');
+            $table->dropColumn('image');
         });
     }
 };

@@ -12,6 +12,7 @@ class StartService
     {
         $service->saveComposeConfigs();
         $commands[] = "cd " . $service->workdir();
+        $commands[] = "echo '####### Saved configuration files to {$service->workdir()}.'";
         $commands[] = "echo '####### Starting service {$service->name} on {$service->server->name}.'";
         $commands[] = "echo '####### Pulling images.'";
         $commands[] = "docker compose pull";

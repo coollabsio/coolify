@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\New;
 
+use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Service;
 use Livewire\Component;
@@ -11,6 +12,7 @@ use Symfony\Component\Yaml\Yaml;
 class DockerCompose extends Component
 {
     public string $dockerComposeRaw = '';
+    public string $envFile = '';
     public array $parameters;
     public array $query;
     public function mount()
@@ -45,13 +47,22 @@ class DockerCompose extends Component
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
-
             $service = Service::create([
                 'name' => 'service' . Str::random(10),
                 'docker_compose_raw' => $this->dockerComposeRaw,
                 'environment_id' => $environment->id,
                 'server_id' => (int) $server_id,
             ]);
+            $variables = parseEnvFormatToArray($this->envFile);
+            foreach ($variables as $key => $variable) {
+                EnvironmentVariable::create([
+                    'key' => $key,
+                    'value' => $variable,
+                    'is_build_time' => false,
+                    'is_preview' => false,
+                    'service_id' => $service->id,
+                ]);
+            }
             $service->name = "service-$service->uuid";
 
             $service->parse(isNew: true);
@@ -64,6 +75,5 @@ class DockerCompose extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 }

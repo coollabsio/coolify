@@ -96,21 +96,47 @@ class Service extends BaseModel
         foreach ($envs as $env) {
             $commands[] = "echo '{$env->key}={$env->value}' >> .env";
         }
+        if ($envs->count() === 0) {
+            $commands[] = "touch .env";
+        }
         instant_remote_process($commands, $this->server);
     }
-    private function generateFqdn($serviceVariables, $serviceName)
+    private function sslip(Server $server)
+    {
+        if (isDev()) {
+            return "127.0.0.1.sslip.io";
+        }
+        return "{$server->ip}.sslip.io";
+    }
+    private function generateFqdn($serviceVariables, $serviceName, Collection $requiredFqdns)
     {
         // Add sslip.io to the service
-        // if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$this->server->ip}.sslip.io";
-            if (isDev()) {
-                $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.127.0.0.1.sslip.io";
+        $defaultUsableFqdn = null;
+        $sslip = $this->sslip($this->server);
+        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}";
+        }
+        if ($requiredFqdns->count() > 0) {
+            foreach ($requiredFqdns as $requiredFqdn) {
+                $requiredFqdn = (array)$requiredFqdn;
+                $name = data_get($requiredFqdn, 'name');
+                $path = data_get($requiredFqdn, 'path');
+                $customFqdn = data_get($requiredFqdn, 'customFqdn');
+                if ($serviceName === $name) {
+                    $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}{$path}";
+                    if ($customFqdn) {
+                        $defaultUsableFqdn = "http://$customFqdn-{$this->uuid}.{$sslip}{$path}";
+                    }
+                }
             }
-        // }
+        }
         return $defaultUsableFqdn ?? null;
     }
-    public function parse(bool $isNew = false): Collection
+    public function parse(bool $isNew = false, ?Collection $requiredFqdns = null): Collection
     {
+        if (!$requiredFqdns) {
+            $requiredFqdns = collect([]);
+        }
         ray('parsing');
         // ray()->clearAll();
         if ($this->docker_compose_raw) {
@@ -130,16 +156,26 @@ class Service extends BaseModel
             $envs = collect([]);
             $ports = collect([]);
 
-            $services = collect($services)->map(function ($service, $serviceName) use ($composeVolumes, $composeNetworks, $definedNetwork, $envs, $volumes, $ports, $isNew) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($composeVolumes, $composeNetworks, $definedNetwork, $envs, $volumes, $ports, $isNew, $requiredFqdns) {
                 $container_name = "$serviceName-{$this->uuid}";
                 $isDatabase = false;
                 $serviceVariables = collect(data_get($service, 'environment', []));
+
+                // Add env_file with at least .env to the service
+                $envFile = collect(data_get($service, 'env_file', []));
+                if ($envFile->count() > 0) {
+                    if (!$envFile->contains('.env')) {
+                        $envFile->push('.env');
+                    }
+                } else {
+                    $envFile = collect(['.env']);
+                }
+                data_set($service, 'env_file', $envFile->toArray());
 
                 // Decide if the service is a database
                 $image = data_get($service, 'image');
                 if ($image) {
                     $imageName = Str::of($image)->before(':');
-                    $imageTag = Str::of($image)->after(':') ?? 'latest';
                     if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
                         $isDatabase = true;
                         data_set($service, 'is_database', true);
@@ -160,16 +196,28 @@ class Service extends BaseModel
                     if ($isDatabase) {
                         $savedService = ServiceDatabase::create([
                             'name' => $serviceName,
-                            'image_tag' => $imageTag,
+                            'image' => $image,
                             'service_id' => $this->id
                         ]);
                     } else {
                         $savedService = ServiceApplication::create([
                             'name' => $serviceName,
-                            'fqdn' => $this->generateFqdn($serviceVariables, $serviceName),
-                            'image_tag' => $imageTag,
+                            'fqdn' => $this->generateFqdn($serviceVariables, $serviceName, $requiredFqdns),
+                            'image' => $image,
                             'service_id' => $this->id
                         ]);
+                    }
+                    if ($requiredFqdns->count() > 0) {
+                        $found = false;
+                        foreach ($requiredFqdns as $requiredFqdn) {
+                            $requiredFqdn = (array)$requiredFqdn;
+                            $name = data_get($requiredFqdn, 'name');
+                            if ($serviceName === $name) {
+                                $savedService->required_fqdn = true;
+                                $savedService->save();
+                                break;
+                            }
+                        }
                     }
                 } else {
                     if ($isDatabase) {
@@ -179,14 +227,13 @@ class Service extends BaseModel
                         if (data_get($savedService, 'fqdn')) {
                             $defaultUsableFqdn = data_get($savedService, 'fqdn', null);
                         } else {
-                            $defaultUsableFqdn = $this->generateFqdn($serviceVariables, $serviceName);
+                            $defaultUsableFqdn = $this->generateFqdn($serviceVariables, $serviceName, $requiredFqdns);
                         }
                         $savedService->fqdn = $defaultUsableFqdn;
                         $savedService->save();
                     }
                 }
 
-                // Set image tag
                 $fqdns = data_get($savedService, 'fqdn');
                 if ($fqdns) {
                     $fqdns = collect(Str::of($fqdns)->explode(','));
@@ -209,6 +256,7 @@ class Service extends BaseModel
                 }
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
+
                 // Collect volumes
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 if ($serviceVolumes->count() > 0) {
@@ -341,6 +389,7 @@ class Service extends BaseModel
                     $value = Str::after($variable, '=');
                     if (!Str::startsWith($value, '$SERVICE_') && !Str::startsWith($value, '${SERVICE_') && Str::startsWith($value, '$')) {
                         $value = Str::of(replaceVariables(Str::of($value)));
+                        $nakedName = $nakedValue = null;
                         if ($value->contains(':')) {
                             $nakedName = $value->before(':');
                             $nakedValue = $value->after(':');
@@ -464,6 +513,7 @@ class Service extends BaseModel
                                     $number = 0;
                                 }
                                 $fqdn = getFqdnWithoutPort(data_get($fqdns, $number, $fqdns->first()));
+                                ray($fqdns);
                                 $environments = collect(data_get($service, 'environment'));
                                 $environments = $environments->map(function ($envValue) use ($value, $fqdn) {
                                     $envValue = Str::of($envValue)->replace($value, $fqdn);
@@ -491,6 +541,7 @@ class Service extends BaseModel
                         }
                     }
                 }
+
                 // Add labels to the service
                 $labels = collect(data_get($service, 'labels', []));
                 $labels = collect([]);

@@ -15,6 +15,7 @@ class FileStorage extends Component
     public string $fs_path;
 
     protected $rules = [
+        'fileStorage.is_directory' => 'required',
         'fileStorage.fs_path' => 'required',
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
@@ -38,6 +39,9 @@ class FileStorage extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
+    }
+    public function instantSave() {
+        $this->submit();
     }
     public function render()
     {

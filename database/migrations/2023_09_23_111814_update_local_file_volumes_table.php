@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('service_databases', function (Blueprint $table) {
-            $table->boolean('exclude_from_status')->default(false);
-            $table->string('image')->nullable();
+        Schema::table('local_file_volumes', function (Blueprint $table) {
+            $table->boolean('is_directory')->default(false);
         });
     }
 
@@ -22,9 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('service_databases', function (Blueprint $table) {
-            $table->dropColumn('exclude_from_status');
-            $table->dropColumn('image');
+        Schema::table('local_file_volumes', function (Blueprint $table) {
+            $table->dropColumn('is_directory');
         });
     }
 };

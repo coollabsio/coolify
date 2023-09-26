@@ -15,21 +15,21 @@
                 <x-forms.input label="Description" id="database.description"></x-forms.input>
             </div>
             <div class="flex gap-2">
-                <x-forms.input required helper="You can change the image tag you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>" label="Image Tag"
-                    id="database.image_tag"></x-forms.input>
+                <x-forms.input required helper="You can change the image you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>" label="Image Tag"
+                    id="database.image"></x-forms.input>
             </div>
         </div>
         <h3 class="pt-2">Advanced</h3>
         <div class="w-64">
-            <x-forms.checkbox instantSave label="Ignore from service status"
+            <x-forms.checkbox instantSave label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
-                id="database.ignore_from_status"></x-forms.checkbox>
+                id="database.exclude_from_status"></x-forms.checkbox>
         </div>
     </form>
-    @if ($database->fileStorages()->get()->count() > 0)
+    @if ($fileStorages->count() > 0)
         <h3 class="py-4">Mounted Files (binds)</h3>
         <div class="flex flex-col gap-4">
-            @foreach ($database->fileStorages()->get() as $fileStorage)
+            @foreach ($fileStorages as $fileStorage)
                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
             @endforeach
         </div>
