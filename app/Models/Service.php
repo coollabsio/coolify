@@ -115,30 +115,30 @@ class Service extends BaseModel
         }
         return "{$server->ip}.sslip.io";
     }
-    private function generateFqdn($serviceVariables, $serviceName, Collection $configuration)
-    {
-        // Add sslip.io to the service
-        $defaultUsableFqdn = null;
-        $sslip = $this->sslip($this->server);
-        if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-            $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}";
-        }
-        if ($configuration->count() > 0) {
-            foreach ($configuration as $requiredFqdn) {
-                $requiredFqdn = (array)$requiredFqdn;
-                $name = data_get($requiredFqdn, 'name');
-                $path = data_get($requiredFqdn, 'path');
-                $customFqdn = data_get($requiredFqdn, 'customFqdn');
-                if ($serviceName === $name) {
-                    $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}{$path}";
-                    if ($customFqdn) {
-                        $defaultUsableFqdn = "http://$customFqdn-{$this->uuid}.{$sslip}{$path}";
-                    }
-                }
-            }
-        }
-        return $defaultUsableFqdn ?? null;
-    }
+    // private function generateFqdn($serviceVariables, $serviceName, Collection $configuration)
+    // {
+    //     // Add sslip.io to the service
+    //     $defaultUsableFqdn = null;
+    //     $sslip = $this->sslip($this->server);
+    //     if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
+    //         $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}";
+    //     }
+    //     if ($configuration->count() > 0) {
+    //         foreach ($configuration as $requiredFqdn) {
+    //             $requiredFqdn = (array)$requiredFqdn;
+    //             $name = data_get($requiredFqdn, 'name');
+    //             $path = data_get($requiredFqdn, 'path');
+    //             $customFqdn = data_get($requiredFqdn, 'customFqdn');
+    //             if ($serviceName === $name) {
+    //                 $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}{$path}";
+    //                 if ($customFqdn) {
+    //                     $defaultUsableFqdn = "http://$customFqdn-{$this->uuid}.{$sslip}{$path}";
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     return $defaultUsableFqdn ?? null;
+    // }
     public function parse(bool $isNew = false): Collection
     {
         // ray()->clearAll();
@@ -376,14 +376,10 @@ class Service extends BaseModel
                                         $generatedServiceFQDNS->put($key->value(), $fqdn);
                                     }
                                 } else {
-                                    ray($key, $fqdn);
                                     $generatedServiceFQDNS->put($key->value(), $fqdn);
                                 }
                                 $fqdn = "http://$containerName.$sslip$path";
-
-                                ray($fqdn);
                             }
-
                             if (!$isDatabase) {
                                 $savedService->fqdn = $fqdn;
                                 $savedService->save();

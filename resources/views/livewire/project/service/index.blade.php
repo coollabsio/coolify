@@ -1,7 +1,7 @@
-<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }">
+<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.10000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
+        <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
             <a :class="activeTab === 'service-stack' && 'text-white'"
                 @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'"
@@ -23,7 +23,6 @@
                             <div>Configuration</div>
                         </div>
                         <x-forms.button type="submit">Save</x-forms.button>
-                        <x-forms.button wire:click='manualRefreshStack'>Refresh Status</x-forms.button>
                         <div x-cloak x-show="raw">
                             <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable
                                 Compose</x-forms.button>
@@ -59,7 +58,7 @@
                     </div>
                 </form>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">
-                    @foreach ($applications as $application)
+                    @foreach ($service->applications as $application)
                         <a @class([
                             'border-l border-dashed border-red-500' => Str::of(
                                 $application->status)->contains(['exited']),
@@ -107,7 +106,7 @@
                                 <span class="text-xs text-error">(configuration required)</span>
                             @endif
                             @if ($database->description)
-                                <span class="text-xs">{{ Str::limit($database->description, 60)  }}</span>
+                                <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
                             @endif
                             <div class="text-xs">{{ $database->status }}</div>
                         </a>

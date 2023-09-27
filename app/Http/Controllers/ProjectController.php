@@ -73,7 +73,6 @@ class ProjectController extends Controller
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
             }
-            ray($oneClickDotEnvs);
             if ($oneClickService) {
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
@@ -83,7 +82,7 @@ class ProjectController extends Controller
                 ]);
                 $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();
-                if ($oneClickDotEnvs->count() > 0) {
+                if ($oneClickDotEnvs?->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
                         $key = Str::before($value, '=');
                         $value = Str::of(Str::after($value, '='));
