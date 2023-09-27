@@ -41,6 +41,7 @@ class Service extends BaseModel
                     instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
                 });
             }
+            instant_remote_process(["docker network rm {$service->uuid}"], $service->server, false);
         });
     }
     public function type()
@@ -262,7 +263,7 @@ class Service extends BaseModel
                 if (!$definedNetworkExists) {
                     $topLevelNetworks->put($definedNetwork, [
                         'name' => $definedNetwork,
-                        'external' => false
+                        'external' => true
                     ]);
                 }
                 $networks = $serviceNetworks->toArray();
@@ -366,7 +367,7 @@ class Service extends BaseModel
                         if (is_null(data_get($savedService, 'fqdn'))) {
                             $sslip = $this->sslip($this->server);
                             $fqdn = "http://$containerName.$sslip";
-                            if (substr_count($key->value(),'_') === 2) {
+                            if (substr_count($key->value(),'_') === 2 && $key->contains("=")) {
                                 $path = $value->value();
                                 if ($generatedServiceFQDNS->count() > 0) {
                                     $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
