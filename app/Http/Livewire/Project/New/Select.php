@@ -23,6 +23,7 @@ class Select extends Component
     public array $parameters;
     public Collection|array $services = [];
     public bool $loadingServices = true;
+    public bool $loading = false;
 
     public ?string $existingPostgresqlUrl = null;
 
@@ -61,19 +62,19 @@ class Select extends Component
             }
             if (isDev()) {
                 $cached = Cache::remember('services', 3600, function () {
-                    $services = File::get(base_path('examples/service-templates.json'));
-                    $services = collect(json_decode($services));
+                    $services = File::get(base_path('templates/service-templates.json'));
+                    $services = collect(json_decode($services))->sortKeys();
                     $this->emit('success', 'Successfully reloaded services from filesystem (development mode).');
                     return $services;
                 });
             } else {
                 $cached = Cache::remember('services', 3600, function () {
-                    $services = Http::get(config('constants.services.offical'));
+                    $services = Http::get(config('constants.services.official'));
                     if ($services->failed()) {
                         throw new \Exception($services->body());
                     }
 
-                    $services = collect($services->json());
+                    $services = collect($services->json())->sortKeys();
                     $this->emit('success', 'Successfully reloaded services from the internet.');
                     return $services;
                 });
@@ -89,6 +90,8 @@ class Select extends Component
     public function setType(string $type)
     {
         $this->type = $type;
+        if ($this->loading) return;
+        $this->loading = true;
         if ($type === "existing-postgresql") {
             $this->current_step = $type;
             return;

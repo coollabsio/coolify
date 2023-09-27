@@ -15,7 +15,7 @@ return [
         ],
     ],
     'services' => [
-        'offical' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+        'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
     ],
     'limits' => [
         'trial_period'=> 7,
