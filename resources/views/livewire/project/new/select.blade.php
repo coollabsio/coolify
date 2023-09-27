@@ -12,7 +12,7 @@
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('public')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Public Repository
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -22,7 +22,7 @@
                 </div>
                 <div class="box group" wire:click="setType('private-gh-app')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Private Repository
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -32,7 +32,7 @@
                 </div>
                 <div class="box group" wire:click="setType('private-deploy-key')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Private Repository (with deploy key)
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -44,7 +44,7 @@
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('dockerfile')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Based on a Dockerfile
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -54,7 +54,7 @@
                 </div>
                 <div class="box group" wire:click="setType('docker-compose-empty')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Based on a Docker Compose
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -67,7 +67,7 @@
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('postgresql')">
                     <div class="flex flex-col mx-6">
-                        <div class="text-xl font-bold text-white group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             New PostgreSQL
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -98,7 +98,7 @@
                         <button class="text-left box group"
                             wire:loading.attr="disabled" wire:click="setType('one-click-service-{{ $serviceName }}')">
                             <div class="flex flex-col mx-6">
-                                <div class="text-xl font-bold text-white group-hover:text-white">
+                                <div class="font-bold text-white group-hover:text-white">
                                     {{ Str::headline($serviceName) }}
                                 </div>
                                 @if (data_get($service, 'slogan'))
