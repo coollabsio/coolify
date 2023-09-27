@@ -53,19 +53,6 @@ class Index extends Component
     {
         return view('livewire.project.service.index');
     }
-    // public function save()
-    // {
-    //     try {
-    //         $this->service->save();
-    //         $this->service->parse();
-    //         $this->service->refresh();
-    //         $this->emit('refreshEnvs');
-    //         $this->emit('success', 'Service saved successfully.');
-    //         $this->service->saveComposeConfigs();
-    //     } catch (\Throwable $e) {
-    //         return handleError($e, $this);
-    //     }
-    // }
     public function submit()
     {
         try {

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Cache;
 
@@ -25,6 +26,15 @@ class ServiceApplication extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+    public function fqdns(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->fqdn)
+                ? []
+                : explode(',', $this->fqdn),
+
+        );
     }
     public function saveFileVolumes()
     {

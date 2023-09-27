@@ -141,7 +141,7 @@ class Service extends BaseModel
     }
     public function parse(bool $isNew = false): Collection
     {
-        ray()->clearAll();
+        // ray()->clearAll();
         if ($this->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($this->docker_compose_raw);
@@ -155,7 +155,9 @@ class Service extends BaseModel
             $services = data_get($yaml, 'services');
             $definedNetwork = $this->uuid;
 
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew) {
+            $generatedServiceFQDNS = collect([]);
+
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS) {
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -205,6 +207,21 @@ class Service extends BaseModel
                             'name' => $serviceName,
                             'service_id' => $this->id
                         ])->first();
+                    }
+                }
+                if (is_null($savedService)) {
+                    if ($isDatabase) {
+                        $savedService = ServiceDatabase::create([
+                            'name' => $serviceName,
+                            'image' => $image,
+                            'service_id' => $this->id
+                        ]);
+                    } else {
+                        $savedService = ServiceApplication::create([
+                            'name' => $serviceName,
+                            'image' => $image,
+                            'service_id' => $this->id
+                        ]);
                     }
                 }
 
@@ -258,6 +275,7 @@ class Service extends BaseModel
                         $type = null;
                         $source = null;
                         $target = null;
+                        $content = null;
                         if (is_string($volume)) {
                             $source = Str::of($volume)->before(':');
                             $target = Str::of($volume)->after(':')->beforeLast(':');
@@ -270,8 +288,15 @@ class Service extends BaseModel
                             $type = data_get_str($volume, 'type');
                             $source = data_get_str($volume, 'source');
                             $target = data_get_str($volume, 'target');
+                            $content = data_get($volume, 'content');
                         }
                         if ($type->value() === 'bind') {
+                            if ($source->value() === "/var/run/docker.sock") {
+                                continue;
+                            }
+                            if ($source->value() === '/tmp' || $source->value() === '/tmp/' ) {
+                                continue;
+                            }
                             LocalFileVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
@@ -281,6 +306,7 @@ class Service extends BaseModel
                                 [
                                     'fs_path' => $source,
                                     'mount_path' => $target,
+                                    'content' => $content,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService)
                                 ]
@@ -305,15 +331,15 @@ class Service extends BaseModel
                 }
 
                 // Add env_file with at least .env to the service
-                $envFile = collect(data_get($service, 'env_file', []));
-                if ($envFile->count() > 0) {
-                    if (!$envFile->contains('.env')) {
-                        $envFile->push('.env');
-                    }
-                } else {
-                    $envFile = collect(['.env']);
-                }
-                data_set($service, 'env_file', $envFile->toArray());
+                // $envFile = collect(data_get($service, 'env_file', []));
+                // if ($envFile->count() > 0) {
+                //     if (!$envFile->contains('.env')) {
+                //         $envFile->push('.env');
+                //     }
+                // } else {
+                //     $envFile = collect(['.env']);
+                // }
+                // data_set($service, 'env_file', $envFile->toArray());
 
 
                 // Get variables from the service
@@ -333,8 +359,37 @@ class Service extends BaseModel
                     } else {
                         // SESSION_SECRET: 123
                         // SESSION_SECRET:
-                        $key = $variableName;
+                        $key = Str::of($variableName);
                         $value = Str::of($variable);
+                    }
+                    if ($key->startsWith('SERVICE_FQDN')) {
+                        if (is_null(data_get($savedService, 'fqdn'))) {
+                            $sslip = $this->sslip($this->server);
+                            $fqdn = "http://$containerName.$sslip";
+                            if (substr_count($key->value(),'_') === 2) {
+                                $path = $value->value();
+                                if ($generatedServiceFQDNS->count() > 0) {
+                                    $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
+                                    if ($alreadyGenerated) {
+                                        $fqdn = $generatedServiceFQDNS->get($key->value());
+                                    } else {
+                                        $generatedServiceFQDNS->put($key->value(), $fqdn);
+                                    }
+                                } else {
+                                    ray($key, $fqdn);
+                                    $generatedServiceFQDNS->put($key->value(), $fqdn);
+                                }
+                                $fqdn = "http://$containerName.$sslip$path";
+
+                                ray($fqdn);
+                            }
+
+                            if (!$isDatabase) {
+                                $savedService->fqdn = $fqdn;
+                                $savedService->save();
+                            }
+                        }
+                        continue;
                     }
                     if ($value?->startsWith('$')) {
                         $value = Str::of(replaceVariables($value));
@@ -415,6 +470,9 @@ class Service extends BaseModel
                                 $key = $value;
                                 $defaultValue = null;
                             }
+                            if ($foundEnv) {
+                                $defaultValue = data_get($foundEnv, 'value');
+                            }
                             EnvironmentVariable::updateOrCreate([
                                 'key' => $key,
                                 'service_id' => $this->id,
@@ -429,7 +487,7 @@ class Service extends BaseModel
                 }
 
                 // Add labels to the service
-                $fqdns = collect(data_get($savedService, 'fqdn'));
+                $fqdns = collect(data_get($savedService, 'fqdns'));
                 $defaultLabels = defaultLabels($this->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
@@ -443,6 +501,15 @@ class Service extends BaseModel
                 data_set($service, 'restart', RESTART_MODE);
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
+
+                // Remove unnecessary variables from service.environment
+                $withoutServiceEnvs = collect([]);
+                collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
+                    if (!Str::of($key)->startsWith('$SERVICE_')) {
+                        $withoutServiceEnvs->put($key, $value);
+                    }
+                });
+                data_set($service, 'environment', $withoutServiceEnvs->toArray());
                 return $service;
             });
             $finalServices = [

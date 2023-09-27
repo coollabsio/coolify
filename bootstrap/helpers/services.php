@@ -109,19 +109,13 @@ function updateCompose($resource) {
 
         // Update FQDN
         $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
+        ray($variableName);
         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
         if ($generatedEnv){
             $generatedEnv->value = $resource->fqdn;
             $generatedEnv->save();
         }
 
-        // // Update URL
-        // $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
-        // $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-        // if ($generatedEnv){
-        //     $generatedEnv->value = $resource->url;
-        //     $generatedEnv->save();
-        // }
 
         $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
         $resource->service->docker_compose_raw = $dockerComposeRaw;

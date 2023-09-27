@@ -70,11 +70,10 @@ class ProjectController extends Controller
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
-            $oneClickConfiguration = data_get($services, "$oneClickServiceName.configuration.proxy", []);
-            $oneClickConfiguration = collect($oneClickConfiguration);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
             }
+            ray($oneClickDotEnvs);
             if ($oneClickService) {
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
@@ -84,38 +83,44 @@ class ProjectController extends Controller
                 ]);
                 $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();
-                if ($oneClickDotEnvs && $oneClickDotEnvs->count() > 0) {
+                if ($oneClickDotEnvs->count() > 0) {
                     $oneClickDotEnvs->each(function ($value) use ($service) {
                         $key = Str::before($value, '=');
                         $value = Str::of(Str::after($value, '='));
-                        if ($value->contains('SERVICE_USER')) {
-                            $value = Str::of(Str::random(10));
-                        }
-                        if ($value->contains('SERVICE_PASSWORD')) {
-                            $value = Str::of(Str::password(symbols: false));
-                        }
-                        if ($value->contains('SERVICE_PASSWORD64')) {
-                            $value = Str::of(Str::password(length: 64, symbols: false));
-                        }
-                        if ($value->contains('SERVICE_BASE64')) {
-                            $length = Str::of($value)->after('SERVICE_BASE64_')->beforeLast('_')->value();
-                            if (is_numeric($length)) {
-                                $length = (int) $length;
-                            } else {
-                                $length = 1;
+                        $generatedValue = $value;
+                        if ($value->contains('SERVICE_')) {
+                            $command = $value->after('SERVICE_')->beforeLast('_');
+                            switch ($command->value()) {
+                                case 'PASSWORD':
+                                    $generatedValue = Str::password(symbols: false);
+                                    break;
+                                case 'PASSWORD_64':
+                                    $generatedValue = Str::password(length: 64, symbols: false);
+                                    break;
+                                case 'BASE64_64':
+                                    $generatedValue = Str::random(64);
+                                    break;
+                                case 'BASE64_128':
+                                    $generatedValue = Str::random(128);
+                                    break;
+                                case 'BASE64':
+                                    $generatedValue = Str::random(32);
+                                    break;
+                                case 'USER':
+                                    $generatedValue = Str::random(16);
+                                    break;
                             }
-                            $value = Str::of(base64_encode(Str::password(length: $length, symbols: false)));
                         }
                         EnvironmentVariable::create([
                             'key' => $key,
-                            'value' => $value->value(),
+                            'value' => $generatedValue,
                             'service_id' => $service->id,
                             'is_build_time' => false,
                             'is_preview' => false,
                         ]);
                     });
                 }
-                $service->parse(isNew: true, configuration: $oneClickConfiguration);
+                $service->parse(isNew: true);
 
                 return redirect()->route('project.service', [
                     'service_uuid' => $service->uuid,

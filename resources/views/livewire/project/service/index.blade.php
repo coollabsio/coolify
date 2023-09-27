@@ -79,10 +79,10 @@
                                 <span class="text-xs text-error">(configuration required)</span>
                             @endif
                             @if ($application->description)
-                                <span class="text-xs">{{ $application->description }}</span>
+                                <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
                             @endif
                             @if ($application->fqdn)
-                                <span class="text-xs">{{ $application->fqdn }}</span>
+                                <span class="text-xs">{{ Str::limit($application->fqdn, 60) }}</span>
                             @endif
                             <div class="text-xs">{{ $application->status }}</div>
                         </a>
@@ -107,7 +107,7 @@
                                 <span class="text-xs text-error">(configuration required)</span>
                             @endif
                             @if ($database->description)
-                                <span class="text-xs">{{ $database->description }}</span>
+                                <span class="text-xs">{{ Str::limit($database->description, 60)  }}</span>
                             @endif
                             <div class="text-xs">{{ $database->status }}</div>
                         </a>
