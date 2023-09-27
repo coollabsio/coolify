@@ -17,7 +17,7 @@ class StartService
         $commands[] = "echo '####### Pulling images.'";
         $commands[] = "docker compose pull";
         $commands[] = "echo '####### Starting containers.'";
-        $commands[] = "docker compose up -d";
+        $commands[] = "docker compose up -d --remove-orphans";
         $commands[] = "docker network connect $service->uuid coolify-proxy 2>/dev/null || true";
         $activity = remote_process($commands, $service->server);
         return $activity;

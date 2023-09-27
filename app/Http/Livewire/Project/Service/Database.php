@@ -35,7 +35,7 @@ class Database extends Component
         try {
             $this->validate();
             $this->database->save();
-            switchImage($this->database);
+            updateCompose($this->database);
             $this->emit('success', 'Database saved successfully.');
         } catch (\Throwable $e) {
             ray($e);

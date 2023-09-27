@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -96,14 +97,32 @@ function saveFileVolumesHelper(ServiceApplication|ServiceDatabase $oneService)
         return handleError($e);
     }
 }
-function switchImage($resource)
-{
+function updateCompose($resource) {
     try {
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
-        $image = data_get($resource, 'image');
         $dockerCompose = Yaml::parse($dockerComposeRaw);
+
+        // Switch Image
+        $image = data_get($resource, 'image');
         data_set($dockerCompose, "services.{$name}.image", $image);
+
+        // Update FQDN
+        $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
+        $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+        if ($generatedEnv){
+            $generatedEnv->value = $resource->fqdn;
+            $generatedEnv->save();
+        }
+
+        // // Update URL
+        // $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
+        // $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+        // if ($generatedEnv){
+        //     $generatedEnv->value = $resource->url;
+        //     $generatedEnv->save();
+        // }
+
         $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
         $resource->service->docker_compose_raw = $dockerComposeRaw;
         $resource->service->save();

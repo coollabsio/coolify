@@ -25,12 +25,4 @@
                 id="database.exclude_from_status"></x-forms.checkbox>
         </div>
     </form>
-    @if ($fileStorages->count() > 0)
-        <h3 class="py-4">Mounted Files (binds)</h3>
-        <div class="flex flex-col gap-4">
-            @foreach ($fileStorages as $fileStorage)
-                <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
-            @endforeach
-        </div>
-    @endif
 </div>

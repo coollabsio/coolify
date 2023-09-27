@@ -34,19 +34,11 @@ class Index extends Component
     {
         $this->applications = $this->service->applications->sort();
         $this->applications->each(function ($application) {
-            $application->fileStorages()->get()->each(function ($fileStorage) use ($application) {
-                if (!$fileStorage->is_directory && $fileStorage->content == null) {
-                    $application->hasMissingFiles = true;
-                }
-            });
+            $application->configuration_required = $application->configurationRequired();
         });
         $this->databases = $this->service->databases->sort();
         $this->databases->each(function ($database) {
-            $database->fileStorages()->get()->each(function ($fileStorage) use ($database) {
-                if (!$fileStorage->is_directory && $fileStorage->content == null) {
-                    $database->hasMissingFiles = true;
-                }
-            });
+            $database->configuration_required = $database->configurationRequired();
         });
         $this->emit('success', 'Stack refreshed successfully.');
     }
@@ -61,24 +53,29 @@ class Index extends Component
     {
         return view('livewire.project.service.index');
     }
-    public function save()
-    {
-        try {
-            $this->service->save();
-            $this->service->parse();
-            $this->service->refresh();
-            $this->emit('refreshEnvs');
-            $this->emit('success', 'Service saved successfully.');
-            $this->service->saveComposeConfigs();
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
+    // public function save()
+    // {
+    //     try {
+    //         $this->service->save();
+    //         $this->service->parse();
+    //         $this->service->refresh();
+    //         $this->emit('refreshEnvs');
+    //         $this->emit('success', 'Service saved successfully.');
+    //         $this->service->saveComposeConfigs();
+    //     } catch (\Throwable $e) {
+    //         return handleError($e, $this);
+    //     }
+    // }
     public function submit()
     {
         try {
             $this->validate();
             $this->service->save();
+            $this->service->parse();
+            $this->service->refresh();
+            $this->service->saveComposeConfigs();
+            $this->refreshStack();
+            $this->emit('refreshEnvs');
             $this->emit('success', 'Service saved successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);

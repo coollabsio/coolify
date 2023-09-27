@@ -44,6 +44,6 @@
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
 '></x-forms.textarea>
-        <x-forms.textarea label="Environment File" rows="20" id="envFile"></x-forms.textarea>
+        {{-- <x-forms.textarea label="Environment File" rows="20" id="envFile"></x-forms.textarea> --}}
     </form>
 </div>

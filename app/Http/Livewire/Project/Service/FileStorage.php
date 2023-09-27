@@ -20,13 +20,17 @@ class FileStorage extends Component
         'fileStorage.mount_path' => 'required',
         'fileStorage.content' => 'nullable',
     ];
-    public function mount() {
+    public function mount()
+    {
         $this->service = $this->fileStorage->service;
         $this->fs_path = Str::of($this->fileStorage->fs_path)->beforeLast('/');
         $file = Str::of($this->fileStorage->fs_path)->afterLast('/');
         if (Str::of($this->fs_path)->startsWith('.')) {
             $this->fs_path = Str::of($this->fs_path)->after('.');
-            $this->fs_path = $this->service->service->workdir() . $this->fs_path . "/" .$file;
+            $this->fs_path = $this->service->service->workdir() . $this->fs_path . "/" . $file;
+        }
+        if ($this->fileStorage->is_directory) {
+            $this->fs_path = Str::of($this->fileStorage->fs_path);
         }
     }
     public function submit()
@@ -40,7 +44,8 @@ class FileStorage extends Component
             return handleError($e, $this);
         }
     }
-    public function instantSave() {
+    public function instantSave()
+    {
         $this->submit();
     }
     public function render()

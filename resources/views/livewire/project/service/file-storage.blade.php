@@ -1,8 +1,8 @@
 <x-collapsible>
     <x-slot:title>
         <div>{{ $fileStorage->mount_path }}
-            @if(is_null($fileStorage->content) && !$fileStorage->is_directory)
-                <span class="text-xs text-warning">(empty)</span>
+            @if (is_null($fileStorage->content) && !$fileStorage->is_directory)
+                <span class="text-xs text-error">(required)</span>
             @endif
         </div>
     </x-slot:title>
@@ -11,11 +11,13 @@
             <div class="w-64">
                 <x-forms.checkbox instantSave label="Is directory?" id="fileStorage.is_directory"></x-forms.checkbox>
             </div>
-            <x-forms.input readonly label="Save your required files here:" id="fs_path"></x-forms.input>
-            @if (!$fileStorage->is_directory)
+
+            @if ($fileStorage->is_directory)
+                <x-forms.input readonly label="Directory on Filesystem (save files here)" id="fs_path"></x-forms.input>
+            @else
                 <div class="flex gap-2">
                     <x-forms.input readonly label="File in Docker Compose file" id="fileStorage.fs_path"></x-forms.input>
-                    <x-forms.input readonly label="File on Filesystem" id="fs_path"></x-forms.input>
+                    <x-forms.input readonly label="File on Filesystem (save files here)" id="fs_path"></x-forms.input>
                 </div>
                 <x-forms.input readonly label="Mount (in container)" id="fileStorage.mount_path"></x-forms.input>
                 <x-forms.textarea label="Content" rows="20" id="fileStorage.content"></x-forms.textarea>

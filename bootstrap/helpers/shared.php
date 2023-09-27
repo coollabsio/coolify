@@ -11,11 +11,13 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
@@ -384,4 +386,10 @@ function parseEnvFormatToArray($env_file_contents)
         }
     }
     return $env_array;
+}
+
+function data_get_str($data, $key, $default = null): Stringable
+{
+    $str = data_get($data, $key, $default) ?? $default;
+    return Str::of($str);
 }

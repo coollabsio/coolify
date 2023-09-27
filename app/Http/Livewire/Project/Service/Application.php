@@ -3,15 +3,12 @@
 namespace App\Http\Livewire\Project\Service;
 
 use App\Models\ServiceApplication;
-use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Application extends Component
 {
     public ServiceApplication $application;
     public $parameters;
-    public $fileStorages;
-    protected $listeners = ["refreshFileStorages"];
     protected $rules = [
         'application.human_name' => 'nullable',
         'application.description' => 'nullable',
@@ -28,10 +25,7 @@ class Application extends Component
     {
         $this->submit();
     }
-    public function refreshFileStorages()
-    {
-        $this->fileStorages = $this->application->fileStorages()->get();
-    }
+
     public function delete()
     {
         try {
@@ -45,18 +39,16 @@ class Application extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $this->fileStorages = collect();
-        $this->refreshFileStorages();
     }
     public function submit()
     {
         try {
             $this->validate();
             $this->application->save();
-            switchImage($this->application);
+            updateCompose($this->application);
             $this->emit('success', 'Application saved successfully.');
         } catch (\Throwable $e) {
-            ray($e);
+            return handleError($e, $this);
         } finally {
             $this->emit('generateDockerCompose');
         }

@@ -6,10 +6,10 @@
                 reversible. <br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    @if ($isReadOnly)
+    @once ($isReadOnly)
         <span class="text-warning">Please modify storage layout in your <a
                 class="underline" href="{{ Str::of(url()->current())->beforeLast('/') }}#compose">Docker Compose</a> file.</span>
-    @endif
+    @endonce
     <form wire:submit.prevent='submit' class="flex flex-col gap-2 pt-4 xl:items-end xl:flex-row">
         @if ($isReadOnly)
             <x-forms.input id="realName" label="Volume Name" required readonly />
