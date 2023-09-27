@@ -45,7 +45,12 @@ class Configuration extends Component
         $this->settings->do_not_track = $this->do_not_track;
         $this->settings->is_auto_update_enabled = $this->is_auto_update_enabled;
         $this->settings->is_registration_enabled = $this->is_registration_enabled;
-        $this->settings->next_channel = $this->next_channel;
+        if ($this->next_channel) {
+            $this->settings->next_channel = false;
+            $this->next_channel = false;
+        } else {
+            $this->settings->next_channel = $this->next_channel;
+        }
         $this->settings->save();
         $this->emit('success', 'Settings updated!');
     }
