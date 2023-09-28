@@ -48,15 +48,15 @@ class SyncBunny extends Command
 
         $versions = "versions.json";
 
-        PendingRequest::macro('storage', function ($fileName) use($that) {
+        PendingRequest::macro('storage', function ($file) use($that) {
             $headers = [
                 'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/octet-stream'
             ];
-            $fileStream = fopen($fileName, "r");
-            $file = fread($fileStream, filesize($fileName));
-            $that->info('Uploading: ' . $fileName);
+            $fileStream = fopen($file, "r");
+            $file = fread($fileStream, filesize($file));
+            $that->info('Uploading: ' . $file);
             return PendingRequest::baseUrl('https://storage.bunnycdn.com')->withHeaders($headers)->withBody($file)->throw();
         });
         PendingRequest::macro('purge', function ($url) use ($that) {

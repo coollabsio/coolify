@@ -406,3 +406,18 @@ function sslip(Server $server)
     }
     return "{$server->ip}.sslip.io";
 }
+
+function getServiceTemplates()
+{
+    if (isDev()) {
+        $services = File::get(base_path('templates/service-templates.json'));
+        $services = collect(json_decode($services))->sortKeys();
+    } else {
+        $services = Http::get(config('constants.services.official'));
+        if ($services->failed()) {
+            throw new \Exception($services->body());
+        }
+        $services = collect($services->json())->sortKeys();
+    }
+    return $services;
+}

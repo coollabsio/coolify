@@ -60,28 +60,9 @@ class Select extends Component
             if ($forceReload) {
                 Cache::forget('services');
             }
-            if (isDev()) {
-                $cached = Cache::remember('services', 3600, function () {
-                    $services = File::get(base_path('templates/service-templates.json'));
-                    $services = collect(json_decode($services))->sortKeys();
-                    $this->emit('success', 'Successfully reloaded services from filesystem (development mode).');
-                    return $services;
-                });
-            } else {
-                $cached = Cache::remember('services', 3600, function () {
-                    $services = Http::get(config('constants.services.official'));
-                    if ($services->failed()) {
-                        throw new \Exception($services->body());
-                    }
-
-                    $services = collect($services->json())->sortKeys();
-                    $this->emit('success', 'Successfully reloaded services from the internet.');
-                    return $services;
-                });
-            }
-            $this->services = $cached;
+            $this->services = getServiceTemplates();
+            $this->emit('success', 'Successfully loaded services.');
         } catch (\Throwable $e) {
-            ray($e);
             return handleError($e, $this);
         } finally {
             $this->loadingServices = false;

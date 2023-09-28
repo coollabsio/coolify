@@ -45,10 +45,10 @@ class ProjectController extends Controller
 
     public function new()
     {
-        $services = Cache::get('services', []);
+        $services = getServiceTemplates();
         $type = Str::of(request()->query('type'));
         $destination_uuid = request()->query('destination');
-        $server_id = request()->query('server');
+        $server_id = request()->query('server_id');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -66,9 +66,10 @@ class ProjectController extends Controller
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
         }
-        if ($type->startsWith('one-click-service-')) {
+        if ($type->startsWith('one-click-service-') && !is_null( (int)$server_id)) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
+            ray($oneClickServiceName);
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
