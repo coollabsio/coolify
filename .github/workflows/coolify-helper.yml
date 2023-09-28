@@ -83,7 +83,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    needs: [ amd64, aarch64 ]
+    needs: [ amd64, aarch64, arm64 ]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
