@@ -16,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--only-template}';
+    protected $signature = 'sync:bunny {--only-template} {--only-version}';
 
     /**
      * The console command description.
@@ -30,7 +30,9 @@ class SyncBunny extends Command
      */
     public function handle()
     {
+        $that = $this;
         $only_template = $this->option('only-template');
+        $only_version = $this->option('only-version');
         $bunny_cdn = "https://cdn.coollabs.io";
         $bunny_cdn_path = "coolify";
         $bunny_cdn_storage_name = "coolcdn";
@@ -46,7 +48,7 @@ class SyncBunny extends Command
 
         $versions = "versions.json";
 
-        PendingRequest::macro('storage', function ($file) {
+        PendingRequest::macro('storage', function ($file) use($that) {
             $headers = [
                 'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
                 'Accept' => 'application/json',
@@ -54,21 +56,22 @@ class SyncBunny extends Command
             ];
             $fileStream = fopen($file, "r");
             $file = fread($fileStream, filesize($file));
+            $that->info('Uploading: ' . $file);
             return PendingRequest::baseUrl('https://storage.bunnycdn.com')->withHeaders($headers)->withBody($file)->throw();
         });
-        PendingRequest::macro('purge', function ($url) {
+        PendingRequest::macro('purge', function ($url) use ($that) {
             $headers = [
                 'AccessKey' => env('BUNNY_API_KEY'),
                 'Accept' => 'application/json',
             ];
-            ray('Purging: ' . $url);
+            $that->info('Purging: ' . $url);
             return PendingRequest::withHeaders($headers)->get('https://api.bunny.net/purge', [
                 "url" => $url,
                 "async" => false
             ]);
         });
         try {
-            $confirmed = confirm('Are you sure?');
+            $confirmed = confirm('Are you sure you want to sync?');
             if (!$confirmed) {
                 return;
             }
@@ -80,23 +83,28 @@ class SyncBunny extends Command
                 $this->info('Service template uploaded & purged...');
                 return;
             }
+            if ($only_version) {
+                Http::pool(fn (Pool $pool) => [
+                    $pool->storage(fileName: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
+                    $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
+                ]);
+                $this->info('versions.json uploaded & purged...');
+                return;
+            }
 
             Http::pool(fn (Pool $pool) => [
-                $pool->storage(file: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
-                $pool->storage(file: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
-                $pool->storage(file: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
-                $pool->storage(file: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
-                $pool->storage(file: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
-                $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
+                $pool->storage(fileName: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
+                $pool->storage(fileName: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
+                $pool->storage(fileName: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
+                $pool->storage(fileName: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
+                $pool->storage(fileName: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
             ]);
-            $this->info("{$bunny_cdn}/{$bunny_cdn_path}");
             Http::pool(fn (Pool $pool) => [
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$production_env"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
-                $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
             $this->info("All files uploaded & purged...");
         } catch (\Throwable $e) {

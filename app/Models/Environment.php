@@ -14,7 +14,7 @@ class Environment extends Model
 
     public function can_delete_environment()
     {
-        return $this->applications()->count() == 0 && $this->postgresqls()->count() == 0;
+        return $this->applications()->count() == 0 && $this->postgresqls()->count() == 0 && $this->services()->count() == 0;
     }
 
     public function applications()

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "next" ]
     paths:
-      - .github/workflows/coolify-helper.yml
+      - .github/workflows/coolify-helper-next.yml
       - docker/coolify-helper/Dockerfile
 
 env:

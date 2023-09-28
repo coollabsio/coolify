@@ -6,7 +6,7 @@
                 Save
             </x-forms.button>
         </div>
-        <div class="">General configuration for your Coolify instance.</div>
+        <div>General configuration for your Coolify instance.</div>
 
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex gap-2 w-96">

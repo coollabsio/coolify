@@ -73,7 +73,7 @@ class Configuration extends Component
     {
         $file = "$this->dynamic_config_path/coolify.yaml";
         if (empty($this->settings->fqdn)) {
-            remote_process([
+            instant_remote_process([
                 "rm -f $file",
             ], $this->server);
         } else {
@@ -129,7 +129,6 @@ class Configuration extends Component
                 ];
             }
             $this->save_configuration_to_disk($traefik_dynamic_conf, $file);
-            dispatch(new ContainerStatusJob($this->server));
         }
     }
 
@@ -142,7 +141,7 @@ class Configuration extends Component
             $yaml;
 
         $base64 = base64_encode($yaml);
-        remote_process([
+        instant_remote_process([
             "mkdir -p $this->dynamic_config_path",
             "echo '$base64' | base64 -d > $file",
         ], $this->server);

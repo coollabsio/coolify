@@ -129,6 +129,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function selectExistingPrivateKey()
     {
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
+        $this->privateKey = $this->createdPrivateKey->private_key;
         $this->currentState = 'create-server';
     }
     public function createNewServer()
