@@ -16,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--only-template}';
+    protected $signature = 'sync:bunny {--only-template} {--only-version}';
 
     /**
      * The console command description.
@@ -32,6 +32,7 @@ class SyncBunny extends Command
     {
         $that = $this;
         $only_template = $this->option('only-template');
+        $only_version = $this->option('only-version');
         $bunny_cdn = "https://cdn.coollabs.io";
         $bunny_cdn_path = "coolify";
         $bunny_cdn_storage_name = "coolcdn";
@@ -70,7 +71,7 @@ class SyncBunny extends Command
             ]);
         });
         try {
-            $confirmed = confirm('Are you sure?');
+            $confirmed = confirm('Are you sure you want to sync?');
             if (!$confirmed) {
                 return;
             }
@@ -82,6 +83,14 @@ class SyncBunny extends Command
                 $this->info('Service template uploaded & purged...');
                 return;
             }
+            if ($only_version) {
+                Http::pool(fn (Pool $pool) => [
+                    $pool->storage(fileName: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
+                    $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
+                ]);
+                $this->info('versions.json uploaded & purged...');
+                return;
+            }
 
             Http::pool(fn (Pool $pool) => [
                 $pool->storage(fileName: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
@@ -89,7 +98,6 @@ class SyncBunny extends Command
                 $pool->storage(fileName: "$parent_dir/$production_env")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$production_env"),
                 $pool->storage(fileName: "$parent_dir/scripts/$upgrade_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$upgrade_script"),
                 $pool->storage(fileName: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
-                $pool->storage(fileName: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
             ]);
             Http::pool(fn (Pool $pool) => [
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file"),
@@ -97,7 +105,6 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$production_env"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$upgrade_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
-                $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
             $this->info("All files uploaded & purged...");
         } catch (\Throwable $e) {
