@@ -212,12 +212,8 @@ class Application extends BaseModel
     {
         if (data_get($this, 'private_key_id')) {
             return 'deploy_key';
-        }
-        if (data_get($this, 'source')) {
+        } else if (data_get($this, 'source')) {
             return 'source';
-        }
-        if (data_get($this, 'private_key_id')) {
-            return 'deploy_key';
         }
         throw new \Exception('No deployment type found');
     }
