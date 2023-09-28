@@ -72,13 +72,20 @@ cat >/etc/docker/daemon.json.coolify <<EOL
 EOL
 cat <<<$(jq . /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json.coolify
 cat <<<$(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json
-DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-$DATE))
-if [ "$DIFF" != "" ]; then
+
+if [ -s /etc/docker/daemon.json.original-$DATE ]; then
+    DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-$DATE))
+    if [ "$DIFF" != "" ]; then
+        echo "Docker configuration updated, restart docker daemon..."
+        systemctl restart docker
+    else
+        echo "Docker configuration is up to date."
+    fi
+else
     echo "Docker configuration updated, restart docker daemon..."
     systemctl restart docker
-else
-    echo "Docker configuration is up to date."
 fi
+
 
 echo -e "-------------"
 
