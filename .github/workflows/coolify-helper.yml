@@ -77,7 +77,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN  }}
       - name: Create & publish manifest
         run: |
-          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker buildx imagetools create --append ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest-aarch64 --tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
       - uses: sarisia/actions-status-discord@v1
         if: always()
         with:
