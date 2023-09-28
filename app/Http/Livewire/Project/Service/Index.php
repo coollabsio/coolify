@@ -29,12 +29,10 @@ class Index extends Component
         $this->applications = $this->service->applications->sort();
         $this->applications->each(function ($application) {
             $application->refresh();
-            $application->configuration_required = $application->configurationRequired();
         });
         $this->databases = $this->service->databases->sort();
         $this->databases->each(function ($database) {
             $database->refresh();
-            $database->configuration_required = $database->configurationRequired();
         });
     }
     public function mount()

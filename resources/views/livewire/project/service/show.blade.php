@@ -10,9 +10,6 @@
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
-                @if ($serviceApplication?->configurationRequired() || $serviceDatabase?->configurationRequired())
-                    <span class="text-red-500">(?)</span>
-                @endif
             </a>
         </div>
         <div class="w-full pl-8">

@@ -40,14 +40,4 @@ class ServiceApplication extends BaseModel
     {
         saveFileVolumesHelper($this);
     }
-    public function configurationRequired() {
-        $required = false;
-        foreach($this->fileStorages as $fileStorage) {
-            if (!$fileStorage->is_directory && $fileStorage->content == null) {
-                $required = true;
-                break;
-            }
-        }
-        return $required;
-    }
 }

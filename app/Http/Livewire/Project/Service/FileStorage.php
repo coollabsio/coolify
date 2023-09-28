@@ -29,9 +29,7 @@ class FileStorage extends Component
             $this->fs_path = Str::of($this->fs_path)->after('.');
             $this->fs_path = $this->service->service->workdir() . $this->fs_path . "/" . $file;
         }
-        if ($this->fileStorage->is_directory) {
-            $this->fs_path = Str::of($this->fileStorage->fs_path);
-        }
+
     }
     public function submit()
     {

@@ -22,7 +22,7 @@
                 <livewire:project.shared.storages.show wire:key="storage-{{ $storage->id }}" :storage="$storage" />
             @endif
         @empty
-            <div class="text-neutral-500">No storages found.</div>
+            <div class="text-neutral-500">No volume storages found.</div>
         @endforelse
     </div>
 </div>

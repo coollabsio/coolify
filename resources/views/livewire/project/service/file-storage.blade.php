@@ -1,17 +1,12 @@
 <x-collapsible>
     <x-slot:title>
-        <div>{{ $fileStorage->mount_path }}
-            @if (is_null($fileStorage->content) && !$fileStorage->is_directory)
-                <span class="text-xs text-error">(required)</span>
-            @endif
-        </div>
+        <div>{{ $fileStorage->mount_path }} </div>
     </x-slot:title>
     <x-slot:action>
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">
             <div class="w-64">
                 <x-forms.checkbox instantSave label="Is directory?" id="fileStorage.is_directory"></x-forms.checkbox>
             </div>
-
             @if ($fileStorage->is_directory)
                 <x-forms.input readonly label="Directory on Filesystem (save files here)" id="fs_path"></x-forms.input>
             @else
