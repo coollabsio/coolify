@@ -3,12 +3,12 @@
 namespace App\Http\Livewire\Project\New;
 
 use App\Models\Server;
-use App\Models\StandaloneDocker;
-use App\Models\SwarmDocker;
 use Countable;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
-use Route;
 
 class Select extends Component
 {
@@ -21,12 +21,16 @@ class Select extends Component
     public Collection|array $standaloneDockers = [];
     public Collection|array $swarmDockers = [];
     public array $parameters;
+    public Collection|array $services = [];
+    public bool $loadingServices = true;
+    public bool $loading = false;
 
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
         'server',
     ];
+
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -44,9 +48,50 @@ class Select extends Component
     //         return handleError($e, $this);
     //     }
     // }
+
+    public function loadThings()
+    {
+        $this->loadServices();
+        $this->loadServers();
+    }
+    public function loadServices(bool $forceReload = false)
+    {
+        try {
+            if ($forceReload) {
+                Cache::forget('services');
+            }
+            if (isDev()) {
+                $cached = Cache::remember('services', 3600, function () {
+                    $services = File::get(base_path('templates/service-templates.json'));
+                    $services = collect(json_decode($services))->sortKeys();
+                    $this->emit('success', 'Successfully reloaded services from filesystem (development mode).');
+                    return $services;
+                });
+            } else {
+                $cached = Cache::remember('services', 3600, function () {
+                    $services = Http::get(config('constants.services.official'));
+                    if ($services->failed()) {
+                        throw new \Exception($services->body());
+                    }
+
+                    $services = collect($services->json())->sortKeys();
+                    $this->emit('success', 'Successfully reloaded services from the internet.');
+                    return $services;
+                });
+            }
+            $this->services = $cached;
+        } catch (\Throwable $e) {
+            ray($e);
+            return handleError($e, $this);
+        } finally {
+            $this->loadingServices = false;
+        }
+    }
     public function setType(string $type)
     {
         $this->type = $type;
+        if ($this->loading) return;
+        $this->loading = true;
         if ($type === "existing-postgresql") {
             $this->current_step = $type;
             return;
@@ -87,7 +132,7 @@ class Select extends Component
         ]);
     }
 
-    public function load_servers()
+    public function loadServers()
     {
         $this->servers = Server::isUsable()->get();
     }

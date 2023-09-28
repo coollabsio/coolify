@@ -4,8 +4,8 @@ namespace App\Http\Livewire;
 
 use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Route;
 use Livewire\Component;
-use Route;
 
 class Help extends Component
 {
@@ -28,7 +28,7 @@ class Help extends Component
     public function submit()
     {
         try {
-            $this->rateLimit(1, 60);
+            $this->rateLimit(3, 60);
             $this->validate();
             $subscriptionType = auth()->user()?->subscription?->type() ?? 'Free';
             $debug = "Route: {$this->path}";
@@ -42,7 +42,7 @@ class Help extends Component
             );
             $mail->subject("[HELP - {$subscriptionType}]: {$this->subject}");
             send_user_an_email($mail,  auth()->user()?->email, 'hi@coollabs.io');
-            $this->emit('success', 'Your message has been sent successfully. We will get in touch with you as soon as possible.');
+            $this->emit('success', 'Your message has been sent successfully. <br>We will get in touch with you as soon as possible.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

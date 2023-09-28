@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Symfony\Component\Yaml\Yaml;
+use Illuminate\Support\Facades\Cache;
 
 class ServiceApplication extends BaseModel
 {
@@ -14,10 +14,6 @@ class ServiceApplication extends BaseModel
     public function type()
     {
         return 'service';
-    }
-    public function documentation()
-    {
-        return data_get(Yaml::parse($this->service->docker_compose_raw), "services.{$this->name}.documentation", 'https://coolify.io/docs');
     }
     public function service()
     {
@@ -30,5 +26,18 @@ class ServiceApplication extends BaseModel
     public function fileStorages()
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+    public function fqdns(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->fqdn)
+                ? []
+                : explode(',', $this->fqdn),
+
+        );
+    }
+    public function saveFileVolumes()
+    {
+        saveFileVolumesHelper($this);
     }
 }

@@ -144,10 +144,8 @@ class GithubPrivateRepository extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            $application->fqdn = "http://{$application->uuid}.{$destination->server->ip}.sslip.io";
-            if (isDev()) {
-                $application->fqdn = "http://{$application->uuid}.127.0.0.1.sslip.io";
-            }
+            $sslip = sslip($destination->server);
+            $application->fqdn = "http://{$application->uuid}.$sslip";
             $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
 

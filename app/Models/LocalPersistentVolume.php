@@ -12,16 +12,19 @@ class LocalPersistentVolume extends Model
 
     public function application()
     {
-        return $this->morphTo();
+        return $this->morphTo('resource');
     }
     public function service()
     {
-        return $this->morphTo();
+        return $this->morphTo('resource');
     }
-
+    public function database()
+    {
+        return $this->morphTo('resource');
+    }
     public function standalone_postgresql()
     {
-        return $this->morphTo();
+        return $this->morphTo('resource');
     }
 
     protected function name(): Attribute

@@ -11,6 +11,6 @@ class LocalFileVolume extends BaseModel
 
     public function service()
     {
-        return $this->morphTo();
+        return $this->morphTo('resource');
     }
 }

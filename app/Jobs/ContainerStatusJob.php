@@ -28,11 +28,12 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
+        $this->handle();
     }
 
     public function middleware(): array
     {
-        return [new WithoutOverlapping($this->server->uuid)];
+        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
     }
 
     public function uniqueId(): string
@@ -74,14 +75,15 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
-            $services = $this->server->services();
+            $services = $this->server->services()->get();
             $previews = $this->server->previews();
-
+            $this->server->proxyType();
             /// Check if proxy is running
             $foundProxyContainer = $containers->filter(function ($value, $key) {
                 return data_get($value, 'Name') === '/coolify-proxy';
             })->first();
             if (!$foundProxyContainer) {
+                ray('Proxy not found, starting it...');
                 if ($this->server->isProxyShouldRun()) {
                     StartProxy::run($this->server, false);
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
@@ -99,7 +101,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
             foreach ($containers as $container) {
                 $containerStatus = data_get($container, 'State.Status');
-                $containerHealth = data_get($container, 'State.Health.Status','unhealthy');
+                $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
                 $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
@@ -147,25 +149,29 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
-                    $coolifyName = data_get($labels, 'coolify.name');
-                    $serviceName = Str::of($coolifyName)->before('-');
-                    $serviceUuid = Str::of($coolifyName)->after('-');
-                    $service = $services->where('uuid', $serviceUuid)->first();
+                    $subType = data_get($labels, 'coolify.service.subType');
+                    $subId = data_get($labels, 'coolify.service.subId');
+                    $service = $services->where('id', $serviceLabelId)->first();
+                    if (!$service) {
+                        continue;
+                    }
+                    if ($subType === 'application') {
+                        $service =  $service->applications()->where('id', $subId)->first();
+                    } else {
+                        $service =  $service->databases()->where('id', $subId)->first();
+                    }
                     if ($service) {
-                        $foundService = $service->byName($serviceName);
-                        if ($foundService) {
-                            $foundServices[] = "$foundService->id-$serviceName";
-                            $statusFromDb = $foundService->status;
-                            if ($statusFromDb !== $containerStatus) {
-                                // ray('Updating status: ' . $containerStatus);
-                                $foundService->update(['status' => $containerStatus]);
-                            }
+                        $foundServices[] = "$service->id-$service->name";
+                        $statusFromDb = $service->status;
+                        if ($statusFromDb !== $containerStatus) {
+                            // ray('Updating status: ' . $containerStatus);
+                            $service->update(['status' => $containerStatus]);
                         }
                     }
                 }
             }
             $exitedServices = collect([]);
-            foreach ($services->get() as $service) {
+            foreach ($services as $service) {
                 $apps = $service->applications()->get();
                 $dbs = $service->databases()->get();
                 foreach ($apps as $app) {

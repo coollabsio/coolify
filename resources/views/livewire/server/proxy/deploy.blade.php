@@ -8,7 +8,7 @@
         </x-slot:modalBody>
     </x-modal>
     @if ($server->isFunctional() && data_get($server, 'proxy.type') !== 'NONE')
-        @if (data_get($server, 'proxy.status') !== 'exited')
+        @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
                 @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable)
                     <button>

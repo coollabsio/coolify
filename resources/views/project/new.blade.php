@@ -7,7 +7,7 @@
         <livewire:project.new.github-private-repository-deploy-key :type="$type" />
     @elseif ($type === 'dockerfile')
         <livewire:project.new.simple-dockerfile :type="$type" />
-    @elseif ($type === 'dockercompose')
+    @elseif ($type === 'docker-compose-empty')
         <livewire:project.new.docker-compose :type="$type" />
     @else
         <livewire:project.new.select />

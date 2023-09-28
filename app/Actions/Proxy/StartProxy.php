@@ -22,6 +22,7 @@ class StartProxy
         if (!$configuration) {
             throw new \Exception("Configuration is not synced");
         }
+        SaveConfiguration::run($server, $configuration);
         $docker_compose_yml_base64 = base64_encode($configuration);
         $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
         $server->save();
@@ -50,12 +51,15 @@ class StartProxy
             "echo '####### Proxy installed successfully.'"
         ]);
         $commands = $commands->merge(connectProxyToNetworks($server));
-        if (!$async) {
-            instant_remote_process($commands, $server);
-            return 'OK';
-        } else {
+        if ($async) {
             $activity = remote_process($commands, $server);
             return $activity;
+        } else {
+            instant_remote_process($commands, $server);
+            $server->proxy->set('status', 'running');
+            $server->proxy->set('type', $proxyType);
+            $server->save();
+            return 'OK';
         }
     }
 }

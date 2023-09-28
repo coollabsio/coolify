@@ -1,6 +1,6 @@
 <div>
     @if ($server->isFunctional())
-        @if (data_get($server,'proxy.type'))
+        @if (data_get($server, 'proxy.type'))
             <div x-init="$wire.loadProxyConfiguration">
                 @if ($selectedProxy === 'TRAEFIK_V2')
                     <form wire:submit.prevent='submit'>
@@ -19,8 +19,8 @@
                                 configurations.
                             </div>
                         @endif
-                        <x-forms.input placeholder="https://coolify.io" id="redirect_url" label="Default Redirect 404"
-                            helper="All urls that has no service available will be redirected to this domain.<span class='text-helper'>You can set to your main marketing page or your social media link.</span>" />
+                        <x-forms.input placeholder="https://app.coolify.io" id="redirect_url" label="Default Redirect 404"
+                            helper="All urls that has no service available will be redirected to this domain." />
                         <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
                             <x-loading text="Loading proxy configuration..." />
                         </div>
@@ -39,18 +39,14 @@
                 @elseif($selectedProxy === 'NONE')
                     <div class="flex items-center gap-2">
                         <h2>Proxy</h2>
-                        @if ($server->proxy->status === 'exited')
-                            <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
-                        @endif
+                        <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
                     </div>
                     <div class="pt-3 pb-4">None</div>
                 @else
-                <div class="flex items-center gap-2">
-                    <h2>Proxy</h2>
-                    @if ($server->proxy->status === 'exited')
+                    <div class="flex items-center gap-2">
+                        <h2>Proxy</h2>
                         <x-forms.button wire:click.prevent="change_proxy">Switch Proxy</x-forms.button>
-                    @endif
-                </div>
+                    </div>
                 @endif
             @else
                 <div>

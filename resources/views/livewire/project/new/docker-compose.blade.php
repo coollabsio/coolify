@@ -12,9 +12,10 @@
     <br>
     - SERVICE_FQDN_*: FQDN - could be changable from the UI. (example: SERVICE_FQDN_GHOST)<br>
     - SERVICE_URL_*: URL parsed from FQDN - could be changable from the UI. (example: SERVICE_URL_GHOST)<br>
-    - SERVICE_USER_*: Generated user, not encrypted in database (example: SERVICE_USER_MYSQL)<br>
-    - SERVICE_PASSWORD_*: Generated password, encrypted in database (example: SERVICE_PASSWORD_MYSQL)<br>"
-            rows="20" id="dockercompose"
+    - SERVICE_BASE64_64_*: Generated 'base64' string with length of '64' (example: SERVICE_BASE64_64_GHOST, to generate 32 bit: SERVICE_BASE64_32_GHOST)<br>
+    - SERVICE_USER_*: Generated user (example: SERVICE_USER_MYSQL)<br>
+    - SERVICE_PASSWORD_*: Generated password (example: SERVICE_PASSWORD_MYSQL)<br>"
+            rows="20" id="dockerComposeRaw"
             placeholder='services:
   ghost:
     documentation: https://ghost.org/docs/config
@@ -43,5 +44,6 @@
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
 '></x-forms.textarea>
+        {{-- <x-forms.textarea label="Environment File" rows="20" id="envFile"></x-forms.textarea> --}}
     </form>
 </div>

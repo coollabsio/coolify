@@ -21,5 +21,5 @@ const DATABASE_DOCKER_IMAGES = [
     'couchdb',
     'neo4j',
     'influxdb',
-    'clickhouse'
+    'clickhouse/clickhouse-server'
 ];

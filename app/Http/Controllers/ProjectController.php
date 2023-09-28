@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
+use App\Models\Service;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
@@ -41,9 +45,10 @@ class ProjectController extends Controller
 
     public function new()
     {
-        $type = request()->query('type');
+        $services = Cache::get('services', []);
+        $type = Str::of(request()->query('type'));
         $destination_uuid = request()->query('destination');
-        $server = requesT()->query('server');
+        $server_id = request()->query('server');
 
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -61,8 +66,70 @@ class ProjectController extends Controller
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
         }
+        if ($type->startsWith('one-click-service-')) {
+            $oneClickServiceName = $type->after('one-click-service-')->value();
+            $oneClickService = data_get($services, "$oneClickServiceName.compose");
+            $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
+            if ($oneClickDotEnvs) {
+                $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
+            }
+            if ($oneClickService) {
+                $service = Service::create([
+                    'name' => "$oneClickServiceName-" . Str::random(10),
+                    'docker_compose_raw' => base64_decode($oneClickService),
+                    'environment_id' => $environment->id,
+                    'server_id' => (int) $server_id,
+                ]);
+                $service->name = "$oneClickServiceName-" . $service->uuid;
+                $service->save();
+                if ($oneClickDotEnvs?->count() > 0) {
+                    $oneClickDotEnvs->each(function ($value) use ($service) {
+                        $key = Str::before($value, '=');
+                        $value = Str::of(Str::after($value, '='));
+                        $generatedValue = $value;
+                        if ($value->contains('SERVICE_')) {
+                            $command = $value->after('SERVICE_')->beforeLast('_');
+                            switch ($command->value()) {
+                                case 'PASSWORD':
+                                    $generatedValue = Str::password(symbols: false);
+                                    break;
+                                case 'PASSWORD_64':
+                                    $generatedValue = Str::password(length: 64, symbols: false);
+                                    break;
+                                case 'BASE64_64':
+                                    $generatedValue = Str::random(64);
+                                    break;
+                                case 'BASE64_128':
+                                    $generatedValue = Str::random(128);
+                                    break;
+                                case 'BASE64':
+                                    $generatedValue = Str::random(32);
+                                    break;
+                                case 'USER':
+                                    $generatedValue = Str::random(16);
+                                    break;
+                            }
+                        }
+                        EnvironmentVariable::create([
+                            'key' => $key,
+                            'value' => $generatedValue,
+                            'service_id' => $service->id,
+                            'is_build_time' => false,
+                            'is_preview' => false,
+                        ]);
+                    });
+                }
+                $service->parse(isNew: true);
+
+                return redirect()->route('project.service', [
+                    'service_uuid' => $service->uuid,
+                    'environment_name' => $environment->name,
+                    'project_uuid' => $project->uuid,
+                ]);
+            }
+        }
         return view('project.new', [
-            'type' => $type
+            'type' => $type->value()
         ]);
     }
 

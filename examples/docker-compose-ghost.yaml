@@ -1,14 +1,8 @@
 services:
   ghost:
-    documentation: https://ghost.org/docs/config
     image: ghost:5
     volumes:
       - ghost-content-data:/var/lib/ghost/content
-      - type: volume
-        source: /data/g
-        target: /data
-        volume:
-          nocopy: true
     environment:
       - url=$SERVICE_FQDN_GHOST
       - database__client=mysql
@@ -16,24 +10,9 @@ services:
       - database__connection__user=$SERVICE_USER_MYSQL
       - database__connection__password=$SERVICE_PASSWORD_MYSQL
       - database__connection__database=${MYSQL_DATABASE-ghost}
-    networks:
-      default:
-        aliases:
-          - alias1
-          - alias3
-        ipv4_address: 172.16.238.10
-        ipv6_address: 2001:3984:3989::10
-    ports:
-      - "2368"
-      - 1234:2368
-      - target: 2368
-        published: 1234
-        protocol: tcp
-        mode: host
     depends_on:
       - mysql
   mysql:
-    documentation: https://hub.docker.com/_/mysql
     image: mysql:8.0
     volumes:
       - ghost-mysql-data:/var/lib/mysql
@@ -42,10 +21,3 @@ services:
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
       - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
-networks:
-  default:
-    ipam:
-      driver: default
-      config:
-        - subnet: "172.16.238.0/24"
-        - subnet: "2001:3984:3989::/64"

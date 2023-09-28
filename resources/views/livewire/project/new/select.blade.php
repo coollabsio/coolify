@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.load_servers">
+<div x-data x-init="$wire.loadThings">
     <h1>New Resource</h1>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
     <div class="flex flex-col gap-2 pt-10">
@@ -12,7 +12,7 @@
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('public')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Public Repository
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -22,7 +22,7 @@
                 </div>
                 <div class="box group" wire:click="setType('private-gh-app')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Private Repository
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -32,7 +32,7 @@
                 </div>
                 <div class="box group" wire:click="setType('private-deploy-key')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Private Repository (with deploy key)
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -44,7 +44,7 @@
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('dockerfile')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             Based on a Dockerfile
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -52,24 +52,22 @@
                         </div>
                     </div>
                 </div>
-                @if (isDev())
-                    <div class="box group" wire:click="setType('dockercompose')">
-                        <div class="flex flex-col mx-6">
-                            <div class="group-hover:text-white">
-                                Based on a Docker Compose
-                            </div>
-                            <div class="text-xs group-hover:text-white">
-                                You can deploy complex application easily with Docker Compose.
-                            </div>
+                <div class="box group" wire:click="setType('docker-compose-empty')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            Based on a Docker Compose
+                        </div>
+                        <div class="text-xs group-hover:text-white">
+                            You can deploy complex application easily with Docker Compose.
                         </div>
                     </div>
-                @endif
+                </div>
             </div>
             <h2 class="py-4">Databases</h2>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('postgresql')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="font-bold text-white group-hover:text-white">
                             New PostgreSQL
                         </div>
                         <div class="text-xs group-hover:text-white">
@@ -88,9 +86,30 @@
                     </div>
                 </div> --}}
             </div>
-            <h2 class="py-4">Services</h2>
+            <div class="flex items-center gap-2">
+                <h2 class="py-4">Services</h2>
+                <x-forms.button wire:click='loadServices(true)'>Reload Services List</x-forms.button>
+            </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
-                Ghost, Plausible, Wordpress, etc... Coming very very soon...
+                @if ($loadingServices)
+                    <span class="loading loading-xs loading-spinner"></span>
+                @else
+                    @foreach ($services as $serviceName => $service)
+                        <button class="text-left box group"
+                            wire:loading.attr="disabled" wire:click="setType('one-click-service-{{ $serviceName }}')">
+                            <div class="flex flex-col mx-6">
+                                <div class="font-bold text-white group-hover:text-white">
+                                    {{ Str::headline($serviceName) }}
+                                </div>
+                                @if (data_get($service, 'slogan'))
+                                    <div class="text-xs">
+                                        {{ data_get($service, 'slogan') }}
+                                    </div>
+                                @endif
+                            </div>
+                        </button>
+                    @endforeach
+                @endif
             </div>
         @endif
         @if ($current_step === 'servers')

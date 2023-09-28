@@ -20,6 +20,7 @@ class Danger extends Component
 
     public function delete()
     {
+        // Should be queued
         try {
             if ($this->resource->type() === 'service') {
                 $server = $this->resource->server;

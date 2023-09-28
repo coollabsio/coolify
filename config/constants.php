@@ -1,6 +1,10 @@
 <?php
 return [
-    'ssh' =>[
+    'docs' => [
+        'base_url' => 'https://coolify.io/docs',
+        'contact' => 'https://coolify.io/docs/contact',
+    ],
+    'ssh' => [
         'connection_timeout' => 10,
         'server_interval' => 20,
         'command_timeout' => 7200,
@@ -14,8 +18,11 @@ return [
             'expiration' => 10,
         ],
     ],
+    'services' => [
+        'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
+    ],
     'limits' => [
-        'trial_period'=> 7,
+        'trial_period' => 7,
         'server' => [
             'zero' => 0,
             'self-hosted' => 999999999999,

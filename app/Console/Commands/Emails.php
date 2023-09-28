@@ -56,6 +56,7 @@ class Emails extends Command
         $type = select(
             'Which Email should be sent?',
             options: [
+                'updates' => 'Send Update Email to all users',
                 'emails-test' => 'Test',
                 'application-deployment-success' => 'Application - Deployment Success',
                 'application-deployment-failed' => 'Application - Deployment Failed',
@@ -69,7 +70,7 @@ class Emails extends Command
                 'realusers-server-lost-connection' => 'REAL - Server Lost Connection',
             ],
         );
-        $emailsGathered = ['realusers-before-trial','realusers-server-lost-connection'];
+        $emailsGathered = ['realusers-before-trial', 'realusers-server-lost-connection'];
         if (!in_array($type, $emailsGathered)) {
             $this->email = text('Email Address to send to');
         }
@@ -78,6 +79,38 @@ class Emails extends Command
         $this->mail = new MailMessage();
         $this->mail->subject("Test Email");
         switch ($type) {
+            case 'updates':
+                $teams = Team::all();
+                if (!$teams || $teams->isEmpty()) {
+                    echo 'No teams found.' . PHP_EOL;
+                    return;
+                }
+                $emails = [];
+                foreach ($teams as $team) {
+                    foreach ($team->members as $member) {
+                        if ($member->email && $member->marketing_emails) {
+                            $emails[] = $member->email;
+                        }
+                    }
+                }
+                $emails = array_unique($emails);
+                $this->info("Sending to " . count($emails) . " emails.");
+                foreach ($emails as $email) {
+                    $this->info($email);
+                }
+                $confirmed = confirm('Are you sure?');
+                if ($confirmed) {
+                    foreach ($emails as $email) {
+                        $this->mail = new MailMessage();
+                        $this->mail->subject('One-click Services, Docker Compose support');
+                        $unsubscribeUrl = route('unsubscribe.marketing.emails', [
+                            'token' => encrypt($email),
+                        ]);
+                        $this->mail->view('emails.updates',["unsubscribeUrl" => $unsubscribeUrl]);
+                        $this->sendEmail($email);
+                    }
+                }
+                break;
             case 'emails-test':
                 $this->mail = (new Test())->toMail();
                 $this->sendEmail();
@@ -141,20 +174,20 @@ class Emails extends Command
                 $this->mail = (new BackupSuccess($backup, $db))->toMail();
                 $this->sendEmail();
                 break;
-            // case 'invitation-link':
-            //     $user = User::all()->first();
-            //     $invitation = TeamInvitation::whereEmail($user->email)->first();
-            //     if (!$invitation) {
-            //         $invitation = TeamInvitation::create([
-            //             'uuid' => Str::uuid(),
-            //             'email' => $user->email,
-            //             'team_id' => 1,
-            //             'link' => 'http://example.com',
-            //         ]);
-            //     }
-            //     $this->mail = (new InvitationLink($user))->toMail();
-            //     $this->sendEmail();
-            //     break;
+                // case 'invitation-link':
+                //     $user = User::all()->first();
+                //     $invitation = TeamInvitation::whereEmail($user->email)->first();
+                //     if (!$invitation) {
+                //         $invitation = TeamInvitation::create([
+                //             'uuid' => Str::uuid(),
+                //             'email' => $user->email,
+                //             'team_id' => 1,
+                //             'link' => 'http://example.com',
+                //         ]);
+                //     }
+                //     $this->mail = (new InvitationLink($user))->toMail();
+                //     $this->sendEmail();
+                //     break;
             case 'waitlist-invitation-link':
                 $this->mail = new MailMessage();
                 $this->mail->view('emails.waitlist-invitation', [

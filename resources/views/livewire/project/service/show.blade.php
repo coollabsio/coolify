@@ -19,14 +19,31 @@
                 </div>
                 <div x-cloak x-show="activeTab === 'storages'">
                     <livewire:project.shared.storages.all :resource="$serviceApplication" />
+                    @if ($serviceApplication->fileStorages()->get()->count() > 0)
+                        <h3 class="py-4">Mounted Files (binds)</h3>
+                        <div class="flex flex-col gap-4">
+                            @foreach ($serviceApplication->fileStorages()->get() as $fileStorage)
+                                <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             @endisset
             @isset($serviceDatabase)
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
                     <livewire:project.service.database :database="$serviceDatabase" />
+
                 </div>
                 <div x-cloak x-show="activeTab === 'storages'">
                     <livewire:project.shared.storages.all :resource="$serviceDatabase" />
+                    @if ($serviceDatabase->fileStorages()->get()->count() > 0)
+                        <h3 class="py-4">Mounted Files (binds)</h3>
+                        <div class="flex flex-col gap-4">
+                            @foreach ($serviceDatabase->fileStorages()->get() as $fileStorage)
+                                <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
+                            @endforeach
+                        </div>
+                    @endif
                 </div>
             @endisset
         </div>

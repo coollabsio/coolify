@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\InstanceSettings;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
@@ -11,11 +12,13 @@ use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
+use Illuminate\Support\Stringable;
 use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
@@ -100,8 +103,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if (isset($livewire)) {
-        $livewire->emit('error', $message);
-        throw new RuntimeException($message);
+        return $livewire->emit('error', $message);
     }
 
     throw new RuntimeException($message);
@@ -385,4 +387,22 @@ function parseEnvFormatToArray($env_file_contents)
         }
     }
     return $env_array;
+}
+
+function data_get_str($data, $key, $default = null): Stringable
+{
+    $str = data_get($data, $key, $default) ?? $default;
+    return Str::of($str);
+}
+
+function sslip(Server $server)
+{
+    if (isDev()) {
+        return "127.0.0.1.sslip.io";
+    }
+    if ($server->ip === 'host.docker.internal') {
+        $baseIp = base_ip();
+        return "$baseIp.sslip.io";
+    }
+    return "{$server->ip}.sslip.io";
 }

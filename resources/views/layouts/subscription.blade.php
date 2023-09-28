@@ -2,7 +2,7 @@
 @section('body')
     @parent
     @if (isSubscriptionOnGracePeriod())
-        <div class="fixed top-3 left-4 z-50" id="vue">
+        <div class="fixed top-[4.5rem] left-4 z-50" id="vue">
             <magic-bar></magic-bar>
         </div>
         <x-navbar />

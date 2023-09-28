@@ -53,7 +53,6 @@ class All extends Component
             $this->resource->environment_variables_preview()->delete();
         } else {
             $variables = parseEnvFormatToArray($this->variables);
-            ray($variables);
             $existingVariables = $this->resource->environment_variables();
             $this->resource->environment_variables()->delete();
         }
@@ -110,11 +109,16 @@ class All extends Component
             $environment->is_build_time = $data['is_build_time'];
             $environment->is_preview = $data['is_preview'];
 
-            if ($this->resource->type() === 'application') {
-                $environment->application_id = $this->resource->id;
-            }
-            if ($this->resource->type() === 'standalone-postgresql') {
-                $environment->standalone_postgresql_id = $this->resource->id;
+            switch ($this->resource->type()) {
+                case 'application':
+                    $environment->application_id = $this->resource->id;
+                    break;
+                case 'standalone-postgresql':
+                    $environment->standalone_postgresql_id = $this->resource->id;
+                    break;
+                case 'service':
+                    $environment->service_id = $this->resource->id;
+                    break;
             }
             $environment->save();
             $this->refreshEnvs();

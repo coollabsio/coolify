@@ -40,8 +40,6 @@ class Kernel extends ConsoleKernel
     private function check_resources($schedule)
     {
         $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
-        ray($servers);
-
         foreach ($servers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
         }

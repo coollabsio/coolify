@@ -94,6 +94,7 @@
                         })
                 }, 2000);
             }
+
             function copyToClipboard(text) {
                 navigator.clipboard.writeText(text);
                 Livewire.emit('success', 'Copied to clipboard.');

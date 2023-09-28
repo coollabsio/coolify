@@ -7,6 +7,8 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
 
+use function Laravel\Prompts\confirm;
+
 class SyncBunny extends Command
 {
     /**
@@ -14,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny';
+    protected $signature = 'sync:bunny {--only-template}';
 
     /**
      * The console command description.
@@ -28,6 +30,7 @@ class SyncBunny extends Command
      */
     public function handle()
     {
+        $only_template = $this->option('only-template');
         $bunny_cdn = "https://cdn.coollabs.io";
         $bunny_cdn_path = "coolify";
         $bunny_cdn_storage_name = "coolcdn";
@@ -39,6 +42,7 @@ class SyncBunny extends Command
         $install_script = "install.sh";
         $upgrade_script = "upgrade.sh";
         $production_env = ".env.production";
+        $service_template = "service-templates.json";
 
         $versions = "versions.json";
 
@@ -64,6 +68,19 @@ class SyncBunny extends Command
             ]);
         });
         try {
+            $confirmed = confirm('Are you sure?');
+            if (!$confirmed) {
+                return;
+            }
+            if ($only_template) {
+                Http::pool(fn (Pool $pool) => [
+                    $pool->storage(file: "$parent_dir/templates/$service_template")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$service_template"),
+                    $pool->purge("$bunny_cdn/$bunny_cdn_path/$service_template"),
+                ]);
+                $this->info('Service template uploaded & purged...');
+                return;
+            }
+
             Http::pool(fn (Pool $pool) => [
                 $pool->storage(file: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
                 $pool->storage(file: "$parent_dir/$compose_file_prod")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file_prod"),
@@ -72,7 +89,7 @@ class SyncBunny extends Command
                 $pool->storage(file: "$parent_dir/scripts/$install_script")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$install_script"),
                 $pool->storage(file: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
             ]);
-            ray("{$bunny_cdn}/{$bunny_cdn_path}");
+            $this->info("{$bunny_cdn}/{$bunny_cdn_path}");
             Http::pool(fn (Pool $pool) => [
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$compose_file_prod"),
@@ -81,9 +98,9 @@ class SyncBunny extends Command
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$install_script"),
                 $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
             ]);
-            echo "All files uploaded & purged...\n";
+            $this->info("All files uploaded & purged...");
         } catch (\Throwable $e) {
-            echo $e->getMessage();
+            $this->error("Error: " . $e->getMessage());
         }
     }
 }

@@ -38,8 +38,8 @@ class Proxy extends Component
 
     public function select_proxy($proxy_type)
     {
-        $this->server->proxy->type = $proxy_type;
-        $this->server->proxy->status = 'exited';
+        $this->server->proxy->set('status', 'exited');
+        $this->server->proxy->set('type', $proxy_type);
         $this->server->save();
         $this->selectedProxy = $this->server->proxy->type;
         $this->emit('proxyStatusUpdated');

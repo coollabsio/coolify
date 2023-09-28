@@ -14,10 +14,6 @@ class ServiceDatabase extends BaseModel
     {
         return 'service';
     }
-    public function documentation()
-    {
-        return data_get(Yaml::parse($this->service->docker_compose_raw), "services.{$this->name}.documentation", 'https://coolify.io/docs');
-    }
     public function service()
     {
         return $this->belongsTo(Service::class);
@@ -25,5 +21,13 @@ class ServiceDatabase extends BaseModel
     public function persistentStorages()
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
+    }
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+    public function saveFileVolumes()
+    {
+        saveFileVolumesHelper($this);
     }
 }
