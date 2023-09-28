@@ -53,7 +53,7 @@ class Service extends BaseModel
     {
         $services = Cache::get('services', []);
         $service = data_get($services, Str::of($this->name)->beforeLast('-')->value, []);
-        return data_get($service, 'documentation', 'https://coolify.io/docs');
+        return data_get($service, 'documentation', config('constants.docs.base_url'));
     }
     public function applications()
     {
