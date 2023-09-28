@@ -11,8 +11,8 @@ use Livewire\Component;
 class Show extends Component
 {
     public Service $service;
-    public ServiceApplication $serviceApplication;
-    public ServiceDatabase $serviceDatabase;
+    public ?ServiceApplication $serviceApplication = null;
+    public ?ServiceDatabase $serviceDatabase = null;
     public array $parameters;
     public array $query;
     public Collection $services;
