@@ -18,10 +18,8 @@ class Status extends Component
     public function getProxyStatus()
     {
         try {
-            if ($this->server->isFunctional()) {
-                dispatch_sync(new ContainerStatusJob($this->server));
-                $this->emit('proxyStatusUpdated');
-            }
+            dispatch_sync(new ContainerStatusJob($this->server));
+            $this->emit('proxyStatusUpdated');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
