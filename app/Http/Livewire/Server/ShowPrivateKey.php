@@ -14,8 +14,8 @@ class ShowPrivateKey extends Component
     public function setPrivateKey($newPrivateKeyId)
     {
         try {
-            refresh_server_connection($this->server->privateKey);
             $oldPrivateKeyId = $this->server->private_key_id;
+            refresh_server_connection($this->server->privateKey);
             $this->server->update([
                 'private_key_id' => $newPrivateKeyId
             ]);
