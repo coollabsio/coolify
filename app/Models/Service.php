@@ -109,37 +109,7 @@ class Service extends BaseModel
         }
         instant_remote_process($commands, $this->server);
     }
-    private function sslip(Server $server)
-    {
-        if (isDev()) {
-            return "127.0.0.1.sslip.io";
-        }
-        return "{$server->ip}.sslip.io";
-    }
-    // private function generateFqdn($serviceVariables, $serviceName, Collection $configuration)
-    // {
-    //     // Add sslip.io to the service
-    //     $defaultUsableFqdn = null;
-    //     $sslip = $this->sslip($this->server);
-    //     if (Str::of($serviceVariables)->contains('SERVICE_FQDN') || Str::of($serviceVariables)->contains('SERVICE_URL')) {
-    //         $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}";
-    //     }
-    //     if ($configuration->count() > 0) {
-    //         foreach ($configuration as $requiredFqdn) {
-    //             $requiredFqdn = (array)$requiredFqdn;
-    //             $name = data_get($requiredFqdn, 'name');
-    //             $path = data_get($requiredFqdn, 'path');
-    //             $customFqdn = data_get($requiredFqdn, 'customFqdn');
-    //             if ($serviceName === $name) {
-    //                 $defaultUsableFqdn = "http://$serviceName-{$this->uuid}.{$sslip}{$path}";
-    //                 if ($customFqdn) {
-    //                     $defaultUsableFqdn = "http://$customFqdn-{$this->uuid}.{$sslip}{$path}";
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     return $defaultUsableFqdn ?? null;
-    // }
+
     public function parse(bool $isNew = false): Collection
     {
         // ray()->clearAll();
@@ -374,7 +344,7 @@ class Service extends BaseModel
                     }
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if (is_null(data_get($savedService, 'fqdn'))) {
-                            $sslip = $this->sslip($this->server);
+                            $sslip = sslip($this->server);
                             $fqdn = "http://$containerName.$sslip";
                             if (substr_count($key->value(), '_') === 2 && $key->contains("=")) {
                                 $path = $value->value();
@@ -409,7 +379,7 @@ class Service extends BaseModel
                             $forService = $value->afterLast('_');
                             $generatedValue = null;
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
-                                $sslip = $this->sslip($this->server);
+                                $sslip = sslip($this->server);
                                 $fqdn = "http://$containerName.$sslip";
                                 if ($foundEnv) {
                                     $fqdn = data_get($foundEnv, 'value');

@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\InstanceSettings;
+use App\Models\Server;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
@@ -392,4 +393,16 @@ function data_get_str($data, $key, $default = null): Stringable
 {
     $str = data_get($data, $key, $default) ?? $default;
     return Str::of($str);
+}
+
+function sslip(Server $server)
+{
+    if (isDev()) {
+        return "127.0.0.1.sslip.io";
+    }
+    if ($server->ip === 'host.docker.internal') {
+        $baseIp = base_ip();
+        return "$baseIp.sslip.io";
+    }
+    return "{$server->ip}.sslip.io";
 }
