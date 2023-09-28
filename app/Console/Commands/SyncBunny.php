@@ -56,7 +56,6 @@ class SyncBunny extends Command
             ];
             $fileStream = fopen($file, "r");
             $file = fread($fileStream, filesize($file));
-            $that->info('Uploading: ' . $file);
             return PendingRequest::baseUrl('https://storage.bunnycdn.com')->withHeaders($headers)->withBody($file)->throw();
         });
         PendingRequest::macro('purge', function ($url) use ($that) {
