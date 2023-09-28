@@ -48,14 +48,15 @@ class SyncBunny extends Command
 
         $versions = "versions.json";
 
-        PendingRequest::macro('storage', function ($file) use($that) {
+        PendingRequest::macro('storage', function ($fileName) use($that) {
             $headers = [
                 'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
                 'Accept' => 'application/json',
                 'Content-Type' => 'application/octet-stream'
             ];
-            $fileStream = fopen($file, "r");
-            $file = fread($fileStream, filesize($file));
+            $fileStream = fopen($fileName, "r");
+            $file = fread($fileStream, filesize($fileName));
+            $that->info('Uploading: ' . $fileName);
             return PendingRequest::baseUrl('https://storage.bunnycdn.com')->withHeaders($headers)->withBody($file)->throw();
         });
         PendingRequest::macro('purge', function ($url) use ($that) {
@@ -76,7 +77,7 @@ class SyncBunny extends Command
             }
             if ($only_template) {
                 Http::pool(fn (Pool $pool) => [
-                    $pool->storage(file: "$parent_dir/templates/$service_template")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$service_template"),
+                    $pool->storage(fileName: "$parent_dir/templates/$service_template")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$service_template"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$service_template"),
                 ]);
                 $this->info('Service template uploaded & purged...');
