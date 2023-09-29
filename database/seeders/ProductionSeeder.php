@@ -69,11 +69,12 @@ class ProductionSeeder extends Seeder
                 PrivateKey::updateOrCreate(
                     [
                         'id' => 0,
-                        'name' => 'localhost\'s key',
-                        'description' => 'The private key for the Coolify host machine (localhost).',
                         'team_id' => 0,
                     ],
-                    ['private_key' => $coolify_key]
+                    [
+                        'name' => 'localhost\'s key',
+                        'description' => 'The private key for the Coolify host machine (localhost).', 'private_key' => $coolify_key
+                    ]
                 );
             } else {
                 echo "No SSH key found for the Coolify host machine (localhost).\n";
