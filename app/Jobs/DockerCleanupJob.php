@@ -16,65 +16,66 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $timeout = 500;
+    public $timeout = 1000;
     public ?string $dockerRootFilesystem = null;
     public ?int $usageBefore = null;
 
     public function middleware(): array
     {
-        return [
-            (new WithoutOverlapping("dockerimagejobs"))->shared(),
-        ];
+        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
     }
-    public function __construct()
+
+    public function uniqueId(): string
+    {
+        return $this->server->uuid;
+    }
+    public function __construct(public Server $server)
     {
     }
     public function handle(): void
     {
-        $queue = ApplicationDeploymentQueue::where('status', '==', 'in_progress')->get();
-        if ($queue->count() > 0) {
+        $queuedCount = 0;
+        $this->server->applications()->each(function ($application) use ($queuedCount) {
+            $count = data_get($application->deployments(), 'count', 0);
+            $queuedCount += $count;
+        });
+        if ($queuedCount > 0) {
             ray('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping')->color('orange');
             return;
         }
         try {
-            // ray()->showQueries()->color('orange');
-            $servers = Server::all();
-            foreach ($servers as $server) {
-                if (
-                    !$server->isFunctional()
-                ) {
-                    continue;
-                }
-                if (isDev()) {
-                    $this->dockerRootFilesystem = "/";
+            if (!$this->server->isFunctional()) {
+                return;
+            }
+            if (isDev()) {
+                $this->dockerRootFilesystem = "/";
+            } else {
+                $this->dockerRootFilesystem = instant_remote_process(
+                    [
+                        "stat --printf=%m $(docker info --format '{{json .DockerRootDir}}'' |sed 's/\"//g')"
+                    ],
+                    $this->server,
+                    false
+                );
+            }
+            if (!$this->dockerRootFilesystem) {
+                return;
+            }
+            $this->usageBefore = $this->getFilesystemUsage();
+            if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
+                ray('Cleaning up ' . $this->server->name)->color('orange');
+                instant_remote_process(['docker image prune -af'], $this->server);
+                instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $this->server);
+                instant_remote_process(['docker builder prune -af'], $this->server);
+                $usageAfter = $this->getFilesystemUsage();
+                if ($usageAfter <  $this->usageBefore) {
+                    ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name)->color('orange');
+                    send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                 } else {
-                    $this->dockerRootFilesystem = instant_remote_process(
-                        [
-                            "stat --printf=%m $(docker info --format '{{json .DockerRootDir}}'' |sed 's/\"//g')"
-                        ],
-                        $server,
-                        false
-                    );
+                    ray('DockerCleanupJob failed to save disk space on ' . $this->server->name)->color('orange');
                 }
-                if (!$this->dockerRootFilesystem) {
-                    continue;
-                }
-                $this->usageBefore = $this->getFilesystemUsage($server);
-                if ($this->usageBefore >= $server->settings->cleanup_after_percentage) {
-                    ray('Cleaning up ' . $server->name)->color('orange');
-                    instant_remote_process(['docker image prune -af'], $server);
-                    instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $server);
-                    instant_remote_process(['docker builder prune -af'], $server);
-                    $usageAfter = $this->getFilesystemUsage($server);
-                    if ($usageAfter <  $this->usageBefore) {
-                        ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $server->name)->color('orange');
-                        send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $server->name);
-                    } else {
-                        ray('DockerCleanupJob failed to save disk space on ' . $server->name)->color('orange');
-                    }
-                } else {
-                    ray('No need to clean up ' . $server->name)->color('orange');
-                }
+            } else {
+                ray('No need to clean up ' . $this->server->name)->color('orange');
             }
         } catch (\Throwable $e) {
             send_internal_notification('DockerCleanupJob failed with: ' . $e->getMessage());
@@ -83,8 +84,8 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
         }
     }
 
-    private function getFilesystemUsage(Server $server)
+    private function getFilesystemUsage()
     {
-        return instant_remote_process(["df '{$this->dockerRootFilesystem}'| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $server, false);
+        return instant_remote_process(["df '{$this->dockerRootFilesystem}'| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this->server, false);
     }
 }
