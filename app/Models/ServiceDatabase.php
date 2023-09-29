@@ -26,8 +26,8 @@ class ServiceDatabase extends BaseModel
     {
         return $this->morphMany(LocalFileVolume::class, 'resource');
     }
-    public function saveFileVolumes()
+    public function getFilesFromServer()
     {
-        saveFileVolumesHelper($this);
+        getFilesystemVolumesFromServer($this);
     }
 }

@@ -306,7 +306,7 @@ class Service extends BaseModel
                                 ]
                             );
                         }
-                        $savedService->saveFileVolumes();
+                        $savedService->getFilesFromServer();
                     }
                 }
 

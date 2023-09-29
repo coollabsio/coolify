@@ -33,12 +33,20 @@ class FileStorage extends Component
     }
     public function submit()
     {
+        $original = $this->fileStorage->getOriginal();
         try {
             $this->validate();
+            if ($this->fileStorage->is_directory) {
+                $this->fileStorage->content = null;
+            }
             $this->fileStorage->save();
-            $this->service->saveFileVolumes();
+            $this->fileStorage->saveStorageOnServer($this->service);
+            // ray($this->fileStorage);
+            // $this->service->saveFileVolumes();
             $this->emit('success', 'File updated successfully.');
         } catch (\Throwable $e) {
+            $this->fileStorage->setRawAttributes($original);
+            $this->fileStorage->save();
             return handleError($e, $this);
         }
     }

@@ -27,8 +27,10 @@ class Show extends Component
         $service = $this->service->applications()->whereName($this->parameters['service_name'])->first();
         if ($service) {
             $this->serviceApplication = $service;
+            $this->serviceApplication->getFilesFromServer();
         } else {
             $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
+            $this->serviceDatabase->getFilesFromServer();
         }
     }
     public function generateDockerCompose()

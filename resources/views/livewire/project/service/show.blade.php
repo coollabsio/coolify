@@ -22,7 +22,7 @@
                     @if ($serviceApplication->fileStorages()->get()->count() > 0)
                         <h3 class="py-4">Mounted Files (binds)</h3>
                         <div class="flex flex-col gap-4">
-                            @foreach ($serviceApplication->fileStorages()->get() as $fileStorage)
+                            @foreach ($serviceApplication->fileStorages()->get()->sort() as $fileStorage)
                                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
                             @endforeach
                         </div>
@@ -39,7 +39,7 @@
                     @if ($serviceDatabase->fileStorages()->get()->count() > 0)
                         <h3 class="py-4">Mounted Files (binds)</h3>
                         <div class="flex flex-col gap-4">
-                            @foreach ($serviceDatabase->fileStorages()->get() as $fileStorage)
+                            @foreach ($serviceDatabase->fileStorages()->get()->sort() as $fileStorage)
                                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
                             @endforeach
                         </div>
