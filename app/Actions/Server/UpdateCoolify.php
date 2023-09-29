@@ -16,8 +16,7 @@ class UpdateCoolify
         try {
             $settings = InstanceSettings::get();
             ray('Running InstanceAutoUpdateJob');
-            $localhost_name = 'localhost';
-            $this->server = Server::where('name', $localhost_name)->first();
+            $this->server = Server::find(0)->first();
             if (!$this->server) {
                 return;
             }
