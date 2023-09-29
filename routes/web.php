@@ -99,7 +99,7 @@ Route::middleware(['auth'])->group(function () {
     ]))->name('server.proxy');
     Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key', [
         'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
-        'privateKeys' => PrivateKey::ownedByCurrentTeam()->get(),
+        'privateKeys' => PrivateKey::ownedByCurrentTeam()->get()->where('is_git_related', false),
     ]))->name('server.private-key');
     Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
         'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail()
@@ -133,7 +133,7 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::get('/security', fn () => view('security.index'))->name('security.index');
     Route::get('/security/private-key', fn () => view('security.private-key.index', [
-        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->where('is_git_related', false)->get()
+        'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->get()
     ]))->name('security.private-key.index');
     Route::get('/security/private-key/new', fn () => view('security.private-key.new'))->name('security.private-key.new');
     Route::get('/security/private-key/{private_key_uuid}', fn () => view('security.private-key.show', [
