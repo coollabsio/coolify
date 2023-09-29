@@ -1,6 +1,6 @@
 <form wire:submit.prevent='submit'>
     <div class="flex items-center gap-2">
-        <h2>Previews Deployments</h2>
+        <h2>Preview Deployments</h2>
         <x-forms.button type="submit">Save</x-forms.button>
         <x-forms.button wire:click="resetToDefault">Reset template to default</x-forms.button>
     </div>
