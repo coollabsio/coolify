@@ -62,7 +62,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     {
         try {
             $status = Str::of(data_get($this->database, 'status'));
-            if (!$status->startsWith('running')) {
+            if (!$status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
                 return;
             }
@@ -90,7 +90,6 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $this->upload_to_s3();
             }
             $this->save_backup_logs();
-            // TODO: Notify user
         } catch (\Throwable $e) {
             ray($e->getMessage());
             send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
