@@ -73,17 +73,22 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
         $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd $workdir"
+            "cd "
         ]);
         instant_remote_process($commands, $server);
         foreach ($fileVolumes as $fileVolume) {
             $path = Str::of(data_get($fileVolume, 'fs_path'));
             $content = data_get($fileVolume, 'content');
-            $isFile = instant_remote_process(["test -f $path && echo OK || echo NOK"], $server);
-            $isDir = instant_remote_process(["test -d $path && echo OK || echo NOK"], $server);
-
-            if ($isFile == 'OK') {
-                $filesystemContent = instant_remote_process(["cat $path"], $server);
+            if ($path->startsWith('.')) {
+                $path = $path->after('.');
+                $fileLocation = $workdir . $path;
+            } else {
+                $fileLocation = $path;
+            }
+            $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
+            $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
+            if ($isFile == 'OK' && !$fileVolume->is_directory) {
+                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
                 if (base64_encode($filesystemContent) != base64_encode($content)) {
                     $fileVolume->content = $filesystemContent;
                     $fileVolume->save();

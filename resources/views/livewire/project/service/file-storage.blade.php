@@ -1,6 +1,6 @@
 <x-collapsible>
     <x-slot:title>
-        <div>{{ $fileStorage->fs_path }} -> {{ $fileStorage->mount_path }}</div>
+        <div>{{$workdir}}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
     </x-slot:title>
     <x-slot:action>
         <form wire:submit.prevent='submit' class="flex flex-col gap-2">

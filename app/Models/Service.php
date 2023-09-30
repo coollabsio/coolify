@@ -196,6 +196,12 @@ class Service extends BaseModel
                     }
                 }
 
+                // Check if image changed
+                if ($savedService->image !== $image) {
+                    $savedService->image = $image;
+                    $savedService->save();
+                }
+
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {

@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Project\Service;
 
 use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
-use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 use Livewire\Component;
 
 class Index extends Component
@@ -20,7 +19,25 @@ class Index extends Component
         'service.name' => 'required',
         'service.description' => 'nullable',
     ];
-    public function checkStatus() {
+    protected $listeners = ["saveCompose"];
+    public function render()
+    {
+        return view('livewire.project.service.index');
+    }
+    public function mount()
+    {
+        $this->parameters = get_route_parameters();
+        $this->query = request()->query();
+        $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
+        $this->refreshStack();
+    }
+    public function saveCompose($raw)
+    {
+        $this->service->docker_compose_raw = $raw;
+        $this->submit();
+    }
+    public function checkStatus()
+    {
         dispatch_sync(new ContainerStatusJob($this->service->server));
         $this->refreshStack();
     }
@@ -35,17 +52,8 @@ class Index extends Component
             $database->refresh();
         });
     }
-    public function mount()
-    {
-        $this->parameters = get_route_parameters();
-        $this->query = request()->query();
-        $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
-        $this->refreshStack();
-    }
-    public function render()
-    {
-        return view('livewire.project.service.index');
-    }
+
+
     public function submit()
     {
         try {

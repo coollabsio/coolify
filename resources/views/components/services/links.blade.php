@@ -4,7 +4,7 @@
             <x-chevron-down />
         </label>
 
-        <div class="absolute hidden group-hover:block">
+        <div class="absolute z-50 hidden group-hover:block">
             <ul tabindex="0"
                 class="relative -ml-24 text-xs text-white normal-case rounded min-w-max menu bg-coolgray-200">
                 @if ($links->count() > 0)
