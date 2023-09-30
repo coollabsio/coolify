@@ -10,7 +10,7 @@ class CreateScheduledBackup extends Component
     public $database;
     public $frequency;
     public bool $enabled = true;
-    public bool $save_s3 = true;
+    public bool $save_s3 = false;
     public $s3_storage_id;
     public $s3s;
 

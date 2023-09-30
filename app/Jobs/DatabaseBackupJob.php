@@ -61,7 +61,8 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         try {
-            if (data_get($this->database, 'status') !== 'running') {
+            $status = Str::of(data_get($this->database, 'status'));
+            if (!$status->startsWith('running')) {
                 ray('database not running');
                 return;
             }
