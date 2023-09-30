@@ -46,7 +46,6 @@ class GithubPrivateRepositoryDeployKey extends Component
     private GithubApp|GitlabApp|null $git_source = null;
     private string $git_host;
     private string $git_repository;
-    private string $git_branch;
 
     public function mount()
     {
@@ -96,7 +95,7 @@ class GithubPrivateRepositoryDeployKey extends Component
             $application_init = [
                 'name' => generate_random_name(),
                 'git_repository' => $this->git_repository,
-                'git_branch' => $this->git_branch,
+                'git_branch' => $this->branch,
                 'git_full_url' => "git@$this->git_host:$this->git_repository.git",
                 'build_pack' => 'nixpacks',
                 'ports_exposes' => $this->port,
@@ -132,11 +131,6 @@ class GithubPrivateRepositoryDeployKey extends Component
         $this->repository_url_parsed = Url::fromString($this->repository_url);
         $this->git_host = $this->repository_url_parsed->getHost();
         $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
-        if ($this->branch) {
-            $this->git_branch = $this->branch;
-        } else {
-            $this->git_branch = $this->repository_url_parsed->getSegment(4) ?? 'main';
-        }
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
