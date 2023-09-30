@@ -1,5 +1,6 @@
 <div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.10000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
+    <livewire:project.service.compose-modal :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
@@ -23,38 +24,12 @@
                             <div>Configuration</div>
                         </div>
                         <x-forms.button type="submit">Save</x-forms.button>
-                        <div x-cloak x-show="raw">
-                            <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Deployable
-                                Compose</x-forms.button>
-                        </div>
-                        <div x-cloak x-show="raw === false">
-                            <x-forms.button class="w-64" @click.prevent="raw = !raw">Show Source
-                                Compose</x-forms.button>
-                        </div>
-
+                        <x-forms.button class="w-64" onclick="composeModal.showModal()">Edit Compose File</x-forms.button>
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input id="service.name" required label="Service Name"
                             placeholder="My super wordpress site" />
                         <x-forms.input id="service.description" label="Description" />
-                    </div>
-                    <div x-cloak x-show="raw">
-                        <x-forms.textarea label="Docker Compose file"
-                            helper="
-                        You can use these variables in your Docker Compose file and Coolify will generate default values or replace them with the values you set on the UI forms.<br>
-                        <br>
-                        - SERVICE_FQDN_*: FQDN - could be changable from the UI. (example: SERVICE_FQDN_GHOST)<br>
-                        - SERVICE_URL_*: URL parsed from FQDN - could be changable from the UI. (example: SERVICE_URL_GHOST)<br>
-                        - SERVICE_BASE64_64_*: Generated 'base64' string with length of '64' (example: SERVICE_BASE64_64_GHOST, to generate 32 bit: SERVICE_BASE64_32_GHOST)<br>
-                        - SERVICE_USER_*: Generated user (example: SERVICE_USER_MYSQL)<br>
-                        - SERVICE_PASSWORD_*: Generated password (example: SERVICE_PASSWORD_MYSQL)<br>"
-                            rows="6" id="service.docker_compose_raw">
-                        </x-forms.textarea>
-                    </div>
-                    <div x-cloak x-show="raw === false">
-                        <x-forms.textarea label="Actual Docker Compose file that will be deployed" readonly
-                            rows="6" id="service.docker_compose">
-                        </x-forms.textarea>
                     </div>
                 </form>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">

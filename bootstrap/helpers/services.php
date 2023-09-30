@@ -64,40 +64,53 @@ function serviceStatus(Service $service)
     }
     return 'exited';
 }
-function saveFileVolumesHelper(ServiceApplication|ServiceDatabase $oneService)
+function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneService)
 {
+    // TODO: make this async
     try {
         $workdir = $oneService->service->workdir();
         $server = $oneService->service->server;
-        $applicationFileVolume = $oneService->fileStorages()->get();
+        $fileVolumes = $oneService->fileStorages()->get();
         $commands = collect([
             "mkdir -p $workdir > /dev/null 2>&1 || true",
-            "cd $workdir"
+            "cd "
         ]);
-        foreach ($applicationFileVolume as $fileVolume) {
-            $path = Str::of($fileVolume->fs_path);
-            if ($fileVolume->is_directory) {
-                $commands->push("test -f $path && rm -f $path > /dev/null 2>&1 || true");
-                $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
-                continue;
+        instant_remote_process($commands, $server);
+        foreach ($fileVolumes as $fileVolume) {
+            $path = Str::of(data_get($fileVolume, 'fs_path'));
+            $content = data_get($fileVolume, 'content');
+            if ($path->startsWith('.')) {
+                $path = $path->after('.');
+                $fileLocation = $workdir . $path;
+            } else {
+                $fileLocation = $path;
             }
-            $content = $fileVolume->content;
-            $dir = $path->beforeLast('/');
-            if ($dir->startsWith('.')) {
-                $dir = $dir->after('.');
-                $dir = $workdir . $dir;
+            $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
+            $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
+            if ($isFile == 'OK' && !$fileVolume->is_directory) {
+                $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
+                if (base64_encode($filesystemContent) != base64_encode($content)) {
+                    $fileVolume->content = $filesystemContent;
+                    $fileVolume->save();
+                }
+            } else {
+                if ($isDir == 'OK') {
+                    $fileVolume->content = null;
+                    $fileVolume->is_directory = true;
+                    $fileVolume->save();
+                } else {
+                    $fileVolume->content = null;
+                    $fileVolume->is_directory = false;
+                    $fileVolume->save();
+                }
             }
-            $content = base64_encode($content);
-            $commands->push("test -d $path && rm -rf $path > /dev/null 2>&1 || true");
-            $commands->push("mkdir -p $dir > /dev/null 2>&1 || true");
-            $commands->push("echo '$content' | base64 -d > $path");
         }
-        return instant_remote_process($commands, $server);
     } catch (\Throwable $e) {
         return handleError($e);
     }
 }
-function updateCompose($resource) {
+function updateCompose($resource)
+{
     try {
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
@@ -111,7 +124,7 @@ function updateCompose($resource) {
         $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
         ray($variableName);
         $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-        if ($generatedEnv){
+        if ($generatedEnv) {
             $generatedEnv->value = $resource->fqdn;
             $generatedEnv->save();
         }

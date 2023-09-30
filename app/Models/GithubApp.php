@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class GithubApp extends BaseModel
 {
+
     protected $guarded = [];
     protected $appends = ['type'];
     protected $casts = [
@@ -16,6 +17,7 @@ class GithubApp extends BaseModel
         'client_secret',
         'webhook_secret',
     ];
+
 
     static public function public()
     {
@@ -34,6 +36,7 @@ class GithubApp extends BaseModel
             if ($applications_count > 0) {
                 throw new \Exception('You cannot delete this GitHub App because it is in use by ' . $applications_count . ' application(s). Delete them first.');
             }
+            $github_app->privateKey()->delete();
         });
     }
 

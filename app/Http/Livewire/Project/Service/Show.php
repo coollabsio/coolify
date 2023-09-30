@@ -20,16 +20,26 @@ class Show extends Component
 
     public function mount()
     {
-        $this->services = collect([]);
-        $this->parameters = get_route_parameters();
-        $this->query = request()->query();
-        $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
-        $service = $this->service->applications()->whereName($this->parameters['service_name'])->first();
-        if ($service) {
-            $this->serviceApplication = $service;
-        } else {
-            $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
+        try {
+            $this->services = collect([]);
+            $this->parameters = get_route_parameters();
+            $this->query = request()->query();
+            $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
+            $service = $this->service->applications()->whereName($this->parameters['service_name'])->first();
+            if ($service) {
+                $this->serviceApplication = $service;
+                $this->serviceApplication->getFilesFromServer();
+            } else {
+                $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
+                $this->serviceDatabase->getFilesFromServer();
+            }
+            if (is_null($service)) {
+                throw new \Exception("Service not found.");
+            }
+        } catch(\Throwable $e) {
+            return handleError($e, $this);
         }
+
     }
     public function generateDockerCompose()
     {

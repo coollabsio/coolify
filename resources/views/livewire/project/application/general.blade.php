@@ -15,16 +15,8 @@
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
                     helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                @if ($wildcard_domain)
-                    @if ($global_wildcard_domain)
-                        <x-forms.button wire:click="generateGlobalRandomDomain">Set Global Wildcard
-                        </x-forms.button>
-                    @endif
-                    @if ($server_wildcard_domain)
-                        <x-forms.button wire:click="generateServerRandomDomain">Set Server Wildcard
-                        </x-forms.button>
-                    @endif
-                @endif
+                    <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                    </x-forms.button>
             </div>
             @if (!$application->dockerfile)
                 <div class="flex items-end gap-2">
@@ -89,7 +81,7 @@
                     id="is_auto_deploy_enabled" label="Auto Deploy" />
                 <x-forms.checkbox
                     helper="Allow to automatically deploy Preview Deployments for all opened PR's.<br><br>Closing a PR will delete Preview Deployments."
-                    instantSave id="is_preview_deployments_enabled" label="Previews Deployments" />
+                    instantSave id="is_preview_deployments_enabled" label="Preview Deployments" />
 
                 <x-forms.checkbox instantSave id="is_git_submodules_enabled" label="Git Submodules"
                     helper="Allow Git Submodules during build process." />

@@ -11,6 +11,7 @@ use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
+use Spatie\Url\Url;
 
 class GithubPrivateRepository extends Component
 {
@@ -95,6 +96,7 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
+        $this->selected_branch_name = data_get($this->branches,'0.name');
     }
 
     protected function loadBranchByPage()
@@ -144,8 +146,9 @@ class GithubPrivateRepository extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            $sslip = sslip($destination->server);
-            $application->fqdn = "http://{$application->uuid}.$sslip";
+            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $application->fqdn = $fqdn;
+
             $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
 

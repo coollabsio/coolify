@@ -196,6 +196,12 @@ class Service extends BaseModel
                     }
                 }
 
+                // Check if image changed
+                if ($savedService->image !== $image) {
+                    $savedService->image = $image;
+                    $savedService->save();
+                }
+
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -306,7 +312,7 @@ class Service extends BaseModel
                                 ]
                             );
                         }
-                        $savedService->saveFileVolumes();
+                        $savedService->getFilesFromServer();
                     }
                 }
 
@@ -344,8 +350,7 @@ class Service extends BaseModel
                     }
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if (is_null(data_get($savedService, 'fqdn'))) {
-                            $sslip = sslip($this->server);
-                            $fqdn = "http://$containerName.$sslip";
+                            $fqdn = generateFqdn($this->server, $containerName);
                             if (substr_count($key->value(), '_') === 2 && $key->contains("=")) {
                                 $path = $value->value();
                                 if ($generatedServiceFQDNS->count() > 0) {
@@ -358,7 +363,7 @@ class Service extends BaseModel
                                 } else {
                                     $generatedServiceFQDNS->put($key->value(), $fqdn);
                                 }
-                                $fqdn = "http://$containerName.$sslip$path";
+                                $fqdn = "$fqdn$path";
                             }
                             if (!$isDatabase) {
                                 $savedService->fqdn = $fqdn;
@@ -379,8 +384,7 @@ class Service extends BaseModel
                             $forService = $value->afterLast('_');
                             $generatedValue = null;
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
-                                $sslip = sslip($this->server);
-                                $fqdn = "http://$containerName.$sslip";
+                                $fqdn = generateFqdn($this->server, $containerName);
                                 if ($foundEnv) {
                                     $fqdn = data_get($foundEnv, 'value');
                                 } else {

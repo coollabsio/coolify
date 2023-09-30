@@ -36,8 +36,8 @@ class ServiceApplication extends BaseModel
 
         );
     }
-    public function saveFileVolumes()
+    public function getFilesFromServer()
     {
-        saveFileVolumesHelper($this);
+        getFilesystemVolumesFromServer($this);
     }
 }

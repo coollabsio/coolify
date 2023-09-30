@@ -22,7 +22,7 @@
             </a>
             @if ($application->git_based())
                 <a :class="activeTab === 'previews' && 'text-white'"
-                    @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Previews
+                    @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
                     Deployments
                 </a>
             @endif
