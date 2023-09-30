@@ -111,13 +111,17 @@ Route::post('/source/github/events', function () {
         $applications = Application::where('repository_project_id', $id)->whereRelation('source', 'is_public', false);
         if ($x_github_event === 'push') {
             $applications = $applications->where('git_branch', $branch)->get();
+            if ($applications->isEmpty()) {
+                return response("Nothing to do. No applications found with branch '$branch'.");
+            }
         }
         if ($x_github_event === 'pull_request') {
             $applications = $applications->where('git_branch', $base_branch)->get();
+            if ($applications->isEmpty()) {
+                return response("Nothing to do. No applications found with branch '$base_branch'.");
+            }
         }
-        if ($applications->isEmpty()) {
-            return response("Nothing to do. No applications found with branch '$base_branch'.");
-        }
+
         foreach ($applications as $application) {
             $isFunctional = $application->destination->server->isFunctional();
             if (!$isFunctional) {
