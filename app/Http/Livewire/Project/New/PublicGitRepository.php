@@ -156,8 +156,8 @@ class PublicGitRepository extends Component
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
 
-            $sslip = sslip($destination->server);
-            $application->fqdn = "http://{$application->uuid}.$sslip";
+            $fqdn = generateFqdn($destination->server, $application->uuid);
+            $application->fqdn = $fqdn;
             $application->name = generate_application_name($this->git_repository, $this->git_branch, $application->uuid);
             $application->save();
 

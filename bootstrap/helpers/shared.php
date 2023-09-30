@@ -395,16 +395,29 @@ function data_get_str($data, $key, $default = null): Stringable
     return Str::of($str);
 }
 
+function generateFqdn(Server $server, string $random)
+{
+    $wildcard = data_get($server, 'settings.wildcard_domain');
+    if (is_null($wildcard) || $wildcard === '') {
+        $wildcard = sslip($server);
+    }
+    $url = Url::fromString($wildcard);
+    $host = $url->getHost();
+    $path = $url->getPath() === '/' ? '' : $url->getPath();
+    $scheme = $url->getScheme();
+    $finalFqdn = "$scheme://{$random}.$host$path" ;
+    return $finalFqdn;
+}
 function sslip(Server $server)
 {
     if (isDev()) {
-        return "127.0.0.1.sslip.io";
+        return "http://127.0.0.1.sslip.io";
     }
     if ($server->ip === 'host.docker.internal') {
         $baseIp = base_ip();
-        return "$baseIp.sslip.io";
+        return "http://$baseIp.sslip.io";
     }
-    return "{$server->ip}.sslip.io";
+    return "http://{$server->ip}.sslip.io";
 }
 
 function getServiceTemplates()

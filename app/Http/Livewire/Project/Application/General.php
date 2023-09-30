@@ -22,9 +22,6 @@ class General extends Component
     public string $git_branch;
     public string|null $git_commit_sha;
     public string $build_pack;
-    public string|null $wildcard_domain = null;
-    public string|null $server_wildcard_domain = null;
-    public string|null $global_wildcard_domain = null;
 
     public bool $is_static;
     public bool $is_git_submodules_enabled;
@@ -91,18 +88,20 @@ class General extends Component
         $this->application->settings->save();
         $this->application->save();
         $this->application->refresh();
-        $this->checkWildCardDomain();
         $this->emit('success', 'Application settings updated!');
     }
 
-    protected function checkWildCardDomain()
-    {
-        $coolify_instance_settings = InstanceSettings::get();
-        $this->server_wildcard_domain = data_get($this->application, 'destination.server.settings.wildcard_domain');
-        $this->global_wildcard_domain = data_get($coolify_instance_settings, 'wildcard_domain');
-        $this->wildcard_domain = $this->server_wildcard_domain ?? $this->global_wildcard_domain ?? null;
-    }
+    public function getWildcardDomain() {
+        $server = data_get($this->application, 'destination.server');
+        if ($server) {
+            $fqdn = generateFqdn($server, $this->application->uuid);
+            ray($fqdn);
+            $this->application->fqdn = $fqdn;
+            $this->application->save();
+            $this->emit('success', 'Application settings updated!');
+        }
 
+    }
     public function mount()
     {
         $this->is_static = $this->application->settings->is_static;
@@ -112,31 +111,6 @@ class General extends Component
         $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
         $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
         $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
-        $this->checkWildCardDomain();
-    }
-
-    public function generateGlobalRandomDomain()
-    {
-        // Set wildcard domain based on Global wildcard domain
-        $url = Url::fromString($this->global_wildcard_domain);
-        $host = $url->getHost();
-        $path = $url->getPath() === '/' ? '' : $url->getPath();
-        $scheme = $url->getScheme();
-        $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
-        $this->application->save();
-        $this->emit('success', 'Application settings updated!');
-    }
-
-    public function generateServerRandomDomain()
-    {
-        // Set wildcard domain based on Server wildcard domain
-        $url = Url::fromString($this->server_wildcard_domain);
-        $host = $url->getHost();
-        $path = $url->getPath() === '/' ? '' : $url->getPath();
-        $scheme = $url->getScheme();
-        $this->application->fqdn = $scheme . '://' . $this->application->uuid . '.' . $host . $path;
-        $this->application->save();
-        $this->emit('success', 'Application settings updated!');
     }
 
     public function submit()
