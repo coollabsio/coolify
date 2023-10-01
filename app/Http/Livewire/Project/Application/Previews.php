@@ -72,8 +72,7 @@ class Previews extends Component
     public function stop(int $pull_request_id)
     {
         try {
-            $container_name = generateApplicationContainerName($this->application);
-            ray('Stopping container: ' . $container_name);
+            $container_name = generateApplicationContainerName($this->application, $pull_request_id);
 
             instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();

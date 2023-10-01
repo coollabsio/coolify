@@ -104,11 +104,11 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
     return data_get($container[0], 'State.Status', 'exited');
 }
 
-function generateApplicationContainerName(Application $application)
+function generateApplicationContainerName(Application $application, $pull_request_id = 0)
 {
     $now = now()->format('Hisu');
-    if ($application->pull_request_id !== 0 && $application->pull_request_id !== null) {
-        return $application->uuid . '-pr-' . $application->pull_request_id;
+    if ($pull_request_id !== 0 && $pull_request_id !== null) {
+        return $application->uuid . '-pr-' . $pull_request_id;
     } else {
         return $application->uuid . '-' . $now;
     }
@@ -207,10 +207,10 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
 {
 
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
-    $container_name = generateApplicationContainerName($application);
+    $container_name = generateApplicationContainerName($application, $pull_request_id);
     $appId = $application->id;
-    if ($pull_request_id !== 0) {
-        $appId = $appId . '-pr-' . $application->pull_request_id;
+    if ($pull_request_id !== 0 && $pull_request_id !== null) {
+        $appId = $appId . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
     $labels = $labels->merge(defaultLabels($appId, $container_name, $pull_request_id));

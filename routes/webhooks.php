@@ -172,9 +172,9 @@ Route::post('/source/github/events', function () {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
-                        $container_name = generateApplicationContainerName($application);
-                        ray('Stopping container: ' . $container_name);
-                        remote_process(["docker rm -f $container_name"], $application->destination->server);
+                        $container_name = generateApplicationContainerName($application,$pull_request_id);
+                        // ray('Stopping container: ' . $container_name);
+                        instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
                         return response('Preview Deployment closed.');
                     }
                     return response('Nothing to do. No Preview Deployment found');

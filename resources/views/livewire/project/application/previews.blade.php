@@ -54,11 +54,11 @@
                 <div class="flex flex-col p-4 bg-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |
                         @if (Str::of(data_get($preview, 'status'))->startsWith('running'))
-                            <x-status.running :status="$status" />
+                            <x-status.running :status="data_get($preview, 'status')" />
                         @elseif(Str::of(data_get($preview, 'status'))->startsWith('restarting'))
-                            <x-status.restarting :status="$status" />
+                            <x-status.restarting :status="data_get($preview, 'status')" />
                         @else
-                            <x-status.stopped :status="$status" />
+                            <x-status.stopped :status="data_get($preview, 'status')" />
                         @endif
                         @if (data_get($preview, 'status') !== 'exited')
                             | <a target="_blank" href="{{ data_get($preview, 'fqdn') }}">Open Preview
