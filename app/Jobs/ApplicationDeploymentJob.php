@@ -89,7 +89,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        $this->container_name = generateApplicationContainerName($this->application);
+        $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
@@ -97,7 +97,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
             if ($this->application->fqdn) {
-                $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
+                if (data_get($this->preview, 'fqdn')) {
+                    $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
+                }
                 $template = $this->application->preview_url_template;
                 $url = Url::fromString($this->application->fqdn);
                 $host = $url->getHost();
@@ -165,6 +167,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "hidden" => true,
                 ]
             );
+            $this->next(ApplicationDeploymentStatus::FAILED->value);
         }
     }
     private function deploy_docker_compose()
@@ -284,7 +287,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function rolling_update()
     {
-        if (count($this->application->ports_mappings_array) > 0){
+        if (count($this->application->ports_mappings_array) > 0) {
             $this->execute_remote_command(
                 ["echo -n 'Application has ports mapped to the host system, rolling update is not supported. Stopping current container.'"],
             );
@@ -796,6 +799,5 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ["echo 'Oops something is not okay, are you okay? 😢'"],
             ["echo '{$exception->getMessage()}'"]
         );
-        $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }
