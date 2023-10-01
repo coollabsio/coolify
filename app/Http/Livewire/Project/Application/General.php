@@ -104,13 +104,15 @@ class General extends Component
     }
     public function mount()
     {
-        $this->is_static = $this->application->settings->is_static;
-        $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
-        $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
-        $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
-        $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
-        $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
-        $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+        if (data_get($this->application,'settings')) {
+            $this->is_static = $this->application->settings->is_static;
+            $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
+            $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
+            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+            $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
+            $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
+            $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+        }
     }
 
     public function submit()
