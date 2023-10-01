@@ -167,7 +167,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "hidden" => true,
                 ]
             );
-            $this->next(ApplicationDeploymentStatus::FAILED->value);
         }
     }
     private function deploy_docker_compose()
@@ -402,7 +401,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->execute_remote_command(
             [
-                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} to {$this->workdir}. '"
+                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->workdir}. '"
             ],
             [
                 $this->importing_git_repository()
@@ -799,5 +798,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             ["echo 'Oops something is not okay, are you okay? 😢'"],
             ["echo '{$exception->getMessage()}'"]
         );
+        $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }

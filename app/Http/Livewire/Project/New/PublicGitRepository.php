@@ -26,6 +26,10 @@ class PublicGitRepository extends Component
     public string $git_branch = 'main';
     public int $rate_limit_remaining = 0;
     public $rate_limit_reset = 0;
+    private object $repository_url_parsed;
+    public GithubApp|GitlabApp|null $git_source = null;
+    public string $git_host;
+    public string $git_repository;
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
@@ -38,10 +42,6 @@ class PublicGitRepository extends Component
         'is_static' => 'static',
         'publish_directory' => 'publish directory',
     ];
-    private object $repository_url_parsed;
-    private GithubApp|GitlabApp|null $git_source = null;
-    private string $git_host;
-    private string $git_repository;
 
     public function mount()
     {
@@ -76,6 +76,7 @@ class PublicGitRepository extends Component
             $this->get_branch();
             $this->selected_branch = $this->git_branch;
         } catch (\Throwable $e) {
+            ray($e->getMessage());
             if (!$this->branch_found && $this->git_branch == 'main') {
                 try {
                     $this->git_branch = 'master';
@@ -122,9 +123,6 @@ class PublicGitRepository extends Component
             $destination_uuid = $this->query['destination'];
             $project_uuid = $this->parameters['project_uuid'];
             $environment_name = $this->parameters['environment_name'];
-
-            $this->get_git_source();
-            $this->git_branch = $this->selected_branch ?? $this->git_branch;
 
             $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
             if (!$destination) {
