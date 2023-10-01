@@ -59,10 +59,6 @@ class Service extends BaseModel
     {
         return $this->hasMany(ServiceApplication::class);
     }
-    public function destination()
-    {
-        return $this->morphTo();
-    }
     public function databases()
     {
         return $this->hasMany(ServiceDatabase::class);
@@ -124,23 +120,15 @@ class Service extends BaseModel
                 throw new \Exception($e->getMessage());
             }
 
-            if ($this->server->destinations()->count() === 1) {
-                $this->destination()->associate($this->server->destinations()->first());
-            }
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
             $services = data_get($yaml, 'services');
-            if ($this->destination) {
-                $definedNetwork = $this->destination->network;
-            } else {
-                $definedNetwork = $this->uuid;
-            }
+            $definedNetwork = $this->uuid;
 
             $generatedServiceFQDNS = collect([]);
 
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS) {
-                $serviceName = Str::of($serviceName)->before("-$this->uuid")->value;
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -505,25 +493,6 @@ class Service extends BaseModel
                 data_set($service, 'environment', $withoutServiceEnvs->toArray());
                 return $service;
             });
-            $services = $services->mapWithKeys(function ($service, $serviceName) {
-                if (!Str::of($serviceName)->contains($this->uuid)) {
-                    $newServiceName = $serviceName . '-' . $this->uuid;
-                    return [$newServiceName => $service];
-                }
-                return [$serviceName => $service];
-            });
-
-            $yaml = collect($yaml);
-            $yamlServices = collect(data_get($yaml, 'services', []));
-            $yamlServices = $yamlServices->mapWithKeys(function ($service, $serviceName) {
-                if (!Str::of($serviceName)->contains($this->uuid)) {
-                    $newServiceName = $serviceName . '-' . $this->uuid;
-                    return [$newServiceName => $service];
-                }
-                return [$serviceName => $service];
-            });
-            $yaml->put('services', $yamlServices->toArray());
-            $yaml = $yaml->toArray();
             $finalServices = [
                 'version' => $dockerComposeVersion,
                 'services' => $services->toArray(),
