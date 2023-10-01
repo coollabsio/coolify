@@ -45,6 +45,9 @@ CMD ["nginx", "-g", "daemon off;"]
         $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
 
         $port = get_port_from_dockerfile($this->dockerfile);
+        if (!$port) {
+            $port = 80;
+        }
         $application = Application::create([
             'name' => 'dockerfile-' . new Cuid2(7),
             'repository_project_id' => 0,

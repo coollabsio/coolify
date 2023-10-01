@@ -113,7 +113,7 @@ function generateApplicationContainerName(Application $application, $pull_reques
         return $application->uuid . '-' . $now;
     }
 }
-function get_port_from_dockerfile($dockerfile): int
+function get_port_from_dockerfile($dockerfile): int|null
 {
     $dockerfile_array = explode("\n", $dockerfile);
     $found_exposed_port = null;
@@ -127,7 +127,7 @@ function get_port_from_dockerfile($dockerfile): int
     if ($found_exposed_port) {
         return (int)$found_exposed_port->value();
     }
-    return 80;
+    return null;
 }
 
 function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'application', $subType = null, $subId = null)
