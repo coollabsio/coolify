@@ -40,7 +40,7 @@
             <x-boarding-step title="Server">
                 <x-slot:question>
                     Do you want to deploy your resources on your <x-highlighted text="Localhost" />
-                    or on a<x-highlighted text="Remote Server" />?
+                    or on a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
                     <x-forms.button class="justify-center box" wire:target="setServerType('localhost')"
