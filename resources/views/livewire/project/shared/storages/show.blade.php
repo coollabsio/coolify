@@ -12,7 +12,7 @@
     @endonce
     <form wire:submit.prevent='submit' class="flex flex-col gap-2 pt-4 xl:items-end xl:flex-row">
         @if ($isReadOnly)
-            <x-forms.input id="realName" label="Volume Name" required readonly />
+            <x-forms.input id="storage.name" label="Volume Name" required readonly />
             <x-forms.input id="storage.host_path" label="Source Path" readonly />
             <x-forms.input id="storage.mount_path" label="Destination Path" required readonly />
         @else

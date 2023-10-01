@@ -248,7 +248,7 @@ class Service extends BaseModel
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    foreach ($serviceVolumes as $volume) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -276,10 +276,10 @@ class Service extends BaseModel
                         }
                         if ($type->value() === 'bind') {
                             if ($source->value() === "/var/run/docker.sock") {
-                                continue;
+                                return $volume;
                             }
                             if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
-                                continue;
+                                return $volume;
                             }
                             LocalFileVolume::updateOrCreate(
                                 [
@@ -297,7 +297,17 @@ class Service extends BaseModel
                                 ]
                             );
                         } else if ($type->value() === 'volume') {
-                            $topLevelVolumes->put($source->value(), null);
+                            $slug = Str::slug($source, '-');
+                            $name = "{$savedService->service->uuid}_{$slug}";
+                            if (is_string($volume)) {
+                                $source = Str::of($volume)->before(':');
+                                $target = Str::of($volume)->after(':')->beforeLast(':');
+                                $source = $name;
+                                $volume = "$source:$target";
+                            } else if(is_array($volume)) {
+                                data_set($volume, 'source', $name);
+                            }
+                            $topLevelVolumes->put($name, null);
                             LocalPersistentVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
@@ -305,7 +315,7 @@ class Service extends BaseModel
                                     'resource_type' => get_class($savedService)
                                 ],
                                 [
-                                    'name' => Str::slug($source, '-'),
+                                    'name' => $name,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService)
@@ -313,7 +323,11 @@ class Service extends BaseModel
                             );
                         }
                         $savedService->getFilesFromServer();
-                    }
+                        ray($volume);
+
+                        return $volume;
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
 
                 // Add env_file with at least .env to the service
