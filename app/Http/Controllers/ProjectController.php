@@ -6,7 +6,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
-use Illuminate\Support\Facades\Cache;
+use App\Models\StandaloneDocker;
 use Illuminate\Support\Str;
 
 class ProjectController extends Controller
@@ -66,20 +66,22 @@ class ProjectController extends Controller
                 'database_uuid' => $standalone_postgresql->uuid,
             ]);
         }
-        if ($type->startsWith('one-click-service-') && !is_null( (int)$server_id)) {
+        if ($type->startsWith('one-click-service-') && !is_null((int)$server_id)) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
-            ray($oneClickServiceName);
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
             }
             if ($oneClickService) {
+                $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
                     'docker_compose_raw' => base64_decode($oneClickService),
                     'environment_id' => $environment->id,
                     'server_id' => (int) $server_id,
+                    'destination_id' => (int) $destination->id,
+                    'destination_type' => $destination->getMorphClass(),
                 ]);
                 $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();
