@@ -9,6 +9,7 @@ class HealthChecks extends Component
 
     public $resource;
     protected $rules = [
+        'resource.health_check_enabled' => 'boolean',
         'resource.health_check_path' => 'string',
         'resource.health_check_port' => 'nullable|string',
         'resource.health_check_host' => 'string',
@@ -22,12 +23,19 @@ class HealthChecks extends Component
         'resource.health_check_start_period' => 'integer',
 
     ];
+    public function instantSave()
+    {
+        $this->resource->save();
+        $this->emit('success', 'Health check updated.');
+
+
+    }
     public function submit()
     {
         try {
             $this->validate();
             $this->resource->save();
-            $this->emit('saved');
+            $this->emit('success', 'Health check updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

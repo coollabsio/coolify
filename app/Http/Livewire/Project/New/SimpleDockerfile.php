@@ -59,6 +59,7 @@ CMD ["nginx", "-g", "daemon off;"]
             'environment_id' => $environment->id,
             'destination_id' => $destination->id,
             'destination_type' => $destination_class,
+            'health_check_enabled' => false,
             'source_id' => 0,
             'source_type' => GithubApp::class
         ]);

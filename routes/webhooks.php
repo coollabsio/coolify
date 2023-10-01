@@ -327,7 +327,7 @@ Route::post('/payments/stripe/events', function () {
                 }
                 if ($alreadyCancelAtPeriodEnd !== $cancelAtPeriodEnd) {
                     if ($cancelAtPeriodEnd) {
-                        send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
+                        // send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
                     } else {
                         send_internal_notification('Subscription resumed for team: ' . $subscription->team->id);
                     }
@@ -346,7 +346,7 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => false,
                     'stripe_trial_already_ended' => true,
                 ]);
-                send_internal_notification('Subscription cancelled: ' . $subscription->team->id);
+                // send_internal_notification('Subscription cancelled: ' . $subscription->team->id);
                 break;
             case 'customer.subscription.trial_will_end':
                 $customerId = data_get($data, 'customer');

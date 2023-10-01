@@ -303,6 +303,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function health_check()
     {
+        if ($this->application->isHealthcheckDisabled()) {
+            $this->newVersionIsHealthy = true;
+            return;
+        }
         ray('New container name: ', $this->container_name);
         if ($this->container_name) {
             $counter = 0;
@@ -573,6 +577,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if ($this->application->isHealthcheckDisabled()) {
+            data_forget($docker_compose, 'services.' . $this->container_name . '.healthcheck');
+        }
         if (count($this->application->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
             $docker_compose['services'][$this->container_name]['ports'] = $this->application->ports_mappings_array;
         }
