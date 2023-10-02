@@ -127,7 +127,7 @@ class General extends Component
             }
             if (data_get($this->application, 'dockerfile')) {
                 $port = get_port_from_dockerfile($this->application->dockerfile);
-                if ($port) {
+                if ($port && !$this->application->ports_exposes) {
                     $this->application->ports_exposes = $port;
                 }
             }
