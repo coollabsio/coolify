@@ -248,7 +248,7 @@ class Service extends BaseModel
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes, $isNew) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -298,7 +298,11 @@ class Service extends BaseModel
                             );
                         } else if ($type->value() === 'volume') {
                             $slug = Str::slug($source, '-');
-                            $name = "{$savedService->service->uuid}_{$slug}";
+                            if ($isNew) {
+                                $name = "{$savedService->service->uuid}-{$slug}";
+                            } else {
+                                $name = "{$savedService->service->uuid}_{$slug}";
+                            }
                             if (is_string($volume)) {
                                 $source = Str::of($volume)->before(':');
                                 $target = Str::of($volume)->after(':')->beforeLast(':');
@@ -323,8 +327,6 @@ class Service extends BaseModel
                             );
                         }
                         $savedService->getFilesFromServer();
-                        ray($volume);
-
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
