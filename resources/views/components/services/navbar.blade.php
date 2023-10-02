@@ -1,4 +1,8 @@
 <div class="navbar-main">
+    <a class="{{ request()->routeIs('project.service') ? 'text-white' : '' }}"
+        href="{{ route('project.service', $parameters) }}">
+        <button>Configuration</button>
+    </a>
     <x-services.links :service="$service" />
     <div class="flex-1"></div>
     @if (serviceStatus($service) === 'degraded')
