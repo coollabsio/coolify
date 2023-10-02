@@ -32,8 +32,6 @@ class DockerCompose extends Component
                 - type: volume
                   source: mydata
                   target: /data
-                  volume:
-                    nocopy: true
                 - type: bind
                   source: ./var/lib/ghost/data
                   target: /data

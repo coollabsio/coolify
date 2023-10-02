@@ -6,7 +6,7 @@ use App\Models\EnvironmentVariable;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Service;
-use Illuminate\Support\Facades\Cache;
+use App\Models\StandaloneDocker;
 use Illuminate\Support\Str;
 
 class ProjectController extends Controller
@@ -75,11 +75,14 @@ class ProjectController extends Controller
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
             }
             if ($oneClickService) {
+                $destination = StandaloneDocker::whereUuid($destination_uuid)->first();
                 $service = Service::create([
                     'name' => "$oneClickServiceName-" . Str::random(10),
                     'docker_compose_raw' => base64_decode($oneClickService),
                     'environment_id' => $environment->id,
                     'server_id' => (int) $server_id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination->getMorphClass(),
                 ]);
                 $service->name = "$oneClickServiceName-" . $service->uuid;
                 $service->save();

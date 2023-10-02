@@ -63,6 +63,10 @@ class Service extends BaseModel
     {
         return $this->hasMany(ServiceDatabase::class);
     }
+    public function destination()
+    {
+        return $this->morphTo();
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);
@@ -124,9 +128,16 @@ class Service extends BaseModel
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
             $services = data_get($yaml, 'services');
-            $definedNetwork = $this->uuid;
 
             $generatedServiceFQDNS = collect([]);
+            if (is_null($this->destination)) {
+                $destination = $this->server->destinations()->first();
+                if ($destination) {
+                    $this->destination()->associate($destination);
+                    $this->save();
+                }
+            }
+            $definedNetwork = collect([$this->uuid]);
 
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS) {
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
@@ -237,13 +248,19 @@ class Service extends BaseModel
                     return $value == $definedNetwork;
                 });
                 if (!$definedNetworkExists) {
-                    $topLevelNetworks->put($definedNetwork, [
-                        'name' => $definedNetwork,
-                        'external' => true
-                    ]);
+                    foreach ($definedNetwork as $network) {
+                        $topLevelNetworks->put($network,  [
+                            'name' => $network,
+                            'external' => true
+                        ]);
+                    }
                 }
                 $networks = $serviceNetworks->toArray();
-                $networks = array_merge($networks, [$definedNetwork]);
+                foreach ($definedNetwork as $key => $network) {
+                    $networks = array_merge($networks, [
+                        $network
+                    ]);
+                }
                 data_set($service, 'networks', $networks);
 
                 // Collect/create/update volumes
@@ -308,7 +325,7 @@ class Service extends BaseModel
                                 $target = Str::of($volume)->after(':')->beforeLast(':');
                                 $source = $name;
                                 $volume = "$source:$target";
-                            } else if(is_array($volume)) {
+                            } else if (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
                             $topLevelVolumes->put($name, null);

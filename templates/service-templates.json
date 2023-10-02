@@ -7,7 +7,7 @@
     "uptime-kuma": {
         "documentation": "https://github.com/louislam/uptime-kuma",
         "slogan": "A free and fancy self-hosted monitoring tool.",
-        "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogbG91aXNsYW0vdXB0aW1lLWt1bWE6MQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROCiAgICB2b2x1bWVzOgogICAgICAtIHVwdGltZS1rdW1hOi9hcHAvZGF0YQ=="
+        "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogbG91aXNsYW0vdXB0aW1lLWt1bWE6MQogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROCiAgICB2b2x1bWVzOgogICAgICAtIHVwdGltZS1rdW1hOi9hcHAvZGF0YQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6IFsiQ01ELVNIRUxMIiwgImV4dHJhL2hlYWx0aGNoZWNrIl0KICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQ=="
     },
     "appsmith": {
         "documentation": "https://docs.appsmith.com/",
