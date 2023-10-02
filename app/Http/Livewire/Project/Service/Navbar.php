@@ -21,7 +21,6 @@ class Navbar extends Component
     }
     public function serviceStatusUpdated()
     {
-        ray('serviceStatusUpdated');
         $this->check_status();
     }
     public function check_status()
