@@ -6,6 +6,7 @@ use Livewire\Component;
 
 class Add extends Component
 {
+    public $uuid;
     public $parameters;
     public string $name;
     public string $mount_path;
@@ -31,8 +32,9 @@ class Add extends Component
     public function submit()
     {
         $this->validate();
+        $name = $this->uuid . '-' . $this->name;
         $this->emitUp('submit', [
-            'name' => $this->name,
+            'name' => $name,
             'mount_path' => $this->mount_path,
             'host_path' => $this->host_path,
         ]);

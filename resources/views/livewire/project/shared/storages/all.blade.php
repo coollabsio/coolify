@@ -8,7 +8,7 @@
             volume
             name, example: <span class='text-helper'>-pr-1</span>" />
                 <x-forms.button class="btn" onclick="newStorage.showModal()">+ Add</x-forms.button>
-                <livewire:project.shared.storages.add />
+                <livewire:project.shared.storages.add :uuid="$resource->uuid" />
             @endif
         </div>
         <div>Persistent storage to preserve data between deployments.</div>

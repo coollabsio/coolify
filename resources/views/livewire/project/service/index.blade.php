@@ -24,7 +24,8 @@
                             <div>Configuration</div>
                         </div>
                         <x-forms.button type="submit">Save</x-forms.button>
-                        <x-forms.button class="w-64" onclick="composeModal.showModal()">Edit Compose File</x-forms.button>
+                        <x-forms.button class="w-64" onclick="composeModal.showModal()">Edit Compose
+                            File</x-forms.button>
                     </div>
                     <div class="flex gap-2">
                         <x-forms.input id="service.name" required label="Service Name"
@@ -34,57 +35,66 @@
                 </form>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">
                     @foreach ($service->applications as $application)
-                        <a @class([
+                        <div @class([
                             'border-l border-dashed border-red-500' => Str::of(
                                 $application->status)->contains(['exited']),
                             'border-l border-dashed border-success' => Str::of(
                                 $application->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $application->status)->contains(['starting']),
-                            'flex flex-col justify-center box',
-                        ])
-                            href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
-                            @if ($application->human_name)
-                                {{ Str::headline($application->human_name) }}
-                            @else
-                                {{ Str::headline($application->name) }}
-                            @endif
-                            @if ($application->configuration_required)
-                                <span class="text-xs text-error">(configuration required)</span>
-                            @endif
-                            @if ($application->description)
-                                <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
-                            @endif
-                            @if ($application->fqdn)
-                                <span class="text-xs">{{ Str::limit($application->fqdn, 60) }}</span>
-                            @endif
-                            <div class="text-xs">{{ $application->status }}</div>
-                        </a>
+                            'flex gap-2 box group',
+                        ])>
+                            <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
+
+                                @if ($application->human_name)
+                                    {{ Str::headline($application->human_name) }}
+                                @else
+                                    {{ Str::headline($application->name) }}
+                                @endif
+                                @if ($application->configuration_required)
+                                    <span class="text-xs text-error">(configuration required)</span>
+                                @endif
+                                @if ($application->description)
+                                    <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
+                                @endif
+                                @if ($application->fqdn)
+                                    <span class="text-xs">{{ Str::limit($application->fqdn, 60) }}</span>
+                                @endif
+                                <div class="text-xs">{{ $application->status }}</div>
+                            </a>
+                            <a class="flex gap-2 p-1 mx-4 text-xs font-bold rounded hover:no-underline hover:text-warning"
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}">Logs</a>
+                        </div>
                     @endforeach
                     @foreach ($databases as $database)
-                        <a @class([
+                        <div @class([
                             'border-l border-dashed border-red-500' => Str::of(
                                 $database->status)->contains(['exited']),
                             'border-l border-dashed border-success' => Str::of(
                                 $database->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $database->status)->contains(['restarting']),
-                            'flex flex-col justify-center box',
-                        ])
-                            href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
-                            @if ($database->human_name)
-                                {{ Str::headline($database->human_name) }}
-                            @else
-                                {{ Str::headline($database->name) }}
-                            @endif
-                            @if ($database->configuration_required)
-                                <span class="text-xs text-error">(configuration required)</span>
-                            @endif
-                            @if ($database->description)
-                                <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
-                            @endif
-                            <div class="text-xs">{{ $database->status }}</div>
-                        </a>
+                            'flex gap-2 box group',
+                        ])>
+                            <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
+                                @if ($database->human_name)
+                                    {{ Str::headline($database->human_name) }}
+                                @else
+                                    {{ Str::headline($database->name) }}
+                                @endif
+                                @if ($database->configuration_required)
+                                    <span class="text-xs text-error">(configuration required)</span>
+                                @endif
+                                @if ($database->description)
+                                    <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
+                                @endif
+                                <div class="text-xs">{{ $database->status }}</div>
+                            </a>
+                            <a class="flex gap-2 p-1 mx-4 text-xs font-bold rounded hover:no-underline hover:text-warning"
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}">Logs</a>
+                        </div>
                     @endforeach
                 </div>
 

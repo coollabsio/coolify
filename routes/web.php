@@ -10,6 +10,7 @@ use App\Http\Livewire\Boarding\Index as BoardingIndex;
 use App\Http\Livewire\Project\Service\Index as ServiceIndex;
 use App\Http\Livewire\Project\Service\Show as ServiceShow;
 use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Project\Shared\Logs;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
@@ -80,14 +81,20 @@ Route::middleware(['auth'])->group(function () {
         [ApplicationController::class, 'deployment']
     )->name('project.application.deployment');
 
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/logs', Logs::class)->name('project.application.logs');
+
     // Databases
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups.all');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups/{backup_uuid}', [DatabaseController::class, 'executions'])->name('project.database.backups.executions');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/logs', Logs::class)->name('project.database.logs');
+
 
     // Services
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
+    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}/logs', Logs::class)->name('project.service.logs');
+
 });
 
 Route::middleware(['auth'])->group(function () {

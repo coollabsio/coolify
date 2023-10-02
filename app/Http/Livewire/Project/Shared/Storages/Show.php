@@ -11,7 +11,6 @@ class Show extends Component
     public LocalPersistentVolume $storage;
     public bool $isReadOnly = false;
     public ?string $modalId = null;
-    public ?string $realName = null;
 
     protected $rules = [
         'storage.name' => 'required|string',
@@ -26,11 +25,6 @@ class Show extends Component
 
     public function mount()
     {
-        if ($this->storage->resource_type === 'App\Models\ServiceApplication' || $this->storage->resource_type === 'App\Models\ServiceDatabase') {
-            $this->realName = "{$this->storage->service->service->uuid}_{$this->storage->name}";
-        } else {
-            $this->realName = $this->storage->name;
-        }
         $this->modalId = new Cuid2(7);
     }
 

@@ -7,6 +7,10 @@
         href="{{ route('project.application.deployments', $parameters) }}">
         <button>Deployments</button>
     </a>
+    <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
+        href="{{ route('project.application.logs', $parameters) }}">
+        <button>Logs</button>
+    </a>
     <x-applications.links :application="$application" />
     <div class="flex-1"></div>
     <x-applications.advanced :application="$application" />
