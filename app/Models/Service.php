@@ -258,7 +258,7 @@ class Service extends BaseModel
                 $networks = $serviceNetworks->toArray();
                 foreach ($definedNetwork as $key => $network) {
                     $networks = array_merge($networks, [
-                        $network => null
+                        $network
                     ]);
                 }
                 data_set($service, 'networks', $networks);
