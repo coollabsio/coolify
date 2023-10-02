@@ -379,9 +379,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function prepare_builder_image()
     {
         $pull = "--pull=always";
-        if (isDev()) {
-            $pull = "--pull=never";
-        }
         $helperImage = config('coolify.helper_image');
         $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
 
