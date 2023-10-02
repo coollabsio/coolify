@@ -287,7 +287,10 @@ class Service extends BaseModel
                             $isDirectory = (bool) data_get($volume, 'isDirectory', false);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
-                                $content = data_get($foundConfig, 'content');
+                                $contentNotNull = data_get($foundConfig, 'content');
+                                if ($contentNotNull) {
+                                    $content = $contentNotNull;
+                                }
                                 $isDirectory = (bool) data_get($foundConfig, 'is_directory');
                             }
                         }
@@ -343,7 +346,7 @@ class Service extends BaseModel
                                 ]
                             );
                         }
-                        $savedService->getFilesFromServer();
+                        $savedService->getFilesFromServer(isInit: true);
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());

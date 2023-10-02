@@ -36,8 +36,8 @@ class ServiceApplication extends BaseModel
 
         );
     }
-    public function getFilesFromServer()
+    public function getFilesFromServer(bool $isInit = false)
     {
-        getFilesystemVolumesFromServer($this);
+        getFilesystemVolumesFromServer($this, $isInit);
     }
 }
