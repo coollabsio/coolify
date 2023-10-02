@@ -64,7 +64,7 @@ function serviceStatus(Service $service)
     }
     return 'exited';
 }
-function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneService)
+function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneService, bool $isInit = false)
 {
     // TODO: make this async
     try {
@@ -87,6 +87,10 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
             }
             $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
+            if ($isFile === 'NOK' &&!$fileVolume->is_directory && $isInit) {
+                $fileVolume->saveStorageOnServer($oneService);
+                continue;
+            }
             if ($isFile == 'OK' && !$fileVolume->is_directory) {
                 $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
                 if (base64_encode($filesystemContent) != base64_encode($content)) {

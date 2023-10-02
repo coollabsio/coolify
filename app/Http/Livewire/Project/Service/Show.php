@@ -33,9 +33,6 @@ class Show extends Component
                 $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
                 $this->serviceDatabase->getFilesFromServer();
             }
-            if (is_null($service)) {
-                throw new \Exception("Service not found.");
-            }
         } catch(\Throwable $e) {
             return handleError($e, $this);
         }
