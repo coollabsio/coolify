@@ -2,9 +2,14 @@
     <div class="flex gap-2">
         <h2>Logs</h2>
         @if ($streamLogs)
-            <span wire:poll.1000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
+            <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
         @endif
     </div>
+
+    <form wire:submit.prevent='getLogs(true)' class="flex items-end gap-2">
+        <x-forms.input label="Only Show Number of Lines" placeholder="1000" required id="numberOfLines"></x-forms.input>
+        <x-forms.button type="submit">Set</x-forms.button>
+    </form>
     <div class="w-32">
         <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
     </div>
