@@ -13,7 +13,7 @@ class GetLogs extends Component
     public Server $server;
     public ?string $container = null;
     public ?bool $streamLogs = false;
-    public int $numberOfLines = 1000;
+    public int $numberOfLines = 100;
     public function doSomethingWithThisChunkOfOutput($output)
     {
         $this->outputs .= $output;
