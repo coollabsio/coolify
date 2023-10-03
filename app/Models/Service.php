@@ -8,7 +8,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
-use Spatie\Url\Url;
 
 class Service extends BaseModel
 {
@@ -20,6 +19,7 @@ class Service extends BaseModel
         static::deleted(function ($service) {
             $storagesToDelete = collect([]);
             foreach ($service->applications()->get() as $application) {
+                instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server, false);
                 $storages = $application->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
@@ -27,6 +27,7 @@ class Service extends BaseModel
                 $application->persistentStorages()->delete();
             }
             foreach ($service->databases()->get() as $database) {
+                instant_remote_process(["docker rm -f {$database->name}-{$service->uuid}"], $service->server, false);
                 $storages = $database->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);

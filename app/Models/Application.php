@@ -18,10 +18,16 @@ class Application extends BaseModel
             ]);
         });
         static::deleting(function ($application) {
+            // Stop Container
+            instant_remote_process(
+                ["docker rm -f {$application->uuid}"],
+                $application->destination->server,
+                false
+            );
             $application->settings()->delete();
             $storages =  $application->persistentStorages()->get();
             foreach ($storages as $storage) {
-                instant_remote_process(["docker volume rm -f $storage->name"], $application->destination->server);
+                instant_remote_process(["docker volume rm -f $storage->name"], $application->destination->server, false);
             }
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
@@ -233,7 +239,7 @@ class Application extends BaseModel
     }
     public function isHealthcheckDisabled(): bool
     {
-        if (data_get($this, 'dockerfile') || data_get($this, 'build_pack') === 'dockerfile' || data_get($this,'health_check_enabled') === false) {
+        if (data_get($this, 'dockerfile') || data_get($this, 'build_pack') === 'dockerfile' || data_get($this, 'health_check_enabled') === false) {
             ray('dockerfile');
             return true;
         }

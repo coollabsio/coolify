@@ -29,9 +29,20 @@ class StandalonePostgresql extends BaseModel
             ]);
         });
         static::deleted(function ($database) {
+            // Stop Container
+            instant_remote_process(
+                ["docker rm -f {$database->uuid}"],
+                $database->destination->server,
+                false
+            );
+            // Stop TCP Proxy
+            if ($database->is_public) {
+                instant_remote_process(["docker rm -f {$database->uuid}-proxy"], $database->destination->server, false);
+            }
             $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
+            // Remove Volume
             instant_remote_process(['docker volume rm postgres-data-' . $database->uuid], $database->destination->server, false);
         });
     }
