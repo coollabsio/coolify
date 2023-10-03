@@ -11,6 +11,7 @@ class Show extends Component
     public LocalPersistentVolume $storage;
     public bool $isReadOnly = false;
     public ?string $modalId = null;
+    public bool $isFirst = true;
 
     protected $rules = [
         'storage.name' => 'required|string',

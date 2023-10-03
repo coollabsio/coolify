@@ -17,17 +17,16 @@
             @forelse ($projects as $project)
                 <div class="gap-2 border border-transparent cursor-pointer box group" x-data
                     x-on:click="goto('{{ $project->uuid }}')">
-                    <div class="flex flex-col mx-6">
+                    <div class="flex flex-col flex-1 mx-6">
                         <a class=" group-hover:text-white hover:no-underline"
                             href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">{{ $project->name }}</a>
                         <div class="text-xs group-hover:text-white hover:no-underline"
                             href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
                             {{ $project->description }}</div>
                     </div>
-                    <div class="flex-1"></div>
-                    <a class="mx-4 rounded hover:text-white"
+                    <a class="mx-4 rounded group-hover:text-white"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning" viewBox="0 0 24 24" stroke-width="1.5"
                             stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
                             <path
