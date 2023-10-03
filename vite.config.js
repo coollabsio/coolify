@@ -4,6 +4,9 @@ import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
     server: {
+        watch: {
+            ignored: ['**/_data/**'],
+          },
         host: "0.0.0.0",
         hmr: process.env.GITPOD_WORKSPACE_URL
             ? {
