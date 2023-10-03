@@ -8,7 +8,6 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
-use Spatie\Url\Url;
 
 class Service extends BaseModel
 {
@@ -260,7 +259,7 @@ class Service extends BaseModel
                 $networks = $serviceNetworks->toArray();
                 foreach ($definedNetwork as $key => $network) {
                     $networks = array_merge($networks, [
-                        $network => null
+                        $network
                     ]);
                 }
                 data_set($service, 'networks', $networks);
@@ -289,7 +288,10 @@ class Service extends BaseModel
                             $isDirectory = (bool) data_get($volume, 'isDirectory', false);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
-                                $content = data_get($foundConfig, 'content');
+                                $contentNotNull = data_get($foundConfig, 'content');
+                                if ($contentNotNull) {
+                                    $content = $contentNotNull;
+                                }
                                 $isDirectory = (bool) data_get($foundConfig, 'is_directory');
                             }
                         }
@@ -317,11 +319,7 @@ class Service extends BaseModel
                             );
                         } else if ($type->value() === 'volume') {
                             $slug = Str::slug($source, '-');
-                            if ($isNew) {
-                                $name = "{$savedService->service->uuid}-{$slug}";
-                            } else {
-                                $name = "{$savedService->service->uuid}_{$slug}";
-                            }
+                            $name = "{$savedService->service->uuid}_{$slug}";
                             if (is_string($volume)) {
                                 $source = Str::of($volume)->before(':');
                                 $target = Str::of($volume)->after(':')->beforeLast(':');
@@ -345,7 +343,7 @@ class Service extends BaseModel
                                 ]
                             );
                         }
-                        $savedService->getFilesFromServer();
+                        $savedService->getFilesFromServer(isInit: true);
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
