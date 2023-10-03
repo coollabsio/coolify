@@ -318,11 +318,7 @@ class Service extends BaseModel
                             );
                         } else if ($type->value() === 'volume') {
                             $slug = Str::slug($source, '-');
-                            if ($isNew) {
-                                $name = "{$savedService->service->uuid}-{$slug}";
-                            } else {
-                                $name = "{$savedService->service->uuid}_{$slug}";
-                            }
+                            $name = "{$savedService->service->uuid}_{$slug}";
                             if (is_string($volume)) {
                                 $source = Str::of($volume)->before(':');
                                 $target = Str::of($volume)->after(':')->beforeLast(':');
