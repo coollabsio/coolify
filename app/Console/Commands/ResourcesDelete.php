@@ -10,14 +10,14 @@ use Illuminate\Console\Command;
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 
-class ResourceDelete extends Command
+class ResourcesDelete extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'resource:delete';
+    protected $signature = 'resources:delete';
 
     /**
      * The console command description.
@@ -46,6 +46,10 @@ class ResourceDelete extends Command
     private function deleteApplication()
     {
         $applications = Application::all();
+        if ($applications->count() === 0) {
+            $this->error('There are no applications to delete.');
+            return;
+        }
         $application = select(
             'What application do you want to delete?',
             $applications->pluck('name')->toArray(),
@@ -60,6 +64,10 @@ class ResourceDelete extends Command
     private function deleteDatabase()
     {
         $databases = StandalonePostgresql::all();
+        if ($databases->count() === 0) {
+            $this->error('There are no databases to delete.');
+            return;
+        }
         $database = select(
             'What database do you want to delete?',
             $databases->pluck('name')->toArray(),
@@ -74,6 +82,10 @@ class ResourceDelete extends Command
     private function deleteService()
     {
         $services = Service::all();
+        if ($services->count() === 0) {
+            $this->error('There are no services to delete.');
+            return;
+        }
         $service = select(
             'What service do you want to delete?',
             $services->pluck('name')->toArray(),
