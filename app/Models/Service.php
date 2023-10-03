@@ -318,8 +318,8 @@ class Service extends BaseModel
                                 ]
                             );
                         } else if ($type->value() === 'volume') {
-                            $slug = Str::slug($source, '-');
-                            $name = "{$savedService->service->uuid}_{$slug}";
+                            $slugWithoutUuid = Str::slug($source, '-');
+                            $name = "{$savedService->service->uuid}_{$slugWithoutUuid}";
                             if (is_string($volume)) {
                                 $source = Str::of($volume)->before(':');
                                 $target = Str::of($volume)->after(':')->beforeLast(':');
@@ -336,7 +336,7 @@ class Service extends BaseModel
                                     'resource_type' => get_class($savedService)
                                 ],
                                 [
-                                    'name' => $name,
+                                    'name' => $slugWithoutUuid,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService)
