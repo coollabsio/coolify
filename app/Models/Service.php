@@ -328,7 +328,9 @@ class Service extends BaseModel
                             } else if (is_array($volume)) {
                                 data_set($volume, 'source', $name);
                             }
-                            $topLevelVolumes->put($name, null);
+                            $topLevelVolumes->put($name, [
+                                'name' => $name,
+                            ]);
                             LocalPersistentVolume::updateOrCreate(
                                 [
                                     'mount_path' => $target,
@@ -336,7 +338,7 @@ class Service extends BaseModel
                                     'resource_type' => get_class($savedService)
                                 ],
                                 [
-                                    'name' => $slugWithoutUuid,
+                                    'name' => $name,
                                     'mount_path' => $target,
                                     'resource_id' => $savedService->id,
                                     'resource_type' => get_class($savedService)
