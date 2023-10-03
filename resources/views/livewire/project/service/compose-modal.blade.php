@@ -1,6 +1,7 @@
 <dialog id="composeModal" class="modal" x-data="{ raw: true }">
     <form method="dialog" class="flex flex-col gap-2 rounded max-w-7xl modal-box" wire:submit.prevent='submit'>
         <h1>Docker Compose</h1>
+        <div>Volume names are updated upon save. The service UUID will be added as a prefix to all volumes, to prevent name collision. To see the actual volume names, go to Storage menu.</div>
         <div x-cloak x-show="raw">
             <x-forms.button class="w-64" @click.prevent="raw = !raw">Check Deployable Compose</x-forms.button>
         </div>

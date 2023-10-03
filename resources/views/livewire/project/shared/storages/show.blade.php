@@ -8,7 +8,7 @@
     </x-modal>
     @once ($isReadOnly)
         <span class="text-warning">Please modify storage layout in your <a
-                class="underline" href="{{ Str::of(url()->current())->beforeLast('/') }}#compose">Docker Compose</a> file.</span>
+                class="underline" href="{{ Str::of(url()->current())->beforeLast('/') }}">Docker Compose</a> file.</span>
     @endonce
     <form wire:submit.prevent='submit' class="flex flex-col gap-2 pt-4 xl:items-end xl:flex-row">
         @if ($isReadOnly)
