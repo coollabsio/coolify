@@ -26,7 +26,7 @@
                 <div x-cloak x-show="activeTab === 'storages'">
                     <livewire:project.shared.storages.all :resource="$serviceApplication" />
                     @if ($serviceApplication->fileStorages()->get()->count() > 0)
-                        <h3 class="py-4">Mounted Files (binds)</h3>
+                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
                         <div class="flex flex-col gap-4">
                             @foreach ($serviceApplication->fileStorages()->get()->sort() as $fileStorage)
                                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
@@ -42,7 +42,7 @@
                 <div x-cloak x-show="activeTab === 'storages'">
                     <livewire:project.shared.storages.all :resource="$serviceDatabase" />
                     @if ($serviceDatabase->fileStorages()->get()->count() > 0)
-                        <h3 class="py-4">Mounted Files (binds)</h3>
+                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
                         <div class="flex flex-col gap-4">
                             @foreach ($serviceDatabase->fileStorages()->get()->sort() as $fileStorage)
                                 <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />

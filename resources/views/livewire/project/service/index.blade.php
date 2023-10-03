@@ -7,6 +7,8 @@
             <a :class="activeTab === 'service-stack' && 'text-white'"
                 @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
+            <a :class="activeTab === 'storages' && 'text-white'"
+                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages</a>
             <a :class="activeTab === 'environment-variables' && 'text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
@@ -34,7 +36,7 @@
                     </div>
                 </form>
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">
-                    @foreach ($service->applications as $application)
+                    @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500' => Str::of(
                                 $application->status)->contains(['exited']),
@@ -97,6 +99,46 @@
                         </div>
                     @endforeach
                 </div>
+
+            </div>
+            <div x-cloak x-show="activeTab === 'storages'">
+                @foreach ($applications as $application)
+                    @if ($loop->first)
+                        <livewire:project.shared.storages.all :resource="$application" />
+                    @else
+                        <livewire:project.shared.storages.all :resource="$application" :isHeaderVisible="false" />
+                    @endif
+                    @if ($application->fileStorages()->get()->count() > 0)
+                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
+                        <div class="flex flex-col gap-4">
+                            @foreach ($application->fileStorages()->get()->sort() as $fileStorage)
+                                <livewire:project.service.file-storage :fileStorage="$fileStorage"
+                                    wire:key="{{ $loop->index }}" />
+                            @endforeach
+                        </div>
+                    @endif
+                @endforeach
+                @foreach ($databases as $database)
+                    @if ($loop->first)
+                        <h3 class="pt-4">{{ Str::headline($database->name) }}</h3>
+                        @if ($applications->count() > 0)
+                            <livewire:project.shared.storages.all :resource="$database" :isHeaderVisible="false" />
+                        @else
+                            <livewire:project.shared.storages.all :resource="$database" />
+                        @endif
+                        @if ($database->fileStorages()->get()->count() > 0)
+                            <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
+                            <div class="flex flex-col gap-4">
+                                @foreach ($database->fileStorages()->get()->sort() as $fileStorage)
+                                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
+                                        wire:key="{{ $loop->index }}" />
+                                @endforeach
+                            </div>
+                        @endif
+                    @else
+                        <livewire:project.shared.storages.all :resource="$database" :isHeaderVisible="false" />
+                    @endif
+                @endforeach
 
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">

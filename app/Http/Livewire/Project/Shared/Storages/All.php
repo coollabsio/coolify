@@ -7,6 +7,7 @@ use Livewire\Component;
 
 class All extends Component
 {
+    public bool $isHeaderVisible = true;
     public $resource;
     protected $listeners = ['refreshStorages', 'submit'];
 
