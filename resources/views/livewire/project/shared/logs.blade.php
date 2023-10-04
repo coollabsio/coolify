@@ -29,13 +29,8 @@
                 </a>
             </div>
             <div class="flex-1 pl-8">
-                @if (serviceStatus($resource) === 'running')
-                    <livewire:project.shared.get-logs :server="$server" :container="$container" />
-                @else
-                    Service is not running.
-                @endif
+                <livewire:project.shared.get-logs :server="$server" :container="$container" />
             </div>
         </div>
     @endif
-
 </x-layout>

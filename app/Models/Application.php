@@ -44,6 +44,10 @@ class Application extends BaseModel
     {
         return $this->morphMany(LocalPersistentVolume::class, 'resource');
     }
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
 
     public function type()
     {

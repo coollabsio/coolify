@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 
@@ -120,7 +121,20 @@ class Server extends BaseModel
     {
         return $this->hasMany(Service::class);
     }
-
+    public function getIp(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (isDev()) {
+                    return '127.0.0.1';
+                }
+                if ($this->ip === 'host.docker.internal') {
+                    return base_ip();
+                }
+                return $this->ip;
+            }
+        );
+    }
     public function previews()
     {
         return $this->destinations()->map(function ($standaloneDocker) {

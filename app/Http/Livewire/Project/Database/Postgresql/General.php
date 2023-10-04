@@ -50,8 +50,9 @@ class General extends Component
         $this->getDbUrl();
     }
     public function getDbUrl() {
+
         if ($this->database->is_public) {
-            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->destination->server->ip}:{$this->database->public_port}/{$this->database->postgres_db}";
+            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->destination->server->getIp}:{$this->database->public_port}/{$this->database->postgres_db}";
         } else {
             $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->uuid}:5432/{$this->database->postgres_db}";
         }
