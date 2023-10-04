@@ -31,8 +31,6 @@ class Index extends Component
         $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
-        ray($this->applications);
-        ray($this->databases);
     }
     public function saveCompose($raw)
     {
