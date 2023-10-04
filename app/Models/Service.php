@@ -386,7 +386,10 @@ class Service extends BaseModel
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if (is_null(data_get($savedService, 'fqdn'))) {
                             $fqdn = generateFqdn($this->server, $containerName);
-                            if (substr_count($key->value(), '_') === 2 && $key->contains("=")) {
+                            if (substr_count($key->value(), '_') === 2) {
+                                if (is_null($value)) {
+                                    $value = Str::of('/');
+                                }
                                 $path = $value->value();
                                 if ($generatedServiceFQDNS->count() > 0) {
                                     $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
