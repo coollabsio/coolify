@@ -3,7 +3,6 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Symfony\Component\Yaml\Yaml;
 
 class ServiceDatabase extends BaseModel
 {

@@ -106,8 +106,7 @@
                     <h2>Storages</h2>
                 </div>
                 <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-                <span class="text-warning">Please modify storage layout in your <a class="underline"
-                        href="{{ Str::of(url()->current())->beforeLast('/') }}">Docker Compose</a> file.</span>
+                <span class="text-warning">Please modify storage layout in your Docker Compose file.</span>
                 @foreach ($applications as $application)
                     <livewire:project.service.storage wire:key="application-{{ $application->id }}"
                         :resource="$application" />
