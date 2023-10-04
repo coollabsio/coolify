@@ -8,6 +8,7 @@ use App\Models\StandalonePostgresql;
 use Illuminate\Console\Command;
 
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 
 class ResourcesDelete extends Command
@@ -50,16 +51,18 @@ class ResourcesDelete extends Command
             $this->error('There are no applications to delete.');
             return;
         }
-        $application = select(
+        $applicationsToDelete = multiselect(
             'What application do you want to delete?',
             $applications->pluck('name')->toArray(),
         );
-        $application = $applications->where('name', $application)->first();
-        $confirmed = confirm("Are you sure you want to delete {$application->name}?");
+        $confirmed = confirm("Are you sure you want to delete all selected resources?");
         if (!$confirmed) {
             return;
         }
-        $application->delete();
+        foreach ($applicationsToDelete as $application) {
+            $toDelete = $applications->where('name', $application)->first();
+            $toDelete->delete();
+        }
     }
     private function deleteDatabase()
     {
@@ -68,16 +71,19 @@ class ResourcesDelete extends Command
             $this->error('There are no databases to delete.');
             return;
         }
-        $database = select(
+        $databasesToDelete = multiselect(
             'What database do you want to delete?',
             $databases->pluck('name')->toArray(),
         );
-        $database = $databases->where('name', $database)->first();
-        $confirmed = confirm("Are you sure you want to delete {$database->name}?");
+        $confirmed = confirm("Are you sure you want to delete all selected resources?");
         if (!$confirmed) {
             return;
         }
-        $database->delete();
+        foreach ($databasesToDelete as $database) {
+            $toDelete = $databases->where('name', $database)->first();
+            $toDelete->delete();
+        }
+
     }
     private function deleteService()
     {
@@ -86,15 +92,17 @@ class ResourcesDelete extends Command
             $this->error('There are no services to delete.');
             return;
         }
-        $service = select(
+        $servicesToDelete = multiselect(
             'What service do you want to delete?',
             $services->pluck('name')->toArray(),
         );
-        $service = $services->where('name', $service)->first();
-        $confirmed = confirm("Are you sure you want to delete {$service->name}?");
+        $confirmed = confirm("Are you sure you want to delete all selected resources?");
         if (!$confirmed) {
             return;
         }
-        $service->delete();
+        foreach ($servicesToDelete as $service) {
+            $toDelete = $services->where('name', $service)->first();
+            $toDelete->delete();
+        }
     }
 }
