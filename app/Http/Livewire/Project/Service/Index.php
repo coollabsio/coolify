@@ -29,7 +29,10 @@ class Index extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
-        $this->refreshStack();
+        $this->applications = $this->service->applications->sort();
+        $this->databases = $this->service->databases->sort();
+        ray($this->applications);
+        ray($this->databases);
     }
     public function saveCompose($raw)
     {

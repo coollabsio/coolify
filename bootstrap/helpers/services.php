@@ -85,28 +85,39 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
             } else {
                 $fileLocation = $path;
             }
+            ray($path,$fileLocation);
+            // Exists and is a file
             $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
+            // Exists and is a directory
             $isDir = instant_remote_process(["test -d $fileLocation && echo OK || echo NOK"], $server);
-            if ($isFile === 'NOK' &&!$fileVolume->is_directory && $isInit) {
-                $fileVolume->saveStorageOnServer($oneService);
-                continue;
-            }
-            if ($isFile == 'OK' && !$fileVolume->is_directory) {
+
+            if ($isFile == 'OK') {
+                // If its a file & exists
                 $filesystemContent = instant_remote_process(["cat $fileLocation"], $server);
-                if (base64_encode($filesystemContent) != base64_encode($content)) {
-                    $fileVolume->content = $filesystemContent;
-                    $fileVolume->save();
-                }
-            } else {
-                if ($isDir == 'OK') {
-                    $fileVolume->content = null;
-                    $fileVolume->is_directory = true;
-                    $fileVolume->save();
-                } else {
-                    $fileVolume->content = null;
-                    $fileVolume->is_directory = false;
-                    $fileVolume->save();
-                }
+                $fileVolume->content = $filesystemContent;
+                $fileVolume->is_directory = false;
+                $fileVolume->save();
+            } else if ($isDir == 'OK') {
+                // If its a directory & exists
+                $fileVolume->content = null;
+                $fileVolume->is_directory = true;
+                $fileVolume->save();
+            } else if ($isFile == 'NOK' && $isDir == 'NOK' && !$fileVolume->is_directory && $isInit && $content) {
+                // Does not exists (no dir or file), not flagged as directory, is init, has content
+                $fileVolume->content = $content;
+                $fileVolume->is_directory = false;
+                $fileVolume->save();
+                $content = base64_encode($content);
+                $dir = Str::of($fileLocation)->dirname();
+                instant_remote_process([
+                    "mkdir -p $dir",
+                    "echo '$content' | base64 -d > $fileLocation"
+                ], $server);
+            } else if ($isFile == 'NOK' && $isDir == 'NOK' && $fileVolume->is_directory && $isInit) {
+                $fileVolume->content = null;
+                $fileVolume->is_directory = true;
+                $fileVolume->save();
+                instant_remote_process(["mkdir -p $fileLocation"], $server);
             }
         }
     } catch (\Throwable $e) {

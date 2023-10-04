@@ -76,6 +76,11 @@ class StandalonePostgresql extends BaseModel
         return $this->belongsTo(Environment::class);
     }
 
+    public function fileStorages()
+    {
+        return $this->morphMany(LocalFileVolume::class, 'resource');
+    }
+
     public function destination()
     {
         return $this->morphTo();

@@ -1,4 +1,4 @@
-<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.10000ms="checkStatus">
+<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.2000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <livewire:project.service.compose-modal :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
     <div class="flex h-full pt-6">
@@ -102,42 +102,18 @@
 
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
+                <div class="flex items-center gap-2">
+                    <h2>Storages</h2>
+                </div>
+                <div class="pb-4">Persistent storage to preserve data between deployments.</div>
+                <span class="text-warning">Please modify storage layout in your <a class="underline"
+                        href="{{ Str::of(url()->current())->beforeLast('/') }}">Docker Compose</a> file.</span>
                 @foreach ($applications as $application)
-                    @if ($loop->first)
-                        <livewire:project.shared.storages.all :resource="$application" />
-                    @else
-                        <livewire:project.shared.storages.all :resource="$application" :isHeaderVisible="false" />
-                    @endif
-                    @if ($application->fileStorages()->get()->count() > 0)
-                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
-                        <div class="flex flex-col gap-4">
-                            @foreach ($application->fileStorages()->get()->sort() as $fileStorage)
-                                <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                                    wire:key="{{ $loop->index }}" />
-                            @endforeach
-                        </div>
-                    @endif
+                    <livewire:project.service.storage wire:key="application-{{ $application->id }}"
+                        :resource="$application" />
                 @endforeach
                 @foreach ($databases as $database)
-                    @if ($loop->first)
-                        <h3 class="pt-4">{{ Str::headline($database->name) }}</h3>
-                        @if ($applications->count() > 0)
-                            <livewire:project.shared.storages.all :resource="$database" :isHeaderVisible="false" />
-                        @else
-                            <livewire:project.shared.storages.all :resource="$database" />
-                        @endif
-                        @if ($database->fileStorages()->get()->count() > 0)
-                            <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
-                            <div class="flex flex-col gap-4">
-                                @foreach ($database->fileStorages()->get()->sort() as $fileStorage)
-                                    <livewire:project.service.file-storage :fileStorage="$fileStorage"
-                                        wire:key="{{ $loop->index }}" />
-                                @endforeach
-                            </div>
-                        @endif
-                    @else
-                        <livewire:project.shared.storages.all :resource="$database" :isHeaderVisible="false" />
-                    @endif
+                    <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
 
             </div>

@@ -24,15 +24,14 @@
                     <livewire:project.service.application :application="$serviceApplication" />
                 </div>
                 <div x-cloak x-show="activeTab === 'storages'">
-                    <livewire:project.shared.storages.all :resource="$serviceApplication" />
-                    @if ($serviceApplication->fileStorages()->get()->count() > 0)
-                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
-                        <div class="flex flex-col gap-4">
-                            @foreach ($serviceApplication->fileStorages()->get()->sort() as $fileStorage)
-                                <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
-                            @endforeach
-                        </div>
-                    @endif
+                    <div class="flex items-center gap-2">
+                        <h2>Storages</h2>
+                    </div>
+                    <div class="pb-4">Persistent storage to preserve data between deployments.</div>
+                    <span class="text-warning">Please modify storage layout in your <a class="underline"
+                            href="{{ Str::of(url()->current())->beforeLast('/') }}">Docker Compose</a> file.</span>
+                    <livewire:project.service.storage wire:key="application-{{ $serviceApplication->id }}"
+                        :resource="$serviceApplication" />
                 </div>
             @endisset
             @isset($serviceDatabase)
@@ -40,15 +39,14 @@
                     <livewire:project.service.database :database="$serviceDatabase" />
                 </div>
                 <div x-cloak x-show="activeTab === 'storages'">
-                    <livewire:project.shared.storages.all :resource="$serviceDatabase" />
-                    @if ($serviceDatabase->fileStorages()->get()->count() > 0)
-                        <h5 class="py-4">Mounted Files/Dirs (binds)</h5>
-                        <div class="flex flex-col gap-4">
-                            @foreach ($serviceDatabase->fileStorages()->get()->sort() as $fileStorage)
-                                <livewire:project.service.file-storage :fileStorage="$fileStorage" wire:key="{{ $loop->index }}" />
-                            @endforeach
-                        </div>
-                    @endif
+                    <div class="flex items-center gap-2">
+                        <h2>Storages</h2>
+                    </div>
+                    <div class="pb-4">Persistent storage to preserve data between deployments.</div>
+                    <span class="text-warning">Please modify storage layout in your <a class="underline"
+                            href="{{ Str::of(url()->current())->beforeLast('/') }}">Docker Compose</a> file.</span>
+                    <livewire:project.service.storage wire:key="application-{{ $serviceDatabase->id }}"
+                        :resource="$serviceDatabase" />
                 </div>
             @endisset
         </div>

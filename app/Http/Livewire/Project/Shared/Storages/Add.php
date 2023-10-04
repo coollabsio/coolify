@@ -33,7 +33,7 @@ class Add extends Component
     {
         $this->validate();
         $name = $this->uuid . '-' . $this->name;
-        $this->emitUp('submit', [
+        $this->emit('addNewVolume', [
             'name' => $name,
             'mount_path' => $this->mount_path,
             'host_path' => $this->host_path,

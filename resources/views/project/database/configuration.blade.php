@@ -47,7 +47,7 @@
                 <livewire:project.shared.destination :destination="$database->destination" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
-                <livewire:project.shared.storages.all :resource="$database" />
+                <livewire:project.service.storage :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.shared.resource-limits :resource="$database" />
