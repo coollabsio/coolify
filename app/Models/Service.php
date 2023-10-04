@@ -140,7 +140,7 @@ class Service extends BaseModel
             }
             $definedNetwork = collect([$this->uuid]);
 
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $yaml) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS) {
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -266,7 +266,7 @@ class Service extends BaseModel
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes, $isNew, $yaml) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -430,11 +430,11 @@ class Service extends BaseModel
                                 $savedService->save();
                             }
                         }
-                        data_forget($service, "environment.$variableName");
-                        $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
-                        if (count(data_get($yaml, 'services.' . $serviceName . '.environment')) === 0) {
-                            $yaml = data_forget($yaml, "services.$serviceName.environment");
-                        }
+                        // data_forget($service, "environment.$variableName");
+                        // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
+                        // if (count(data_get($yaml, 'services.' . $serviceName . '.environment')) === 0) {
+                        //     $yaml = data_forget($yaml, "services.$serviceName.environment");
+                        // }
                         continue;
                     }
                     if ($value?->startsWith('$')) {
@@ -562,7 +562,6 @@ class Service extends BaseModel
                     }
                 });
                 data_set($service, 'environment', $withoutServiceEnvs->toArray());
-                $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
                 return $service;
             });
             $finalServices = [
@@ -571,6 +570,7 @@ class Service extends BaseModel
                 'volumes' => $topLevelVolumes->toArray(),
                 'networks' => $topLevelNetworks->toArray(),
             ];
+            $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
             $this->docker_compose = Yaml::dump($finalServices, 10, 2);
             $this->save();
             $this->saveComposeConfigs();
