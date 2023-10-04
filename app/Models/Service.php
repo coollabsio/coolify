@@ -408,6 +408,7 @@ class Service extends BaseModel
                                 $savedService->save();
                             }
                         }
+                        data_forget($service, "environment.$variableName");
                         continue;
                     }
                     if ($value?->startsWith('$')) {
@@ -422,10 +423,17 @@ class Service extends BaseModel
                             $forService = $value->afterLast('_');
                             $generatedValue = null;
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
-                                $fqdn = generateFqdn($this->server, $containerName);
+                                if (Str::lower($forService) === $serviceName) {
+                                    $fqdn = generateFqdn($this->server, $containerName);
+                                } else {
+                                    $fqdn = generateFqdn($this->server, Str::lower($forService) . '-' . $this->uuid);
+                                }
                                 if ($foundEnv) {
                                     $fqdn = data_get($foundEnv, 'value');
                                 } else {
+                                    if ($command->value() === 'URL') {
+                                        $fqdn = Str::of($fqdn)->after('://')->value();
+                                    }
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $fqdn,
@@ -434,10 +442,11 @@ class Service extends BaseModel
                                         'is_preview' => false,
                                     ]);
                                 }
-
                                 if (!$isDatabase) {
-                                    $savedService->fqdn = $fqdn;
-                                    $savedService->save();
+                                    if ($command->value() === 'FQDN') {
+                                        $savedService->fqdn = $fqdn;
+                                        $savedService->save();
+                                    }
                                 }
                             } else {
                                 switch ($command) {

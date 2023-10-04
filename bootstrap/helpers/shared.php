@@ -14,6 +14,7 @@ use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
