@@ -157,11 +157,13 @@ function fqdnLabelsForTraefik(Collection $domains, $container_name, $is_force_ht
         $path = $url->getPath();
         $schema = $url->getScheme();
         $port = $url->getPort();
-        $slug = Str::slug($host . $path);
 
-        $http_label = "{$container_name}-{$slug}-http";
-        $https_label = "{$container_name}-{$slug}-https";
-
+        $http_label = "{$container_name}-http";
+        $https_label = "{$container_name}-https";
+        if ($port) {
+            $http_label = "{$http_label}-{$port}";
+            $https_label = "{$https_label}-{$port}";
+        }
         if ($schema === 'https') {
             // Set labels for https
             $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
