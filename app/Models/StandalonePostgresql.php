@@ -28,7 +28,7 @@ class StandalonePostgresql extends BaseModel
                 'is_readonly' => true
             ]);
         });
-        static::deleted(function ($database) {
+        static::deleting(function ($database) {
             // Stop Container
             instant_remote_process(
                 ["docker rm -f {$database->uuid}"],

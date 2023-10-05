@@ -16,7 +16,7 @@ class Service extends BaseModel
 
     protected static function booted()
     {
-        static::deleted(function ($service) {
+        static::deleting(function ($service) {
             $storagesToDelete = collect([]);
             foreach ($service->applications()->get() as $application) {
                 instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server, false);
