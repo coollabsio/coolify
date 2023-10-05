@@ -233,7 +233,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         );
         $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
         $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
@@ -258,7 +258,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
         $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
 
         if (!$this->force_rebuild) {
             $this->execute_remote_command([
@@ -307,7 +307,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->newVersionIsHealthy = true;
             return;
         }
-        ray('New container name: ', $this->container_name);
+        // ray('New container name: ', $this->container_name);
         if ($this->container_name) {
             $counter = 0;
             $this->execute_remote_command(
@@ -354,7 +354,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
         $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->application->git_repository}:{$this->application->git_branch}.'",
         ]);
@@ -628,14 +628,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_environment_variables($ports)
     {
         $environment_variables = collect();
-        ray('Generate Environment Variables')->green();
+        // ray('Generate Environment Variables')->green();
         if ($this->pull_request_id === 0) {
-            ray($this->application->runtime_environment_variables)->green();
+            // ray($this->application->runtime_environment_variables)->green();
             foreach ($this->application->runtime_environment_variables as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
         } else {
-            ray($this->application->runtime_environment_variables_preview)->green();
+            // ray($this->application->runtime_environment_variables_preview)->green();
             foreach ($this->application->runtime_environment_variables_preview as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
