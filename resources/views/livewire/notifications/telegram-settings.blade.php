@@ -27,34 +27,30 @@
         <h2 class="mt-4">Subscribe to events</h2>
         <div class="w-96">
             @if (isDev())
-            <h3 class="mt-4">Test</h3>
-                <div class="flex items-end gap-10">
-                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_test" label="Enabled" />
+                <div class="w-64">
+                    <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_test" label="Test" />
                     <x-forms.input
                         helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
                         id="team.telegram_notifications_test_message_thread_id" label="Custom Topic ID" />
                 </div>
             @endif
-            <h3 class="mt-4">Container Status Changes</h3>
-            <div class="flex items-end gap-10">
+            <div class="w-64">
                 <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_status_changes"
-                label="Enabled" />
+                label="Container Status Changes" />
                 <x-forms.input
                     helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
                     id="team.telegram_notifications_status_changes_message_thread_id" label="Custom Topic ID" />
             </div>
-            <h3 class="mt-4">Application Deployments</h3>
-            <div class="flex items-end gap-10">
+            <div class="w-64">
                 <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_deployments"
-                label="Enabled" />
+                label="Application Deployments" />
                 <x-forms.input
                     helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
                     id="team.telegram_notifications_deployments_message_thread_id" label="Custom Topic ID" />
             </div>
-            <h3 class="mt-4">Backup Status</h3>
-            <div class="flex items-end gap-10">
+            <div class="w-64">
                 <x-forms.checkbox instantSave="saveModel" id="team.telegram_notifications_database_backups"
-                label="Enabled" />
+                label="Backup Status" />
                 <x-forms.input
                     helper="If you are using Group chat with Topics, you can specify the topics ID. If empty, General topic will be used."
                     id="team.telegram_notifications_database_backups_message_thread_id" label="Custom Topic ID" />

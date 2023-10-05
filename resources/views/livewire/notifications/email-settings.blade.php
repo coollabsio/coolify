@@ -104,24 +104,14 @@
         <h2 class="mt-4">Subscribe to events</h2>
         <div class="w-64">
             @if (isDev())
-                <h3 class="mt-4">Test</h3>
-                <div class="flex items-end gap-10">
-                    <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_test" label="Enabled" />
-                </div>
+                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_test" label="Test" />
             @endif
-            <h3 class="mt-4">Container Status Changes</h3>
-            <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_status_changes" label="Enabled" />
-            </div>
-            <h3 class="mt-4">Application Deployments</h3>
-            <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_deployments" label="Enabled" />
-            </div>
-            <h3 class="mt-4">Backup Status</h3>
-            <div class="flex items-end gap-10">
-                <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_database_backups"
-                    label="Enabled" />
-            </div>
+            <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_status_changes"
+                label="Container Status Changes" />
+            <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_deployments"
+                label="Application Deployments" />
+            <x-forms.checkbox instantSave="saveModel" id="team.smtp_notifications_database_backups"
+                label="Backup Status" />
         </div>
     @endif
 </div>
