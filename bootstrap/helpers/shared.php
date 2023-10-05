@@ -14,6 +14,7 @@ use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
@@ -425,6 +426,16 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
+        $deprecated = File::get(base_path('templates/deprecated.json'));
+        $deprecated = collect(json_decode($deprecated))->sortKeys();
+        $services = $services->merge($deprecated);
+        $version = config('version');
+        $services = $services->map(function ($service) use ($version) {
+            if (version_compare($version, data_get($service,'minVersion', '0.0.0'), '<')) {
+                $service->disabled = true;
+            }
+            return $service;
+        });
     } else {
         $services = Http::get(config('constants.services.official'));
         if ($services->failed()) {

@@ -16,7 +16,7 @@ class Service extends BaseModel
 
     protected static function booted()
     {
-        static::deleted(function ($service) {
+        static::deleting(function ($service) {
             $storagesToDelete = collect([]);
             foreach ($service->applications()->get() as $application) {
                 instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server, false);
@@ -266,7 +266,7 @@ class Service extends BaseModel
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes, $isNew) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($savedService, $topLevelVolumes) {
                         $type = null;
                         $source = null;
                         $target = null;
@@ -384,9 +384,20 @@ class Service extends BaseModel
                         $value = Str::of($variable);
                     }
                     if ($key->startsWith('SERVICE_FQDN')) {
-                        if (is_null(data_get($savedService, 'fqdn'))) {
-                            $fqdn = generateFqdn($this->server, $containerName);
-                            if (substr_count($key->value(), '_') === 2) {
+                        if ($isNew) {
+                            $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
+                            $fqdn = generateFqdn($this->server, "{$name->value()}-{$this->uuid}");
+                            if (substr_count($key->value(), '_') === 3) {
+                                // SERVICE_FQDN_UMAMI_1000
+                                $port = $key->afterLast('_');
+                            } else {
+                                // SERVICE_FQDN_UMAMI
+                                $port = null;
+                            }
+                            if ($port) {
+                                $fqdn = "$fqdn:$port";
+                            }
+                            if (substr_count($key->value(), '_') >= 2) {
                                 if (is_null($value)) {
                                     $value = Str::of('/');
                                 }
@@ -403,11 +414,22 @@ class Service extends BaseModel
                                 }
                                 $fqdn = "$fqdn$path";
                             }
+
                             if (!$isDatabase) {
+                                if ($savedService->fqdn) {
+                                    $fqdn = $savedService->fqdn . ',' . $fqdn;
+                                } else {
+                                    $fqdn = $fqdn;
+                                }
                                 $savedService->fqdn = $fqdn;
                                 $savedService->save();
                             }
                         }
+                        // data_forget($service, "environment.$variableName");
+                        // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
+                        // if (count(data_get($yaml, 'services.' . $serviceName . '.environment')) === 0) {
+                        //     $yaml = data_forget($yaml, "services.$serviceName.environment");
+                        // }
                         continue;
                     }
                     if ($value?->startsWith('$')) {
@@ -422,10 +444,17 @@ class Service extends BaseModel
                             $forService = $value->afterLast('_');
                             $generatedValue = null;
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
-                                $fqdn = generateFqdn($this->server, $containerName);
+                                if (Str::lower($forService) === $serviceName) {
+                                    $fqdn = generateFqdn($this->server, $containerName);
+                                } else {
+                                    $fqdn = generateFqdn($this->server, Str::lower($forService) . '-' . $this->uuid);
+                                }
                                 if ($foundEnv) {
                                     $fqdn = data_get($foundEnv, 'value');
                                 } else {
+                                    if ($command->value() === 'URL') {
+                                        $fqdn = Str::of($fqdn)->after('://')->value();
+                                    }
                                     EnvironmentVariable::create([
                                         'key' => $key,
                                         'value' => $fqdn,
@@ -434,10 +463,11 @@ class Service extends BaseModel
                                         'is_preview' => false,
                                     ]);
                                 }
-
                                 if (!$isDatabase) {
-                                    $savedService->fqdn = $fqdn;
-                                    $savedService->save();
+                                    if ($command->value() === 'FQDN') {
+                                        $savedService->fqdn = $fqdn;
+                                        $savedService->save();
+                                    }
                                 }
                             } else {
                                 switch ($command) {
@@ -513,19 +543,19 @@ class Service extends BaseModel
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($fqdns, $containerName, true));
                     }
                 }
-
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
                 data_set($service, 'restart', RESTART_MODE);
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
-
                 // Remove unnecessary variables from service.environment
                 $withoutServiceEnvs = collect([]);
                 collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
-                    if (!Str::of($key)->startsWith('$SERVICE_')) {
-                        $withoutServiceEnvs->put($key, $value);
+                    if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
+                        $k = Str::of($value)->before("=");
+                        $v = Str::of($value)->after("=");
+                        $withoutServiceEnvs->put($k->value(), $v->value());
                     }
                 });
                 data_set($service, 'environment', $withoutServiceEnvs->toArray());

@@ -95,19 +95,31 @@
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
                     @foreach ($services as $serviceName => $service)
-                        <button class="text-left box group"
-                            wire:loading.attr="disabled" wire:click="setType('one-click-service-{{ $serviceName }}')">
-                            <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white group-hover:text-white">
-                                    {{ Str::headline($serviceName) }}
-                                </div>
-                                @if (data_get($service, 'slogan'))
-                                    <div class="text-xs">
-                                        {{ data_get($service, 'slogan') }}
+                        @if (data_get($service, 'disabled'))
+                            <button class="text-left bg-black cursor-not-allowed bg-coolgray-200/20 box-without-bg"
+                                disabled>
+                                <div class="flex flex-col mx-6">
+                                    <div class="font-bold text-coolgray-500">
+                                        {{ Str::headline($serviceName) }}
                                     </div>
-                                @endif
-                            </div>
-                        </button>
+                                    You need to upgrade to {{ data_get($service, 'minVersion') }} to use this service.
+                                </div>
+                            </button>
+                        @else
+                            <button class="text-left box group" wire:loading.attr="disabled"
+                                wire:click="setType('one-click-service-{{ $serviceName }}')">
+                                <div class="flex flex-col mx-6">
+                                    <div class="font-bold text-white group-hover:text-white">
+                                        {{ Str::headline($serviceName) }}
+                                    </div>
+                                    @if (data_get($service, 'slogan'))
+                                        <div class="text-xs">
+                                            {{ data_get($service, 'slogan') }}
+                                        </div>
+                                    @endif
+                                </div>
+                            </button>
+                        @endif
                     @endforeach
                 @endif
             </div>

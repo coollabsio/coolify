@@ -11,7 +11,8 @@ services:
       - database__connection__password=$SERVICE_PASSWORD_MYSQL
       - database__connection__database=${MYSQL_DATABASE-ghost}
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
   mysql:
     image: mysql:8.0
     volumes:
@@ -20,4 +21,9 @@ services:
       - MYSQL_USER=${SERVICE_USER_MYSQL}
       - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQL_ROOT}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

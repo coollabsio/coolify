@@ -1,0 +1,16 @@
+services:
+  minio:
+    image: quay.io/minio/minio:RELEASE.2023-09-30T07-02-29Z
+    command: server /data --console-address ":9001"
+    environment:
+      SERVICE_FQDN_MINIO_9000:
+      SERVICE_FQDN_CONSOLE_9001:
+      MINIO_ROOT_USER: $SERVICE_USER_MINIO
+      MINIO_ROOT_PASSWORD: $SERVICE_PASSWORD_MINIO
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

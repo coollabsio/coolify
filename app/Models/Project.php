@@ -22,7 +22,7 @@ class Project extends BaseModel
                 'project_id' => $project->id,
             ]);
         });
-        static::deleted(function ($project) {
+        static::deleting(function ($project) {
             $project->environments()->delete();
             $project->settings()->delete();
         });

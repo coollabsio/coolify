@@ -9,6 +9,7 @@ use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index as BoardingIndex;
 use App\Http\Livewire\Project\Service\Index as ServiceIndex;
 use App\Http\Livewire\Project\Service\Show as ServiceShow;
+use App\Http\Livewire\Dev\Compose as Compose;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Project\Shared\Logs;
 use App\Http\Livewire\Server\All;
@@ -29,6 +30,9 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
+if (isDev()) {
+    Route::get('/dev/compose', Compose::class)->name('dev.compose');
+}
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         $arrayOfRequest = $request->only(Fortify::email());
@@ -94,7 +98,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}/logs', Logs::class)->name('project.service.logs');
-
 });
 
 Route::middleware(['auth'])->group(function () {
