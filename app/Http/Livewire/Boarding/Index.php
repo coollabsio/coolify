@@ -76,7 +76,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         Team::find(currentTeam()->id)->update([
             'show_boarding' => false
         ]);
-        ray(currentTeam());
         refreshSession();
         return redirect()->route('dashboard');
     }
