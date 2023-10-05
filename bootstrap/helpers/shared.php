@@ -353,13 +353,14 @@ function setNotificationChannels($notifiable, $event)
     $isEmailEnabled = isEmailEnabled($notifiable);
     $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
     $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+    $isSubscribedToEmailEvent = data_get($notifiable, "smtp_notifications_$event");
     $isSubscribedToDiscordEvent = data_get($notifiable, "discord_notifications_$event");
     $isSubscribedToTelegramEvent = data_get($notifiable, "telegram_notifications_$event");
 
     if ($isDiscordEnabled && $isSubscribedToDiscordEvent) {
         $channels[] = DiscordChannel::class;
     }
-    if ($isEmailEnabled) {
+    if ($isEmailEnabled && $isSubscribedToEmailEvent) {
         $channels[] = EmailChannel::class;
     }
     if ($isTelegramEnabled && $isSubscribedToTelegramEvent) {
@@ -406,7 +407,7 @@ function generateFqdn(Server $server, string $random)
     $host = $url->getHost();
     $path = $url->getPath() === '/' ? '' : $url->getPath();
     $scheme = $url->getScheme();
-    $finalFqdn = "$scheme://{$random}.$host$path" ;
+    $finalFqdn = "$scheme://{$random}.$host$path";
     return $finalFqdn;
 }
 function sslip(Server $server)
@@ -431,7 +432,7 @@ function getServiceTemplates()
         $services = $services->merge($deprecated);
         $version = config('version');
         $services = $services->map(function ($service) use ($version) {
-            if (version_compare($version, data_get($service,'minVersion', '0.0.0'), '<')) {
+            if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
                 $service->disabled = true;
             }
             return $service;
