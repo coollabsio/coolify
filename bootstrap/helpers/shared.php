@@ -429,6 +429,13 @@ function getServiceTemplates()
         $deprecated = File::get(base_path('templates/deprecated.json'));
         $deprecated = collect(json_decode($deprecated))->sortKeys();
         $services = $services->merge($deprecated);
+        $version = config('version');
+        $services = $services->map(function ($service) use ($version) {
+            if (version_compare($version, data_get($service,'minVersion', '0.0.0'), '<')) {
+                $service->disabled = true;
+            }
+            return $service;
+        });
     } else {
         $services = Http::get(config('constants.services.official'));
         if ($services->failed()) {
