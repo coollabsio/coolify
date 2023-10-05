@@ -69,7 +69,6 @@ class ProjectController extends Controller
         if ($type->startsWith('one-click-service-') && !is_null( (int)$server_id)) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
-            ray($oneClickServiceName);
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
             if ($oneClickDotEnvs) {
                 $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');

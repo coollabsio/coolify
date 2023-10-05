@@ -1,12 +1,12 @@
 <?php
 
-use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id): Collection
 {
@@ -147,23 +147,21 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     }
     return $labels;
 }
-function fqdnLabelsForTraefik(Collection $domains, $container_name, $is_force_https_enabled)
+function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     foreach ($domains as $domain) {
+        $uuid = (string)new Cuid2(7);
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
         $schema = $url->getScheme();
         $port = $url->getPort();
 
-        $http_label = "{$container_name}-http";
-        $https_label = "{$container_name}-https";
-        if ($port) {
-            $http_label = "{$http_label}-{$port}";
-            $https_label = "{$https_label}-{$port}";
-        }
+        $http_label = "{$uuid}-http";
+        $https_label = "{$uuid}-https";
+
         if ($schema === 'https') {
             // Set labels for https
             $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -223,7 +221,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         // Add Traefik labels no matter which proxy is selected
-        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $container_name, $application->settings->is_force_https_enabled));
+        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $application->settings->is_force_https_enabled));
     }
     return $labels->all();
 }

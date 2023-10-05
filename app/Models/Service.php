@@ -540,7 +540,7 @@ class Service extends BaseModel
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($fqdns, $containerName, true));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($fqdns, true));
                     }
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());
