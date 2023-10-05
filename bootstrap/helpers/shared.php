@@ -426,6 +426,9 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
+        $deprecated = File::get(base_path('templates/deprecated.json'));
+        $deprecated = collect(json_decode($deprecated))->sortKeys();
+        $services = $services->merge($deprecated);
     } else {
         $services = Http::get(config('constants.services.official'));
         if ($services->failed()) {
