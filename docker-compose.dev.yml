@@ -34,14 +34,14 @@ services:
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
       POSTGRES_HOST_AUTH_METHOD: "trust"
     volumes:
-      - /data/coolify/_volumes/database/:/var/lib/postgresql/data
+      - coolify-pg-data-dev:/var/lib/postgresql/data
   redis:
     ports:
       - "${FORWARD_REDIS_PORT:-6379}:6379"
     env_file:
       - .env
     volumes:
-      - /data/coolify/_volumes/redis/:/data
+      - coolify-redis-data-dev:/data
   vite:
     image: node:19
     working_dir: /var/www/html
@@ -56,7 +56,7 @@ services:
     volumes:
       - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
-      - /data/coolify/:/data/coolify
+      - coolify-data-dev:/data/coolify
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: coolify-mail
@@ -76,6 +76,12 @@ services:
       MINIO_ACCESS_KEY: "${MINIO_ACCESS_KEY:-minioadmin}"
       MINIO_SECRET_KEY: "${MINIO_SECRET_KEY:-minioadmin}"
     volumes:
-      - /data/coolify/_volumes/minio/:/data
+      - coolify-minio-data-dev:/data
     networks:
       - coolify
+
+volumes:
+  coolify-data-dev:
+  coolify-pg-data-dev:
+  coolify-redis-data-dev:
+  coolify-minio-data-dev:
