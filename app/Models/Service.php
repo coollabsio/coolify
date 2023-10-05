@@ -414,12 +414,7 @@ class Service extends BaseModel
                                 }
                                 $fqdn = "$fqdn$path";
                             }
-                            // } else if  (substr_count($key->value(), '_') === 3) {
-                            //     if (is_null($value)) {
-                            //         $value = Str::of('/');
-                            //     }
-                            //     $path = $value->value();
-                            // }
+
                             if (!$isDatabase) {
                                 if ($savedService->fqdn) {
                                     $fqdn = $savedService->fqdn . ',' . $fqdn;
@@ -557,8 +552,10 @@ class Service extends BaseModel
                 // Remove unnecessary variables from service.environment
                 $withoutServiceEnvs = collect([]);
                 collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
-                    if (!Str::of($key)->startsWith('$SERVICE_')) {
-                        $withoutServiceEnvs->put($key, $value);
+                    if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
+                        $k = Str::of($value)->before("=");
+                        $v = Str::of($value)->after("=");
+                        $withoutServiceEnvs->put($k->value(), $v->value());
                     }
                 });
                 data_set($service, 'environment', $withoutServiceEnvs->toArray());
