@@ -29,7 +29,8 @@ class Form extends Component
     public function generate_real_url()
     {
         if (data_get($this->application, 'fqdn')) {
-            $url = Url::fromString($this->application->fqdn);
+            $firstFqdn = Str::of($this->application->fqdn)->before(',');
+            $url = Url::fromString($firstFqdn);
             $host = $url->getHost();
             $this->preview_url_template = Str::of($this->application->preview_url_template)->replace('{{domain}}', $host);
         }

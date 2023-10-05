@@ -92,6 +92,7 @@ class ProjectController extends Controller
                         $generatedValue = $value;
                         if ($value->contains('SERVICE_')) {
                             $command = $value->after('SERVICE_')->beforeLast('_');
+                            // TODO: make it shared with Service.php
                             switch ($command->value()) {
                                 case 'PASSWORD':
                                     $generatedValue = Str::password(symbols: false);
