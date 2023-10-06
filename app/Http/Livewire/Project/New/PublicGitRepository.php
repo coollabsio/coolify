@@ -103,6 +103,7 @@ class PublicGitRepository extends Component
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
+            return;
         }
         $this->git_repository = $this->repository_url;
         $this->git_source = 'other';
