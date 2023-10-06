@@ -81,7 +81,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            1 server <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
+                            1 server <x-helper helper="Bring Your Own Server." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -90,7 +90,16 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Basic Support
+                            Included Email System
+                        </li>
+                        <li class="flex gap-x-3">
+                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                                aria-hidden="true">
+                                <path fill-rule="evenodd"
+                                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+                                    clip-rule="evenodd" />
+                            </svg>
+                            Email Support
                         </li>
                         <li class="flex font-bold text-white gap-x-3">
                             <svg width="512" height="512" class="flex-none w-5 h-6 text-green-600"
@@ -139,7 +148,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            10 servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
+                            10 servers <x-helper helper="Bring Your Own Server." />
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -206,7 +215,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            ? servers <x-helper helper="Bring Your Own Server. All you need is n SSH connection." />
+                            ? servers <x-helper helper="Bring Your Own Server." />
                         </li>
 
                         <li class="flex gap-x-3">
