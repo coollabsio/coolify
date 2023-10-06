@@ -56,8 +56,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $serverUptimeCheckNumberMax = 3;
             while (true) {
                 if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
-                    $this->server->settings()->update(['is_reachable' => false]);
-                    $this->server->team->notify(new Unreachable($this->server));
+                    send_internal_notification('Server unreachable: ' . $this->server->name);
+                    // $this->server->settings()->update(['is_reachable' => false]);
+                    // $this->server->team->notify(new Unreachable($this->server));
                     return;
                 }
                 $result = $this->checkServerConnection();
