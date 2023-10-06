@@ -15,11 +15,12 @@ You can ask for guidance anytime on our
 ## 2) Set your environment variables
 
 - Copy [.env.development.example](./.env.development.example) to .env.
-- If necessary, set `USERID` & `GROUPID` accordingly (read in .env file).
 
 ## 3) Start & setup Coolify
 
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
+  - If you see weird permission errors, especially on Mac, run `sudo spin up` instead. 
+
 - Run `./scripts/run setup:dev` - This will generate a secret key for you, delete any existing database layouts, migrate database to the new layout, and seed your database.
 
 ## 4) Start development
