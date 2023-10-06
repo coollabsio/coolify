@@ -144,7 +144,7 @@ class PublicGitRepository extends Component
 
             if ($this->git_source === 'other') {
                 $application_init = [
-                    'name' => generate_application_name($this->git_repository, $this->git_branch),
+                    'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->git_branch,
                     'build_pack' => 'nixpacks',
@@ -178,7 +178,6 @@ class PublicGitRepository extends Component
 
             $fqdn = generateFqdn($destination->server, $application->uuid);
             $application->fqdn = $fqdn;
-            $application->name = generate_application_name($this->git_repository, $this->git_branch, $application->uuid);
             $application->save();
 
             return redirect()->route('project.application.configuration', [
