@@ -7,6 +7,8 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\PrivateKey;
 use App\Models\Server;
+use App\Notifications\Server\Revived;
+use App\Notifications\Server\Unreachable;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -85,7 +87,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     if ($isMux && config('coolify.mux_enabled')) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
-    if (data_get($server,'settings.is_cloudflare_tunnel')) {
+    if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
     $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
@@ -122,13 +124,14 @@ function instant_remote_process(Collection|array $command, Server $server, $thro
     }
     return $output;
 }
-function excludeCertainErrors(string $errorOutput, ?int $exitCode = null) {
+function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)
+{
     $ignoredErrors = collect([
         'Permission denied (publickey',
         'Could not resolve hostname',
     ]);
     $ignored = false;
-    foreach ($ignoredErrors as $ignoredError)  {
+    foreach ($ignoredErrors as $ignoredError) {
         if (Str::contains($errorOutput, $ignoredError)) {
             $ignored = true;
             break;
@@ -183,6 +186,9 @@ function validateServer(Server $server, bool $throwError = false)
         $uptime = instant_remote_process(['uptime'], $server, $throwError);
         if (!$uptime) {
             $server->settings->is_reachable = false;
+            $server->team->notify(new Unreachable($server));
+            $server->unreachable_email_sent = true;
+            $server->save();
             return [
                 "uptime" => null,
                 "dockerVersion" => null,
@@ -203,6 +209,11 @@ function validateServer(Server $server, bool $throwError = false)
             $server->settings->is_usable = false;
         } else {
             $server->settings->is_usable = true;
+            if (data_get($server, 'unreachable_email_sent') === true) {
+                $server->team->notify(new Revived($server));
+                $server->unreachable_email_sent = false;
+                $server->save();
+            }
         }
         return [
             "uptime" => $uptime,
@@ -213,7 +224,9 @@ function validateServer(Server $server, bool $throwError = false)
         $server->settings->is_usable = false;
         throw $e;
     } finally {
-        if (data_get($server, 'settings')) $server->settings->save();
+        if (data_get($server, 'settings')) {
+            $server->settings->save();
+        }
     }
 }
 

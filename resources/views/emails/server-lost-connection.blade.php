@@ -4,7 +4,7 @@ Coolify cannot connect to your server ({{$name}}). Please check your server and 
 
 All automations & integrations are turned off!
 
-IMPORTANT: You have to validate your server again after you fix the issue.
+IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations.
 
 If you have any questions, please contact us.
 

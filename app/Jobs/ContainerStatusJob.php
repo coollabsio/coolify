@@ -7,6 +7,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
+use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -51,14 +52,20 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         try {
+            ray("checking server status for {$this->server->name}");
             // ray()->clearAll();
             $serverUptimeCheckNumber = 0;
             $serverUptimeCheckNumberMax = 3;
             while (true) {
                 if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                     send_internal_notification('Server unreachable: ' . $this->server->name);
-                    // $this->server->settings()->update(['is_reachable' => false]);
-                    // $this->server->team->notify(new Unreachable($this->server));
+                    if ($this->server->unreachable_email_sent === false) {
+                        $this->server->team->notify(new Unreachable($this->server));
+                    }
+                    $this->server->settings()->update([
+                        'is_reachable' => false,
+                    ]);
+                    $this->server->update(['unreachable_email_sent' => true]);
                     return;
                 }
                 $result = $this->checkServerConnection();
@@ -68,6 +75,20 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $serverUptimeCheckNumber++;
                 sleep(5);
             }
+            if (data_get($this->server, 'unreachable_email_sent') === true) {
+                $this->server->team->notify(new Revived($this->server));
+                $this->server->update(['unreachable_email_sent' => false]);
+            }
+            if (
+                data_get($this->server, 'settings.is_reachable') === false ||
+                data_get($this->server, 'settings.is_usable') === false
+            ) {
+                $this->server->settings()->update([
+                    'is_reachable' => true,
+                    'is_usable' => true
+                ]);
+            }
+
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
+use Illuminate\Support\Str;
 
 class Server extends BaseModel
 {
@@ -15,6 +16,11 @@ class Server extends BaseModel
 
     protected static function booted()
     {
+        static::saved(function ($server) {
+            $server->ip = Str::of($server->ip)->trim();
+            $server->user = Str::of($server->user)->trim();
+        });
+
         static::created(function ($server) {
             ServerSetting::create([
                 'server_id' => $server->id,

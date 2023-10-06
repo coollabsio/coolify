@@ -48,7 +48,11 @@ class Kernel extends ConsoleKernel
     }
     private function check_resources($schedule)
     {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
+        if (isCloud()) {
+            $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false);
+        } else {
+            $servers = Server::all();
+        }
         foreach ($servers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
         }
