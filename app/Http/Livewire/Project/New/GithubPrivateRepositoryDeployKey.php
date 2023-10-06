@@ -11,6 +11,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use Livewire\Component;
 use Spatie\Url\Url;
+use Illuminate\Support\Str;
 
 class GithubPrivateRepositoryDeployKey extends Component
 {
@@ -29,7 +30,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public string $repository_url;
     public string $branch;
     protected $rules = [
-        'repository_url' => 'required|url',
+        'repository_url' => 'required',
         'branch' => 'required|string',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
@@ -43,8 +44,8 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'Publish directory',
     ];
     private object $repository_url_parsed;
-    private GithubApp|GitlabApp|null $git_source = null;
-    private string $git_host;
+    private GithubApp|GitlabApp|string $git_source = 'other';
+    private ?string $git_host = null;
     private string $git_repository;
 
     public function mount()
@@ -92,21 +93,38 @@ class GithubPrivateRepositoryDeployKey extends Component
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
-            $application_init = [
-                'name' => generate_random_name(),
-                'git_repository' => $this->git_repository,
-                'git_branch' => $this->branch,
-                'git_full_url' => "git@$this->git_host:$this->git_repository.git",
-                'build_pack' => 'nixpacks',
-                'ports_exposes' => $this->port,
-                'publish_directory' => $this->publish_directory,
-                'environment_id' => $environment->id,
-                'destination_id' => $destination->id,
-                'destination_type' => $destination_class,
-                'private_key_id' => $this->private_key_id,
-                'source_id' => $this->git_source->id,
-                'source_type' => $this->git_source->getMorphClass()
-            ];
+            if ($this->git_source === 'other') {
+                $application_init = [
+                    'name' => generate_random_name(),
+                    'git_repository' => $this->git_repository,
+                    'git_branch' => $this->branch,
+                    'git_full_url' => $this->git_repository,
+                    'build_pack' => 'nixpacks',
+                    'ports_exposes' => $this->port,
+                    'publish_directory' => $this->publish_directory,
+                    'environment_id' => $environment->id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination_class,
+                    'private_key_id' => $this->private_key_id,
+                ];
+            } else {
+                $application_init = [
+                    'name' => generate_random_name(),
+                    'git_repository' => $this->git_repository,
+                    'git_branch' => $this->branch,
+                    'git_full_url' => "git@$this->git_host:$this->git_repository.git",
+                    'build_pack' => 'nixpacks',
+                    'ports_exposes' => $this->port,
+                    'publish_directory' => $this->publish_directory,
+                    'environment_id' => $environment->id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination_class,
+                    'private_key_id' => $this->private_key_id,
+                    'source_id' => $this->git_source->id,
+                    'source_type' => $this->git_source->getMorphClass()
+                ];
+            }
+
             $application = Application::create($application_init);
             $application->settings->is_static = $this->is_static;
             $application->settings->save();
@@ -134,10 +152,13 @@ class GithubPrivateRepositoryDeployKey extends Component
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
-        } elseif ($this->git_host == 'gitlab.com') {
-            $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
-        } elseif ($this->git_host == 'bitbucket.org') {
-            // Not supported yet
+            return;
         }
+        if (Str::of($this->repository_url)->startsWith('http')) {
+            $this->git_host = $this->repository_url_parsed->getHost();
+            $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+            $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
+        }
+        $this->git_source = 'other';
     }
 }

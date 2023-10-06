@@ -25,7 +25,7 @@ class Previews extends Component
     public function load_prs()
     {
         try {
-            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = git_api(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
+            ['rate_limit_remaining' => $rate_limit_remaining, 'data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/pulls");
             $this->rate_limit_remaining = $rate_limit_remaining;
             $this->pull_requests = $data->sortBy('number')->values();
         } catch (\Throwable $e) {

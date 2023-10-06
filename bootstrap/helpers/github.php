@@ -50,7 +50,7 @@ function generate_github_jwt_token(GithubApp $source)
     return $issuedToken;
 }
 
-function git_api(GithubApp|GitlabApp $source, string $endpoint, string $method = 'get', array|null $data = null, bool $throwError = true)
+function githubApi(GithubApp|GitlabApp $source, string $endpoint, string $method = 'get', array|null $data = null, bool $throwError = true)
 {
     if ($source->getMorphClass() == 'App\Models\GithubApp') {
         if ($source->is_public) {

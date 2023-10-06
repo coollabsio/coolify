@@ -22,8 +22,13 @@
                     <h3 class="pt-8 pb-2">Details</h3>
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">
-                            <x-forms.input disabled id="git_branch" label="Selected branch"
-                                helper="You can select other branches after configuration is done." />
+                            @if ($git_source === 'other')
+                                <x-forms.input id="git_branch" label="Selected branch"
+                                    helper="You can select other branches after configuration is done." />
+                            @else
+                                <x-forms.input disabled id="git_branch" label="Selected branch"
+                                    helper="You can select other branches after configuration is done." />
+                            @endif
                             @if ($is_static)
                                 <x-forms.input id="publish_directory" label="Publish Directory"
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />

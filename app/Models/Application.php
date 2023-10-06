@@ -68,6 +68,7 @@ class Application extends BaseModel
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/tree/{$this->git_branch}";
                 }
+                return $this->git_repository;
             }
 
         );
@@ -80,6 +81,7 @@ class Application extends BaseModel
                 if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
                     return "{$this->source->html_url}/{$this->git_repository}/commits/{$this->git_branch}";
                 }
+                return $this->git_repository;
             }
         );
     }
@@ -224,6 +226,8 @@ class Application extends BaseModel
             return 'deploy_key';
         } else if (data_get($this, 'source')) {
             return 'source';
+        } else {
+            return 'other';
         }
         throw new \Exception('No deployment type found');
     }
@@ -239,6 +243,7 @@ class Application extends BaseModel
         if ($this->dockerfile) {
             return false;
         }
+
         return true;
     }
     public function isHealthcheckDisabled(): bool

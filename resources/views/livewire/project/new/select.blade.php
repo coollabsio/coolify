@@ -23,7 +23,7 @@
                 <div class="box group" wire:click="setType('private-gh-app')">
                     <div class="flex flex-col mx-6">
                         <div class="font-bold text-white group-hover:text-white">
-                            Private Repository
+                            Private Repository (with GitHub App)
                         </div>
                         <div class="text-xs group-hover:text-white">
                             You can deploy public & private repositories through your GitHub Apps.
@@ -36,7 +36,7 @@
                             Private Repository (with deploy key)
                         </div>
                         <div class="text-xs group-hover:text-white">
-                            You can deploy public & private repositories with a simple deploy key.
+                            You can deploy public & private repositories with a simple deploy key (SSH key).
                         </div>
                     </div>
                 </div>

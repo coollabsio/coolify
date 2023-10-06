@@ -66,7 +66,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue, ShouldBeEncrypted
 
     private function update_comment()
     {
-        ['data' => $data] = git_api(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/comments/{$this->preview->pull_request_issue_comment_id}", method: 'patch', data: [
             'body' => $this->body,
         ], throwError: false);
         if (data_get($data, 'message') === 'Not Found') {
@@ -77,7 +77,7 @@ class ApplicationPullRequestUpdateJob implements ShouldQueue, ShouldBeEncrypted
 
     private function create_comment()
     {
-        ['data' => $data] = git_api(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->pull_request_id}/comments", method: 'post', data: [
+        ['data' => $data] = githubApi(source: $this->application->source, endpoint: "/repos/{$this->application->git_repository}/issues/{$this->pull_request_id}/comments", method: 'post', data: [
             'body' => $this->body,
         ]);
         $this->preview->pull_request_issue_comment_id = $data['id'];
