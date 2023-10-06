@@ -146,17 +146,18 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     private function get_git_source()
     {
-        if (Str::of($this->repository_url)->startsWith('http')) {
-            $this->repository_url_parsed = Url::fromString($this->repository_url);
-            $this->git_host = $this->repository_url_parsed->getHost();
-            $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
-        } else {
-            $this->git_repository = $this->repository_url;
-        }
+        $this->repository_url_parsed = Url::fromString($this->repository_url);
+        $this->git_host = $this->repository_url_parsed->getHost();
+        $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
             return;
+        }
+        if (Str::of($this->repository_url)->startsWith('http')) {
+            $this->git_host = $this->repository_url_parsed->getHost();
+            $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
+            $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
         }
         $this->git_source = 'other';
     }
