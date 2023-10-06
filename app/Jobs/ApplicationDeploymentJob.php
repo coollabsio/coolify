@@ -52,9 +52,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private string $container_name;
     private string|null $currently_running_container_name = null;
+    private string $basedir;
     private string $workdir;
     private string $configuration_dir;
-    private string $build_workdir;
     private string $build_image_name;
     private string $production_image_name;
     private bool $is_debug_enabled;
@@ -84,11 +84,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->server = $this->destination->server;
 
-        $this->workdir = "/artifacts/{$this->deployment_uuid}";
+        $this->basedir = "/artifacts/{$this->deployment_uuid}";
+        $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
-        $this->build_workdir = "{$this->workdir}" . rtrim($this->application->base_directory, '/');
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
+        ray($this->basedir,$this->workdir);
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -161,12 +162,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ]
                 );
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    "hidden" => true,
-                ]
-            );
+            // $this->execute_remote_command(
+            //     [
+            //         "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+            //         "hidden" => true,
+            //     ]
+            // );
         }
     }
     private function deploy_docker_compose()
@@ -391,7 +392,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "hidden" => true,
             ],
             [
-                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}")
             ],
         );
     }
@@ -402,13 +403,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->execute_remote_command(
             [
-                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->workdir}. '"
+                "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}. '"
             ],
             [
-                $this->importing_git_repository()
+                $this->importing_git_repository(), "hidden" => true
             ],
             [
-                executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git rev-parse HEAD"),
+                executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git rev-parse HEAD"),
                 "hidden" => true,
                 "save" => "git_commit_sha"
             ],
@@ -432,16 +433,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
                 if ($this->source->is_public) {
-                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->workdir}";
+                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->basedir}";
                     $git_clone_command = $this->set_git_import_settings($git_clone_command);
 
                     $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
                 } else {
                     $github_access_token = generate_github_installation_token($this->source);
-                    $commands->push(executeInDocker($this->deployment_uuid, "git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->workdir}"));
+                    $commands->push(executeInDocker($this->deployment_uuid, "git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->basedir}"));
                 }
                 if ($this->pull_request_id !== 0) {
-                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->workdir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
+                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
                 }
                 return $commands->implode(' && ');
             }
@@ -463,13 +464,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function set_git_import_settings($git_clone_command)
     {
         if ($this->application->git_commit_sha !== 'HEAD') {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
+            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
         }
         if ($this->application->settings->is_git_submodules_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git submodule update --init --recursive";
+            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git submodule update --init --recursive";
         }
         if ($this->application->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->workdir} && git lfs pull";
+            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git lfs pull";
         }
         return $git_clone_command;
     }
@@ -477,17 +478,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function cleanup_git()
     {
         $this->execute_remote_command(
-            [executeInDocker($this->deployment_uuid, "rm -fr {$this->workdir}/.git")],
+            [executeInDocker($this->deployment_uuid, "rm -fr {$this->basedir}/.git")],
         );
     }
 
     private function generate_nixpacks_confs()
     {
+
         $this->execute_remote_command(
             [
                 "echo -n 'Generating nixpacks configuration.'",
+            ]
+        );
+        $nixpacks_command = $this->nixpacks_build_cmd();
+        $this->execute_remote_command(
+            [
+                "echo -n Running: $nixpacks_command",
             ],
-            [$this->nixpacks_build_cmd()],
+            [executeInDocker($this->deployment_uuid, $nixpacks_command)],
             [executeInDocker($this->deployment_uuid, "cp {$this->workdir}/.nixpacks/Dockerfile {$this->workdir}/Dockerfile")],
             [executeInDocker($this->deployment_uuid, "rm -f {$this->workdir}/.nixpacks/Dockerfile")]
         );
@@ -496,7 +504,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        $nixpacks_command = "nixpacks build --no-cache -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -507,7 +515,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
         }
         $nixpacks_command .= " {$this->workdir}";
-        return executeInDocker($this->deployment_uuid, $nixpacks_command);
+        return $nixpacks_command;
     }
 
     private function generate_env_variables()
@@ -673,7 +681,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function build_image()
     {
         $this->execute_remote_command([
-            "echo -n 'Building docker image for your application.'",
+            "echo -n 'Building docker image for your application. To check the current progress, click on Show Debug Logs.'",
         ]);
 
         if ($this->application->settings->is_static) {

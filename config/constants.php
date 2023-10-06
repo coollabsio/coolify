@@ -31,9 +31,9 @@ return [
             'ultimate' => 25,
         ],
         'email' => [
-            'zero' => false,
+            'zero' => true,
             'self-hosted' => true,
-            'basic' => false,
+            'basic' => true,
             'pro' => true,
             'ultimate' => true,
         ],

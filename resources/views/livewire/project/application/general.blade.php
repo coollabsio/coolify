@@ -15,8 +15,8 @@
             <div class="flex items-end gap-2">
                 <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
                     helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                    <x-forms.button wire:click="getWildcardDomain">Generate Domain
-                    </x-forms.button>
+                <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                </x-forms.button>
             </div>
             @if (!$application->dockerfile)
                 <div class="flex items-end gap-2">
@@ -42,7 +42,7 @@
                 </div>
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                        helper="Directory to use as root. Useful for monorepos. WIP" disabled />
+                        helper="Directory to use as root. Useful for monorepos." />
                     @if ($application->settings->is_static)
                         <x-forms.input placeholder="/dist" id="application.publish_directory" label="Publish Directory"
                             required />

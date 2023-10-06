@@ -15,7 +15,6 @@ class EmailChannel
         try {
             $this->bootConfigs($notifiable);
             $recepients = $notifiable->getRecepients($notification);
-            ray($recepients);
             if (count($recepients) === 0) {
                 throw new Exception('No email recipients found');
             }

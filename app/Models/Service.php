@@ -117,7 +117,7 @@ class Service extends BaseModel
 
     public function parse(bool $isNew = false): Collection
     {
-        // ray()->clearAll();
+        ray()->clearAll();
         if ($this->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($this->docker_compose_raw);
@@ -550,15 +550,17 @@ class Service extends BaseModel
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
                 // Remove unnecessary variables from service.environment
-                $withoutServiceEnvs = collect([]);
-                collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
-                    if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
-                        $k = Str::of($value)->before("=");
-                        $v = Str::of($value)->after("=");
-                        $withoutServiceEnvs->put($k->value(), $v->value());
-                    }
-                });
-                data_set($service, 'environment', $withoutServiceEnvs->toArray());
+                // $withoutServiceEnvs = collect([]);
+                // collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
+                //     ray($key, $value);
+                //     if (!Str::of($key)->startsWith('$SERVICE_') && !Str::of($value)->startsWith('SERVICE_')) {
+                //         $k = Str::of($value)->before("=");
+                //         $v = Str::of($value)->after("=");
+                //         $withoutServiceEnvs->put($k->value(), $v->value());
+                //     }
+                // });
+                // ray($withoutServiceEnvs);
+                // data_set($service, 'environment', $withoutServiceEnvs->toArray());
                 return $service;
             });
             $finalServices = [
@@ -568,7 +570,7 @@ class Service extends BaseModel
                 'networks' => $topLevelNetworks->toArray(),
             ];
             $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-            $this->docker_compose = Yaml::dump($finalServices, 10, 2);
+        $this->docker_compose = Yaml::dump($finalServices, 10, 2);
             $this->save();
             $this->saveComposeConfigs();
             return collect([]);
