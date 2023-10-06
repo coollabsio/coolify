@@ -22,7 +22,8 @@
                 </x-forms.button>
             @endif
             @if (isEmailEnabled($team) &&
-                    auth()->user()->isAdminFromSession())
+                    auth()->user()->isAdminFromSession() &&
+                    isTestEmailEnabled($team))
                 <x-forms.button onclick="sendTestEmail.showModal()"
                     class="text-white normal-case btn btn-xs no-animation btn-primary">
                     Send Test Email

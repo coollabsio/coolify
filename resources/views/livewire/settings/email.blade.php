@@ -22,7 +22,9 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if (isEmailEnabled($settings))
+            @if (isEmailEnabled($settings) &&
+                    auth()->user()->isAdminFromSession() &&
+                    isTestEmailEnabled($settings))
                 <x-forms.button onclick="sendTestEmail.showModal()"
                     class="text-white normal-case btn btn-xs no-animation btn-primary">
                     Send Test Email

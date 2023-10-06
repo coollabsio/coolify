@@ -343,6 +343,10 @@ function send_user_an_email(MailMessage $mail, string $email, ?string $cc = null
         );
     }
 }
+function isTestEmailEnabled($notifiable)
+{
+    return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled');
+}
 function isEmailEnabled($notifiable)
 {
     return data_get($notifiable, 'smtp_enabled') || data_get($notifiable, 'resend_enabled') || data_get($notifiable, 'use_instance_email_settings');
