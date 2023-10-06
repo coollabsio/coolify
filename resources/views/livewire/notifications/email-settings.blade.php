@@ -22,7 +22,8 @@
                 </x-forms.button>
             @endif
             @if (isEmailEnabled($team) &&
-                    auth()->user()->isAdminFromSession())
+                    auth()->user()->isAdminFromSession() &&
+                    isTestEmailEnabled($team))
                 <x-forms.button onclick="sendTestEmail.showModal()"
                     class="text-white normal-case btn btn-xs no-animation btn-primary">
                     Send Test Email
@@ -31,15 +32,22 @@
 
         </div>
     </form>
-    @if ($this->sharedEmailEnabled)
-        <div class="w-64 pb-4">
-            <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
-                label="Use hosted email service" />
-        </div>
+    @if (isCloud())
+        @if ($this->sharedEmailEnabled)
+            <div class="w-64 pb-4">
+                <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
+                    label="Use Hosted Email Service" />
+            </div>
+        @else
+            <div class="pb-4 w-96">
+                <x-forms.checkbox disabled id="team.use_instance_email_settings"
+                    label="Use Hosted Email Service (Pro+ subscription required)" />
+            </div>
+        @endif
     @else
         <div class="pb-4 w-96">
-            <x-forms.checkbox disabled id="team.use_instance_email_settings"
-                label="Use hosted email service (Pro+ subscription required)" />
+            <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
+                label="Use system wide (transactional) email settings" />
         </div>
     @endif
     @if (!$team->use_instance_email_settings)
