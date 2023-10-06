@@ -36,7 +36,7 @@
                             Private Repository (with deploy key)
                         </div>
                         <div class="text-xs group-hover:text-white">
-                            You can deploy public & private repositories with a simple deploy key.
+                            You can deploy public & private repositories with a simple deploy key (SSH key).
                         </div>
                     </div>
                 </div>
