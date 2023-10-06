@@ -19,19 +19,28 @@
                 </x-forms.button>
             </div>
             @if (!$application->dockerfile)
-                <div class="flex items-end gap-2">
-                    <x-forms.select id="application.build_pack" label="Build Pack" required>
-                        <option value="nixpacks">Nixpacks</option>
-                        <option value="dockerfile">Dockerfile</option>
-                    </x-forms.select>
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2">
+                        <x-forms.select id="application.build_pack" label="Build Pack" required>
+                            <option value="nixpacks">Nixpacks</option>
+                            <option value="dockerfile">Dockerfile</option>
+                        </x-forms.select>
+                        @if ($application->settings->is_static)
+                            <x-forms.select id="application.static_image" label="Static Image" required>
+                                <option value="nginx:alpine">nginx:alpine</option>
+                                <option disabled value="apache:alpine">apache:alpine</option>
+                            </x-forms.select>
+                        @endif
+                    </div>
+                    @if ($application->could_set_build_commands())
+                        <div class="w-64">
+                            <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                                helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                        </div>
+                    @endif
                 </div>
             @endif
-            @if ($application->settings->is_static)
-                <x-forms.select id="application.static_image" label="Static Image" required>
-                    <option value="nginx:alpine">nginx:alpine</option>
-                    <option disabled value="apache:alpine">apache:alpine</option>
-                </x-forms.select>
-            @endif
+
             @if ($application->could_set_build_commands())
                 <h3>Build</h3>
                 <div class="flex flex-col gap-2 xl:flex-row">
@@ -69,10 +78,7 @@
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
-            @if ($application->could_set_build_commands())
-                <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                    helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-            @endif
+
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />

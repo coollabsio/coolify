@@ -27,9 +27,10 @@ class PublicGitRepository extends Component
     public int $rate_limit_remaining = 0;
     public $rate_limit_reset = 0;
     private object $repository_url_parsed;
-    public GithubApp|GitlabApp|null $git_source = null;
+    public GithubApp|GitlabApp|string $git_source = 'other';
     public string $git_host;
     public string $git_repository;
+
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
@@ -64,7 +65,10 @@ class PublicGitRepository extends Component
         }
         $this->emit('success', 'Application settings updated!');
     }
-
+    public function load_any_git()
+    {
+        $this->branch_found = true;
+    }
     public function load_branch()
     {
         try {
@@ -99,21 +103,22 @@ class PublicGitRepository extends Component
 
         if ($this->git_host == 'github.com') {
             $this->git_source = GithubApp::where('name', 'Public GitHub')->first();
-        } elseif ($this->git_host == 'gitlab.com') {
-            $this->git_source = GitlabApp::where('name', 'Public GitLab')->first();
-        } elseif ($this->git_host == 'bitbucket.org') {
-            // Not supported yet
         }
-        if (is_null($this->git_source)) {
-            throw new \Exception('Git source not found. What?!');
-        }
+        $this->git_repository = $this->repository_url;
+        $this->git_source = 'other';
     }
 
     private function get_branch()
     {
-        ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = git_api(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
-        $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
-        $this->branch_found = true;
+        if ($this->git_source === 'other') {
+            $this->branch_found = true;
+            return;
+        }
+        if ($this->git_source->getMorphClass() === 'App\Models\GithubApp') {
+            ['rate_limit_remaining' => $this->rate_limit_remaining, 'rate_limit_reset' => $this->rate_limit_reset] = githubApi(source: $this->git_source, endpoint: "/repos/{$this->git_repository}/branches/{$this->git_branch}");
+            $this->rate_limit_reset = Carbon::parse((int)$this->rate_limit_reset)->format('Y-M-d H:i:s');
+            $this->branch_found = true;
+        }
     }
 
     public function submit()
@@ -136,19 +141,34 @@ class PublicGitRepository extends Component
             $project = Project::where('uuid', $project_uuid)->first();
             $environment = $project->load(['environments'])->environments->where('name', $environment_name)->first();
 
-            $application_init = [
-                'name' => generate_application_name($this->git_repository, $this->git_branch),
-                'git_repository' => $this->git_repository,
-                'git_branch' => $this->git_branch,
-                'build_pack' => 'nixpacks',
-                'ports_exposes' => $this->port,
-                'publish_directory' => $this->publish_directory,
-                'environment_id' => $environment->id,
-                'destination_id' => $destination->id,
-                'destination_type' => $destination_class,
-                'source_id' => $this->git_source->id,
-                'source_type' => $this->git_source->getMorphClass()
-            ];
+            if ($this->git_source === 'other') {
+                $application_init = [
+                    'name' => generate_application_name($this->git_repository, $this->git_branch),
+                    'git_repository' => $this->git_repository,
+                    'git_branch' => $this->git_branch,
+                    'build_pack' => 'nixpacks',
+                    'ports_exposes' => $this->port,
+                    'publish_directory' => $this->publish_directory,
+                    'environment_id' => $environment->id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination_class,
+                ];
+            } else {
+                $application_init = [
+                    'name' => generate_application_name($this->git_repository, $this->git_branch),
+                    'git_repository' => $this->git_repository,
+                    'git_branch' => $this->git_branch,
+                    'build_pack' => 'nixpacks',
+                    'ports_exposes' => $this->port,
+                    'publish_directory' => $this->publish_directory,
+                    'environment_id' => $environment->id,
+                    'destination_id' => $destination->id,
+                    'destination_type' => $destination_class,
+                    'source_id' => $this->git_source->id,
+                    'source_type' => $this->git_source->getMorphClass()
+                ];
+            }
+
 
             $application = Application::create($application_init);
 

@@ -45,7 +45,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $commit;
     private bool $force_rebuild;
 
-    private GithubApp|GitlabApp $source;
+    private GithubApp|GitlabApp|string $source = 'other';
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
     private ApplicationPreview|null $preview = null;
@@ -80,7 +80,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->commit = $this->application_deployment_queue->commit;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
 
-        $this->source = $this->application->source->getMorphClass()::where('id', $this->application->source->id)->first();
+        $source = data_get($this->application, 'source');
+        if ($source) {
+            $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
+        }
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->server = $this->destination->server;
 
@@ -89,7 +92,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        ray($this->basedir,$this->workdir);
+        ray($this->basedir, $this->workdir);
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -425,6 +428,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
 
+
         if ($this->application->deploymentType() === 'source') {
             $source_html_url = data_get($this->application, 'source.html_url');
             $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
@@ -457,6 +461,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
                 executeInDocker($this->deployment_uuid, $git_clone_command)
             ]);
+            return $commands->implode(' && ');
+        }
+        if ($this->application->deploymentType() === 'other') {
+            $git_clone_command = "{$git_clone_command} {$this->application->git_repository} {$this->basedir}";
+            $git_clone_command = $this->set_git_import_settings($git_clone_command);
+            $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
+            ray($commands);
             return $commands->implode(' && ');
         }
     }
