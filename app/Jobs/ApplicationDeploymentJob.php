@@ -165,12 +165,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ]
                 );
             }
-            // $this->execute_remote_command(
-            //     [
-            //         "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-            //         "hidden" => true,
-            //     ]
-            // );
+            $this->execute_remote_command(
+                [
+                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+                    "hidden" => true,
+                ]
+            );
         }
     }
     private function deploy_docker_compose()
@@ -427,7 +427,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
         }
-
 
         if ($this->application->deploymentType() === 'source') {
             $source_html_url = data_get($this->application, 'source.html_url');

@@ -243,9 +243,7 @@ class Application extends BaseModel
         if ($this->dockerfile) {
             return false;
         }
-        if (is_null($this->source)) {
-            return false;
-        }
+
         return true;
     }
     public function isHealthcheckDisabled(): bool
