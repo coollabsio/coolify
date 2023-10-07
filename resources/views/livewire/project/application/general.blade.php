@@ -41,25 +41,28 @@
                 </div>
             @endif
 
+            <h3>Build</h3>
             @if ($application->could_set_build_commands())
-                <h3>Build</h3>
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="pnpm install" id="application.install_command"
                         label="Install Command" />
                     <x-forms.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
                     <x-forms.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
                 </div>
-                <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                        helper="Directory to use as root. Useful for monorepos." />
+            @endif
+
+            <div class="flex flex-col gap-2 xl:flex-row">
+                <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
+                    helper="Directory to use as root. Useful for monorepos." />
+                @if ($application->could_set_build_commands())
                     @if ($application->settings->is_static)
                         <x-forms.input placeholder="/dist" id="application.publish_directory" label="Publish Directory"
                             required />
                     @else
                         <x-forms.input placeholder="/" id="application.publish_directory" label="Publish Directory" />
                     @endif
-                </div>
-            @endif
+                @endif
+            </div>
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif

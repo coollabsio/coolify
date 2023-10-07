@@ -254,7 +254,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         );
         $this->prepare_builder_image();
         $this->clone_repository();
-
+        $this->set_base_dir();
         $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
         if (strlen($tag) > 128) {
             $tag = $tag->substr(0, 128);
@@ -364,6 +364,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         ]);
         $this->prepare_builder_image();
         $this->clone_repository();
+        $this->set_base_dir();
         $this->cleanup_git();
         if ($this->application->build_pack === 'nixpacks') {
             $this->generate_nixpacks_confs();
@@ -400,7 +401,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         );
     }
 
-
+    private function set_base_dir() {
+        $this->execute_remote_command(
+            [
+                "echo -n 'Setting base directory to {$this->workdir}.'"
+            ],
+        );
+    }
 
     private function clone_repository()
     {
@@ -452,7 +459,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if ($this->application->deploymentType() === 'deploy_key') {
             $private_key = base64_encode($this->application->private_key->private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->workdir}";
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
