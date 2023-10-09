@@ -129,6 +129,7 @@ function allowedPathsForUnsubscribedAccounts()
         'livewire/message/check-license',
         'livewire/message/switch-team',
         'livewire/message/subscription.pricing-plans',
+        'livewire/message/help'
     ];
 }
 function allowedPathsForBoardingAccounts()
@@ -145,5 +146,6 @@ function allowedPathsForInvalidAccounts() {
         'logout',
         'verify',
         'livewire/message/verify-email',
+        'livewire/message/help'
     ];
 }
