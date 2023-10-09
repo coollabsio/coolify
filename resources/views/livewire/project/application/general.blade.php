@@ -24,6 +24,7 @@
                         <x-forms.select id="application.build_pack" label="Build Pack" required>
                             <option value="nixpacks">Nixpacks</option>
                             <option value="dockerfile">Dockerfile</option>
+                            <option value="dockerimage">Docker Image</option>
                         </x-forms.select>
                         @if ($application->settings->is_static)
                             <x-forms.select id="application.static_image" label="Static Image" required>
