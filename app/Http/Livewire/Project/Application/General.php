@@ -17,10 +17,10 @@ class General extends Component
     public Application $application;
     public Collection $services;
     public string $name;
-    public string|null $fqdn;
+    public ?string $fqdn = null;
     public string $git_repository;
     public string $git_branch;
-    public string|null $git_commit_sha;
+    public ?string $git_commit_sha = null;
     public string $build_pack;
 
     public bool $is_static;
