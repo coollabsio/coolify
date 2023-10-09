@@ -11,7 +11,7 @@ class DecideWhatToDoWithUser
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!auth()->user() || !isCloud() || !auth()->user()->instanceAdmin()) {
+        if (!auth()->user() || !isCloud() || isInstanceAdmin()) {
             return $next($request);
         }
         if (!auth()->user()->hasVerifiedEmail()) {
