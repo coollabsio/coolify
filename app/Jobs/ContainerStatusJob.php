@@ -46,28 +46,37 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         try {
             ray("checking server status for {$this->server->name}");
             // ray()->clearAll();
-            $serverUptimeCheckNumber = 0;
+            $serverUptimeCheckNumber = $this->server->unreachable_count;
             $serverUptimeCheckNumberMax = 3;
-            while (true) {
-                ray('checking # ' . $serverUptimeCheckNumber);
-                if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
-                    if ($this->server->unreachable_email_sent === false) {
-                        ray('Server unreachable, sending notification...');
-                        // $this->server->team->notify(new Unreachable($this->server));
-                    }
-                    $this->server->settings()->update([
-                        'is_reachable' => false,
-                    ]);
+
+            ray('checking # ' . $serverUptimeCheckNumber);
+            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
+                if ($this->server->unreachable_email_sent === false) {
+                    ray('Server unreachable, sending notification...');
+                    // $this->server->team->notify(new Unreachable($this->server));
                     $this->server->update(['unreachable_email_sent' => true]);
-                    return;
                 }
-                $result = $this->server->validateConnection();
-                if ($result) {
-                    break;
-                }
-                $serverUptimeCheckNumber++;
-                sleep(5);
+                $this->server->settings()->update([
+                    'is_reachable' => false,
+                    'unreachable_count' => 0,
+                ]);
+                return;
             }
+            $result = $this->server->validateConnection();
+            if ($result) {
+                $this->server->settings()->update([
+                    'is_reachable' => true,
+                    'unreachable_count' => 0,
+                ]);
+            } else {
+                $serverUptimeCheckNumber++;
+                $this->server->settings()->update([
+                    'is_reachable' => false,
+                    'unreachable_count' => $serverUptimeCheckNumber,
+                ]);
+                return;
+            }
+
             if (data_get($this->server, 'unreachable_email_sent') === true) {
                 ray('Server is reachable again, sending notification...');
                 // $this->server->team->notify(new Revived($this->server));
@@ -82,7 +91,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     'is_usable' => true
                 ]);
             }
-            $this->server->validateDockerEngine(true);
+            // $this->server->validateDockerEngine(true);
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;
