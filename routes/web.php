@@ -26,6 +26,7 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Route;
@@ -61,7 +62,19 @@ Route::post('/forgot-password', function (Request $request) {
     }
     return response()->json(['message' => 'Transactional emails are not active'], 400);
 })->name('password.forgot');
+
+
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
+
+Route::get('/verify', function () {
+    return view('auth.verify-email');
+})->middleware('auth')->name('verify.email');
+
+Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+    $request->fulfill();
+    return redirect('/');
+})->middleware(['auth'])->name('verify.verify');
+
 Route::middleware(['throttle:login'])->group(function () {
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
@@ -74,7 +87,7 @@ Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/environment/new', [MagicController::class, 'newEnvironment']);
 });
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'all'])->name('projects');
     Route::get('/project/{project_uuid}/edit', [ProjectController::class, 'edit'])->name('project.edit');
     Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
@@ -114,7 +127,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/boarding', BoardingIndex::class)->name('boarding');
     Route::middleware(['throttle:force-password-reset'])->group(function () {

@@ -33,11 +33,13 @@ class Application extends BaseModel
         });
         static::deleting(function ($application) {
             // Stop Container
-            instant_remote_process(
-                ["docker rm -f {$application->uuid}"],
-                $application->destination->server,
-                false
-            );
+            if ($application->destination->server->isFunctional()) {
+                instant_remote_process(
+                    ["docker rm -f {$application->uuid}"],
+                    $application->destination->server,
+                    false
+                );
+            }
             $application->settings()->delete();
             $storages =  $application->persistentStorages()->get();
             foreach ($storages as $storage) {

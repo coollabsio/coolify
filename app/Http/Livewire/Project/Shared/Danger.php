@@ -31,7 +31,9 @@ class Danger extends Component
                     $destination = $this->resource->destination->getMorphClass()::where('id', $this->resource->destination->id)->first();
                     $server = $destination->server;
                 }
-                instant_remote_process(["docker rm -f {$this->resource->uuid}"], $server);
+                if ($this->resource->destination->server->isFunctional()) {
+                    instant_remote_process(["docker rm -f {$this->resource->uuid}"], $server);
+                }
             }
             $this->resource->delete();
             return redirect()->route('project.resources', [

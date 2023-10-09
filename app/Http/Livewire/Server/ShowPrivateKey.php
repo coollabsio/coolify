@@ -32,34 +32,18 @@ class ShowPrivateKey extends Component
         }
     }
 
-    public function checkConnection($install = false)
+    public function checkConnection()
     {
         try {
             $uptime = $this->server->validateConnection();
             if ($uptime) {
-                $install && $this->emit('success', 'Server is reachable.');
+                $this->emit('success', 'Server is reachable.');
             } else {
-                $install && $this->emit('error', 'Server is not reachable. Please check your connection and private key configuration.');
-                return;
-            }
-            $dockerInstalled = $this->server->validateDockerEngine();
-            if ($dockerInstalled) {
-                $install && $this->emit('success', 'Docker Engine is installed.<br> Checking version.');
-            } else {
-                $install && $this->installDocker();
-                return;
-            }
-            $dockerVersion = $this->server->validateDockerEngineVersion();
-            if ($dockerVersion) {
-                $install && $this->emit('success', 'Docker Engine version is 23+.');
-            } else {
-                $install && $this->installDocker();
+                $this->emit('error', 'Server is not reachable. Please check your connection and private key configuration.');
                 return;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
-        } finally {
-            $this->emit('proxyStatusUpdated');
         }
     }
 

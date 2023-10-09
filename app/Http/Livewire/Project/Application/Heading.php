@@ -21,11 +21,13 @@ class Heading extends Component
 
     public function check_status()
     {
-        dispatch(new ContainerStatusJob($this->application->destination->server));
-        $this->application->refresh();
-        $this->application->previews->each(function ($preview) {
-            $preview->refresh();
-        });
+        if ($this->application->destination->server->isFunctional()) {
+            dispatch(new ContainerStatusJob($this->application->destination->server));
+            $this->application->refresh();
+            $this->application->previews->each(function ($preview) {
+                $preview->refresh();
+            });
+        }
     }
 
     public function force_deploy_without_cache()
