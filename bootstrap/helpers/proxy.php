@@ -247,7 +247,7 @@ EOF;
         "mkdir -p $configuration_dir",
         "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
         "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
-        "docker compose --project-directory {$configuration_dir} up -d >/dev/null",
+        "docker compose --project-directory {$configuration_dir} up -d --remove-orphans >/dev/null",
 
 
     ], $database->destination->server);
