@@ -59,9 +59,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->settings()->update([
                     'is_reachable' => false,
                 ]);
-                $this->server->update([
-                    'unreachable_count' => 0,
-                ]);
                 return;
             }
             $result = $this->server->validateConnection();
