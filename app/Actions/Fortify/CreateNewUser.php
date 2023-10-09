@@ -58,6 +58,11 @@ class CreateNewUser implements CreatesNewUsers
                 'password' => Hash::make($input['password']),
             ]);
             $team = $user->teams()->first();
+            if (isCloud()) {
+                $user->sendVerificationEmail();
+            } else {
+                $user->markEmailAsVerified();
+            }
         }
         // Set session variable
         session(['currentTeam' => $user->currentTeam = $team]);

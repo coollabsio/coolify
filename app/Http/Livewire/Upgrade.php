@@ -5,10 +5,11 @@ namespace App\Http\Livewire;
 use App\Actions\Server\UpdateCoolify;
 use App\Models\InstanceSettings;
 use Livewire\Component;
-use Masmerise\Toaster\Toaster;
+use DanHarrin\LivewireRateLimiting\WithRateLimiting;
 
 class Upgrade extends Component
 {
+    use WithRateLimiting;
     public bool $showProgress = false;
     public bool $isUpgradeAvailable = false;
     public string $latestVersion = '';
@@ -31,6 +32,7 @@ class Upgrade extends Component
     public function upgrade()
     {
         try {
+            $this->rateLimit(1, 30);
             if ($this->showProgress) {
                 return;
             }

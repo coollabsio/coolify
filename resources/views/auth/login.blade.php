@@ -9,12 +9,12 @@
                 @if ($is_registration_enabled)
                     @if (config('coolify.waitlist'))
                         <a href="/waitlist"
-                            class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
+                            class="text-xs text-center text-white normal-case bg-transparent border-none rounded no-animation hover:no-underline btn btn-sm bg-coollabs-gradient">
                             Join the waitlist
                         </a>
                     @else
                         <a href="/register"
-                            class="text-xs normal-case hover:no-underline btn btn-sm bg-coollabs-gradient">
+                            class="text-xs text-center text-white normal-case bg-transparent border-none rounded no-animation hover:no-underline btn btn-sm bg-coollabs-gradient">
                             {{ __('auth.register_now') }}
                         </a>
                     @endif

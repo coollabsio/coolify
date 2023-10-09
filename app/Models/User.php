@@ -6,8 +6,12 @@ use App\Notifications\Channels\SendsEmail;
 use App\Notifications\TransactionalEmails\ResetPassword as TransactionalEmailsResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\URL;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -54,6 +58,23 @@ class User extends Authenticatable implements SendsEmail
         return $this->email;
     }
 
+    public function sendVerificationEmail()
+    {
+        $mail = new MailMessage();
+        $url = Url::temporarySignedRoute(
+            'verify.verify',
+            Carbon::now()->addMinutes(Config::get('auth.verification.expire', 60)),
+            [
+                'id' => $this->getKey(),
+                'hash' => sha1($this->getEmailForVerification()),
+            ]
+        );
+        $mail->view('emails.email-verification', [
+            'url' => $url,
+        ]);
+        $mail->subject('Coolify Cloud: Verify your email.');
+        send_user_an_email($mail, $this->email);
+    }
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new TransactionalEmailsResetPassword($token));
@@ -61,7 +82,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function isAdmin()
     {
-        return data_get($this->pivot,'role') === 'admin' || data_get($this->pivot,'role') === 'owner';
+        return data_get($this->pivot, 'role') === 'admin' || data_get($this->pivot, 'role') === 'owner';
     }
 
     public function isAdminFromSession()
@@ -79,7 +100,7 @@ class User extends Authenticatable implements SendsEmail
             return true;
         }
         $team = $teams->where('id', session('currentTeam')->id)->first();
-        $role = data_get($team,'pivot.role');
+        $role = data_get($team, 'pivot.role');
         return $role === 'admin' || $role === 'owner';
     }
 
@@ -96,7 +117,7 @@ class User extends Authenticatable implements SendsEmail
 
     public function currentTeam()
     {
-        return Cache::remember('team:' . auth()->user()->id, 3600, function() {
+        return Cache::remember('team:' . auth()->user()->id, 3600, function () {
             return Team::find(session('currentTeam')->id);
         });
     }
