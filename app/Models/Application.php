@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Models\Activity;
+use Illuminate\Support\Str;
 
 class Application extends BaseModel
 {
@@ -12,6 +13,19 @@ class Application extends BaseModel
 
     protected static function booted()
     {
+        static::saving(function ($application) {
+            if ($application->fqdn == '') {
+                $application->fqdn = null;
+            }
+            $application->forceFill([
+                'fqdn' => $application->fqdn,
+                'install_command' => Str::of($application->install_command)->trim(),
+                'build_command' => Str::of($application->build_command)->trim(),
+                'start_command' => Str::of($application->start_command)->trim(),
+                'base_directory' => Str::of($application->base_directory)->trim(),
+                'publish_directory' => Str::of($application->publish_directory)->trim(),
+            ]);
+        });
         static::created(function ($application) {
             ApplicationSetting::create([
                 'application_id' => $application->id,

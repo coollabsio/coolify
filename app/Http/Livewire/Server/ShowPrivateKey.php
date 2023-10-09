@@ -32,36 +32,34 @@ class ShowPrivateKey extends Component
         }
     }
 
-    public function checkConnection()
+    public function checkConnection($install = false)
     {
         try {
-            ['uptime' => $uptime, 'dockerVersion' => $dockerVersion] = validateServer($this->server, true);
+            $uptime = $this->server->validateConnection();
             if ($uptime) {
-                $this->server->settings->update([
-                    'is_reachable' => true
-                ]);
-                $this->emit('success', 'Server is reachable with this private key.');
+                $install && $this->emit('success', 'Server is reachable.');
             } else {
-                $this->server->settings->update([
-                    'is_reachable' => false,
-                    'is_usable' => false
-                ]);
-                $this->emit('error', 'Server is not reachable with this private key.');
+                $install && $this->emit('error', 'Server is not reachable. Please check your connection and private key configuration.');
                 return;
             }
-            if ($dockerVersion) {
-                $this->server->settings->update([
-                    'is_usable' => true
-                ]);
-                $this->emit('success', 'Server is usable for Coolify.');
+            $dockerInstalled = $this->server->validateDockerEngine();
+            if ($dockerInstalled) {
+                $install && $this->emit('success', 'Docker Engine is installed.<br> Checking version.');
             } else {
-                $this->server->settings->update([
-                    'is_usable' => false
-                ]);
-                $this->emit('error', 'Old (lower than 23) or no Docker version detected. Install Docker Engine on the General tab.');
+                $install && $this->installDocker();
+                return;
+            }
+            $dockerVersion = $this->server->validateDockerEngineVersion();
+            if ($dockerVersion) {
+                $install && $this->emit('success', 'Docker Engine version is 23+.');
+            } else {
+                $install && $this->installDocker();
+                return;
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->emit('proxyStatusUpdated');
         }
     }
 

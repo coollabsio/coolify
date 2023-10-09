@@ -310,6 +310,7 @@ function send_internal_notification(string $message): void
         $baseUrl = config('app.name');
         $team = Team::find(0);
         $team->notify(new GeneralNotification("👀 {$baseUrl}: " . $message));
+        ray("👀 {$baseUrl}: " . $message);
     } catch (\Throwable $e) {
         ray($e->getMessage());
     }

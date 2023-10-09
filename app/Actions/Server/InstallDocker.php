@@ -2,12 +2,14 @@
 
 namespace App\Actions\Server;
 
+use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 
 class InstallDocker
 {
-    public function __invoke(Server $server)
+    use AsAction;
+    public function handle(Server $server)
     {
         $dockerVersion = '24.0';
         $config = base64_encode('{

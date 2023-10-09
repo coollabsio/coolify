@@ -220,7 +220,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function installDocker()
     {
         $this->dockerInstallationStarted = true;
-        $activity = resolve(InstallDocker::class)($this->createdServer);
+        $activity = InstallDocker::run($this->createdServer);
         $this->emit('newMonitorActivity', $activity->id);
     }
     public function dockerInstalledOrSkipped()

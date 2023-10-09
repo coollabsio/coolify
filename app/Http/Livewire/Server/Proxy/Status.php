@@ -26,7 +26,9 @@ class Status extends Component
     }
     public function getProxyStatusWithNoti()
     {
-        $this->emit('success', 'Refreshed proxy status.');
-        $this->getProxyStatus();
+        if ($this->server->isFunctional()) {
+            $this->emit('success', 'Refreshed proxy status.');
+            $this->getProxyStatus();
+        }
     }
 }

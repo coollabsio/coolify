@@ -13,6 +13,10 @@ use App\Http\Livewire\Dev\Compose as Compose;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Project\Shared\Logs;
 use App\Http\Livewire\Server\All;
+use App\Http\Livewire\Server\Create;
+use App\Http\Livewire\Server\Destination\Show as DestinationShow;
+use App\Http\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Http\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Http\Livewire\Server\Show;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GithubApp;
@@ -102,18 +106,11 @@ Route::middleware(['auth'])->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::get('/servers', All::class)->name('server.all');
-    Route::get('/server/new', [ServerController::class, 'new_server'])->name('server.create');
+    Route::get('/server/new', Create::class)->name('server.create');
     Route::get('/server/{server_uuid}', Show::class)->name('server.show');
-    Route::get('/server/{server_uuid}/proxy', fn () => view('server.proxy', [
-        'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail(),
-    ]))->name('server.proxy');
-    Route::get('/server/{server_uuid}/private-key', fn () => view('server.private-key', [
-        'server' => Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->firstOrFail(),
-        'privateKeys' => PrivateKey::ownedByCurrentTeam()->get()->where('is_git_related', false),
-    ]))->name('server.private-key');
-    Route::get('/server/{server_uuid}/destinations', fn () => view('server.destinations', [
-        'server' => Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->firstOrFail()
-    ]))->name('server.destinations');
+    Route::get('/server/{server_uuid}/proxy', ProxyShow::class)->name('server.proxy');
+    Route::get('/server/{server_uuid}/private-key', PrivateKeyShow::class)->name('server.private-key');
+    Route::get('/server/{server_uuid}/destinations', DestinationShow::class)->name('server.destinations');
 });
 
 

@@ -3,22 +3,24 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use Illuminate\Bus\Queueable;
 use App\Notifications\Channels\DiscordChannel;
 use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
-use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class Unreachable extends Notification implements ShouldQueue
+class Revived extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public $tries = 1;
     public function __construct(public Server $server)
     {
-
+        if ($this->server->unreachable_email_sent === false) {
+            return;
+        }
     }
 
     public function via(object $notifiable): array
@@ -43,8 +45,8 @@ class Unreachable extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("⛔ Server ({$this->server->name}) is unreachable after trying to connect to it 5 times");
-        $mail->view('emails.server-lost-connection', [
+        $mail->subject("✅ Server ({$this->server->name}) revived.");
+        $mail->view('emails.server-revived', [
             'name' => $this->server->name,
         ]);
         return $mail;
@@ -52,13 +54,13 @@ class Unreachable extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "⛔ Server '{$this->server->name}' is unreachable after trying to connect to it 5 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations.";
+        $message = "✅ Server '{$this->server->name}' revived. All automations & integrations are turned on again!";
         return $message;
     }
     public function toTelegram(): array
     {
         return [
-            "message" => "⛔ Server '{$this->server->name}' is unreachable after trying to connect to it 5 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations."
+            "message" => "✅ Server '{$this->server->name}' revived. All automations & integrations are turned on again!"
         ];
     }
 }

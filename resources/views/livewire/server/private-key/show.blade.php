@@ -1,4 +1,4 @@
-<x-layout>
-    <x-server.navbar :server="$server" />
+<div>
+    <x-server.navbar :server="$server" :parameters="$parameters" />
     <livewire:server.show-private-key :server="$server" :privateKeys="$privateKeys" />
-</x-layout>
+</div>
