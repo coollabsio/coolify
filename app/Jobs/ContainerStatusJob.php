@@ -58,6 +58,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $this->server->settings()->update([
                     'is_reachable' => false,
+                ]);
+                $this->server->update([
                     'unreachable_count' => 0,
                 ]);
                 return;
@@ -66,12 +68,16 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if ($result) {
                 $this->server->settings()->update([
                     'is_reachable' => true,
+                ]);
+                $this->server->update([
                     'unreachable_count' => 0,
                 ]);
             } else {
                 $serverUptimeCheckNumber++;
                 $this->server->settings()->update([
                     'is_reachable' => false,
+                ]);
+                $this->server->update([
                     'unreachable_count' => $serverUptimeCheckNumber,
                 ]);
                 return;
