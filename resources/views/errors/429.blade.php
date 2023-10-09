@@ -10,7 +10,7 @@
                 <a href="/">
                     <x-forms.button>Go back home</x-forms.button>
                 </a>
-                <a href="https://docs.coollabs.io/contact.html" class="font-semibold text-white ">Contact
+                <a href="{{ config('coolify.docs') }}" class="font-semibold text-white ">Contact
                     support
                     <span aria-hidden="true">&rarr;</span></a>
             </div>

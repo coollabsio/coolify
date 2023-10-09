@@ -36,7 +36,7 @@ You can find the installation script [here](./scripts/install.sh).
 
 ## Support
 
-Contact us [here](https://docs.coollabs.io/contact).
+Contact us [here](https://coolify.io/contact).
 
 ## Recognitions
 

@@ -256,7 +256,7 @@
                     your self-hosted instance?
                     <x-forms.button>
                         <a class="font-bold text-white hover:no-underline"
-                            href="https://docs.coollabs.io/contact">Contact Us</a>
+                            href="{{ config('coolify.docs') }}">Contact Us</a>
                     </x-forms.button>
                 </div>
             </div>
