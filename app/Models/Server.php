@@ -16,9 +16,11 @@ class Server extends BaseModel
 
     protected static function booted()
     {
-        static::saved(function ($server) {
-            $server->ip = Str::of($server->ip)->trim();
-            $server->user = Str::of($server->user)->trim();
+        static::saving(function ($server) {
+            $server->forceFill([
+                'ip' => Str::of($server->ip)->trim(),
+                'user' => Str::of($server->user)->trim(),
+            ]);
         });
 
         static::created(function ($server) {
@@ -204,5 +206,49 @@ class Server extends BaseModel
     public function isFunctional()
     {
         return $this->settings->is_reachable && $this->settings->is_usable;
+    }
+    public function validateConnection()
+    {
+        $uptime = instant_remote_process(['uptime'], $this, false);
+        if (!$uptime) {
+            $this->settings->is_reachable = false;
+            $this->settings->save();
+            return false;
+        }
+        $this->settings->is_reachable = true;
+        $this->settings->save();
+        return true;
+    }
+    public function validateDockerEngine($throwError = false)
+    {
+        $dockerBinary = instant_remote_process(["command -v docker"], $this, false);
+        if (is_null($dockerBinary)) {
+            $this->settings->is_usable = false;
+            $this->settings->save();
+            if ($throwError) {
+                throw new \Exception('Server is not usable.');
+            }
+            return false;
+        }
+        $this->settings->is_usable = true;
+        $this->settings->save();
+        $this->validateCoolifyNetwork();
+        return true;
+    }
+    public function validateDockerEngineVersion()
+    {
+        $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this, false);
+        $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
+        if (is_null($dockerVersion)) {
+            $this->settings->is_usable = false;
+            $this->settings->save();
+            return false;
+        }
+        $this->settings->is_usable = true;
+        $this->settings->save();
+        return true;
+    }
+    public function validateCoolifyNetwork() {
+        return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
     }
 }

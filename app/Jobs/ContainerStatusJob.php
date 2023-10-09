@@ -41,15 +41,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         return $this->server->uuid;
     }
-
-    private function checkServerConnection()
-    {
-        $uptime = instant_remote_process(['uptime'], $this->server, false);
-        if (!is_null($uptime)) {
-            return true;
-        }
-    }
-    public function handle(): void
+    public function handle()
     {
         try {
             ray("checking server status for {$this->server->name}");
@@ -57,9 +49,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $serverUptimeCheckNumber = 0;
             $serverUptimeCheckNumberMax = 3;
             while (true) {
+                ray('checking # ' . $serverUptimeCheckNumber);
                 if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                     send_internal_notification('Server unreachable: ' . $this->server->name);
                     if ($this->server->unreachable_email_sent === false) {
+                        ray('Server unreachable, sending notification...');
                         $this->server->team->notify(new Unreachable($this->server));
                     }
                     $this->server->settings()->update([
@@ -68,7 +62,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $this->server->update(['unreachable_email_sent' => true]);
                     return;
                 }
-                $result = $this->checkServerConnection();
+                $result = $this->server->validateConnection();
                 if ($result) {
                     break;
                 }
@@ -76,6 +70,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 sleep(5);
             }
             if (data_get($this->server, 'unreachable_email_sent') === true) {
+                ray('Server is reachable again, sending notification...');
                 $this->server->team->notify(new Revived($this->server));
                 $this->server->update(['unreachable_email_sent' => false]);
             }
@@ -88,7 +83,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     'is_usable' => true
                 ]);
             }
-
+            $this->server->validateDockerEngine(true);
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;
@@ -288,7 +283,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
-            throw $e;
+            return handleError($e);
         }
     }
 }

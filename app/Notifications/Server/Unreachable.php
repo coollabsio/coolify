@@ -3,6 +3,9 @@
 namespace App\Notifications\Server;
 
 use App\Models\Server;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\EmailChannel;
+use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -20,7 +23,21 @@ class Unreachable extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'status_changes');
+        $channels = [];
+        $isEmailEnabled = isEmailEnabled($notifiable);
+        $isDiscordEnabled = data_get($notifiable, 'discord_enabled');
+        $isTelegramEnabled = data_get($notifiable, 'telegram_enabled');
+
+        if ($isDiscordEnabled) {
+            $channels[] = DiscordChannel::class;
+        }
+        if ($isEmailEnabled ) {
+            $channels[] = EmailChannel::class;
+        }
+        if ($isTelegramEnabled) {
+            $channels[] = TelegramChannel::class;
+        }
+        return $channels;
     }
 
     public function toMail(): MailMessage

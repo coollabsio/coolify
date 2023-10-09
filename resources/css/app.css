@@ -56,7 +56,7 @@ a {
     @apply flex items-center p-2 transition-colors cursor-pointer min-h-16 bg-coolgray-200 hover:bg-coollabs-100 hover:text-white hover:no-underline min-w-[24rem];
 }
 .box-without-bg {
-    @apply flex items-center p-2 transition-colors  min-h-16 hover:text-white hover:no-underline min-w-[24rem];
+    @apply flex items-center p-2 transition-colors min-h-16 hover:text-white hover:no-underline min-w-[24rem];
 }
 
 .lds-heart {

@@ -11,7 +11,7 @@ class Deploy extends Component
     public Server $server;
     public bool $traefikDashboardAvailable = false;
     public ?string $currentRoute = null;
-    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable'];
+    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable', 'serverRefresh' => 'proxyStatusUpdated'];
 
     public function mount() {
         $this->currentRoute = request()->route()->getName();

@@ -1,4 +1,4 @@
-<div>
+<div x-init="$wire.validateServer(false)">
     <x-modal yesOrNo modalId="deleteServer" modalTitle="Delete Server">
         <x-slot:modalBody>
             <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
@@ -25,6 +25,11 @@
         @else
             Server is reachable and validated.
         @endif
+        @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
+            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100" wire:click.prevent='validateServer' isHighlighted>
+                Validate Server & Install Docker Engine
+            </x-forms.button>
+        @endif
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input id="server.name" label="Name" required />
@@ -42,27 +47,12 @@
                 </div>
             </div>
             <div class="w-64">
-                <x-forms.checkbox instantSave helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                <x-forms.checkbox instantSave
+                    helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                     id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
             </div>
         </div>
-        @if (!$server->settings->is_reachable)
-            <x-forms.button class="mt-8 mb-4 box" wire:click.prevent='validateServer'>
-                Validate Server
-            </x-forms.button>
-        @endif
-        @if ($server->settings->is_reachable && !$server->settings->is_usable && $server->id !== 0)
-            @if ($dockerInstallationStarted)
-                <x-forms.button class="mt-8 mb-4 box" wire:click.prevent='validateServer'>
-                    Validate Server
-                </x-forms.button>
-            @else
-                <x-forms.button class="mt-8 mb-4 box" onclick="installDocker.showModal()"
-                    wire:click.prevent='installDocker' isHighlighted>
-                    Install Docker Engine 24.0
-                </x-forms.button>
-            @endif
-        @endif
+
         @if ($server->isFunctional())
             <h3 class="py-4">Settings</h3>
             <x-forms.input id="cleanup_after_percentage" label="Disk Cleanup threshold (%)" required
@@ -80,4 +70,11 @@
             Delete
         </x-forms.button>
     @endif
+
+    <script>
+        Livewire.on('installDocker', () => {
+            console.log('asd');
+            installDocker.showModal();
+        })
+    </script>
 </div>
