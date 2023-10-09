@@ -340,9 +340,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $this->newVersionIsHealthy = true;
                     $this->execute_remote_command(
                         [
-                            "echo 'New version of your application is healthy.'"
-                        ],
-                        [
                             "echo 'Rolling update completed.'"
                         ],
                     );
