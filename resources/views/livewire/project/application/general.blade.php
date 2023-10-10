@@ -56,6 +56,11 @@
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
                         helper="Directory to use as root. Useful for monorepos." />
+                    @if ($application->build_pack === 'dockerfile')
+                        <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
+                            label="Dockerfile Location"
+                            helper="It is calculated together with the Base Directory: {{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}" />
+                    @endif
                     @if ($application->could_set_build_commands())
                         @if ($application->settings->is_static)
                             <x-forms.input placeholder="/dist" id="application.publish_directory"

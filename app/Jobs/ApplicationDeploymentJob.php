@@ -57,6 +57,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string|null $currently_running_container_name = null;
     private string $basedir;
     private string $workdir;
+    private ?string $build_pack = null;
     private string $configuration_dir;
     private string $build_image_name;
     private string $production_image_name;
@@ -65,6 +66,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $env_args;
     private $docker_compose;
     private $docker_compose_base64;
+    private string $dockerfile_location = '/Dockerfile';
 
     private $log_model;
     private Collection $saved_outputs;
@@ -76,6 +78,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
+        $this->build_pack = data_get($this->application, 'build_pack');
 
         $this->application_deployment_queue_id = $application_deployment_queue_id;
         $this->deployment_uuid = $this->application_deployment_queue->deployment_uuid;
@@ -140,6 +143,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->deploy_simple_dockerfile();
             } else if ($this->application->build_pack === 'dockerimage') {
                 $this->deploy_dockerimage();
+            } else if ($this->application->build_pack === 'dockerfile') {
+                $this->deploy_dockerfile();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();
@@ -178,6 +183,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         }
     }
+
     private function deploy_docker_compose()
     {
         $dockercompose_base64 = base64_encode($this->application->dockercompose);
@@ -263,6 +269,35 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
         $this->prepare_builder_image();
         $this->generate_compose_file();
+        $this->rolling_update();
+    }
+
+    private function deploy_dockerfile()
+    {
+        if (data_get($this->application, 'dockerfile_location')) {
+            $this->dockerfile_location = $this->application->dockerfile_location;
+        }
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->clone_repository();
+        $this->set_base_dir();
+        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
+        if (strlen($tag) > 128) {
+            $tag = $tag->substr(0, 128);
+        }
+
+        $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
+        $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
+        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->cleanup_git();
+        $this->generate_compose_file();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
+        // $this->build_image();
         $this->rolling_update();
     }
     private function deploy()
@@ -629,6 +664,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
+        if ($this->build_pack === 'dockerfile') {
+            $docker_compose['services'][$this->container_name]['build'] = [
+                'context' => $this->workdir,
+                'dockerfile' => $this->workdir . $this->dockerfile_location,
+            ];
+        }
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
@@ -785,7 +826,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->execute_remote_command(
             ["echo -n 'Starting application (could take a while).'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d >/dev/null"), "hidden" => true],
         );
     }
 
