@@ -8,6 +8,7 @@ class BackupEdit extends Component
 {
     public $backup;
     public $s3s;
+    public ?string $status = null;
     public array $parameters;
 
     protected $rules = [

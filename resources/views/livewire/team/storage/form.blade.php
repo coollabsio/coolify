@@ -10,12 +10,17 @@
             <div class="pb-4">
                 <h2>Storage Details</h2>
                 <div>{{ $storage->name }}</div>
+                @if ($storage->is_usable)
+                    <div> Usable </div>
+                @else
+                    <div class="text-red-500"> Not Usable </div>
+                @endif
             </div>
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
             <x-forms.button wire:click="test_s3_connection">
-                Test Connection
+                Validate Connection
             </x-forms.button>
             <x-forms.button isError isModal modalId="deleteS3Storage">
                 Delete

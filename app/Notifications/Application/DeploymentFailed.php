@@ -52,10 +52,10 @@ class DeploymentFailed extends Notification implements ShouldQueue
         $pull_request_id = data_get($this->preview, 'pull_request_id', 0);
         $fqdn = $this->fqdn;
         if ($pull_request_id === 0) {
-            $mail->subject('❌ Deployment failed of ' . $this->application_name . '.');
+            $mail->subject('Coolify: Deployment failed of ' . $this->application_name . '.');
         } else {
             $fqdn = $this->preview->fqdn;
-            $mail->subject('❌ Deployment failed of pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . '.');
+            $mail->subject('Coolify: Deployment failed of pull request #' . $this->preview->pull_request_id . ' of ' . $this->application_name . '.');
         }
         $mail->view('emails.application-deployment-failed', [
             'name' => $this->application_name,
@@ -69,10 +69,10 @@ class DeploymentFailed extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = '❌ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
+            $message = 'Coolify:  Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
             $message .= '[View Deployment Logs](' . $this->deployment_url . ')';
         } else {
-            $message = '❌ Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
+            $message = 'Coolify: Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
             $message .= '[View Deployment Logs](' . $this->deployment_url . ')';
         }
         return $message;
@@ -80,9 +80,9 @@ class DeploymentFailed extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         if ($this->preview) {
-            $message = '❌ Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
+            $message = 'Coolify: Pull request #' . $this->preview->pull_request_id . ' of **' . $this->application_name . '** (' . $this->preview->fqdn . ') deployment failed: ';
         } else {
-            $message = '❌ Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
+            $message = 'Coolify: Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
         }
         return [
             "message" => $message,

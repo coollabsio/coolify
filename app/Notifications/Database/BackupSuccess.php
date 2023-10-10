@@ -30,7 +30,7 @@ class BackupSuccess extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("✅ Backup successfully done for {$this->database->name}");
+        $mail->subject("Coolify: Backup successfully done for {$this->database->name}");
         $mail->view('emails.backup-success', [
             'name' => $this->name,
             'frequency' => $this->frequency,
@@ -40,11 +40,11 @@ class BackupSuccess extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return "✅ Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+        return "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
     }
     public function toTelegram(): array
     {
-        $message = "✅ Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
+        $message = "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was successful.";
         return [
             "message" => $message,
         ];

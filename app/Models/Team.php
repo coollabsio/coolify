@@ -48,6 +48,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
         }
         return explode(',', $recipients);
     }
+
     public function limits(): Attribute
     {
         return Attribute::make(
@@ -125,7 +126,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
 
     public function s3s()
     {
-        return $this->hasMany(S3Storage::class);
+        return $this->hasMany(S3Storage::class)->where('is_usable', true);
     }
     public function trialEnded() {
         foreach ($this->servers as $server) {

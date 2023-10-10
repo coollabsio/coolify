@@ -45,7 +45,7 @@ class StatusChanged extends Notification implements ShouldQueue
     {
         $mail = new MailMessage();
         $fqdn = $this->fqdn;
-        $mail->subject("⛔ {$this->application_name} has been stopped");
+        $mail->subject("Coolify: {$this->application_name} has been stopped");
         $mail->view('emails.application-status-changes', [
             'name' => $this->application_name,
             'fqdn' => $fqdn,
@@ -56,7 +56,7 @@ class StatusChanged extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = '⛔ ' . $this->application_name . ' has been stopped.
+        $message = 'Coolify: ' . $this->application_name . ' has been stopped.
 
 ';
         $message .= '[Open Application in Coolify](' . $this->application_url . ')';
@@ -64,7 +64,7 @@ class StatusChanged extends Notification implements ShouldQueue
     }
     public function toTelegram(): array
     {
-        $message = '⛔ ' . $this->application_name . ' has been stopped.';
+        $message = 'Coolify: ' . $this->application_name . ' has been stopped.';
         return [
             "message" => $message,
             "buttons" => [

@@ -31,7 +31,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
-    public string $backup_status;
+    public string $backup_status = 'failed';
     public ?string $backup_location = null;
     public string $backup_dir;
     public string $backup_file;
@@ -74,7 +74,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
             }
-            $this->backup_file = "/pg_dump-" . Carbon::now()->timestamp . ".dump";
+            $this->backup_file = "/pg-backup-customformat-" . Carbon::now()->timestamp . ".backup";
             $this->backup_location = $this->backup_dir . $this->backup_file;
 
             $this->backup_log = ScheduledDatabaseBackupExecution::create([
@@ -90,10 +90,17 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $this->upload_to_s3();
             }
             $this->save_backup_logs();
+            $this->team->notify(new BackupSuccess($this->backup, $this->database));
+            $this->backup_status = 'success';
         } catch (\Throwable $e) {
-            ray($e->getMessage());
+            $this->backup_status = 'failed';
             send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
+            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
             throw $e;
+        } finally {
+            $this->backup_log->update([
+                'status' => $this->backup_status,
+            ]);
         }
     }
 
@@ -103,28 +110,15 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             ray($this->backup_dir);
             $commands[] = "mkdir -p " . $this->backup_dir;
             $commands[] = "docker exec $this->container_name pg_dump -Fc -U {$this->database->postgres_user} > $this->backup_location";
-
             $this->backup_output = instant_remote_process($commands, $this->server);
-
             $this->backup_output = trim($this->backup_output);
-
             if ($this->backup_output === '') {
                 $this->backup_output = null;
             }
-
             ray('Backup done for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location);
-
-            $this->backup_status = 'success';
-            $this->team->notify(new BackupSuccess($this->backup, $this->database));
         } catch (\Throwable $e) {
-            $this->backup_status = 'failed';
             $this->add_to_backup_output($e->getMessage());
             ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());
-            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
-        } finally {
-            $this->backup_log->update([
-                'status' => $this->backup_status,
-            ]);
         }
     }
 
@@ -163,11 +157,16 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             }
             $key = $this->s3->key;
             $secret = $this->s3->secret;
-            //            $region = $this->s3->region;
+            // $region = $this->s3->region;
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
+            $this->s3->testConnection();
+            if (isDev()) {
+                $commands[] = "docker run --pull=always -d --network {$this->database->destination->network} --name backup-of-{$this->backup->uuid} --rm -v coolify_coolify-data-dev:/data/coolify:ro ghcr.io/coollabsio/coolify-helper >/dev/null 2>&1";
+            } else {
+                $commands[] = "docker run --pull=always -d --network {$this->database->destination->network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper >/dev/null 2>&1";
+            }
 
-            $commands[] = "docker run --pull=always -d --network {$this->database->destination->network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);
@@ -175,7 +174,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             ray('Uploaded to S3. ' . $this->backup_location . ' to s3://' . $bucket . $this->backup_dir);
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
-            ray($e->getMessage());
+            throw $e;
         } finally {
             $command = "docker rm -f backup-of-{$this->backup->uuid}";
             instant_remote_process([$command], $this->server);
