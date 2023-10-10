@@ -49,6 +49,8 @@ class General extends Component
         'application.ports_exposes' => 'required',
         'application.ports_mappings' => 'nullable',
         'application.dockerfile' => 'nullable',
+        'application.docker_registry_image_name' => 'nullable',
+        'application.docker_registry_image_tag' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -67,6 +69,8 @@ class General extends Component
         'application.ports_exposes' => 'Ports exposes',
         'application.ports_mappings' => 'Ports mappings',
         'application.dockerfile' => 'Dockerfile',
+        'application.docker_registry_image_name' => 'Docker registry image name',
+        'application.docker_registry_image_tag' => 'Docker registry image tag',
 
     ];
 

@@ -259,13 +259,14 @@ class Application extends BaseModel
         if ($this->dockerfile) {
             return false;
         }
-
+        if ($this->build_pack === 'dockerimage'){
+            return false;
+        }
         return true;
     }
     public function isHealthcheckDisabled(): bool
     {
         if (data_get($this, 'dockerfile') || data_get($this, 'build_pack') === 'dockerfile' || data_get($this, 'health_check_enabled') === false) {
-            ray('dockerfile');
             return true;
         }
         return false;

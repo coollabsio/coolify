@@ -6,6 +6,6 @@
             <h2>Docker Image</h2>
             <x-forms.button type="submit">Save</x-forms.button>
         </div>
-        <x-forms.input rows="20" id="dockerImage" placeholder="nginx"></x-forms.textarea>
+        <x-forms.input rows="20" id="dockerImage" placeholder="nginx:latest"></x-forms.textarea>
     </form>
 </div>

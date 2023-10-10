@@ -26,7 +26,11 @@ class DockerImage extends Component
             'dockerImage' => 'required'
         ]);
         $image = Str::of($this->dockerImage)->before(':');
-        $tag = Str::of($this->dockerImage)->after(':') ?: 'latest';
+        if (Str::of($this->dockerImage)->contains(':')) {
+            $tag = Str::of($this->dockerImage)->after(':');
+        } else {
+            $tag = 'latest';
+        }
         $destination_uuid = $this->query['destination'];
         $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
         if (!$destination) {
@@ -39,6 +43,7 @@ class DockerImage extends Component
 
         $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
         $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
+        ray($image,$tag);
         $application = Application::create([
             'name' => 'docker-image-' . new Cuid2(7),
             'repository_project_id' => 0,

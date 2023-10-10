@@ -45,6 +45,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $commit;
     private bool $force_rebuild;
 
+    private ?string $dockerImage = null;
+    private ?string $dockerImageTag = null;
+
     private GithubApp|GitlabApp|string $source = 'other';
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
@@ -135,6 +138,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
+            } else if ($this->application->build_pack === 'dockerimage') {
+                $this->deploy_dockerimage();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();
@@ -245,6 +250,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->rolling_update();
     }
 
+    private function deploy_dockerimage()
+    {
+        $this->dockerImage = $this->application->docker_registry_image_name;
+        $this->dockerImageTag = $this->application->docker_registry_image_tag;
+        ray("echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag}.'");
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag}.'"
+            ],
+        );
+        $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
+        $this->prepare_builder_image();
+        $this->generate_compose_file();
+        $this->rolling_update();
+    }
     private function deploy()
     {
         $this->execute_remote_command(
@@ -398,7 +418,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         );
     }
 
-    private function set_base_dir() {
+    private function set_base_dir()
+    {
         $this->execute_remote_command(
             [
                 "echo -n 'Setting base directory to {$this->workdir}.'"
@@ -671,7 +692,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_healthcheck_commands()
     {
-        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile') {
+        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile' || $this->application->build_pack === 'dockerimage') {
             // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
             return 'exit 0';
         }
