@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Support\Facades\Storage;
 
 class S3Storage extends BaseModel
 {
@@ -10,6 +12,7 @@ class S3Storage extends BaseModel
 
     protected $guarded = [];
     protected $casts = [
+        'is_usable' => 'boolean',
         'key' => 'encrypted',
         'secret' => 'encrypted',
     ];
@@ -19,7 +22,15 @@ class S3Storage extends BaseModel
         $selectArray = collect($select)->concat(['id']);
         return S3Storage::whereTeamId(currentTeam()->id)->select($selectArray->all())->orderBy('name');
     }
+    public function isUsable()
+    {
+        return $this->is_usable;
+    }
 
+    public function team()
+    {
+        return $this->belongsTo(Team::class);
+    }
     public function awsUrl()
     {
         return "{$this->endpoint}/{$this->bucket}";
@@ -27,7 +38,34 @@ class S3Storage extends BaseModel
 
     public function testConnection()
     {
-        set_s3_target($this);
-        return \Storage::disk('custom-s3')->files();
+        try {
+            set_s3_target($this);
+            Storage::disk('custom-s3')->files();
+            $this->unusable_email_sent = false;
+            $this->is_usable = true;
+            return;
+        } catch (\Throwable $e) {
+            $this->is_usable = false;
+            if ($this->unusable_email_sent === false) {
+                $mail = new MailMessage();
+                $mail->subject('Coolify: S3 Storage Connection Error');
+                $mail->view('emails.s3-connection-error', ['name' => $this->name, 'reason' => $e->getMessage(), 'url' => route('team.storages.show', ['storage_uuid' => $this->uuid])]);
+                $users = collect([]);
+                $members = $this->team->members()->get();
+                foreach ($members as $user) {
+                    if ($user->isAdmin()) {
+                        $users->push($user);
+                    }
+                }
+                foreach ($users as $user) {
+                    send_user_an_email($mail, $user->email);
+                }
+                $this->unusable_email_sent = true;
+            }
+
+            throw $e;
+        } finally {
+            $this->save();
+        }
     }
 }

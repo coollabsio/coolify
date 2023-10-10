@@ -15,7 +15,7 @@
                     'border-red-500' => !$server->settings->is_reachable,
                 ])>
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">
+                    <div class="font-bold text-white">
                         {{ $server->name }}
                     </div>
                     <div class="text-xs group-hover:text-white">

@@ -4,7 +4,9 @@
         <x-forms.button type="submit">
             Save
         </x-forms.button>
-        <livewire:project.database.backup-now :backup="$backup" />
+        @if (Str::of($status)->startsWith('running'))
+            <livewire:project.database.backup-now :backup="$backup" />
+        @endif
         @if ($backup->database_id !== 0)
             <x-forms.button isError wire:click="delete">Delete</x-forms.button>
         @endif
@@ -16,7 +18,7 @@
     @if ($backup->save_s3)
         <div class="pb-6">
             <x-forms.select id="backup.s3_storage_id" label="S3 Storage" required>
-                <option value="default" disabled>Select a S3 storage</option>
+                <option value="default">Select a S3 storage</option>
                 @foreach ($s3s as $s3)
                     <option value="{{ $s3->id }}">{{ $s3->name }}</option>
                 @endforeach

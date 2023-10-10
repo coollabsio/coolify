@@ -62,6 +62,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="box group" wire:click="setType('docker-image')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            Based on an existing Docker Image
+                        </div>
+                        <div class="text-xs group-hover:text-white">
+                            You can deploy an existing Docker Image form any Registry.
+                        </div>
+                    </div>
+                </div>
             </div>
             <h2 class="py-4">Databases</h2>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">

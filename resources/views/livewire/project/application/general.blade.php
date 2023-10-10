@@ -24,6 +24,7 @@
                         <x-forms.select id="application.build_pack" label="Build Pack" required>
                             <option value="nixpacks">Nixpacks</option>
                             <option value="dockerfile">Dockerfile</option>
+                            <option value="dockerimage">Docker Image</option>
                         </x-forms.select>
                         @if ($application->settings->is_static)
                             <x-forms.select id="application.static_image" label="Static Image" required>
@@ -41,28 +42,42 @@
                 </div>
             @endif
 
-            <h3>Build</h3>
-            @if ($application->could_set_build_commands())
+            @if ($application->build_pack !== 'dockerimage')
+                <h3>Build</h3>
+                @if ($application->could_set_build_commands())
+                    <div class="flex flex-col gap-2 xl:flex-row">
+                        <x-forms.input placeholder="pnpm install" id="application.install_command"
+                            label="Install Command" />
+                        <x-forms.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
+                        <x-forms.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
+                    </div>
+                @endif
+
                 <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input placeholder="pnpm install" id="application.install_command"
-                        label="Install Command" />
-                    <x-forms.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
-                    <x-forms.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
+                    <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
+                        helper="Directory to use as root. Useful for monorepos." />
+                    @if ($application->build_pack === 'dockerfile')
+                        <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
+                            label="Dockerfile Location"
+                            helper="It is calculated together with the Base Directory: {{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}" />
+                    @endif
+                    @if ($application->could_set_build_commands())
+                        @if ($application->settings->is_static)
+                            <x-forms.input placeholder="/dist" id="application.publish_directory"
+                                label="Publish Directory" required />
+                        @else
+                            <x-forms.input placeholder="/" id="application.publish_directory"
+                                label="Publish Directory" />
+                        @endif
+                    @endif
+                </div>
+            @else
+                <div class="flex flex-col gap-2 xl:flex-row">
+                    <x-forms.input id="application.docker_registry_image_name" required label="Docker Image" />
+                    <x-forms.input id="application.docker_registry_image_tag" required label="Docker Image Tag" />
                 </div>
             @endif
 
-            <div class="flex flex-col gap-2 xl:flex-row">
-                <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                    helper="Directory to use as root. Useful for monorepos." />
-                @if ($application->could_set_build_commands())
-                    @if ($application->settings->is_static)
-                        <x-forms.input placeholder="/dist" id="application.publish_directory" label="Publish Directory"
-                            required />
-                    @else
-                        <x-forms.input placeholder="/" id="application.publish_directory" label="Publish Directory" />
-                    @endif
-                @endif
-            </div>
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
@@ -81,7 +96,6 @@
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
-
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />

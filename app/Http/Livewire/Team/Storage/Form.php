@@ -9,6 +9,7 @@ class Form extends Component
 {
     public S3Storage $storage;
     protected $rules = [
+        'storage.is_usable' => 'nullable|boolean',
         'storage.name' => 'nullable|min:3|max:255',
         'storage.description' => 'nullable|min:3|max:255',
         'storage.region' => 'required|max:255',
@@ -18,6 +19,7 @@ class Form extends Component
         'storage.endpoint' => 'required|url|max:255',
     ];
     protected $validationAttributes = [
+        'storage.is_usable' => 'Is Usable',
         'storage.name' => 'Name',
         'storage.description' => 'Description',
         'storage.region' => 'Region',

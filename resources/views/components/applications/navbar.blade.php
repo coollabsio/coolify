@@ -16,7 +16,7 @@
     <x-applications.advanced :application="$application" />
 
     @if ($application->status !== 'exited')
-        <button wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
+        <button title="With rolling update if possible" wire:click='deploy' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24" stroke-width="2"
                 stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
@@ -25,7 +25,7 @@
                 </path>
                 <path d="M7.05 11.038v-3.988"></path>
             </svg>
-            Restart
+            Redeploy
         </button>
         <button wire:click='stop' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2"

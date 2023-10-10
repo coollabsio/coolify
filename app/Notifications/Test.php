@@ -24,14 +24,14 @@ class Test extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("Test Email");
+        $mail->subject("Coolify: Test Email");
         $mail->view('emails.test');
         return $mail;
     }
 
     public function toDiscord(): string
     {
-        $message = 'This is a test Discord notification from Coolify.';
+        $message = 'Coolify: This is a test Discord notification from Coolify.';
         $message .= "\n\n";
         $message .= '[Go to your dashboard](' . base_url() . ')';
         return $message;
@@ -39,7 +39,7 @@ class Test extends Notification implements ShouldQueue
     public function toTelegram(): array
     {
         return [
-            "message" => 'This is a test Telegram notification from Coolify.',
+            "message" => 'Coolify: This is a test Telegram notification from Coolify.',
             "buttons" => [
                 [
                     "text" => "Go to your dashboard",

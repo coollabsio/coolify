@@ -30,7 +30,7 @@ class BackupFailed extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("❌ [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
+        $mail->subject("Coolify: [ACTION REQUIRED] Backup FAILED for {$this->database->name}");
         $mail->view('emails.backup-failed', [
             'name' => $this->name,
             'frequency' => $this->frequency,
@@ -41,11 +41,11 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        return "❌ Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
+        return "Coolify: Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
     }
     public function toTelegram(): array
     {
-        $message = "❌ Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
+        $message = "Coolify:  Database backup for {$this->name} with frequency of {$this->frequency} was FAILED.\n\nReason: {$this->output}";
         return [
             "message" => $message,
         ];

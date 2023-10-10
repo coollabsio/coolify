@@ -101,7 +101,21 @@ class Application extends BaseModel
             }
         );
     }
-
+    public function dockerfileLocation(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (is_null($value) || $value === '') {
+                    return '/Dockerfile';
+                } else {
+                    if ($value !== '/') {
+                        return Str::start(Str::replaceEnd('/', '', $value), '/');
+                    }
+                    return Str::start($value, '/');
+                }
+            }
+        );
+    }
     public function baseDirectory(): Attribute
     {
         return Attribute::make(
@@ -259,13 +273,14 @@ class Application extends BaseModel
         if ($this->dockerfile) {
             return false;
         }
-
+        if ($this->build_pack === 'dockerimage') {
+            return false;
+        }
         return true;
     }
     public function isHealthcheckDisabled(): bool
     {
-        if (data_get($this, 'dockerfile') || data_get($this, 'build_pack') === 'dockerfile' || data_get($this, 'health_check_enabled') === false) {
-            ray('dockerfile');
+        if (data_get($this, 'health_check_enabled') === false) {
             return true;
         }
         return false;

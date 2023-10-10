@@ -2,11 +2,12 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
-            <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
-                class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
-                Add</a>
             @if ($environment->can_delete_environment())
                 <livewire:project.delete-environment :environment_id="$environment->id" />
+            @else
+                <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+                    class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
+                    New</a>
             @endif
         </div>
         <nav class="flex pt-2 pb-10">
@@ -32,14 +33,15 @@
         </nav>
     </div>
     @if ($environment->can_delete_environment())
-        <p>No resources found.</p>
+        <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+            class="items-center justify-center box">+ Add New Resource</a>
     @endif
     <div class="grid gap-2 lg:grid-cols-2">
         @foreach ($environment->applications->sortBy('name') as $application)
             <a class="box group"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">{{ $application->name }}</div>
+                    <div class="font-bold text-white">{{ $application->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $application->description }}</div>
                 </div>
             </a>
@@ -48,19 +50,19 @@
             <a class="box group"
                 href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">{{ $databases->name }}</div>
+                    <div class="font-bold text-white">{{ $databases->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $databases->description }}</div>
                 </div>
             </a>
         @endforeach
         @foreach ($environment->services->sortBy('name') as $service)
-        <a class="box group"
-            href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
-            <div class="flex flex-col mx-6">
-                <div class=" group-hover:text-white">{{ $service->name }}</div>
-                <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
-            </div>
-        </a>
-    @endforeach
+            <a class="box group"
+                href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
+                <div class="flex flex-col mx-6">
+                    <div class="font-bold text-white">{{ $service->name }}</div>
+                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
+                </div>
+            </a>
+        @endforeach
     </div>
 </x-layout>

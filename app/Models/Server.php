@@ -17,10 +17,14 @@ class Server extends BaseModel
     protected static function booted()
     {
         static::saving(function ($server) {
-            $server->forceFill([
-                'ip' => Str::of($server->ip)->trim(),
-                'user' => Str::of($server->user)->trim(),
-            ]);
+            $payload = [];
+            if ($server->user) {
+                $payload['user'] = Str::of($server->user)->trim();
+            }
+            if ($server->ip) {
+                $payload['ip'] = Str::of($server->ip)->trim();
+            }
+            $server->forceFill($payload);
         });
 
         static::created(function ($server) {

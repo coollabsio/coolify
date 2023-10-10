@@ -205,16 +205,22 @@ stream {
    }
 }
 EOF;
+    $dockerfile = <<< EOF
+FROM nginx:stable-alpine
+
+COPY nginx.conf /etc/nginx/nginx.conf
+EOF;
     $docker_compose = [
         'version' => '3.8',
         'services' => [
             $containerName => [
+                'build' => [
+                    'context' => $configuration_dir,
+                    'dockerfile' => 'Dockerfile',
+                ],
                 'image' => "nginx:stable-alpine",
                 'container_name' => $containerName,
                 'restart' => RESTART_MODE,
-                'volumes' => [
-                    "$configuration_dir/nginx.conf:/etc/nginx/nginx.conf:ro",
-                ],
                 'ports' => [
                     "$database->public_port:$database->public_port",
                 ],
@@ -243,13 +249,13 @@ EOF;
     ];
     $dockercompose_base64 = base64_encode(Yaml::dump($docker_compose, 4, 2));
     $nginxconf_base64 = base64_encode($nginxconf);
+    $dockerfile_base64 = base64_encode($dockerfile);
     instant_remote_process([
         "mkdir -p $configuration_dir",
+        "echo '{$dockerfile_base64}' | base64 -d > $configuration_dir/Dockerfile",
         "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
         "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
-        "docker compose --project-directory {$configuration_dir} up -d >/dev/null",
-
-
+        "docker compose --project-directory {$configuration_dir} up --build -d >/dev/null",
     ], $database->destination->server);
 }
 function stopPostgresProxy(StandalonePostgresql $database)
