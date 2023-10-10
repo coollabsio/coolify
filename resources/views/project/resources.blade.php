@@ -50,7 +50,7 @@
             <a class="box group"
                 href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">{{ $databases->name }}</div>
+                    <div class="font-bold text-white">{{ $databases->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $databases->description }}</div>
                 </div>
             </a>
@@ -59,7 +59,7 @@
             <a class="box group"
                 href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">{{ $service->name }}</div>
+                    <div class="font-bold text-white">{{ $service->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
                 </div>
             </a>
