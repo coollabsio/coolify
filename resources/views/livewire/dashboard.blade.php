@@ -36,6 +36,7 @@
         </div>
     </div>
     <h3 class="pb-4">Projects</h3>
+
     @if ($projects->count() === 1)
         <div class="grid grid-cols-1 gap-2">
         @else
@@ -43,7 +44,7 @@
     @endif
     @foreach ($projects as $project)
         <div class="gap-2 border border-transparent cursor-pointer box group" x-data
-            x-on:click="goto('{{ $project->uuid }}')">
+            x-on:click="gotoProject('{{ $project->uuid }}')">
             @if (data_get($project, 'environments.0.name'))
                 <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                     href="{{ route('project.resources', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
@@ -107,5 +108,11 @@
     </a>
 @endforeach
 </div>
+<script>
+    function gotoProject(uuid) {
+        window.location.href = '/project/' + uuid;
+    }
+   
+</script>
 {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
 </div>
