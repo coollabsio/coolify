@@ -41,7 +41,7 @@
             <a class="box group"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">{{ $application->name }}</div>
+                    <div class="font-bold text-white">{{ $application->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $application->description }}</div>
                 </div>
             </a>
