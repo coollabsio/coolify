@@ -3,8 +3,11 @@
 namespace App\Notifications\Database;
 
 use App\Models\ScheduledDatabaseBackup;
+use App\Notifications\Channels\DiscordChannel;
+use App\Notifications\Channels\TelegramChannel;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Notifications\Channels\MailChannel;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -24,7 +27,7 @@ class BackupFailed extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'database_backups');
+        return [DiscordChannel::class, TelegramChannel::class, MailChannel::class];
     }
 
     public function toMail(): MailMessage
