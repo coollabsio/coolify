@@ -55,14 +55,16 @@ class ResourcesDelete extends Command
         }
         $serversToDelete = multiselect(
             'What server do you want to delete?',
-            $servers->pluck('id')->toArray(),
+            $servers->pluck('id')->sort()->toArray(),
         );
-        $confirmed = confirm("Are you sure you want to delete all selected resources?");
-        if (!$confirmed) {
-            return;
-        }
+
         foreach ($serversToDelete as $server) {
             $toDelete = $servers->where('id', $server)->first();
+            $this->info($toDelete);
+            $confirmed = confirm("Are you sure you want to delete all selected resources?");
+            if (!$confirmed) {
+                break;
+            }
             $toDelete->delete();
         }
     }
@@ -75,14 +77,16 @@ class ResourcesDelete extends Command
         }
         $applicationsToDelete = multiselect(
             'What application do you want to delete?',
-            $applications->pluck('name')->toArray(),
+            $applications->pluck('name')->sort()->toArray(),
         );
-        $confirmed = confirm("Are you sure you want to delete all selected resources?");
-        if (!$confirmed) {
-            return;
-        }
+
         foreach ($applicationsToDelete as $application) {
             $toDelete = $applications->where('name', $application)->first();
+            $this->info($toDelete);
+            $confirmed = confirm("Are you sure you want to delete all selected resources? ");
+            if (!$confirmed) {
+                break;
+            }
             $toDelete->delete();
         }
     }
@@ -95,14 +99,16 @@ class ResourcesDelete extends Command
         }
         $databasesToDelete = multiselect(
             'What database do you want to delete?',
-            $databases->pluck('name')->toArray(),
+            $databases->pluck('name')->sort()->toArray(),
         );
-        $confirmed = confirm("Are you sure you want to delete all selected resources?");
-        if (!$confirmed) {
-            return;
-        }
+
         foreach ($databasesToDelete as $database) {
             $toDelete = $databases->where('name', $database)->first();
+            $this->info($toDelete);
+            $confirmed = confirm("Are you sure you want to delete all selected resources?");
+            if (!$confirmed) {
+                return;
+            }
             $toDelete->delete();
         }
 
@@ -116,14 +122,16 @@ class ResourcesDelete extends Command
         }
         $servicesToDelete = multiselect(
             'What service do you want to delete?',
-            $services->pluck('name')->toArray(),
+            $services->pluck('name')->sort()->toArray(),
         );
-        $confirmed = confirm("Are you sure you want to delete all selected resources?");
-        if (!$confirmed) {
-            return;
-        }
+
         foreach ($servicesToDelete as $service) {
             $toDelete = $services->where('name', $service)->first();
+            $this->info($toDelete);
+            $confirmed = confirm("Are you sure you want to delete all selected resources?");
+            if (!$confirmed) {
+                return;
+            }
             $toDelete->delete();
         }
     }
