@@ -25,7 +25,7 @@
                             Public Repository
                         </div>
                         <div class="text-xs group-hover:text-white">
-                            You can deploy any kind of public repositories from the supported git servers.
+                            You can deploy any kind of public repositories from the supported git providers.
                         </div>
                     </div>
                 </div>

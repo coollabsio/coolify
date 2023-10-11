@@ -72,10 +72,14 @@ class PublicGitRepository extends Component
     public function load_branch()
     {
         try {
-            $this->branch_found = false;
             $this->validate([
                 'repository_url' => 'required|url'
             ]);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+        try {
+            $this->branch_found = false;
             $this->get_git_source();
             $this->get_branch();
             $this->selected_branch = $this->git_branch;
