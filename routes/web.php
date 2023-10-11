@@ -73,6 +73,7 @@ Route::get('/verify', function () {
 
 Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
     $request->fulfill();
+    send_internal_notification("User {$request->user()->name} verified their email address.");
     return redirect('/');
 })->middleware(['auth'])->name('verify.verify');
 

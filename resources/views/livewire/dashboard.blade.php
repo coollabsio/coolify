@@ -14,9 +14,12 @@
             <span>Your subscription has been activated! Welcome onboard!</span>
         </div>
     @endif
-
-    <h3 class="pb-4">Projects</h3>
-
+    @if ($projects->count() === 0 && $servers->count() === 0)
+        No resources found. Add your first server / private key <a class="text-white underline" href="{{route('server.create')}}">here</a>.
+    @endif
+    @if ($projects->count() > 0)
+        <h3 class="pb-4">Projects</h3>
+    @endif
     @if ($projects->count() === 1)
         <div class="grid grid-cols-1 gap-2">
         @else
@@ -58,7 +61,9 @@
         </div>
     @endforeach
 </div>
-<h3 class="py-4">Servers</h3>
+@if ($projects->count() > 0)
+    <h3 class="pb-4">Servers</h3>
+@endif
 @if ($servers->count() === 1)
     <div class="grid grid-cols-1 gap-2">
     @else

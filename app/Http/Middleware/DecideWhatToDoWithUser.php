@@ -12,6 +12,9 @@ class DecideWhatToDoWithUser
     public function handle(Request $request, Closure $next): Response
     {
         if (!auth()->user() || !isCloud() || isInstanceAdmin()) {
+            if (!isCloud() && showBoarding()  && !in_array($request->path(), allowedPathsForBoardingAccounts())) {
+                return redirect('boarding');
+            }
             return $next($request);
         }
         if (!auth()->user()->hasVerifiedEmail()) {
