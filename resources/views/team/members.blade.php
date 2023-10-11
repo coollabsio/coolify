@@ -25,7 +25,7 @@
             @else
                 <h3>Invite a new member</h3>
                 @if (isInstanceAdmin())
-                    <div class="pb-4 text-xs text-warning">You need to configure <a href="/settings/emails"
+                    <div class="pb-4 text-xs text-warning">You need to configure (as root team) <a href="/settings#smtp"
                             class="underline text-warning">Transactional
                             Emails</a>
                         before

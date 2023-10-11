@@ -24,7 +24,7 @@
     @endif
     @foreach ($projects as $project)
         <div class="gap-2 border border-transparent cursor-pointer box group" x-data
-            x-on:click="gotoProject('{{ $project->uuid }}')">
+            x-on:click="gotoProject('{{ $project->uuid }}','{{ data_get($project, 'environments.0.name', 'production') }}')">
             @if (data_get($project, 'environments.0.name'))
                 <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                     href="{{ route('project.resources', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
@@ -94,8 +94,8 @@
 </div>
 
 <script>
-    function gotoProject(uuid) {
-        window.location.href = '/project/' + uuid;
+    function gotoProject(uuid, environment = 'production') {
+        window.location.href = '/project/' + uuid + '/' + environment;
     }
 </script>
 {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
