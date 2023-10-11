@@ -125,6 +125,12 @@ class General extends Component
     {
         try {
             $this->validate();
+            if (data_get($this->application,'build_pack') === 'dockerimage') {
+                $this->validate([
+                    'application.docker_registry_image_name' => 'required',
+                    'application.docker_registry_image_tag' => 'required',
+                ]);
+            }
             if (data_get($this->application, 'fqdn')) {
                 $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
                     return Str::of($domain)->trim()->lower();

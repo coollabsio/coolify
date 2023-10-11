@@ -73,8 +73,8 @@
                 </div>
             @else
                 <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input id="application.docker_registry_image_name" required label="Docker Image" />
-                    <x-forms.input id="application.docker_registry_image_tag" required label="Docker Image Tag" />
+                    <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
+                    <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
                 </div>
             @endif
 
