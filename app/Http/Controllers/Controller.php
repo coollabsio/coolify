@@ -46,15 +46,6 @@ class Controller extends BaseController
         }
         return redirect()->route('login')->with('error', 'Invalid credentials.');
     }
-    public function subscription()
-    {
-        if (!isCloud()) {
-            abort(404);
-        }
-        return view('subscription.index', [
-            'settings' => InstanceSettings::get(),
-        ]);
-    }
 
     public function license()
     {

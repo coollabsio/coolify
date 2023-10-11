@@ -18,6 +18,7 @@ use App\Http\Livewire\Server\Destination\Show as DestinationShow;
 use App\Http\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
 use App\Http\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Http\Livewire\Server\Show;
+use App\Http\Livewire\Subscription\Show as SubscriptionShow;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -133,7 +134,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
-    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.index');
+    Route::get('/subscription', SubscriptionShow::class)->name('subscription.index');
     // Route::get('/help', Help::class)->name('help');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');

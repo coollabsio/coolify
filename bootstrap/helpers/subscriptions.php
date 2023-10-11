@@ -110,7 +110,10 @@ function getStripeCustomerPortalSession(Team $team)
 {
     Stripe::setApiKey(config('subscription.stripe_api_key'));
     $return_url = route('team.index');
-    $stripe_customer_id = $team->subscription->stripe_customer_id;
+    $stripe_customer_id = data_get($team,'subscription.stripe_customer_id');
+    if (!$stripe_customer_id) {
+        return null;
+    }
     $session = \Stripe\BillingPortal\Session::create([
         'customer' => $stripe_customer_id,
         'return_url' => $return_url,
