@@ -61,7 +61,18 @@ class Form extends Component
         $activity = InstallDocker::run($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
-
+    public function checkLocalhostConnection() {
+        $uptime = $this->server->validateConnection();
+        if ($uptime) {
+            $this->emit('success', 'Server is reachable.');
+            $this->server->settings->is_reachable = true;
+            $this->server->settings->is_usable = true;
+            $this->server->settings->save();
+        } else {
+            $this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
+            return;
+        }
+    }
     public function validateServer($install = true)
     {
         try {
@@ -69,7 +80,7 @@ class Form extends Component
             if ($uptime) {
                 $install && $this->emit('success', 'Server is reachable.');
             } else {
-                $install &&$this->emit('error', 'Server is not reachable. Please check your connection and private key configuration.');
+                $install &&$this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();
@@ -117,6 +128,7 @@ class Form extends Component
             $this->emit('error', 'IP address is already in use by another team.');
             return;
         }
+        refresh_server_connection($this->server->privateKey);
         $this->server->settings->wildcard_domain = $this->wildcard_domain;
         $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
         $this->server->settings->save();

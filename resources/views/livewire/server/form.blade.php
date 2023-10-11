@@ -26,8 +26,15 @@
             Server is reachable and validated.
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
-            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100" wire:click.prevent='validateServer' isHighlighted>
+            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
+                wire:click.prevent='validateServer' isHighlighted>
                 Validate Server & Install Docker Engine
+            </x-forms.button>
+        @endif
+        @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id === 0)
+            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
+                wire:click.prevent='checkLocalhostConnection' isHighlighted>
+                Validate Server
             </x-forms.button>
         @endif
         <div class="flex flex-col gap-2 pt-4">
@@ -35,7 +42,7 @@
                 <x-forms.input id="server.name" label="Name" required />
                 <x-forms.input id="server.description" label="Description" />
                 <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
-                    helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example</span>In case you set:<span class='text-helper'>https://example.com</span>your applications will get: <span class='text-helper'>https://randomId.example.com</span>" />
+                    helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example:</span><br>In case you set:<span class='text-helper'>https://example.com</span> your applications will get:<br> <span class='text-helper'>https://randomId.example.com</span>" />
                 {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
@@ -59,13 +66,13 @@
                 helper="Disk cleanup job will be executed if disk usage is more than this number." />
         @endif
     </form>
-    <h2 class="pt-4">Danger Zone</h2>
-    <div class="">Woah. I hope you know what are you doing.</div>
-    <h4 class="pt-4">Delete Server</h4>
-    <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
-        back!
-    </div>
-    @if ($server->id !== 0 || isDev())
+    @if ($server->id !== 0)
+        <h2 class="pt-4">Danger Zone</h2>
+        <div class="">Woah. I hope you know what are you doing.</div>
+        <h4 class="pt-4">Delete Server</h4>
+        <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
+            back!
+        </div>
         <x-forms.button isError isModal modalId="deleteServer">
             Delete
         </x-forms.button>
