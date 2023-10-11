@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'docs' => 'https://coolify.io/contact',
+    'docs' => 'https://coolify.io/docs/contact',
     'self_hosted' => env('SELF_HOSTED', true),
     'waitlist' => env('WAITLIST', false),
     'license_url' => 'https://licenses.coollabs.io',
