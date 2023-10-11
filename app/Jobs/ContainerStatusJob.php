@@ -44,7 +44,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         try {
-            // ray("checking server status for {$this->server->name}");
+            ray("checking server status for {$this->server->name}");
             // ray()->clearAll();
             $serverUptimeCheckNumber = $this->server->unreachable_count;
             $serverUptimeCheckNumberMax = 3;
@@ -58,6 +58,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $this->server->settings()->update([
                     'is_reachable' => false,
+                ]);
+                $this->server->update([
+                    'unreachable_count' => 0,
                 ]);
                 return;
             }

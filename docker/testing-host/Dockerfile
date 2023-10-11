@@ -27,4 +27,4 @@ RUN mkdir -p ~/.ssh
 RUN echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFuGmoeGq/pojrsyP1pszcNVuZx9iFkCELtxrh31QJ68 coolify@coolify-instance" >> ~/.ssh/authorized_keys
 
 EXPOSE 22
-CMD ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0"]
+CMD ["/usr/sbin/sshd", "-D", "-o", "ListenAddress=0.0.0.0", "-o", "Port=22"]
