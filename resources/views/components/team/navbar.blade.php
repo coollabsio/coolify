@@ -1,11 +1,14 @@
 <div class="pb-6">
-    <h1>Team</h1>
+    <div class="flex items-end gap-2">
+        <h1>Team</h1>
+        <a href="/team/new"><x-forms.button>+ New Team</x-forms.button></a>
+    </div>
     <nav class="flex pt-2 pb-10">
         <ol class="inline-flex items-center">
             <li>
                 <div class="flex items-center">
                     <span>Currently active team: <span
-                        class="text-warning">{{ session('currentTeam.name') }}</span></span>
+                            class="text-warning">{{ session('currentTeam.name') }}</span></span>
                 </div>
             </li>
         </ol>
