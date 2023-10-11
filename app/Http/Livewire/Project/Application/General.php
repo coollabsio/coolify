@@ -76,6 +76,9 @@ class General extends Component
 
     ];
 
+    public function updatedApplicationBuildPack(){
+        $this->submit();
+    }
     public function instantSave()
     {
         // @TODO: find another way - if possible
