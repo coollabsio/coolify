@@ -1,13 +1,13 @@
 <div>
     <h1>Create a new Application</h1>
     <div class="pb-4">Deploy any public Git repositories.</div>
-    <form class="flex flex-col gap-2" wire:submit.prevent>
+    <form class="flex flex-col gap-2" wire:submit.prevent='load_branch'>
         <div class="flex flex-col gap-2">
             <div class="flex flex-col">
                 <div class="flex items-end gap-2">
-                    <x-forms.input wire:keydown.enter='load_branch' id="repository_url" label="Repository URL"
+                    <x-forms.input required  id="repository_url" label="Repository URL"
                         helper="{!! __('repository.url') !!}" />
-                    <x-forms.button wire:click.prevent="load_branch">
+                    <x-forms.button type="submit">
                         Check repository
                     </x-forms.button>
                 </div>
@@ -16,10 +16,9 @@
                         <div class="flex gap-2 py-2">
                             <div>Rate Limit</div>
                             <x-helper
-                                helper="Rate limit remaining: {{ $rate_limit_remaining }}<br>Rate limit reset at: {{ $rate_limit_reset }}" />
+                                helper="Rate limit remaining: {{ $rate_limit_remaining }}<br>Rate limit reset at: {{ $rate_limit_reset }} UTC"  />
                         </div>
                     @endif
-                    <h3 class="pt-8 pb-2">Details</h3>
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">
                             @if ($git_source === 'other')
