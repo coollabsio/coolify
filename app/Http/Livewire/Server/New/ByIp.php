@@ -11,13 +11,13 @@ class ByIp extends Component
 {
     public $private_keys;
     public $limit_reached;
-    public int|null $private_key_id = null;
+    public ?int $private_key_id = null;
     public $new_private_key_name;
     public $new_private_key_description;
     public $new_private_key_value;
 
     public string $name;
-    public string|null $description = null;
+    public ?string $description = null;
     public string $ip;
     public string $user = 'root';
     public int $port = 22;
@@ -26,16 +26,16 @@ class ByIp extends Component
     protected $rules = [
         'name' => 'required|string',
         'description' => 'nullable|string',
-        'ip' => 'required',
+        'ip' => 'required|ip',
         'user' => 'required|string',
         'port' => 'required|integer',
     ];
     protected $validationAttributes = [
-        'name' => 'name',
-        'description' => 'description',
-        'ip' => 'ip',
-        'user' => 'user',
-        'port' => 'port',
+        'name' => 'Name',
+        'description' => 'Description',
+        'ip' => 'IP Address',
+        'user' => 'User',
+        'port' => 'Port',
     ];
 
     public function mount()
