@@ -59,7 +59,7 @@ class ResourcesDelete extends Command
         );
 
         foreach ($serversToDelete as $id) {
-            $toDelete = $servers->find($id)->first();
+            $toDelete = Server::find($id);
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources?");
             if (!$confirmed) {
