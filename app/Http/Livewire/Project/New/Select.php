@@ -2,12 +2,11 @@
 
 namespace App\Http\Livewire\Project\New;
 
+use App\Models\Project;
 use App\Models\Server;
 use Countable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Select extends Component
@@ -24,7 +23,8 @@ class Select extends Component
     public Collection|array $services = [];
     public bool $loadingServices = true;
     public bool $loading = false;
-
+    public $environments = [];
+    public ?string $selectedEnvironment = null;
     public ?string $existingPostgresqlUrl = null;
 
     protected $queryString = [
@@ -37,8 +37,18 @@ class Select extends Component
         if (isDev()) {
             $this->existingPostgresqlUrl = 'postgres://coolify:password@coolify-db:5432';
         }
+        $projectUuid = data_get($this->parameters, 'project_uuid');
+        $this->environments = Project::whereUuid($projectUuid)->first()->environments;
+        $this->selectedEnvironment = data_get($this->parameters, 'environment_name');
     }
 
+    public function updatedSelectedEnvironment()
+    {
+        return redirect()->route('project.resources.new', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'environment_name' => $this->selectedEnvironment,
+        ]);
+    }
     // public function addExistingPostgresql()
     // {
     //     try {
