@@ -14,27 +14,7 @@
             <span>Your subscription has been activated! Welcome onboard!</span>
         </div>
     @endif
-    <div class="w-full rounded stats stats-vertical lg:stats-horizontal">
-        <div class="stat">
-            <div class="stat-title">Servers</div>
-            <div class="stat-value">{{ $servers->count() }} </div>
-        </div>
 
-        <div class="stat">
-            <div class="stat-title">Projects</div>
-            <div class="stat-value">{{ $projects->count() }}</div>
-        </div>
-
-        <div class="stat">
-            <div class="stat-title">Resources</div>
-            <div class="stat-value">{{ $resources }}</div>
-            <div class="stat-desc">Applications, databases, etc...</div>
-        </div>
-        <div class="stat">
-            <div class="stat-title">S3 Storages</div>
-            <div class="stat-value">{{ $s3s }}</div>
-        </div>
-    </div>
     <h3 class="pb-4">Projects</h3>
 
     @if ($projects->count() === 1)
@@ -60,6 +40,10 @@
                         {{ $project->description }}</div>
                 </a>
             @endif
+            <a class="mx-4 rounded group-hover:text-white hover:no-underline "
+                href="{{ route('project.resources.new', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
+                <span class="font-bold hover:text-warning">+ New Resource</span>
+            </a>
             <a class="mx-4 rounded group-hover:text-white"
                 href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning" viewBox="0 0 24 24"
@@ -108,11 +92,11 @@
     </a>
 @endforeach
 </div>
+
 <script>
     function gotoProject(uuid) {
         window.location.href = '/project/' + uuid;
     }
-   
 </script>
 {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
 </div>

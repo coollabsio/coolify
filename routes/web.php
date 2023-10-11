@@ -135,7 +135,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
     Route::get('/subscription', SubscriptionShow::class)->name('subscription.index');
-    // Route::get('/help', Help::class)->name('help');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
