@@ -8,6 +8,9 @@
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     <title>Coolify</title>
     @env('local')
+    @if (!isCloud())
+        <meta name="robots" content="noindex">
+    @endif
     <link rel="icon" href="{{ asset('favicon-dev.png') }}" type="image/x-icon" />
 @else
     <link rel="icon" href="{{ asset('coolify-transparent.png') }}" type="image/x-icon" />
