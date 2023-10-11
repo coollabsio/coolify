@@ -58,8 +58,8 @@ class ResourcesDelete extends Command
             $servers->pluck('id')->sort()->toArray(),
         );
 
-        foreach ($serversToDelete as $server) {
-            $toDelete = $servers->where('id', $server)->first();
+        foreach ($serversToDelete as $id) {
+            $toDelete = $servers->find($id)->first();
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources?");
             if (!$confirmed) {
