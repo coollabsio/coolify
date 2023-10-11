@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Application;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandalonePostgresql;
 use Illuminate\Console\Command;
@@ -34,7 +35,7 @@ class ResourcesDelete extends Command
     {
         $resource = select(
             'What resource do you want to delete?',
-            ['Application', 'Database', 'Service'],
+            ['Application', 'Database', 'Service', 'Server'],
         );
         if ($resource === 'Application') {
             $this->deleteApplication();
@@ -42,6 +43,27 @@ class ResourcesDelete extends Command
             $this->deleteDatabase();
         } elseif ($resource === 'Service') {
             $this->deleteService();
+        } elseif($resource === 'Server') {
+            $this->deleteServer();
+        }
+    }
+    private function deleteServer() {
+        $servers = Server::all();
+        if ($servers->count() === 0) {
+            $this->error('There are no applications to delete.');
+            return;
+        }
+        $serversToDelete = multiselect(
+            'What server do you want to delete?',
+            $servers->pluck('id')->toArray(),
+        );
+        $confirmed = confirm("Are you sure you want to delete all selected resources?");
+        if (!$confirmed) {
+            return;
+        }
+        foreach ($serversToDelete as $server) {
+            $toDelete = $servers->where('id', $server)->first();
+            $toDelete->delete();
         }
     }
     private function deleteApplication()
