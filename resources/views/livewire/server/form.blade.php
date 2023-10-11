@@ -31,6 +31,12 @@
                 Validate Server & Install Docker Engine
             </x-forms.button>
         @endif
+        @if ($server->id === 0)
+            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
+                wire:click.prevent='checkLocalhostConnection' isHighlighted>
+                Validate Server
+            </x-forms.button>
+        @endif
         <div class="flex flex-col gap-2 pt-4">
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input id="server.name" label="Name" required />
