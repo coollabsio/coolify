@@ -11,19 +11,11 @@ class Dashboard extends Component
 {
     public $projects = [];
     public $servers = [];
-    public int $s3s = 0;
-    public int $resources = 0;
 
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();
-        $this->s3s = S3Storage::ownedByCurrentTeam()->get()->count();
-        $projects = Project::ownedByCurrentTeam()->get();
-        foreach ($projects as $project) {
-            $this->resources += $project->applications->count();
-            $this->resources += $project->postgresqls->count();
-        }
-        $this->projects = $projects;
+        $this->projects = Project::ownedByCurrentTeam()->get();
     }
     // public function getIptables()
     // {

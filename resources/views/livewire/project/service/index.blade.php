@@ -65,8 +65,8 @@
                                 @endif
                                 <div class="text-xs">{{ $application->status }}</div>
                             </a>
-                            <a class="flex gap-2 p-1 mx-4 text-xs font-bold rounded hover:no-underline hover:text-warning"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}">Logs</a>
+                            <a class="flex gap-2 p-1 mx-4 font-bold rounded group-hover:text-white hover:no-underline"
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}"><span class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                     @foreach ($databases as $database)
@@ -94,8 +94,8 @@
                                 @endif
                                 <div class="text-xs">{{ $database->status }}</div>
                             </a>
-                            <a class="flex gap-2 p-1 mx-4 text-xs font-bold rounded hover:no-underline hover:text-warning"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}">Logs</a>
+                            <a class="flex gap-2 p-1 mx-4 font-bold rounded hover:no-underline group-hover:text-white"
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}"><span class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                 </div>

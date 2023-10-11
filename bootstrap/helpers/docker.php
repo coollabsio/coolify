@@ -147,7 +147,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     }
     return $labels;
 }
-function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled)
+function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled, $onlyPort = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -158,7 +158,9 @@ function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled)
         $path = $url->getPath();
         $schema = $url->getScheme();
         $port = $url->getPort();
-
+        if (is_null($port) && !is_null($onlyPort)) {
+            $port = $onlyPort;
+        }
         $http_label = "{$uuid}-http";
         $https_label = "{$uuid}-https";
 
@@ -203,9 +205,12 @@ function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled)
 
     return $labels;
 }
-function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
+function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null, $ports): array
 {
-
+    $onlyPort = null;
+    if (count($ports) === 1) {
+        $onlyPort = $ports[0];
+    }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
     $container_name = generateApplicationContainerName($application, $pull_request_id);
     $appId = $application->id;
@@ -221,7 +226,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         // Add Traefik labels no matter which proxy is selected
-        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $application->settings->is_force_https_enabled));
+        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $application->settings->is_force_https_enabled,$onlyPort));
     }
     return $labels->all();
 }

@@ -200,7 +200,7 @@
                                 label="Description" id="remoteServerDescription" />
                         </div>
                         <div class="flex gap-2">
-                            <x-forms.input required placeholder="Hostname or IP address" label="Hostname or IP Address"
+                            <x-forms.input required placeholder="127.0.0.1" label="IP Address"
                                 id="remoteServerHost" />
                             <x-forms.input required placeholder="Port number of your server. Default is 22."
                                 label="Port" id="remoteServerPort" />

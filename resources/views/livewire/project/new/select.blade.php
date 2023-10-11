@@ -1,5 +1,14 @@
 <div x-data x-init="$wire.loadThings">
-    <h1>New Resource</h1>
+    <div class="flex gap-2 ">
+        <h1>New Resource</h1>
+        <div class="w-96">
+            <x-forms.select wire:model="selectedEnvironment">
+                @foreach ($environments as $environment)
+                    <option value="{{ $environment->name }}">Environment: {{ $environment->name }}</option>
+                @endforeach
+            </x-forms.select>
+        </div>
+    </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
     <div class="flex flex-col gap-2 pt-10">
         @if ($current_step === 'type')

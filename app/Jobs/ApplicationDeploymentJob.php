@@ -620,7 +620,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
-                    'labels' => generateLabelsApplication($this->application, $this->preview),
+                    'labels' => generateLabelsApplication($this->application, $this->preview, $ports),
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,

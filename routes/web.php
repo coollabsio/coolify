@@ -5,7 +5,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
-use App\Http\Controllers\ServerController;
 use App\Http\Livewire\Boarding\Index as BoardingIndex;
 use App\Http\Livewire\Project\Service\Index as ServiceIndex;
 use App\Http\Livewire\Project\Service\Show as ServiceShow;
@@ -17,7 +16,9 @@ use App\Http\Livewire\Server\Create;
 use App\Http\Livewire\Server\Destination\Show as DestinationShow;
 use App\Http\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
 use App\Http\Livewire\Server\Proxy\Show as ProxyShow;
+use App\Http\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Http\Livewire\Server\Show;
+use App\Http\Livewire\Subscription\Show as SubscriptionShow;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GithubApp;
 use App\Models\GitlabApp;
@@ -122,6 +123,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/server/new', Create::class)->name('server.create');
     Route::get('/server/{server_uuid}', Show::class)->name('server.show');
     Route::get('/server/{server_uuid}/proxy', ProxyShow::class)->name('server.proxy');
+    Route::get('/server/{server_uuid}/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
     Route::get('/server/{server_uuid}/private-key', PrivateKeyShow::class)->name('server.private-key');
     Route::get('/server/{server_uuid}/destinations', DestinationShow::class)->name('server.destinations');
 });
@@ -133,8 +135,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(['throttle:force-password-reset'])->group(function () {
         Route::get('/force-password-reset', [Controller::class, 'force_passoword_reset'])->name('auth.force-password-reset');
     });
-    Route::get('/subscription', [Controller::class, 'subscription'])->name('subscription.index');
-    // Route::get('/help', Help::class)->name('help');
+    Route::get('/subscription', SubscriptionShow::class)->name('subscription.index');
     Route::get('/settings', [Controller::class, 'settings'])->name('settings.configuration');
     Route::get('/settings/license', [Controller::class, 'license'])->name('settings.license');
     Route::get('/profile', fn () => view('profile', ['request' => request()]))->name('profile');
