@@ -2,16 +2,18 @@
 
 namespace App\Actions\Server;
 
+use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 
 class UpdateCoolify
 {
+    use AsAction;
     public ?Server $server = null;
     public ?string $latestVersion = null;
     public ?string $currentVersion = null;
 
-    public function __invoke(bool $force)
+    public function handle(bool $force)
     {
         try {
             $settings = InstanceSettings::get();

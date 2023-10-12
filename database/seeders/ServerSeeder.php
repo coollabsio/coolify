@@ -16,10 +16,6 @@ class ServerSeeder extends Seeder
             'ip' => "coolify-testing-host",
             'team_id' => 0,
             'private_key_id' => 0,
-            // 'proxy' => ServerMetadata::from([
-            //     'type' => ProxyTypes::TRAEFIK_V2->value,
-            //     'status' => ProxyStatus::EXITED->value
-            // ]),
         ]);
     }
 }

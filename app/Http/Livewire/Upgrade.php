@@ -37,7 +37,7 @@ class Upgrade extends Component
                 return;
             }
             $this->showProgress = true;
-            resolve(UpdateCoolify::class)(true);
+            UpdateCoolify::run(true);
             $this->emit('success', "Upgrading to {$this->latestVersion} version...");
         } catch (\Throwable $e) {
             return handleError($e, $this);
