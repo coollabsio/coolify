@@ -16,6 +16,7 @@ class General extends Component
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
+        'database.redis_conf' => 'nullable',
         'database.redis_password' => 'required',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
@@ -25,7 +26,8 @@ class General extends Component
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
-        'database.redis_password' => 'Postgres User',
+        'database.redis_conf' => 'Redis Configuration',
+        'database.redis_password' => 'Redis Password',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',
@@ -34,6 +36,9 @@ class General extends Component
     public function submit() {
         try {
             $this->validate();
+            if ($this->database->redis_conf === "") {
+                $this->database->redis_conf = null;
+            }
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');
         } catch (Exception $e) {

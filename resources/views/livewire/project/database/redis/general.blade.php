@@ -23,5 +23,6 @@
             </div>
             <x-forms.input label="Redis URL" readonly wire:model="db_url" />
         </div>
+        <x-forms.textarea label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
     </form>
 </div>

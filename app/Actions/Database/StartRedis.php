@@ -20,6 +20,9 @@ class StartRedis
     public function handle(Server $server, StandaloneRedis $database)
     {
         $this->database = $database;
+
+        $startCommand = "redis-server --requirepass {$this->database->redis_password} --appendonly yes";
+
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
@@ -31,12 +34,14 @@ class StartRedis
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
+        $this->add_custom_redis();
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
-                    'command' => "redis-server --requirepass {$this->database->redis_password} --appendonly yes",
+                    'command' => $startCommand,
                     'container_name' => $container_name,
                     'environment' => $environment_variables,
                     'restart' => RESTART_MODE,
@@ -80,16 +85,15 @@ class StartRedis
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        // if (count($this->init_scripts) > 0) {
-        //     foreach ($this->init_scripts as $init_script) {
-        //         $docker_compose['services'][$container_name]['volumes'][] = [
-        //             'type' => 'bind',
-        //             'source' => $init_script,
-        //             'target' => '/docker-entrypoint-initdb.d/' . basename($init_script),
-        //             'read_only' => true,
-        //         ];
-        //     }
-        // }
+        if (!is_null($this->database->redis_conf)) {
+            $docker_compose['services'][$container_name]['volumes'][] = [
+                'type' => 'bind',
+                'source' => $this->configuration_dir . '/redis.conf',
+                'target' => '/usr/local/etc/redis/redis.conf',
+                'read_only' => true,
+            ];
+            $docker_compose['services'][$container_name]['command'] =  $startCommand . ' /usr/local/etc/redis/redis.conf';
+        }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
         $this->commands[] = "echo '{$docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml";
@@ -140,5 +144,16 @@ class StartRedis
         }
 
         return $environment_variables->all();
+    }
+    private function add_custom_redis()
+    {
+        if (is_null($this->database->redis_conf)) {
+            return;
+        }
+        $filename = 'redis.conf';
+        $content = $this->database->redis_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
+
     }
 }
