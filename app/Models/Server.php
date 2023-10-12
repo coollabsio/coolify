@@ -93,8 +93,11 @@ class Server extends BaseModel
 
     public function proxyType()
     {
-        $type = $this->proxy->get('type');
-        if (is_null($type)) {
+        $proxyType = $this->proxy->get('type');
+        if ($proxyType === ProxyTypes::NONE->value) {
+            return $proxyType;
+        }
+        if (is_null($proxyType)) {
             $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
             $this->proxy->status = ProxyStatus::EXITED->value;
             $this->save();

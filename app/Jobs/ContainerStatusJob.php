@@ -114,7 +114,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 return data_get($value, 'Name') === '/coolify-proxy';
             })->first();
             if (!$foundProxyContainer) {
-                ray('Proxy not found, starting it...');
                 if ($this->server->isProxyShouldRun()) {
                     StartProxy::run($this->server, false);
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
