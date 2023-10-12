@@ -13,20 +13,15 @@ class Navbar extends Component
     public Service $service;
     public array $parameters;
     public array $query;
-    protected $listeners = ['serviceStatusUpdated'];
 
     public function render()
     {
         return view('livewire.project.service.navbar');
     }
-    public function serviceStatusUpdated()
+
+    public function checkStatus()
     {
-        $this->check_status();
-    }
-    public function check_status()
-    {
-        dispatch_sync(new ContainerStatusJob($this->service->server));
-        $this->service->refresh();
+        $this->emit('checkStatus');
     }
     public function deploy()
     {

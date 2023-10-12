@@ -13,13 +13,7 @@ class Index extends Component
     public $databases;
     public array $parameters;
     public array $query;
-    protected $rules = [
-        'service.docker_compose_raw' => 'required',
-        'service.docker_compose' => 'required',
-        'service.name' => 'required',
-        'service.description' => 'nullable',
-    ];
-    protected $listeners = ["saveCompose"];
+    protected $listeners = ["refreshStacks","checkStatus"];
     public function render()
     {
         return view('livewire.project.service.index');
@@ -32,17 +26,12 @@ class Index extends Component
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }
-    public function saveCompose($raw)
-    {
-        $this->service->docker_compose_raw = $raw;
-        $this->submit();
-    }
     public function checkStatus()
     {
         dispatch_sync(new ContainerStatusJob($this->service->server));
-        $this->refreshStack();
+        $this->refreshStacks();
     }
-    public function refreshStack()
+    public function refreshStacks()
     {
         $this->applications = $this->service->applications->sort();
         $this->applications->each(function ($application) {
@@ -52,22 +41,5 @@ class Index extends Component
         $this->databases->each(function ($database) {
             $database->refresh();
         });
-    }
-
-
-    public function submit()
-    {
-        try {
-            $this->validate();
-            $this->service->save();
-            $this->service->parse();
-            $this->service->refresh();
-            $this->service->saveComposeConfigs();
-            $this->refreshStack();
-            $this->emit('refreshEnvs');
-            $this->emit('success', 'Service saved successfully.');
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
     }
 }
