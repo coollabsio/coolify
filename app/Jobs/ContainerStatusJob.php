@@ -29,7 +29,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        $this->handle();
+
     }
 
     public function middleware(): array
@@ -44,7 +44,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         try {
-            ray("checking server status for {$this->server->name}");
+            ray("checking server status for {$this->server->id}");
             // ray()->clearAll();
             $serverUptimeCheckNumber = $this->server->unreachable_count;
             $serverUptimeCheckNumberMax = 3;
@@ -114,7 +114,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 return data_get($value, 'Name') === '/coolify-proxy';
             })->first();
             if (!$foundProxyContainer) {
-                ray('Proxy not found, starting it...');
                 if ($this->server->isProxyShouldRun()) {
                     StartProxy::run($this->server, false);
                     $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));

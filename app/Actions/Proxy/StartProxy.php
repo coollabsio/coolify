@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proxy;
 
+use App\Enums\ProxyTypes;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -14,7 +15,7 @@ class StartProxy
     {
         $commands = collect([]);
         $proxyType = $server->proxyType();
-        if ($proxyType === 'none') {
+        if ($proxyType === ProxyTypes::NONE->value) {
             return 'OK';
         }
         $proxy_path = get_proxy_path();

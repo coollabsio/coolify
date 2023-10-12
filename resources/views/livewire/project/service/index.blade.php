@@ -1,40 +1,24 @@
-<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.2000ms="checkStatus">
+<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" wire:poll.15000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <livewire:project.service.compose-modal :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a :class="activeTab === 'service-stack' && 'text-white'"
-                @click.prevent="activeTab = 'service-stack'; window.location.hash = 'service-stack'"
-                href="#">Service Stack</a>
-            <a :class="activeTab === 'storages' && 'text-white'"
-                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages</a>
+            <a :class="activeTab === 'service-stack' && 'text-white'" @click.prevent="activeTab = 'service-stack';
+                window.location.hash = 'service-stack'" href="#">Service Stack</a>
+            <a :class="activeTab === 'storages' && 'text-white'" @click.prevent="activeTab = 'storages';
+                window.location.hash = 'storages'" href="#">Storages</a>
             <a :class="activeTab === 'environment-variables' && 'text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'danger' && 'text-white'"
-                @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
+            <a :class="activeTab === 'danger' && 'text-white'" @click.prevent="activeTab = 'danger';
+                window.location.hash = 'danger'" href="#">Danger Zone
             </a>
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'service-stack'">
-                <form wire:submit.prevent='submit' class="flex flex-col gap-4 pb-2">
-                    <div class="flex gap-2">
-                        <div>
-                            <h2> Service Stack </h2>
-                            <div>Configuration</div>
-                        </div>
-                        <x-forms.button type="submit">Save</x-forms.button>
-                        <x-forms.button class="w-64" onclick="composeModal.showModal()">Edit Compose
-                            File</x-forms.button>
-                    </div>
-                    <div class="flex gap-2">
-                        <x-forms.input id="service.name" required label="Service Name"
-                            placeholder="My super wordpress site" />
-                        <x-forms.input id="service.description" label="Description" />
-                    </div>
-                </form>
+                <livewire:project.service.stack-form :service="$service" />
                 <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">
                     @foreach ($applications as $application)
                         <div @class([
@@ -66,7 +50,8 @@
                                 <div class="text-xs">{{ $application->status }}</div>
                             </a>
                             <a class="flex gap-2 p-1 mx-4 font-bold rounded group-hover:text-white hover:no-underline"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}"><span class="hover:text-warning">Logs</span></a>
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}"><span
+                                    class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                     @foreach ($databases as $database)
@@ -95,7 +80,8 @@
                                 <div class="text-xs">{{ $database->status }}</div>
                             </a>
                             <a class="flex gap-2 p-1 mx-4 font-bold rounded hover:no-underline group-hover:text-white"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}"><span class="hover:text-warning">Logs</span></a>
+                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}"><span
+                                    class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                 </div>
@@ -126,3 +112,4 @@
             </div>
         </div>
     </div>
+</div>

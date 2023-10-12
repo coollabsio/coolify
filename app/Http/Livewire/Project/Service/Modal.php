@@ -6,8 +6,8 @@ use Livewire\Component;
 
 class Modal extends Component
 {
-    public function serviceStatusUpdated() {
-        $this->emit('serviceStatusUpdated');
+    public function checkStatus() {
+        $this->emit('checkStatus');
     }
     public function render()
     {
