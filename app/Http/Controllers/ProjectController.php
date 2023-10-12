@@ -59,11 +59,16 @@ class ProjectController extends Controller
             return redirect()->route('dashboard');
         }
         if (in_array($type, DATABASE_TYPES)) {
-            $standalone_postgresql = create_standalone_postgresql($environment->id, $destination_uuid);
+            if ($type->value() === "postgresql") {
+                $database = create_standalone_postgresql($environment->id, $destination_uuid);
+            } else if ($type->value() === 'redis') {
+                $database = create_standalone_redis($environment->id, $destination_uuid);
+            }
+            ray($database);
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,
-                'database_uuid' => $standalone_postgresql->uuid,
+                'database_uuid' => $database->uuid,
             ]);
         }
         if ($type->startsWith('one-click-service-') && !is_null( (int)$server_id)) {

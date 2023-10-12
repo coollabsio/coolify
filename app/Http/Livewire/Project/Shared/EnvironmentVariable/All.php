@@ -75,6 +75,9 @@ class All extends Component
                     case 'standalone-postgresql':
                         $environment->standalone_postgresql_id = $this->resource->id;
                         break;
+                    case 'standalone-redis':
+                        $environment->standalone_redis_id = $this->resource->id;
+                        break;
                     case 'service':
                         $environment->service_id = $this->resource->id;
                         break;

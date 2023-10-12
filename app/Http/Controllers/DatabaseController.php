@@ -19,7 +19,7 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
         }
@@ -37,7 +37,7 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
         }
@@ -64,7 +64,7 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
         }

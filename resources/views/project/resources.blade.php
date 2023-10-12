@@ -46,7 +46,7 @@
                 </div>
             </a>
         @endforeach
-        @foreach ($environment->databases->sortBy('name') as $databases)
+        @foreach ($environment->databases()->sortBy('name') as $databases)
             <a class="box group"
                 href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
                 <div class="flex flex-col mx-6">
