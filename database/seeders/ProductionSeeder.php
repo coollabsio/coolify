@@ -13,8 +13,8 @@ use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\Team;
 use App\Models\User;
-use DB;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Storage;
 
@@ -22,6 +22,12 @@ class ProductionSeeder extends Seeder
 {
     public function run(): void
     {
+        if (isCloud()) {
+            echo "Running in cloud mode.\n";
+        } else {
+            echo "Running in self-hosted mode.\n";
+        }
+
         // Fix for 4.0.0-beta.37
         if (User::find(0) !== null && Team::find(0) !== null) {
             if (DB::table('team_user')->where('user_id', 0)->first() === null) {
@@ -61,7 +67,6 @@ class ProductionSeeder extends Seeder
         }
 
         if (!isCloud()) {
-            echo "Running in self-hosted mode.\n";
             // Save SSH Keys for the Coolify Host
             $coolify_key_name = "id.root@host.docker.internal";
             $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
