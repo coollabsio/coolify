@@ -61,6 +61,7 @@ class ProductionSeeder extends Seeder
         }
 
         if (!isCloud()) {
+            echo "Running in self-hosted mode.\n";
             // Save SSH Keys for the Coolify Host
             $coolify_key_name = "id.root@host.docker.internal";
             $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
