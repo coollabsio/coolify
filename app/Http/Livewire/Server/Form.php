@@ -21,7 +21,7 @@ class Form extends Component
     protected $rules = [
         'server.name' => 'required|min:6',
         'server.description' => 'nullable',
-        'server.ip' => 'required',
+        'server.ip' => 'required|ip',
         'server.user' => 'required',
         'server.port' => 'required',
         'server.settings.is_cloudflare_tunnel' => 'required',
@@ -30,11 +30,11 @@ class Form extends Component
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
-        'server.name' => 'name',
-        'server.description' => 'description',
-        'server.ip' => 'ip',
-        'server.user' => 'user',
-        'server.port' => 'port',
+        'server.name' => 'Name',
+        'server.description' => 'Description',
+        'server.ip' => 'IP address',
+        'server.user' => 'User',
+        'server.port' => 'Port',
         'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'is reachable',
         'server.settings.is_part_of_swarm' => 'is part of swarm'

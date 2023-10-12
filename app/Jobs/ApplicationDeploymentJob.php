@@ -142,14 +142,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
             } else if ($this->application->build_pack === 'dockerimage') {
-                $this->deploy_dockerimage();
+                $this->deploy_dockerimage_buildpack();
             } else if ($this->application->build_pack === 'dockerfile') {
-                $this->deploy_dockerfile();
+                $this->deploy_dockerfile_buildpack();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();
                 } else {
-                    $this->deploy();
+                    $this->deploy_nixpacks_buildpack();
                 }
             }
             if ($this->server->isProxyShouldRun()) {
@@ -257,7 +257,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->rolling_update();
     }
 
-    private function deploy_dockerimage()
+    private function deploy_dockerimage_buildpack()
     {
         $this->dockerImage = $this->application->docker_registry_image_name;
         $this->dockerImageTag = $this->application->docker_registry_image_tag;
@@ -273,7 +273,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->rolling_update();
     }
 
-    private function deploy_dockerfile()
+    private function deploy_dockerfile_buildpack()
     {
         if (data_get($this->application, 'dockerfile_location')) {
             $this->dockerfile_location = $this->application->dockerfile_location;
@@ -301,7 +301,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // $this->build_image();
         $this->rolling_update();
     }
-    private function deploy()
+    private function deploy_nixpacks_buildpack()
     {
         $this->execute_remote_command(
             [
@@ -334,9 +334,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         $this->cleanup_git();
-        if ($this->application->build_pack === 'nixpacks') {
-            $this->generate_nixpacks_confs();
-        }
+        $this->generate_nixpacks_confs();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
@@ -763,7 +761,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -850,7 +848,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function add_build_env_variables_to_dockerfile()
     {
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "cat {$this->workdir}/Dockerfile"), "hidden" => true, "save" => 'dockerfile'
+            executeInDocker($this->deployment_uuid, "cat {$this->workdir}/{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile'
         ]);
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
 
@@ -859,7 +857,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/Dockerfile"),
+            executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}/{$this->dockerfile_location}"),
             "hidden" => true
         ]);
     }
