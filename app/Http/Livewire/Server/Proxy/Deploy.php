@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server\Proxy;
 
+use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
@@ -11,17 +12,28 @@ class Deploy extends Component
     public Server $server;
     public bool $traefikDashboardAvailable = false;
     public ?string $currentRoute = null;
-    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable', 'serverRefresh' => 'proxyStatusUpdated'];
+    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable', 'serverRefresh' => 'proxyStatusUpdated', "checkProxy", "startProxy"];
 
-    public function mount() {
+    public function mount()
+    {
         $this->currentRoute = request()->route()->getName();
     }
-    public function traefikDashboardAvailable(bool $data) {
+    public function traefikDashboardAvailable(bool $data)
+    {
         $this->traefikDashboardAvailable = $data;
     }
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
+    }
+    public function checkProxy() {
+        try {
+            CheckProxy::run($this->server);
+            $this->emit('startProxyPolling');
+            $this->emit('proxyChecked');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
     public function startProxy()
     {

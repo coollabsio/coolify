@@ -27,11 +27,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public $timeout = 120;
 
-    public function __construct(public Server $server)
-    {
-
-    }
-
     public function middleware(): array
     {
         return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
@@ -41,6 +36,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         return $this->server->uuid;
     }
+
+    public function __construct(public Server $server)
+    {
+    }
+
     public function handle()
     {
         try {

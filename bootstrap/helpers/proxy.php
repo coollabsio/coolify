@@ -22,7 +22,7 @@ function connectProxyToNetworks(Server $server)
     }
     $commands = $networks->map(function ($network) {
         return [
-            "echo '####### Connecting coolify-proxy to $network network...'",
+            "echo 'Connecting coolify-proxy to $network network...'",
             "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
             "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
         ];
