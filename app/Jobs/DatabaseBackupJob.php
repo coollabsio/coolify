@@ -66,50 +66,77 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 ray('database not running');
                 return;
             }
+            $databaseType = $this->database->type();
+            $databasesToBackup = data_get($this->backup, 'databases_to_backup');
+
+            if (is_null($databasesToBackup)) {
+                if ($databaseType === 'standalone-postgresql') {
+                    $databasesToBackup = [$this->database->postgres_db];
+                } else {
+                    return;
+                }
+            } else {
+                $databasesToBackup = explode(',', $databasesToBackup);
+                $databasesToBackup = array_map('trim', $databasesToBackup);
+            }
             $this->container_name = $this->database->uuid;
             $this->backup_dir = backup_dir() . "/databases/" . Str::of($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->container_name;
 
             if ($this->database->name === 'coolify-db') {
+                $databasesToBackup = ['coolify'];
                 $this->container_name = "coolify-db";
                 $ip = Str::slug($this->server->ip);
                 $this->backup_dir = backup_dir() . "/coolify" . "/coolify-db-$ip";
             }
-            $this->backup_file = "/pg-backup-customformat-" . Carbon::now()->timestamp . ".backup";
-            $this->backup_location = $this->backup_dir . $this->backup_file;
-
-            $this->backup_log = ScheduledDatabaseBackupExecution::create([
-                'filename' => $this->backup_location,
-                'scheduled_database_backup_id' => $this->backup->id,
-            ]);
-            if ($this->database->type() === 'standalone-postgresql') {
-                $this->backup_standalone_postgresql();
+            foreach ($databasesToBackup as $database) {
+                $size = 0;
+                ray('Backing up ' . $database);
+                try {
+                    $this->backup_file = "/pg-dump-$database-" . Carbon::now()->timestamp . ".dmp";
+                    $this->backup_location = $this->backup_dir . $this->backup_file;
+                    $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                        'database_name' => $database,
+                        'filename' => $this->backup_location,
+                        'scheduled_database_backup_id' => $this->backup->id,
+                    ]);
+                    if ($databaseType === 'standalone-postgresql') {
+                        $this->backup_standalone_postgresql($database);
+                    }
+                    $size = $this->calculate_size();
+                    $this->remove_old_backups();
+                    if ($this->backup->save_s3) {
+                        $this->upload_to_s3();
+                    }
+                    $this->team->notify(new BackupSuccess($this->backup, $this->database));
+                    $this->backup_log->update([
+                        'status' => 'success',
+                        'message' => $this->backup_output,
+                        'size' => $size,
+                    ]);
+                } catch (\Throwable $e) {
+                    $this->backup_log->update([
+                        'status' => 'failed',
+                        'message' => $this->backup_output,
+                        'size' => $size,
+                        'filename' => null
+                    ]);
+                    send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
+                    $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
+                    throw $e;
+                }
             }
-            $this->calculate_size();
-            $this->remove_old_backups();
-            if ($this->backup->save_s3) {
-                $this->upload_to_s3();
-            }
-            $this->save_backup_logs();
-            $this->team->notify(new BackupSuccess($this->backup, $this->database));
-            $this->backup_status = 'success';
         } catch (\Throwable $e) {
-            $this->backup_status = 'failed';
             send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
-            $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
             throw $e;
-        } finally {
-            $this->backup_log->update([
-                'status' => $this->backup_status,
-            ]);
         }
     }
 
-    private function backup_standalone_postgresql(): void
+    private function backup_standalone_postgresql(string $database): void
     {
         try {
             ray($this->backup_dir);
             $commands[] = "mkdir -p " . $this->backup_dir;
-            $commands[] = "docker exec $this->container_name pg_dump -Fc -U {$this->database->postgres_user} > $this->backup_location";
+            $commands[] = "docker exec $this->container_name pg_dump --format=custom --no-acl --no-owner --username {$this->database->postgres_user} $database > $this->backup_location";
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {
@@ -119,6 +146,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             $this->add_to_backup_output($e->getMessage());
             ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -131,9 +159,9 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
         }
     }
 
-    private function calculate_size(): void
+    private function calculate_size()
     {
-        $this->size = instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server);
+        return instant_remote_process(["du -b $this->backup_location | cut -f1"], $this->server, false);
     }
 
     private function remove_old_backups(): void
@@ -179,14 +207,5 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             $command = "docker rm -f backup-of-{$this->backup->uuid}";
             instant_remote_process([$command], $this->server);
         }
-    }
-
-    private function save_backup_logs(): void
-    {
-        $this->backup_log->update([
-            'status' => $this->backup_status,
-            'message' => $this->backup_output,
-            'size' => $this->size,
-        ]);
     }
 }

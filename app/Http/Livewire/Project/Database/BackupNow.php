@@ -13,6 +13,6 @@ class BackupNow extends Component
         dispatch(new DatabaseBackupJob(
             backup: $this->backup
         ));
-        $this->emit('success', 'Backup queued. It will be available in a few minutes');
+        $this->emit('success', 'Backup queued. It will be available in a few minutes.');
     }
 }

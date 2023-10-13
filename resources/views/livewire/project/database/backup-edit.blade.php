@@ -26,6 +26,7 @@
         </div>
     @endif
     <div class="flex gap-2">
+        <x-forms.input label="Databases To Backup" helper="Comma separated list of databases to backup. Empty will include the default one." id="backup.databases_to_backup" />
         <x-forms.input label="Frequency" id="backup.frequency" />
         <x-forms.input label="Number of backups to keep (locally)" id="backup.number_of_backups_locally" />
     </div>

@@ -78,10 +78,10 @@ class Backup extends Component
         dispatch(new DatabaseBackupJob(
             backup: $this->backup
         ));
-        $this->emit('success', 'Backup queued. It will be available in a few minutes');
+        $this->emit('success', 'Backup queued. It will be available in a few minutes.');
     }
     public function submit()
     {
-        $this->emit('success', 'Backup updated successfully');
+        $this->emit('success', 'Backup updated successfully.');
     }
 }
