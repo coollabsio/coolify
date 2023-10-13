@@ -98,7 +98,6 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'git_full_url' => $this->git_repository,
                     'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
@@ -112,7 +111,6 @@ class GithubPrivateRepositoryDeployKey extends Component
                     'name' => generate_random_name(),
                     'git_repository' => $this->git_repository,
                     'git_branch' => $this->branch,
-                    'git_full_url' => "git@$this->git_host:$this->git_repository.git",
                     'build_pack' => 'nixpacks',
                     'ports_exposes' => $this->port,
                     'publish_directory' => $this->publish_directory,
@@ -158,6 +156,8 @@ class GithubPrivateRepositoryDeployKey extends Component
             $this->git_host = $this->repository_url_parsed->getHost();
             $this->git_repository = $this->repository_url_parsed->getSegment(1) . '/' . $this->repository_url_parsed->getSegment(2);
             $this->git_repository = Str::finish("git@$this->git_host:$this->git_repository", '.git');
+        } else {
+            $this->git_repository = $this->repository_url;
         }
         $this->git_source = 'other';
     }

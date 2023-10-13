@@ -77,6 +77,10 @@ class General extends Component
     ];
 
     public function updatedApplicationBuildPack(){
+        if ($this->application->build_pack !== 'nixpacks') {
+            $this->application->settings->is_static = $this->is_static = false;
+            $this->application->settings->save();
+        }
         $this->submit();
     }
     public function instantSave()

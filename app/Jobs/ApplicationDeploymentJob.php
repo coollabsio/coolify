@@ -510,8 +510,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         if ($this->application->deploymentType() === 'deploy_key') {
+            $port = 22;
+            preg_match('/(?<=:)\d+(?=\/)/', $this->application->git_repository, $matches);
+            if (count($matches) === 1) {
+                $port = $matches[0];
+            }
             $private_key = base64_encode($this->application->private_key->private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_full_url} {$this->basedir}";
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -p $port -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
@@ -799,7 +804,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
         } else {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
