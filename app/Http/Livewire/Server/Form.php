@@ -122,14 +122,13 @@ class Form extends Component
     }
     public function submit()
     {
-        $validDomainsForServers = collect(['host.docker.internal', 'coolify-testing-host']);
-        if ($validDomainsForServers->contains($this->server->ip)) {
-            $this->validate();
-        } else {
+        if(isCloud() && !isDev()) {
             $this->validate();
             $this->validate([
                 'server.ip' => 'required|ip',
             ]);
+        } else {
+            $this->validate();
         }
         $uniqueIPs = Server::all()->reject(function (Server $server) {
             return $server->id === $this->server->id;
