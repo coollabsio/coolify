@@ -23,6 +23,6 @@
             </div>
             <x-forms.input label="Redis URL" type="password" readonly wire:model="db_url" />
         </div>
-        <x-forms.textarea label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
+        <x-forms.textarea helper="<a target='_blank' class='text-white underline' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>Redis Default Configuration</a>" label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
     </form>
 </div>
