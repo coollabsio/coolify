@@ -12,7 +12,7 @@
             <div class="flex gap-4">
                 @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable)
                     <button>
-                        <a target="_blank" href="http://{{ $server->ip }}:8080">
+                        <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard
                             <x-external-link />
                         </a>

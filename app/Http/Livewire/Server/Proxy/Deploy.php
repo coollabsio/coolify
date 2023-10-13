@@ -12,10 +12,17 @@ class Deploy extends Component
     public Server $server;
     public bool $traefikDashboardAvailable = false;
     public ?string $currentRoute = null;
+    public ?string $serverIp = null;
+
     protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable', 'serverRefresh' => 'proxyStatusUpdated', "checkProxy", "startProxy"];
 
     public function mount()
     {
+        if ($this->server->id === 0) {
+            $this->serverIp = base_ip();
+        } else {
+            $this->serverIp = $this->server->ip;
+        }
         $this->currentRoute = request()->route()->getName();
     }
     public function traefikDashboardAvailable(bool $data)
@@ -26,7 +33,11 @@ class Deploy extends Component
     {
         $this->server->refresh();
     }
-    public function checkProxy() {
+    public function ip()
+    {
+    }
+    public function checkProxy()
+    {
         try {
             CheckProxy::run($this->server);
             $this->emit('startProxyPolling');
