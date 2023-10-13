@@ -32,7 +32,7 @@ class CreateScheduledBackup extends Component
                 $this->emit('error', 'Invalid Cron / Human expression.');
                 return;
             }
-            ScheduledDatabaseBackup::create([
+            $payload = [
                 'enabled' => true,
                 'frequency' => $this->frequency,
                 'save_s3' => $this->save_s3,
@@ -40,7 +40,11 @@ class CreateScheduledBackup extends Component
                 'database_id' => $this->database->id,
                 'database_type' => $this->database->getMorphClass(),
                 'team_id' => currentTeam()->id,
-            ]);
+            ];
+            if ($this->database->type() === 'standalone-postgresql') {
+                $payload['databases_to_backup'] = $this->database->postgres_db;
+            }
+            ScheduledDatabaseBackup::create($payload);
             $this->emit('refreshScheduledBackups');
         } catch (\Throwable $e) {
             handleError($e, $this);

@@ -64,7 +64,6 @@ class ProjectController extends Controller
             } else if ($type->value() === 'redis') {
                 $database = create_standalone_redis($environment->id, $destination_uuid);
             }
-            ray($database);
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
                 'environment_name' => $environment->name,
