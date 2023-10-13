@@ -10,7 +10,7 @@
             <x-forms.input label="Name" id="database.name" />
             <x-forms.input label="Description" id="database.description" />
             <x-forms.input label="Image" id="database.image" required
-                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/postgres'>https://hub.docker.com/_/postgres</a>" />
+                helper="For all available images, check here:<br><br><a target='_blank' href='https://hub.docker.com/_/redis'>https://hub.docker.com/_/redis</a>" />
         </div>
         <div class="flex flex-col gap-2">
             <h3 class="py-2">Network</h3>
