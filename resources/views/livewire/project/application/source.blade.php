@@ -36,7 +36,7 @@
         </div>
         @isset($application->private_key_id)
             <h3 class="pt-4">Deploy Key</h3>
-            <div class="py-2 pt-4">Currently attache Private Key: <span
+            <div class="py-2 pt-4">Currently attached Private Key: <span
                     class="text-warning">{{ $application->private_key->name }}</span>
             </div>
 
