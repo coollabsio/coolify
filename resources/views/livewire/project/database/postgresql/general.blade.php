@@ -62,7 +62,7 @@
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
             </div>
-            <x-forms.input label="Postgres URL" readonly wire:model="db_url" />
+            <x-forms.input label="Postgres URL" type="password" readonly wire:model="db_url" />
         </div>
     </form>
     <div class="pb-16">

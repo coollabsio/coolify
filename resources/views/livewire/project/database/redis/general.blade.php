@@ -21,7 +21,7 @@
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
             </div>
-            <x-forms.input label="Redis URL" readonly wire:model="db_url" />
+            <x-forms.input label="Redis URL" type="password" readonly wire:model="db_url" />
         </div>
         <x-forms.textarea label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
     </form>
