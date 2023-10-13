@@ -9,11 +9,7 @@
         <h1>Logs</h1>
         <livewire:project.database.heading :database="$resource" />
         <div class="pt-4">
-            @if (Str::of($status)->startsWith('running'))
-                <livewire:project.shared.get-logs :server="$server" :container="$container" />
-            @else
-                Database is not running.
-            @endif
+            <livewire:project.shared.get-logs :server="$server" :container="$container" />
         </div>
     @elseif ($type === 'service')
         <livewire:project.service.navbar :service="$resource" :parameters="$parameters" :query="$query" />

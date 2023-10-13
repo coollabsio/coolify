@@ -133,8 +133,6 @@ class StartRedis
     private function generate_environment_variables()
     {
         $environment_variables = collect();
-        ray('Generate Environment Variables')->green();
-        ray($this->database->runtime_environment_variables)->green();
         foreach ($this->database->runtime_environment_variables as $env) {
             $environment_variables->push("$env->key=$env->value");
         }
