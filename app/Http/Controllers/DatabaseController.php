@@ -68,6 +68,14 @@ class DatabaseController extends Controller
         if (!$database) {
             return redirect()->route('dashboard');
         }
+        // No backups for redis
+        if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
+            return redirect()->route('project.database.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'database_uuid' => $database->uuid,
+            ]);
+        }
         return view('project.database.backups.all', [
             'database' => $database,
             's3s' => currentTeam()->s3s,
