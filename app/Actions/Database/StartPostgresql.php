@@ -41,6 +41,9 @@ class StartPostgresql
                     'networks' => [
                         $this->database->destination->network,
                     ],
+                    'labels' => [
+                        'coolify.managed' => 'true',
+                    ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
