@@ -21,7 +21,7 @@ class Form extends Component
     protected $rules = [
         'server.name' => 'required|min:6',
         'server.description' => 'nullable',
-        'server.ip' => 'required|ip',
+        'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
         'server.settings.is_cloudflare_tunnel' => 'required',
@@ -45,7 +45,8 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-    public function serverRefresh() {
+    public function serverRefresh()
+    {
         $this->validateServer();
     }
     public function instantSave()
@@ -61,7 +62,8 @@ class Form extends Component
         $activity = InstallDocker::run($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
-    public function checkLocalhostConnection() {
+    public function checkLocalhostConnection()
+    {
         $uptime = $this->server->validateConnection();
         if ($uptime) {
             $this->emit('success', 'Server is reachable.');
@@ -80,7 +82,7 @@ class Form extends Component
             if ($uptime) {
                 $install && $this->emit('success', 'Server is reachable.');
             } else {
-                $install &&$this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
+                $install && $this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();
@@ -120,7 +122,14 @@ class Form extends Component
     }
     public function submit()
     {
-        $this->validate();
+        if(isCloud() && !isDev()) {
+            $this->validate();
+            $this->validate([
+                'server.ip' => 'required|ip',
+            ]);
+        } else {
+            $this->validate();
+        }
         $uniqueIPs = Server::all()->reject(function (Server $server) {
             return $server->id === $this->server->id;
         })->pluck('ip')->toArray();

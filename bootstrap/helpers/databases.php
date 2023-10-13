@@ -3,6 +3,7 @@
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Visus\Cuid2\Cuid2;
 
 function generate_database_name(string $type): string
@@ -21,6 +22,21 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
     return StandalonePostgresql::create([
         'name' => generate_database_name('postgresql'),
         'postgres_password' => \Illuminate\Support\Str::password(symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+
+function create_standalone_redis($environment_id, $destination_uuid): StandaloneRedis
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneRedis::create([
+        'name' => generate_database_name('redis'),
+        'redis_password' => \Illuminate\Support\Str::password(symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),

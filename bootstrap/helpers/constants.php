@@ -1,6 +1,6 @@
 <?php
 
-const DATABASE_TYPES = ['postgresql'];
+const DATABASE_TYPES = ['postgresql','redis'];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
     'hourly' => '0 * * * *',

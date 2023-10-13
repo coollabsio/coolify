@@ -94,6 +94,16 @@
                         </div>
                     </div>
                 </div>
+                <div class="box group" wire:click="setType('redis')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New Redis
+                        </div>
+                        <div class="text-xs group-hover:text-white">
+                            The open source, in-memory data store for cache, streaming engine, and message broker.
+                        </div>
+                    </div>
+                </div>
                 {{-- <div class="box group" wire:click="setType('existing-postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">

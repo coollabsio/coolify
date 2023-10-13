@@ -123,7 +123,8 @@ class Server extends BaseModel
     {
         return $this->destinations()->map(function ($standaloneDocker) {
             $postgresqls = $standaloneDocker->postgresqls;
-            return $postgresqls?->concat([]) ?? collect([]);
+            $redis = $standaloneDocker->redis;
+            return $postgresqls->concat($redis);
         })->flatten();
     }
     public function applications()

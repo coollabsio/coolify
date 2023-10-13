@@ -17,6 +17,7 @@ class BackupEdit extends Component
         'backup.number_of_backups_locally' => 'required|integer|min:1',
         'backup.save_s3' => 'required|boolean',
         'backup.s3_storage_id' => 'nullable|integer',
+        'backup.databases_to_backup' => 'nullable',
     ];
     protected $validationAttributes = [
         'backup.enabled' => 'Enabled',
@@ -24,6 +25,7 @@ class BackupEdit extends Component
         'backup.number_of_backups_locally' => 'Number of Backups Locally',
         'backup.save_s3' => 'Save to S3',
         'backup.s3_storage_id' => 'S3 Storage',
+        'backup.databases_to_backup' => 'Databases to Backup',
     ];
     protected $messages = [
         'backup.s3_storage_id' => 'Select a S3 Storage',
@@ -37,7 +39,6 @@ class BackupEdit extends Component
         }
     }
 
-
     public function delete()
     {
         // TODO: Delete backup from server and add a confirmation modal
@@ -49,6 +50,7 @@ class BackupEdit extends Component
     {
         try {
             $this->custom_validate();
+
             $this->backup->save();
             $this->backup->refresh();
             $this->emit('success', 'Backup updated successfully');
@@ -71,9 +73,11 @@ class BackupEdit extends Component
 
     public function submit()
     {
-        ray($this->backup->s3_storage_id);
         try {
             $this->custom_validate();
+            if ($this->backup->databases_to_backup == '' || $this->backup->databases_to_backup === null) {
+                $this->backup->databases_to_backup = null;
+            }
             $this->backup->save();
             $this->backup->refresh();
             $this->emit('success', 'Backup updated successfully');

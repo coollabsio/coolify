@@ -43,23 +43,24 @@ class ResourcesDelete extends Command
             $this->deleteDatabase();
         } elseif ($resource === 'Service') {
             $this->deleteService();
-        } elseif($resource === 'Server') {
+        } elseif ($resource === 'Server') {
             $this->deleteServer();
         }
     }
-    private function deleteServer() {
+    private function deleteServer()
+    {
         $servers = Server::all();
         if ($servers->count() === 0) {
             $this->error('There are no applications to delete.');
             return;
         }
         $serversToDelete = multiselect(
-            'What server do you want to delete?',
-            $servers->pluck('id')->sort()->toArray(),
+            label: 'What server do you want to delete?',
+            options: $servers->pluck('name', 'id')->sortKeys(),
         );
 
-        foreach ($serversToDelete as $id) {
-            $toDelete = Server::find($id);
+        foreach ($serversToDelete as $server) {
+            $toDelete = $servers->where('id', $server)->first();
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources?");
             if (!$confirmed) {
@@ -77,11 +78,12 @@ class ResourcesDelete extends Command
         }
         $applicationsToDelete = multiselect(
             'What application do you want to delete?',
-            $applications->pluck('name')->sort()->toArray(),
+            $applications->pluck('name', 'id')->sortKeys(),
         );
 
         foreach ($applicationsToDelete as $application) {
-            $toDelete = $applications->where('name', $application)->first();
+            ray($application);
+            $toDelete = $applications->where('id', $application)->first();
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources? ");
             if (!$confirmed) {
@@ -99,11 +101,11 @@ class ResourcesDelete extends Command
         }
         $databasesToDelete = multiselect(
             'What database do you want to delete?',
-            $databases->pluck('name')->sort()->toArray(),
+            $databases->pluck('name', 'id')->sortKeys(),
         );
 
         foreach ($databasesToDelete as $database) {
-            $toDelete = $databases->where('name', $database)->first();
+            $toDelete = $databases->where('id', $database)->first();
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources?");
             if (!$confirmed) {
@@ -111,7 +113,6 @@ class ResourcesDelete extends Command
             }
             $toDelete->delete();
         }
-
     }
     private function deleteService()
     {
@@ -122,11 +123,11 @@ class ResourcesDelete extends Command
         }
         $servicesToDelete = multiselect(
             'What service do you want to delete?',
-            $services->pluck('name')->sort()->toArray(),
+            $services->pluck('name', 'id')->sortKeys(),
         );
 
         foreach ($servicesToDelete as $service) {
-            $toDelete = $services->where('name', $service)->first();
+            $toDelete = $services->where('id', $service)->first();
             $this->info($toDelete);
             $confirmed = confirm("Are you sure you want to delete all selected resources?");
             if (!$confirmed) {

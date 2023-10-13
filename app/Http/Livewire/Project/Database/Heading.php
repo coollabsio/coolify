@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\Database;
 
 use App\Actions\Database\StartPostgresql;
+use App\Actions\Database\StartRedis;
 use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
@@ -26,6 +27,7 @@ class Heading extends Component
     {
         dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
+        $this->emit('refresh');
     }
 
     public function mount()
@@ -40,7 +42,7 @@ class Heading extends Component
             $this->database->destination->server
         );
         if ($this->database->is_public) {
-            stopPostgresProxy($this->database);
+            stopDatabaseProxy($this->database);
             $this->database->is_public = false;
         }
         $this->database->status = 'exited';
@@ -53,6 +55,10 @@ class Heading extends Component
     {
         if ($this->database->type() === 'standalone-postgresql') {
             $activity = resolve(StartPostgresql::class)($this->database->destination->server, $this->database);
+            $this->emit('newMonitorActivity', $activity->id);
+        }
+        if ($this->database->type() === 'standalone-redis') {
+            $activity = StartRedis::run($this->database->destination->server, $this->database);
             $this->emit('newMonitorActivity', $activity->id);
         }
     }

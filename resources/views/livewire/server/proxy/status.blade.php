@@ -1,6 +1,6 @@
 <div>
     @if ($server->isFunctional())
-        <div class="flex gap-2" x-init="$wire.getProxyStatus">
+        <div class="flex gap-2" @if ($polling) wire:poll.2000ms='checkProxy' @endif>
             @if (data_get($server, 'proxy.status') === 'running')
                 <x-status.running status="Proxy Running" />
             @elseif (data_get($server, 'proxy.status') === 'restarting')
@@ -8,7 +8,9 @@
             @else
                 <x-status.stopped status="Proxy Stopped" />
             @endif
-            <x-forms.button wire:click='getProxyStatusWithNoti'>Refresh </x-forms.button>
+            @if (data_get($server, 'proxy.status') === 'running')
+                <x-forms.button wire:click='checkProxy(true)'>Refresh</x-forms.button>
+            @endif
         </div>
     @endif
 </div>

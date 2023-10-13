@@ -47,20 +47,7 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
             if (!$this->server->isFunctional()) {
                 return;
             }
-            if (isDev()) {
-                $this->dockerRootFilesystem = "/";
-            } else {
-                $this->dockerRootFilesystem = instant_remote_process(
-                    [
-                        "stat --printf=%m $(docker info --format '{{json .DockerRootDir}}'' |sed 's/\"//g')"
-                    ],
-                    $this->server,
-                    false
-                );
-            }
-            if (!$this->dockerRootFilesystem) {
-                return;
-            }
+            $this->dockerRootFilesystem = "/";
             $this->usageBefore = $this->getFilesystemUsage();
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
                 ray('Cleaning up ' . $this->server->name)->color('orange');

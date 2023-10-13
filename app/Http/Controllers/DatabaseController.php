@@ -19,7 +19,7 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
         }
@@ -37,7 +37,7 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
         }
@@ -64,9 +64,17 @@ class DatabaseController extends Controller
         if (!$environment) {
             return redirect()->route('dashboard');
         }
-        $database = $environment->databases->where('uuid', request()->route('database_uuid'))->first();
+        $database = $environment->databases()->where('uuid', request()->route('database_uuid'))->first();
         if (!$database) {
             return redirect()->route('dashboard');
+        }
+        // No backups for redis
+        if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
+            return redirect()->route('project.database.configuration', [
+                'project_uuid' => $project->uuid,
+                'environment_name' => $environment->name,
+                'database_uuid' => $database->uuid,
+            ]);
         }
         return view('project.database.backups.all', [
             'database' => $database,

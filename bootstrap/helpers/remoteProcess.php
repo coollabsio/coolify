@@ -108,12 +108,13 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
 }
 function instant_remote_process(Collection|array $command, Server $server, $throwError = true)
 {
+    $timeout = config('constants.ssh.command_timeout');
     if ($command instanceof Collection) {
         $command = $command->toArray();
     }
     $command_string = implode("\n", $command);
     $ssh_command = generateSshCommand($server, $command_string);
-    $process = Process::run($ssh_command);
+    $process = Process::timeout($timeout)->run($ssh_command);
     $output = trim($process->output());
     $exitCode = $process->exitCode();
     if ($exitCode !== 0) {

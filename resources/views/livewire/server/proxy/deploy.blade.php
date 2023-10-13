@@ -12,7 +12,7 @@
             <div class="flex gap-4">
                 @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable)
                     <button>
-                        <a target="_blank" href="http://{{ $server->ip }}:8080">
+                        <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard
                             <x-external-link />
                         </a>
@@ -20,8 +20,9 @@
                 @endif
                 <x-forms.button isModal noStyle modalId="stopProxy"
                     class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2"
-                        stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round"
+                        stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
                         <path d="M6 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"></path>
                         <path d="M14 5m0 1a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1z"></path>
@@ -30,7 +31,7 @@
                 </x-forms.button>
             </div>
         @else
-            <button wire:click='startProxy' onclick="startProxy.showModal()"
+            <button onclick="checkProxy()"
                 class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -42,4 +43,13 @@
             </button>
         @endif
     @endif
+    <script>
+        function checkProxy() {
+            Livewire.emit('checkProxy')
+        }
+        Livewire.on('proxyChecked', () => {
+            startProxy.showModal();
+            Livewire.emit('startProxy');
+        })
+    </script>
 </div>

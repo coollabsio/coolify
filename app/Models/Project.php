@@ -52,4 +52,8 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(StandalonePostgresql::class, Environment::class);
     }
+    public function redis()
+    {
+        return $this->hasManyThrough(StandaloneRedis::class, Environment::class);
+    }
 }

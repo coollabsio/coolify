@@ -6,12 +6,13 @@ use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use Livewire\Component;
 
 class Logs extends Component
 {
     public ?string $type = null;
-    public Application|StandalonePostgresql|Service $resource;
+    public Application|StandalonePostgresql|Service|StandaloneRedis $resource;
     public Server $server;
     public ?string $container = null;
     public $parameters;
@@ -33,7 +34,14 @@ class Logs extends Component
             }
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
-            $this->resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->firstOrFail();
+            $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
+            if (is_null($resource)) {
+                $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
+                if (is_null($resource)) {
+                    abort(404);
+                }
+            }
+            $this->resource = $resource;
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;

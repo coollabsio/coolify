@@ -67,10 +67,10 @@ class General extends Component
             }
             if ($this->database->is_public) {
                 $this->emit('success', 'Starting TCP proxy...');
-                startPostgresProxy($this->database);
+                startDatabaseProxy($this->database);
                 $this->emit('success', 'Database is now publicly accessible.');
             } else {
-                stopPostgresProxy($this->database);
+                stopDatabaseProxy($this->database);
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
             $this->getDbUrl();

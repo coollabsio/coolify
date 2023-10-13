@@ -7,14 +7,13 @@
         href="{{ route('project.database.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
-        href="{{ route('project.database.backups.all', $parameters) }}">
-        <button>Backups</button>
-    </a>
-    {{-- <x-applications.links :application="$application" /> --}}
+    @if ($database->getMorphClass() === 'App\Models\StandalonePostgresql')
+        <a class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
+            href="{{ route('project.database.backups.all', $parameters) }}">
+            <button>Backups</button>
+        </a>
+    @endif
     <div class="flex-1"></div>
-    {{-- <x-applications.advanced :application="$application" /> --}}
-
     @if ($database->status !== 'exited')
         <button wire:click='stop' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-error" viewBox="0 0 24 24" stroke-width="2"
