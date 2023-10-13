@@ -124,8 +124,7 @@ class Server extends BaseModel
         return $this->destinations()->map(function ($standaloneDocker) {
             $postgresqls = $standaloneDocker->postgresqls;
             $redis = $standaloneDocker->redis;
-            return $postgresqls->merge($redis);
-            // return $postgresqls?->concat([]) ?? collect([]);
+            return $postgresqls->concat($redis);
         })->flatten();
     }
     public function applications()
