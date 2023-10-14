@@ -4,6 +4,7 @@ namespace App\Actions\Service;
 
 use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Service;
+use App\Notifications\Application\StatusChanged;
 
 class StopService
 {
@@ -22,5 +23,7 @@ class StopService
         }
         instant_remote_process(["docker network disconnect {$service->uuid} coolify-proxy 2>/dev/null"], $service->server, false);
         instant_remote_process(["docker network rm {$service->uuid} 2>/dev/null"], $service->server, false);
+        // TODO: make notification for databases
+        // $service->environment->project->team->notify(new StatusChanged($service));
     }
 }

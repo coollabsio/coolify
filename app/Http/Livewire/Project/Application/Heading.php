@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\Application;
 
+use App\Actions\Application\StopApplication;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Application;
 use Livewire\Component;
@@ -59,22 +60,9 @@ class Heading extends Component
 
     public function stop()
     {
-        $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id);
-        if ($containers->count() === 0) {
-            return;
-        }
-        foreach ($containers as $container) {
-            $containerName = data_get($container, 'Names');
-            if ($containerName) {
-                instant_remote_process(
-                    ["docker rm -f {$containerName}"],
-                    $this->application->destination->server
-                );
-                $this->application->status = 'exited';
-                $this->application->save();
-                // $this->application->environment->project->team->notify(new StatusChanged($this->application));
-            }
-        }
+        StopApplication::run($this->application);
+        $this->application->status = 'exited';
+        $this->application->save();
         $this->application->refresh();
     }
 }

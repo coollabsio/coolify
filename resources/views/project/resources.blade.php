@@ -38,30 +38,48 @@
     @endif
     <div class="grid gap-2 lg:grid-cols-2">
         @foreach ($environment->applications->sortBy('name') as $application)
-            <a class="box group"
+            <a class="relative box group"
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $application->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $application->description }}</div>
+
                 </div>
+                @if (Str::of(data_get($application, 'status'))->startsWith('running'))
+                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(data_get($application, 'status'))->startsWith('exited'))
+                    <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                @endif
             </a>
         @endforeach
-        @foreach ($environment->databases()->sortBy('name') as $databases)
-            <a class="box group"
-                href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $databases->uuid]) }}">
+        @foreach ($environment->databases()->sortBy('name') as $database)
+            <a class="relative box group"
+                href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $database->uuid]) }}">
                 <div class="flex flex-col mx-6">
-                    <div class="font-bold text-white">{{ $databases->name }}</div>
-                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $databases->description }}</div>
+                    <div class="font-bold text-white">{{ $database->name }}</div>
+                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $database->description }}</div>
                 </div>
+                @if (Str::of(data_get($database, 'status'))->startsWith('running'))
+                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(data_get($database, 'status'))->startsWith('exited'))
+                    <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                @endif
             </a>
         @endforeach
         @foreach ($environment->services->sortBy('name') as $service)
-            <a class="box group"
+            <a class="relative box group"
                 href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $service->name }}</div>
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
                 </div>
+                @if (Str::of(serviceStatus($service))->startsWith('running'))
+                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(serviceStatus($service))->startsWith('degraded'))
+                    <div class="absolute bg-yellow-400 -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(serviceStatus($service))->startsWith('exited'))
+                    <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                @endif
             </a>
         @endforeach
     </div>
