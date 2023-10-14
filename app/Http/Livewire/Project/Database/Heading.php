@@ -4,7 +4,9 @@ namespace App\Http\Livewire\Project\Database;
 
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
+use App\Actions\Database\StopDatabase;
 use App\Jobs\ContainerStatusJob;
+use App\Notifications\Application\StatusChanged;
 use Livewire\Component;
 
 class Heading extends Component
@@ -37,24 +39,16 @@ class Heading extends Component
 
     public function stop()
     {
-        instant_remote_process(
-            ["docker rm -f {$this->database->uuid}"],
-            $this->database->destination->server
-        );
-        if ($this->database->is_public) {
-            stopDatabaseProxy($this->database);
-            $this->database->is_public = false;
-        }
+        StopDatabase::run($this->database);
         $this->database->status = 'exited';
         $this->database->save();
         $this->check_status();
-        // $this->database->environment->project->team->notify(new StatusChanged($this->database));
     }
 
     public function start()
     {
         if ($this->database->type() === 'standalone-postgresql') {
-            $activity = resolve(StartPostgresql::class)($this->database->destination->server, $this->database);
+            $activity = StartPostgresql::run($this->database->destination->server, $this->database);
             $this->emit('newMonitorActivity', $activity->id);
         }
         if ($this->database->type() === 'standalone-redis') {

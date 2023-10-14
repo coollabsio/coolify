@@ -2,6 +2,8 @@
 
 namespace App\Http\Livewire\Project\Database\Redis;
 
+use App\Actions\Database\StartDatabaseProxy;
+use App\Actions\Database\StopDatabaseProxy;
 use App\Models\StandaloneRedis;
 use Exception;
 use Livewire\Component;
@@ -55,10 +57,10 @@ class General extends Component
             }
             if ($this->database->is_public) {
                 $this->emit('success', 'Starting TCP proxy...');
-                startDatabaseProxy($this->database);
+                StartDatabaseProxy::run($this->database);
                 $this->emit('success', 'Database is now publicly accessible.');
             } else {
-                stopDatabaseProxy($this->database);
+                StopDatabaseProxy::run($this->database);
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
             $this->getDbUrl();

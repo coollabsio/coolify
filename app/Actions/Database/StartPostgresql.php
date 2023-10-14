@@ -6,15 +6,18 @@ use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
+use Lorisleiva\Actions\Concerns\AsAction;
 
 class StartPostgresql
 {
+    use AsAction;
+
     public StandalonePostgresql $database;
     public array $commands = [];
     public array $init_scripts = [];
     public string $configuration_dir;
 
-    public function __invoke(Server $server, StandalonePostgresql $database)
+    public function handle(Server $server, StandalonePostgresql $database)
     {
         $this->database = $database;
         $container_name = $this->database->uuid;
