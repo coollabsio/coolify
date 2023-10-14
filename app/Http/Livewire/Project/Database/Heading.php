@@ -6,7 +6,6 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
 use App\Jobs\ContainerStatusJob;
-use App\Notifications\Application\StatusChanged;
 use Livewire\Component;
 
 class Heading extends Component
@@ -29,7 +28,6 @@ class Heading extends Component
     {
         dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
-        $this->emit('refresh');
     }
 
     public function mount()
