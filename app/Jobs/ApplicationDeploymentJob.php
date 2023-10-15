@@ -298,7 +298,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
-        // $this->build_image();
+        $this->build_image();
         $this->rolling_update();
     }
     private function deploy_nixpacks_buildpack()
@@ -668,12 +668,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if ($this->build_pack === 'dockerfile') {
-            $docker_compose['services'][$this->container_name]['build'] = [
-                'context' => $this->workdir,
-                'dockerfile' => $this->workdir . $this->dockerfile_location,
-            ];
-        }
+        // if ($this->build_pack === 'dockerfile') {
+        //     $docker_compose['services'][$this->container_name]['build'] = [
+        //         'context' => $this->workdir,
+        //         'dockerfile' => $this->workdir . $this->dockerfile_location,
+        //     ];
+        // }
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
@@ -804,7 +804,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
         } else {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
