@@ -9,7 +9,7 @@ use Illuminate\Foundation\Validation\ValidatesRequests;
 class ApplicationController extends Controller
 {
     use AuthorizesRequests, ValidatesRequests;
-
+    /*App configuration*/
     public function configuration()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -26,7 +26,7 @@ class ApplicationController extends Controller
         }
         return view('project.application.configuration', ['application' => $application]);
     }
-
+    /*App deployements*/
     public function deployments()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
@@ -44,7 +44,7 @@ class ApplicationController extends Controller
         ['deployments' => $deployments, 'count' => $count] = $application->deployments(0, 8);
         return view('project.application.deployments', ['application' => $application, 'deployments' => $deployments, 'deployments_count' => $count]);
     }
-
+    /*App deployement*/
     public function deployment()
     {
         $deploymentUuid = request()->route('deployment_uuid');
