@@ -18,7 +18,7 @@ if [ $EUID != 0 ]; then
     echo "Please run as root"
     exit
 fi
-if [ $OS_TYPE != "ubuntu" ] && [ $OS_TYPE != "debian" ]; then
+if [ $OS_TYPE != "ubuntu" ] && [ $OS_TYPE != "debian" ] && [ $OS_TYPE != "raspbian" ]; then
     echo "This script only supports Ubuntu and Debian for now."
     exit
 fi
