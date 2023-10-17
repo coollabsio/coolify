@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 
 class ProjectController extends Controller
 {
+    /*Get All Project And Count Server*/
     public function all()
     {
         return view('projects', [
@@ -18,31 +19,31 @@ class ProjectController extends Controller
             'servers' => Server::ownedByCurrentTeam()->count(),
         ]);
     }
-
+    /*Edit Project*/
     public function edit()
     {
         $projectUuid = request()->route('project_uuid');
         $teamId = currentTeam()->id;
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
+        if (!$project) { /*If project not found*/
+            return redirect()->route('dashboard');/* Redirect to dashboard*/
         }
-        return view('project.edit', ['project' => $project]);
+        return view('project.edit', ['project' => $project]); /* Redirect to project edit page*/
     }
-
+    /* Get Project */
     public function show()
     {
         $projectUuid = request()->route('project_uuid');
         $teamId = currentTeam()->id;
 
         $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
+        if (!$project) { /* If project not fount*/
+            return redirect()->route('dashboard'); /* Redirect to dashboard*/
         }
         $project->load(['environments']);
-        return view('project.show', ['project' => $project]);
+        return view('project.show', ['project' => $project]);/* Redirect to Project*/
     }
-
+    /* Add new to Project*/
     public function new()
     {
         $services = getServiceTemplates();
@@ -140,7 +141,7 @@ class ProjectController extends Controller
             'type' => $type->value()
         ]);
     }
-
+    /* View Project Ressources*/
     public function resources()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
