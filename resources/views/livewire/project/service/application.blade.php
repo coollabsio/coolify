@@ -18,10 +18,10 @@
             <div class="flex gap-2">
                 @if ($application->required_fqdn)
                     <x-forms.input required placeholder="https://app.coolify.io" label="Domains"
-                        id="application.fqdn"></x-forms.input>
+                        id="application.fqdn" helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
                 @else
                     <x-forms.input placeholder="https://app.coolify.io" label="Domains"
-                        id="application.fqdn"></x-forms.input>
+                        id="application.fqdn" helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "></x-forms.input>
                 @endif
                 <x-forms.input required
                     helper="You can change the image you would like to deploy.<br><br><span class='text-warning'>WARNING. You could corrupt your data. Only do it if you know what you are doing.</span>"
