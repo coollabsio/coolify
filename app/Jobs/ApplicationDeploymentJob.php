@@ -455,7 +455,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->stop_running_container();
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
         );
     }
 
@@ -858,7 +858,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->execute_remote_command(
             ["echo -n 'Starting application (could take a while).'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
         );
     }
 
