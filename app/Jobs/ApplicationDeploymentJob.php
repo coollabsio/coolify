@@ -71,6 +71,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $log_model;
     private Collection $saved_outputs;
 
+    private string $serverUser = 'root';
+    private string $serverUserHomeDir = '/root';
+
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
@@ -92,7 +95,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->server = $this->destination->server;
-
+        $this->serverUser = $this->server->user;
         $this->basedir = "/artifacts/{$this->deployment_uuid}";
         $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
@@ -160,6 +163,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             return "--add-host $name:$ip";
         })->implode(' ');
 
+        // Get user home directory
+        $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
@@ -458,7 +463,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $pull = "--pull=always";
         $helperImage = config('coolify.helper_image');
-        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
 
         $this->execute_remote_command(
             [
