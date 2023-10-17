@@ -60,12 +60,16 @@ class DeploymentNavbar extends Component
                 $previous_logs[] = $new_log_entry;
                 $this->application_deployment_queue->update([
                     'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
-                    'current_process_id' => null,
-                    'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
                 ]);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->application_deployment_queue->update([
+                'current_process_id' => null,
+                'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
+            ]);
+            queue_next_deployment($this->application);
         }
     }
 }
