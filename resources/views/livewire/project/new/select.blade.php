@@ -152,6 +152,9 @@
                     @endforeach
                 @endif
             </div>
+            <div class="py-4 pb-10">Trademarks Policy: The respective trademarks mentioned here are owned by the
+                respective
+                companies, and use of them does not imply any affiliation or endorsement.</div>
         @endif
         @if ($current_step === 'servers')
             <ul class="pb-10 steps">
