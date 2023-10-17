@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -117,10 +118,18 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 return data_get($value, 'Name') === '/coolify-proxy';
             })->first();
             if (!$foundProxyContainer) {
-                if ($this->server->isProxyShouldRun()) {
-                    StartProxy::run($this->server, false);
-                    $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                try {
+                    $shouldStart = CheckProxy::run($this->server);
+                    if ($shouldStart) {
+                        StartProxy::run($this->server, false);
+                        $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                    } else {
+                        ray('Proxy could not be started.');
+                    }
+                } catch (\Throwable $e) {
+                    ray($e);
                 }
+
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();

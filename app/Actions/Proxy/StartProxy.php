@@ -13,8 +13,6 @@ class StartProxy
     public function handle(Server $server, bool $async = true): string|Activity
     {
         try {
-            CheckProxy::run($server);
-
             $proxyType = $server->proxyType();
             $commands = collect([]);
             $proxy_path = get_proxy_path();

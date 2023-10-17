@@ -34,7 +34,7 @@ class Status extends Component
                 }
                 $this->numberOfPolls++;
             }
-            CheckProxy::run($this->server);
+            CheckProxy::run($this->server, true);
             $this->emit('proxyStatusUpdated');
             if ($this->server->proxy->status === 'running') {
                 $this->polling = false;
