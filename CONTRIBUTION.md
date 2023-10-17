@@ -27,3 +27,5 @@ You can ask for guidance anytime on our
 You can login your Coolify instance at `localhost:8000` with `test@example.com` and `password`.
 
 Your horizon (Laravel scheduler): `localhost:8000/horizon` - Only reachable if you logged in with root user.
+
+Mails are caught by Mailpit: `localhost:8025`
