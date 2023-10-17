@@ -9,34 +9,35 @@ use App\Models\Team;
 
 class MagicController extends Controller
 {
+    /*Get Server Status*/
     public function servers()
     {
         return response()->json([
             'servers' => Server::isUsable()->get()
         ]);
     }
-
+    /*Get Projects destinations*/
     public function destinations()
     {
         return response()->json([
             'destinations' => Server::destinationsByServer(request()->query('server_id'))->sortBy('name')
         ]);
     }
-
+    /*Get Projects*/
     public function projects()
     {
         return response()->json([
             'projects' => Project::ownedByCurrentTeam()->get()
         ]);
     }
-
+     /*Get Projects environement*/
     public function environments()
     {
         return response()->json([
             'environments' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->first()->environments
         ]);
     }
-
+    /*Add new projects*/
     public function newProject()
     {
         $project = Project::firstOrCreate(
@@ -47,7 +48,7 @@ class MagicController extends Controller
             'project_uuid' => $project->uuid
         ]);
     }
-
+    /*Add new envivironement*/
     public function newEnvironment()
     {
         $environment = Environment::firstOrCreate(
@@ -58,7 +59,7 @@ class MagicController extends Controller
             'environment_name' => $environment->name,
         ]);
     }
-
+    /*Create New Team*/
     public function newTeam()
     {
         $team = Team::create(
