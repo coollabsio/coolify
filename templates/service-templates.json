@@ -25,6 +25,21 @@
         "slogan": "Ghost is a popular open-source content management system (CMS) and blogging platform, known for its simplicity and focus on content creation.",
         "compose": "c2VydmljZXM6CiAgZ2hvc3Q6CiAgICBpbWFnZTogZ2hvc3Q6NQogICAgdm9sdW1lczoKICAgICAgLSBnaG9zdC1jb250ZW50LWRhdGE6L3Zhci9saWIvZ2hvc3QvY29udGVudAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gdXJsPSRTRVJWSUNFX0ZRRE5fR0hPU1QKICAgICAgLSBkYXRhYmFzZV9fY2xpZW50PW15c3FsCiAgICAgIC0gZGF0YWJhc2VfX2Nvbm5lY3Rpb25fX2hvc3Q9bXlzcWwKICAgICAgLSBkYXRhYmFzZV9fY29ubmVjdGlvbl9fdXNlcj0kU0VSVklDRV9VU0VSX01ZU1FMCiAgICAgIC0gZGF0YWJhc2VfX2Nvbm5lY3Rpb25fX3Bhc3N3b3JkPSRTRVJWSUNFX1BBU1NXT1JEX01ZU1FMCiAgICAgIC0gZGF0YWJhc2VfX2Nvbm5lY3Rpb25fX2RhdGFiYXNlPSR7TVlTUUxfREFUQUJBU0UtZ2hvc3R9CiAgICBkZXBlbmRzX29uOgogICAgICBteXNxbDoKICAgICAgICBjb25kaXRpb246IHNlcnZpY2VfaGVhbHRoeQogIG15c3FsOgogICAgaW1hZ2U6IG15c3FsOjguMAogICAgdm9sdW1lczoKICAgICAgLSBnaG9zdC1teXNxbC1kYXRhOi92YXIvbGliL215c3FsCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBNWVNRTF9VU0VSPSR7U0VSVklDRV9VU0VSX01ZU1FMfQogICAgICAtIE1ZU1FMX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9NWVNRTH0KICAgICAgLSBNWVNRTF9EQVRBQkFTRT0ke01ZU1FMX0RBVEFCQVNFfQogICAgICAtIE1ZU1FMX1JPT1RfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX01ZU1FMUk9PVH0KICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJteXNxbGFkbWluIiwgInBpbmciLCAiLWgiLCAibG9jYWxob3N0Il0KICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEw"
     },
+    "heimdall": {
+        "documentation": "https://github.com/linuxserver/Heimdall",
+        "slogan": "Heimdall is a self-hosted dashboard for managing and organizing your server applications, providing a centralized and efficient interface.",
+        "compose": "c2VydmljZXM6CiAgaGVpbWRhbGw6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9oZWltZGFsbDpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIFRaPUV1cm9wZS9NYWRyaWQKICAgIHZvbHVtZXM6CiAgICAgIC0gaGVpbWRhbGwtY29uZmlnOi9jb25maWcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAiXQogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1"
+    },
+    "pairdrop": {
+        "documentation": "https://github.com/schlagmichdoch/PairDrop/blob/master/docs/faq.md",
+        "slogan": "Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.",
+        "compose": "c2VydmljZXM6CiAgcGFpcmRyb3A6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9wYWlyZHJvcDpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIFRaPUV1cm9wZS9NYWRyaWQKICAgICAgLSBERUJVR19NT0RFPWZhbHNlCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogWyJDTUQiLCAiY3VybCIsICItZiIsICJodHRwOi8vbG9jYWxob3N0OjMwMDAiXQogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1"
+    },
+    "snapdrop": {
+        "documentation": "https://github.com/RobinLinus/snapdrop/blob/master/docs/faq.md",
+        "slogan": "A self-hosted file-sharing service for secure and convenient file transfers, whether on a local network or the internet.",
+        "compose": "c2VydmljZXM6CiAgc25hcGRyb3A6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9zbmFwZHJvcDpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIFRaPUV1cm9wZS9NYWRyaWQKICAgIHZvbHVtZXM6CiAgICAgIC0gc25hcGRyb3AtY29uZmlnOi9jb25maWcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAiXQogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1"
+    },
     "umami": {
         "documentation": "https://umami.is/docs/getting-started",
         "slogan": "Umami is a lightweight, self-hosted web analytics platform designed to provide website owners with insights into visitor behavior without compromising user privacy.",
