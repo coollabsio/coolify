@@ -34,5 +34,6 @@ class Navbar extends Component
         StopService::run($this->service);
         $this->service->refresh();
         $this->emit('success', 'Service stopped successfully.');
+        $this->checkStatus();
     }
 }
