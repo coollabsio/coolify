@@ -6,6 +6,7 @@ use Livewire\Component;
 
 class StackForm extends Component
 {
+    public $service;
     protected $listeners = ["saveCompose"];
     protected $rules = [
         'service.docker_compose_raw' => 'required',
@@ -13,7 +14,6 @@ class StackForm extends Component
         'service.name' => 'required',
         'service.description' => 'nullable',
     ];
-    public $service;
     public function saveCompose($raw)
     {
         $this->service->docker_compose_raw = $raw;

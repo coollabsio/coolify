@@ -67,7 +67,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $docker_compose;
     private $docker_compose_base64;
     private string $dockerfile_location = '/Dockerfile';
-
+    private ?string $addHosts = null;
     private $log_model;
     private Collection $saved_outputs;
 
@@ -98,7 +98,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
-        ray($this->basedir, $this->workdir);
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
@@ -138,6 +137,29 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
+
+        // Generate custom host<->ip mapping
+        $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
+        $allContainers = format_docker_command_output_to_json($allContainers);
+        $ips = collect([]);
+        if (count($allContainers) > 0) {
+            $allContainers = $allContainers[0];
+            foreach ($allContainers as $container) {
+                $containerName = data_get($container, 'Name');
+                if ($containerName === 'coolify-proxy') {
+                    continue;
+                }
+                $containerIp = data_get($container, 'IPv4Address');
+                if ($containerName && $containerIp) {
+                    $containerIp = str($containerIp)->before('/');
+                    $ips->put($containerName, $containerIp->value());
+                }
+            }
+        }
+        $this->addHosts = $ips->map(function ($ip, $name) {
+            return "--add-host $name:$ip";
+        })->implode(' ');
+
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
@@ -766,7 +788,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -799,12 +821,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]
             );
         } else {
+            ray("docker build $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}");
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }

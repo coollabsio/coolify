@@ -382,7 +382,7 @@ class Service extends BaseModel
                         $value = Str::of($variable);
                     }
                     if ($key->startsWith('SERVICE_FQDN')) {
-                        if ($isNew) {
+                        if ($isNew || $savedService->fqdn === null) {
                             $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
                             $fqdn = generateFqdn($this->server, "{$name->value()}-{$this->uuid}");
                             if (substr_count($key->value(), '_') === 3) {
