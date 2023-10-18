@@ -19,7 +19,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
@@ -75,7 +74,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->update([
                     'unreachable_count' => 0,
                 ]);
-                Log::info("Server {$this->server->id} is reachable.");
             } else {
                 $serverUptimeCheckNumber++;
                 $this->server->settings()->update([
