@@ -19,6 +19,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
@@ -40,9 +41,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        if (isDev()) {
-            $this->handle();
-        }
+        $this->handle();
     }
 
     public function handle()
@@ -76,6 +75,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->update([
                     'unreachable_count' => 0,
                 ]);
+                Log::info("Server {$this->server->id} is reachable.");
             } else {
                 $serverUptimeCheckNumber++;
                 $this->server->settings()->update([
@@ -129,7 +129,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } catch (\Throwable $e) {
                     ray($e);
                 }
-
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
