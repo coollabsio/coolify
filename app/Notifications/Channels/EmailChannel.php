@@ -30,7 +30,12 @@ class EmailChannel
             );
         } catch (Exception $e) {
             ray($e->getMessage());
-            send_internal_notification("EmailChannel error: {$e->getMessage()}. Failed to send email to: " . implode(', ', $recepients) . " with subject: {$mailMessage->subject}");
+            $message = "EmailChannel error: {$e->getMessage()}. Failed to send email to:";
+            if (isset($recepients)) {
+                $message .= implode(', ', $recepients);
+            }
+            $message .= " with subject: {$mailMessage->subject}";
+            send_internal_notification($message);
             throw $e;
         }
     }

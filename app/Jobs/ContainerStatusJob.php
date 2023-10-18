@@ -40,9 +40,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        if (isDev()) {
-            $this->handle();
-        }
+        $this->handle();
     }
 
     public function handle()
@@ -129,7 +127,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } catch (\Throwable $e) {
                     ray($e);
                 }
-
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
