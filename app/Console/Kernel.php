@@ -19,13 +19,9 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         if (isDev()) {
-            // $schedule->job(new ContainerStatusJob(Server::find(0)))->everyTenMinutes()->onOneServer();
-            // $schedule->command('horizon:snapshot')->everyMinute();
+            $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-            // $schedule->job(new CheckResaleLicenseJob)->hourly();
-            // $schedule->job(new DockerCleanupJob)->everyOddHour();
-            // $this->instance_auto_update($schedule);
-            // $this->check_scheduled_backups($schedule);
+            $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->cleanup_servers($schedule);
             $this->check_scheduled_backups($schedule);
@@ -69,7 +65,6 @@ class Kernel extends ConsoleKernel
     }
     private function check_scheduled_backups($schedule)
     {
-        ray('check_scheduled_backups');
         $scheduled_backups = ScheduledDatabaseBackup::all();
         if ($scheduled_backups->isEmpty()) {
             ray('no scheduled backups');
