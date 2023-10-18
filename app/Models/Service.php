@@ -538,7 +538,7 @@ class Service extends BaseModel
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($fqdns, true));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
                     }
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());
@@ -568,7 +568,7 @@ class Service extends BaseModel
                 'networks' => $topLevelNetworks->toArray(),
             ];
             $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-        $this->docker_compose = Yaml::dump($finalServices, 10, 2);
+            $this->docker_compose = Yaml::dump($finalServices, 10, 2);
             $this->save();
             $this->saveComposeConfigs();
             return collect([]);

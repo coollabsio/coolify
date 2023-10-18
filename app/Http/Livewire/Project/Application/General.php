@@ -3,12 +3,9 @@
 namespace App\Http\Livewire\Project\Application;
 
 use App\Models\Application;
-use App\Models\InstanceSettings;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
-use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
 
 class General extends Component
 {
@@ -22,6 +19,9 @@ class General extends Component
     public string $git_branch;
     public ?string $git_commit_sha = null;
     public string $build_pack;
+
+    public $customLabels;
+    public bool $labelsChanged = false;
 
     public bool $is_static;
     public bool $is_git_submodules_enabled;
@@ -52,6 +52,7 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
+        'application.custom_labels' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -73,15 +74,42 @@ class General extends Component
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
-
+        'application.custom_labels' => 'Custom labels',
     ];
 
-    public function updatedApplicationBuildPack(){
+    public function mount()
+    {
+        if (is_null(data_get($this->application, 'custom_labels'))) {
+            $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+        } else {
+            $this->customLabels = str($this->application->custom_labels)->replace(',', "\n");
+        }
+        if (data_get($this->application, 'settings')) {
+            $this->is_static = $this->application->settings->is_static;
+            $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
+            $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
+            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
+            $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
+            $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
+            $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+        }
+        $this->checkLabelUpdates();
+    }
+    public function updatedApplicationBuildPack()
+    {
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = $this->is_static = false;
             $this->application->settings->save();
         }
         $this->submit();
+    }
+    public function checkLabelUpdates()
+    {
+        if (md5($this->application->custom_labels) !== md5(implode(",", generateLabelsApplication($this->application)))) {
+            $this->labelsChanged = true;
+        } else {
+            $this->labelsChanged = false;
+        }
     }
     public function instantSave()
     {
@@ -102,37 +130,35 @@ class General extends Component
         $this->application->save();
         $this->application->refresh();
         $this->emit('success', 'Application settings updated!');
+        $this->checkLabelUpdates();
     }
 
-    public function getWildcardDomain() {
+    public function getWildcardDomain()
+    {
         $server = data_get($this->application, 'destination.server');
         if ($server) {
             $fqdn = generateFqdn($server, $this->application->uuid);
-            ray($fqdn);
             $this->application->fqdn = $fqdn;
             $this->application->save();
             $this->emit('success', 'Application settings updated!');
         }
-
     }
-    public function mount()
+    public function resetDefaultLabels($showToaster = true)
     {
-        if (data_get($this->application,'settings')) {
-            $this->is_static = $this->application->settings->is_static;
-            $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
-            $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
-            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
-            $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
-            $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
-            $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
-        }
+        $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+        $this->submit($showToaster);
     }
 
-    public function submit()
+    public function updatedApplicationFqdn()
+    {
+        $this->resetDefaultLabels(false);
+        $this->emit('success', 'Labels reseted to default!');
+    }
+    public function submit($showToaster = true)
     {
         try {
             $this->validate();
-            if (data_get($this->application,'build_pack') === 'dockerimage') {
+            if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
                     'application.docker_registry_image_tag' => 'required',
@@ -156,10 +182,16 @@ class General extends Component
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
+            if (gettype($this->customLabels) === 'string') {
+                $this->customLabels = str($this->customLabels)->replace(',', "\n");
+            }
+            $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
             $this->application->save();
-            $this->emit('success', 'Application settings updated!');
+            $showToaster && $this->emit('success', 'Application settings updated!');
         } catch (\Throwable $e) {
             return handleError($e, $this);
+        } finally {
+            $this->checkLabelUpdates();
         }
     }
 }

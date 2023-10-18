@@ -93,6 +93,12 @@
                 <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
             </div>
+            @if ($labelsChanged)
+                <x-forms.textarea label="Custom Labels" rows="15" id="customLabels"></x-forms.textarea>
+            @else
+                <x-forms.textarea label="Coolify Generated Labels" rows="15" id="customLabels"></x-forms.textarea>
+            @endif
+            <x-forms.button wire:click="resetDefaultLabels">Reset to Default Labels</x-forms.button>
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
