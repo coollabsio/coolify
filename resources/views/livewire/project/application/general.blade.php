@@ -5,8 +5,12 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
+            @if ($isConfigurationChanged)
+                <div class="font-bold text-warning">Configuration not applied to the running application. You need to
+                    redeploy.</div>
+            @endif
         </div>
-        <div class="">General configuration for your application.</div>
+        <div>General configuration for your application.</div>
         <div class="flex flex-col gap-2 py-4">
             <div class="flex flex-col items-end gap-2 xl:flex-row">
                 <x-forms.input id="application.name" label="Name" required />
@@ -81,7 +85,6 @@
             @if ($application->dockerfile)
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
-
             <h3>Network</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
                 @if ($application->settings->is_static)

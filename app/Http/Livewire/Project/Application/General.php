@@ -22,6 +22,7 @@ class General extends Component
 
     public $customLabels;
     public bool $labelsChanged = false;
+    public bool $isConfigurationChanged = false;
 
     public bool $is_static;
     public bool $is_git_submodules_enabled;
@@ -79,6 +80,7 @@ class General extends Component
 
     public function mount()
     {
+        $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         if (is_null(data_get($this->application, 'custom_labels'))) {
             $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
         } else {
@@ -131,6 +133,7 @@ class General extends Component
         $this->application->refresh();
         $this->emit('success', 'Application settings updated!');
         $this->checkLabelUpdates();
+        $this->isConfigurationChanged = $this->application->isConfigurationChanged();
     }
 
     public function getWildcardDomain()
@@ -192,6 +195,7 @@ class General extends Component
             return handleError($e, $this);
         } finally {
             $this->checkLabelUpdates();
+            $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         }
     }
 }

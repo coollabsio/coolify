@@ -78,7 +78,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        ray()->clearScreen();
+        // ray()->clearScreen();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
@@ -185,6 +185,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 dispatch(new ContainerStatusJob($this->server));
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
+            $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
             ray($e);
             $this->fail($e);
@@ -353,13 +354,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->execute_remote_command([
                 "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
             ]);
-            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
                 $this->execute_remote_command([
-                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
+                    "echo 'No configuration changed & Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped.'",
                 ]);
                 $this->generate_compose_file();
                 $this->rolling_update();
                 return;
+            }
+            if ($this->application->isConfigurationChanged()) {
+                $this->execute_remote_command([
+                    "echo 'Configuration changed. Rebuilding image.'",
+                ]);
             }
         }
         $this->cleanup_git();
