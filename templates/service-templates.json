@@ -20,6 +20,11 @@
         "slogan": "Code-Server is a self-hosted, web-based code editor that enables remote coding and collaboration from any device, anywhere.",
         "compose": "c2VydmljZXM6CiAgY29kZS1zZXJ2ZXI6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9jb2RlLXNlcnZlcjpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9DT0RFU0VSVkVSCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIFBBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEXzY0X1BBU1NXT1JEQ09ERVNFUlZFUgogICAgICAtIFNVRE9fUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfU1VET0NPREVTRVJWRVIKICAgICAgLSBERUZBVUxUX1dPUktTUEFDRT0vd29ya3NwYWNlCiAgICB2b2x1bWVzOgogICAgICAtIGNvZGUtc2VydmVyLWNvbmZpZzovY29uZmlnCiAgICAgIC0gY29kZS1zZXJ2ZXItd29ya3NwYWNlOi93b3Jrc3BhY2UKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODQ0MyJdCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTU="
     },
+    "dokuwiki": {
+        "documentation": "https://www.dokuwiki.org/faq",
+        "slogan": "A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases with simplicity and flexibility.",
+        "compose": "c2VydmljZXM6CiAgZG9rdXdpa2k6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9kb2t1d2lraTpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9ET0tVV0lLSQogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIFRaPUV1cm9wZS9NYWRyaWQKICAgIHZvbHVtZXM6CiAgICAgIC0gZG9rdXdpa2ktY29uZmlnOi9jb25maWcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAiXQogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1"
+    },
     "fider": {
         "documentation": "https://fider.io/docs",
         "slogan": "Fider is an open-source feedback platform for collecting and managing user feedback, helping you prioritize improvements to your products and services",
