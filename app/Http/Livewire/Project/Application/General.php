@@ -80,6 +80,9 @@ class General extends Component
 
     public function mount()
     {
+        if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
+            $this->application->isConfigurationChanged(true);
+        }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         if (is_null(data_get($this->application, 'custom_labels'))) {
             $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");

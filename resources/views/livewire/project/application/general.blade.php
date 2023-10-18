@@ -101,7 +101,7 @@
             @else
                 <x-forms.textarea label="Coolify Generated Labels" rows="15" id="customLabels"></x-forms.textarea>
             @endif
-            <x-forms.button wire:click="resetDefaultLabels">Reset to Default Labels</x-forms.button>
+            <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
