@@ -5,7 +5,7 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if ($isConfigurationChanged)
+            @if ($isConfigurationChanged && !is_null($application->config_hash))
                 <div class="font-bold text-warning">Configuration not applied to the running application. You need to
                     redeploy.</div>
             @endif
