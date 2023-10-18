@@ -62,7 +62,7 @@
     @endforeach
 </div>
 @if ($projects->count() > 0)
-    <h3 class="pb-4">Servers</h3>
+    <h3 class="py-4">Servers</h3>
 @endif
 @if ($servers->count() === 1)
     <div class="grid grid-cols-1 gap-2">
@@ -97,7 +97,9 @@
     </a>
 @endforeach
 </div>
-
+    {{-- <h3 class="py-4">Tokens</h3>
+    {{auth()->user()->tokens}}
+    <x-forms.button wire:click='createToken'>Create Token</x-forms.button> --}}
 <script>
     function gotoProject(uuid, environment = 'production') {
         window.location.href = '/project/' + uuid + '/' + environment;

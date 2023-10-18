@@ -17,6 +17,10 @@ class Dashboard extends Component
         $this->servers = Server::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get();
     }
+    // public function createToken() {
+    //     $token = auth()->user()->createToken('test');
+    //     ray($token);
+    // }
     // public function getIptables()
     // {
     //     $servers = Server::ownedByCurrentTeam()->get();
