@@ -555,7 +555,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $port = $matches[0];
             }
             $private_key = base64_encode($this->application->private_key->private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -p $port -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p $port -o Port=$port -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
