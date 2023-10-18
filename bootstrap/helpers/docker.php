@@ -147,11 +147,12 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     }
     return $labels;
 }
-function fqdnLabelsForTraefik($uuid, Collection $domains, bool $is_force_https_enabled, $onlyPort = null)
+function fqdnLabelsForTraefik(Collection $domains, bool $is_force_https_enabled, $onlyPort = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     foreach ($domains as $domain) {
+        $uuid = (string)new Cuid2(7);
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
@@ -212,13 +213,13 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $onlyPort = $ports[0];
     }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
-    // $container_name = generateApplicationContainerName($application, $pull_request_id);
+    $container_name = generateApplicationContainerName($application, $pull_request_id);
     $appId = $application->id;
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         $appId = $appId . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
-    $labels = $labels->merge(defaultLabels($appId, $application->uuid, $pull_request_id));
+    $labels = $labels->merge(defaultLabels($appId, $container_name, $pull_request_id));
     if ($application->fqdn) {
         if ($pull_request_id !== 0) {
             $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
@@ -226,7 +227,8 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         // Add Traefik labels no matter which proxy is selected
-        $labels = $labels->merge(fqdnLabelsForTraefik($application->uuid, $domains, $application->settings->is_force_https_enabled, $onlyPort));
+        $labels = $labels->merge(fqdnLabelsForTraefik($domains, $application->settings->is_force_https_enabled, $onlyPort));
     }
+    ray($labels);
     return $labels->all();
 }
