@@ -46,9 +46,11 @@
 
                 </div>
                 @if (Str::of(data_get($application, 'status'))->startsWith('running'))
-                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                    <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
                 @elseif (Str::of(data_get($application, 'status'))->startsWith('exited'))
                     <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(data_get($application, 'status'))->startsWith('restarting'))
+                    <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
                 @endif
             </a>
         @endforeach
@@ -60,9 +62,11 @@
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $database->description }}</div>
                 </div>
                 @if (Str::of(data_get($database, 'status'))->startsWith('running'))
-                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                    <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
                 @elseif (Str::of(data_get($database, 'status'))->startsWith('exited'))
                     <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                @elseif (Str::of(data_get($database, 'status'))->startsWith('restaring'))
+                    <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
                 @endif
             </a>
         @endforeach
@@ -74,9 +78,9 @@
                     <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
                 </div>
                 @if (Str::of(serviceStatus($service))->startsWith('running'))
-                    <div class="absolute bg-green-400 -top-1 -left-1 badge badge-xs"></div>
+                    <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
                 @elseif (Str::of(serviceStatus($service))->startsWith('degraded'))
-                    <div class="absolute bg-yellow-400 -top-1 -left-1 badge badge-xs"></div>
+                    <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
                 @elseif (Str::of(serviceStatus($service))->startsWith('exited'))
                     <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
                 @endif
