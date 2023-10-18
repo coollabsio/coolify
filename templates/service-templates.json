@@ -35,6 +35,11 @@
         "slogan": "Heimdall is a self-hosted dashboard for managing and organizing your server applications, providing a centralized and efficient interface.",
         "compose": "c2VydmljZXM6CiAgaGVpbWRhbGw6CiAgICBpbWFnZTogbHNjci5pby9saW51eHNlcnZlci9oZWltZGFsbDpsYXRlc3QKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9IRUlNREFMTAogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIFRaPUV1cm9wZS9NYWRyaWQKICAgIHZvbHVtZXM6CiAgICAgIC0gaGVpbWRhbGwtY29uZmlnOi9jb25maWcKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODAiXQogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1"
     },
+    "metube": {
+        "documentation": "https://github.com/alexta69/metube",
+        "slogan": "A web GUI for youtube-dl with playlist support. It enables you to effortlessly download videos from YouTube and dozens of other sites.",
+        "compose": "c2VydmljZXM6CiAgbWV0dWJlOgogICAgaW1hZ2U6IGdoY3IuaW8vYWxleHRhNjkvbWV0dWJlOmxhdGVzdAogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX01FVFVCRQogICAgICAtIFVJRD0xMDAwCiAgICAgIC0gR0lEPTEwMDAKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OiBbIkNNRCIsICJjdXJsIiwgIi1mIiwgImh0dHA6Ly9sb2NhbGhvc3Q6ODA4MSJdCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTU="
+    },
     "pairdrop": {
         "documentation": "https://github.com/schlagmichdoch/PairDrop/blob/master/docs/faq.md",
         "slogan": "Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.",
