@@ -119,6 +119,7 @@ class General extends Component
     public function instantSave()
     {
         // @TODO: find another way - if possible
+        $force_https = $this->application->settings->is_force_https_enabled;
         $this->application->settings->is_static = $this->is_static;
         if ($this->is_static) {
             $this->application->ports_exposes = 80;
@@ -137,6 +138,9 @@ class General extends Component
         $this->emit('success', 'Application settings updated!');
         $this->checkLabelUpdates();
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
+        if ($force_https !== $this->is_force_https_enabled) {
+            $this->resetDefaultLabels(false);
+        }
     }
 
     public function getWildcardDomain()
