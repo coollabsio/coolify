@@ -73,6 +73,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private string $serverUser = 'root';
     private string $serverUserHomeDir = '/root';
+    private string $dockerConfigFileExists = 'NOK';
 
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
@@ -165,6 +166,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
+        ray("test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'");
+        $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
@@ -455,7 +458,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->stop_running_container();
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
         );
     }
 
@@ -463,7 +466,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $pull = "--pull=always";
         $helperImage = config('coolify.helper_image');
-        $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host  --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+        if ($this->dockerConfigFileExists === 'OK') {
+            $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+        } else {
+            $runCommand = "docker run {$pull} -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+        }
 
         $this->execute_remote_command(
             [
@@ -830,7 +837,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ]
             );
         } else {
-            ray("docker build $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}");
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
@@ -858,7 +864,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->execute_remote_command(
             ["echo -n 'Starting application (could take a while).'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d >/dev/null"), "hidden" => true],
+            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
         );
     }
 

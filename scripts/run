@@ -21,9 +21,10 @@ function help {
 }
 
 function setup:dev {
-    docker exec coolify bash -c "php artisan key:generate"
     docker exec coolify bash -c "composer install"
+    docker exec coolify bash -c "php artisan key:generate"
     docker exec coolify bash -c "php artisan migrate:fresh --seed"
+    sudo chmod -R o+rwx .
 }
 function sync:v3 {
     if [ -z "$1" ]; then

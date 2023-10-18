@@ -193,23 +193,24 @@ class Server extends BaseModel
     }
     public function isProxyShouldRun()
     {
-        $shouldRun = false;
         if ($this->proxyType() === ProxyTypes::NONE->value) {
             return false;
         }
-        foreach ($this->applications() as $application) {
-            if (data_get($application, 'fqdn')) {
-                $shouldRun = true;
-                break;
-            }
-        }
-        if ($this->id === 0) {
-            $settings = InstanceSettings::get();
-            if (data_get($settings, 'fqdn')) {
-                $shouldRun = true;
-            }
-        }
-        return $shouldRun;
+        // foreach ($this->applications() as $application) {
+        //     if (data_get($application, 'fqdn')) {
+        //         $shouldRun = true;
+        //         break;
+        //     }
+        // }
+        // ray($this->services()->get());
+
+        // if ($this->id === 0) {
+        //     $settings = InstanceSettings::get();
+        //     if (data_get($settings, 'fqdn')) {
+        //         $shouldRun = true;
+        //     }
+        // }
+        return true;
     }
     public function isFunctional()
     {

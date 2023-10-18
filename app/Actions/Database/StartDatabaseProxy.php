@@ -87,7 +87,7 @@ class StartDatabaseProxy
             "echo '{$dockerfile_base64}' | base64 -d > $configuration_dir/Dockerfile",
             "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
             "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
-            "docker compose --project-directory {$configuration_dir} up --build -d >/dev/null",
+            "docker compose --project-directory {$configuration_dir} up --build -d",
         ], $database->destination->server);
     }
 }

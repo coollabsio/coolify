@@ -28,6 +28,7 @@ class Kernel extends ConsoleKernel
             // $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->cleanup_servers($schedule);
+            $this->check_scheduled_backups($schedule);
         } else {
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();

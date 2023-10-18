@@ -39,7 +39,7 @@ class Deploy extends Component
     public function checkProxy()
     {
         try {
-            CheckProxy::run($this->server);
+            CheckProxy::run($this->server, true);
             $this->emit('startProxyPolling');
             $this->emit('proxyChecked');
         } catch (\Throwable $e) {
