@@ -437,9 +437,6 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
-        $deprecated = File::get(base_path('templates/deprecated.json'));
-        $deprecated = collect(json_decode($deprecated))->sortKeys();
-        $services = $services->merge($deprecated);
         $version = config('version');
         $services = $services->map(function ($service) use ($version) {
             if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
