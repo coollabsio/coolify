@@ -1,0 +1,18 @@
+# documentation: https://www.dokuwiki.org/faq
+# slogan: A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases with simplicity and flexibility.
+
+services:
+  dokuwiki:
+    image: lscr.io/linuxserver/dokuwiki:latest
+    environment:
+      - SERVICE_FQDN_DOKUWIKI
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - dokuwiki-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

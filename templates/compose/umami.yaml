@@ -1,0 +1,27 @@
+# documentation: https://umami.is/docs/getting-started
+# slogan: Umami is a lightweight, self-hosted web analytics platform designed to provide website owners with insights into visitor behavior without compromising user privacy.
+
+services:
+  umami:
+    image: ghcr.io/umami-software/umami:postgresql-latest
+    environment:
+      - SERVICE_FQDN_UMAMI
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgresql:5432/$POSTGRES_DB
+      - DATABASE_TYPE=postgres
+      - APP_SECRET=$SERVICE_PASSWORD_64_UMAMI
+    depends_on:
+      postgresql:
+        condition: service_healthy
+  postgresql:
+    image: postgres:15-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-umami}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

@@ -12,7 +12,6 @@ use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -25,30 +24,23 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 1;
-    public $timeout = 120;
-
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
-    }
-
-    public function uniqueId(): string
-    {
-        return $this->server->uuid;
-    }
-
     public function __construct(public Server $server)
     {
-        if (isDev()) {
-            $this->handle();
-        }
+    }
+    public function middleware(): array
+    {
+        return [(new WithoutOverlapping($this->server->id))->dontRelease()];
     }
 
-    public function handle()
+    public function uniqueId(): int
     {
+        return $this->server->id;
+    }
+
+    public function handle(): void
+    {
+        ray("checking server status for {$this->server->id}");
         try {
-            // ray("checking server status for {$this->server->id}");
             // ray()->clearAll();
             $serverUptimeCheckNumber = $this->server->unreachable_count;
             $serverUptimeCheckNumberMax = 3;
@@ -129,7 +121,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } catch (\Throwable $e) {
                     ray($e);
                 }
-
             } else {
                 $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
                 $this->server->save();
@@ -308,7 +299,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
-            return handleError($e);
+            handleError($e);
         }
     }
 }

@@ -54,7 +54,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ApplicationPreview|null $preview = null;
 
     private string $container_name;
-    private string|null $currently_running_container_name = null;
+    private ?string $currently_running_container_name = null;
     private string $basedir;
     private string $workdir;
     private ?string $build_pack = null;
@@ -75,10 +75,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $serverUserHomeDir = '/root';
     private string $dockerConfigFileExists = 'NOK';
 
+    private int $customPort = 22;
+
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        ray()->clearScreen();
+        // ray()->clearScreen();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
@@ -166,8 +168,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
-        ray("test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'");
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
+
+        // Check custom port
+        preg_match('/(?<=:)\d+(?=\/)/', $this->application->git_repository, $matches);
+        if (count($matches) === 1) {
+            $this->customPort = $matches[0];
+            $gitHost = str($this->application->git_repository)->before(':');
+            $gitRepo = str($this->application->git_repository)->after('/');
+            $this->application->git_repository = "$gitHost:$gitRepo";
+        }
         try {
             if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
@@ -186,6 +196,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 dispatch(new ContainerStatusJob($this->server));
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
+            $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
             ray($e);
             $this->fail($e);
@@ -354,13 +365,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->execute_remote_command([
                 "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
             ]);
-            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+            if (Str::of($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
                 $this->execute_remote_command([
-                    "echo 'Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped...'"
+                    "echo 'No configuration changed & Docker Image found locally with the same Git Commit SHA {$this->application->uuid}:{$this->commit}. Build step skipped.'",
                 ]);
                 $this->generate_compose_file();
                 $this->rolling_update();
                 return;
+            }
+            if ($this->application->isConfigurationChanged()) {
+                $this->execute_remote_command([
+                    "echo 'Configuration changed. Rebuilding image.'",
+                ]);
             }
         }
         $this->cleanup_git();
@@ -544,13 +560,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         if ($this->application->deploymentType() === 'deploy_key') {
-            $port = 22;
-            preg_match('/(?<=:)\d+(?=\/)/', $this->application->git_repository, $matches);
-            if (count($matches) === 1) {
-                $port = $matches[0];
-            }
             $private_key = base64_encode($this->application->private_key->private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -p $port -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
+            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
@@ -650,6 +661,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables($ports);
 
+        $labels = generateLabelsApplication($this->application, $this->preview);
+        if (data_get($this->application, 'custom_labels')) {
+            $labels = str($this->application->custom_labels)->explode(',')->toArray();
+        }
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -658,7 +673,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
-                    'labels' => generateLabelsApplication($this->application, $this->preview, $ports),
+                    'labels' => $labels,
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,

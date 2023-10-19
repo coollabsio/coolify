@@ -23,7 +23,7 @@
     @if ($projects->count() === 1)
         <div class="grid grid-cols-1 gap-2">
         @else
-            <div class="grid grid-cols-3 gap-2">
+            <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
     @endif
     @foreach ($projects as $project)
         <div class="gap-2 border border-transparent cursor-pointer box group" x-data
@@ -43,7 +43,7 @@
                         {{ $project->description }}</div>
                 </a>
             @endif
-            <a class="mx-4 rounded group-hover:text-white hover:no-underline "
+            <a class="mx-4 rounded group-hover:text-white hover:no-underline"
                 href="{{ route('project.resources.new', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                 <span class="font-bold hover:text-warning">+ New Resource</span>
             </a>
@@ -62,7 +62,7 @@
     @endforeach
 </div>
 @if ($projects->count() > 0)
-    <h3 class="pb-4">Servers</h3>
+    <h3 class="py-4">Servers</h3>
 @endif
 @if ($servers->count() === 1)
     <div class="grid grid-cols-1 gap-2">
@@ -97,7 +97,9 @@
     </a>
 @endforeach
 </div>
-
+    {{-- <h3 class="py-4">Tokens</h3>
+    {{auth()->user()->tokens}}
+    <x-forms.button wire:click='createToken'>Create Token</x-forms.button> --}}
 <script>
     function gotoProject(uuid, environment = 'production') {
         window.location.href = '/project/' + uuid + '/' + environment;
