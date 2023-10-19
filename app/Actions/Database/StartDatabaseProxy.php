@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Models\StandaloneMongodb;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -11,13 +12,15 @@ class StartDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb $database)
     {
         $internalPort = null;
-        if ($database->getMorphClass()=== 'App\Models\StandaloneRedis') {
+        if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
             $internalPort = 6379;
-        } else if ($database->getMorphClass()=== 'App\Models\StandalonePostgresql') {
+        } else if ($database->getMorphClass() === 'App\Models\StandalonePostgresql') {
             $internalPort = 5432;
+        } else if ($database->getMorphClass() === 'App\Models\StandaloneMongodb') {
+            $internalPort = 27017;
         }
         $containerName = "{$database->uuid}-proxy";
         $configuration_dir = database_proxy_dir($database->uuid);

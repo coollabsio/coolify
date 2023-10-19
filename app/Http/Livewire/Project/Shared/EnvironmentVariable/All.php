@@ -78,6 +78,9 @@ class All extends Component
                     case 'standalone-redis':
                         $environment->standalone_redis_id = $this->resource->id;
                         break;
+                    case 'standalone-mongodb':
+                        $environment->standalone_mongodb_id = $this->resource->id;
+                        break;
                     case 'service':
                         $environment->service_id = $this->resource->id;
                         break;

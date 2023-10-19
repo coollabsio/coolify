@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StandaloneRedis extends BaseModel
+class StandaloneMongodb extends BaseModel
 {
     use HasFactory;
     protected $guarded = [];
@@ -15,7 +15,7 @@ class StandaloneRedis extends BaseModel
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'redis-data-' . $database->uuid,
+                'name' => 'mongodb-data-' . $database->uuid,
                 'mount_path' => '/data',
                 'host_path' => null,
                 'resource_id' => $database->id,
@@ -53,7 +53,7 @@ class StandaloneRedis extends BaseModel
 
     public function type(): string
     {
-        return 'standalone-redis';
+        return 'standalone-mongodb';
     }
 
     public function environment()

@@ -103,6 +103,15 @@
                             The open source, in-memory data store for cache, streaming engine, and message broker.
                         </div>
                     </div>
+                </div> <div class="box group" wire:click="setType('mongodb')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New MongoDB
+                        </div>
+                        <div class="text-xs group-hover:text-white">
+                            MongoDB is a source-available cross-platform document-oriented database program.
+                        </div>
+                    </div>
                 </div>
                 {{-- <div class="box group" wire:click="setType('existing-postgresql')">
                     <div class="flex flex-col mx-6">
