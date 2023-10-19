@@ -55,7 +55,13 @@ class StandaloneMongodb extends BaseModel
     {
         return 'standalone-mongodb';
     }
-
+    public function getDbUrl() {
+        if ($this->is_public) {
+            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
+        } else {
+            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true";
+        }
+    }
     public function environment()
     {
         return $this->belongsTo(Environment::class);

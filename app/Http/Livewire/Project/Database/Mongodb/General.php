@@ -67,7 +67,7 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
-            $this->getDbUrl();
+            $this->db_url = $this->database->getDbUrl();
             $this->database->save();
         } catch(\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;
@@ -81,16 +81,9 @@ class General extends Component
 
     public function mount()
     {
-        $this->getDbUrl();
+        $this->db_url = $this->database->getDbUrl();
     }
-    public function getDbUrl() {
 
-        if ($this->database->is_public) {
-            $this->db_url = "mongodb://{$this->database->mongo_initdb_root_username}:{$this->database->mongo_initdb_root_password}@{$this->database->destination->server->getIp}:{$this->database->public_port}/?directConnection=true";
-        } else {
-            $this->db_url = "mongodb://{$this->database->mongo_initdb_root_username}:{$this->database->mongo_initdb_root_password}@{$this->database->uuid}:27017/?directConnection=true";
-        }
-    }
     public function render()
     {
         return view('livewire.project.database.mongodb.general');
