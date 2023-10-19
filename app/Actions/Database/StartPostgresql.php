@@ -145,6 +145,9 @@ class StartPostgresql
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_USER'))->isEmpty()) {
             $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
         }
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PGUSER'))->isEmpty()) {
+            $environment_variables->push("PGUSER={$this->database->postgres_user}");
+        }
 
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
             $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
