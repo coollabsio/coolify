@@ -1,0 +1,15 @@
+# documentation: https://docs.appsmith.com
+# slogan: Appsmith is an open-source, self-hosted application development platform that enables you to build powerful web applications with ease.
+
+services:
+  appsmith:
+    image: index.docker.io/appsmith/appsmith-ce
+    environment:
+      - SERVICE_FQDN
+      - APPSMITH_MAIL_ENABLED=false
+      - APPSMITH_DISABLE_TELEMETRY=true
+      - APPSMITH_DISABLE_INTERCOM=true
+      - APPSMITH_SENTRY_DSN=
+      - APPSMITH_SMART_LOOK_ID=
+    volumes:
+      - stacks-data:/appsmith-stacks

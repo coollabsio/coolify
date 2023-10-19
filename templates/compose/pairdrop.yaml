@@ -1,0 +1,17 @@
+# documentation: https://github.com/schlagmichdoch/PairDrop/blob/master/docs/faq.md
+# slogan: Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.
+
+services:
+  pairdrop:
+    image: lscr.io/linuxserver/pairdrop:latest
+    environment:
+      - SERVICE_FQDN_PAIRDROP
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - DEBUG_MODE=false
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

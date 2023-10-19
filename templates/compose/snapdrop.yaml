@@ -1,0 +1,18 @@
+# documentation: https://github.com/RobinLinus/snapdrop/blob/master/docs/faq.md
+# slogan: A self-hosted file-sharing service for secure and convenient file transfers, whether on a local network or the internet.
+
+services:
+  snapdrop:
+    image: lscr.io/linuxserver/snapdrop:latest
+    environment:
+      - SERVICE_FQDN_SNAPDROP
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - snapdrop-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
