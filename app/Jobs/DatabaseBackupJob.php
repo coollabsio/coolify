@@ -6,6 +6,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
+use App\Models\StandaloneMongodb;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
@@ -27,7 +28,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public ?Team $team = null;
     public Server $server;
     public ScheduledDatabaseBackup $backup;
-    public StandalonePostgresql $database;
+    public StandalonePostgresql|StandaloneMongodb $database;
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;

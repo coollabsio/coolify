@@ -7,7 +7,7 @@
         href="{{ route('project.database.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    @if ($database->getMorphClass() === 'App\Models\StandalonePostgresql')
+    @if ($database->getMorphClass() === 'App\Models\StandalonePostgresql' || $database->getMorphClass() === 'App\Models\StandaloneMongodb')
         <a class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
             href="{{ route('project.database.backups.all', $parameters) }}">
             <button>Backups</button>
