@@ -213,7 +213,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
             $this->getProxyType();
         } catch (\Throwable $e) {
-            $this->dockerInstallationStarted = false;
+            // $this->dockerInstallationStarted = false;
             return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
         }
     }

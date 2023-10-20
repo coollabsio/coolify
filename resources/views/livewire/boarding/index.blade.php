@@ -225,12 +225,12 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
-                    @if ($dockerInstallationStarted)
                     <x-forms.button class="justify-center box" wire:click="installDocker"
-                        onclick="installDocker.showModal()">
-                        Let's do it!</x-forms.button>
+                    onclick="installDocker.showModal()">
+                    Let's do it!</x-forms.button>
+                    @if ($dockerInstallationStarted)
                         <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
-                            Next</x-forms.button>
+                            Validate Server & Continue</x-forms.button>
                     @endif
                 </x-slot:actions>
                 <x-slot:explanation>
@@ -314,7 +314,7 @@
                     I will redirect you to the new resource page, where you can create your first resource.
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="justify-center box" wire:click="showNewResource">Let's do
+                    <div class="items-center justify-center box" wire:click="showNewResource">Let's do
                         it!</div>
                 </x-slot:actions>
                 <x-slot:explanation>
