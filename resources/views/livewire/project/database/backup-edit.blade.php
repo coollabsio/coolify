@@ -27,7 +27,7 @@
     @endif
     <div class="flex flex-col gap-2">
         <div class="flex gap-2">
-            @if ($backup->database_type === 'App\Models\StandalonePostgres')
+            @if ($backup->database_type === 'App\Models\StandalonePostgresql')
                 <x-forms.input label="Databases To Backup"
                     helper="Comma separated list of databases to backup. Empty will include the default one."
                     id="backup.databases_to_backup" />
