@@ -1,11 +1,9 @@
 <?php
 
+use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartPostgresql;
-use App\Models\Application;
-use App\Models\Service;
-use App\Models\StandaloneMongodb;
-use App\Models\StandalonePostgresql;
-use App\Models\StandaloneRedis;
+use App\Actions\Database\StartRedis;
+use App\Actions\Service\StartService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -57,6 +55,21 @@ Route::group([
                     'started_at' => now(),
                 ]);
                 return response()->json(['message' => 'Database started.'], 200);
+            } else if ($type === 'App\Models\StandaloneRedis') {
+                StartRedis::run($resource);
+                $resource->update([
+                    'started_at' => now(),
+                ]);
+                return response()->json(['message' => 'Database started.'], 200);
+            } else if ($type === 'App\Models\StandaloneMongodb') {
+                StartMongodb::run($resource);
+                $resource->update([
+                    'started_at' => now(),
+                ]);
+                return response()->json(['message' => 'Database started.'], 200);
+            }else if ($type === 'App\Models\Service') {
+                StartService::run($resource);
+                return response()->json(['message' => 'Service started.'], 200);
             }
         }
         return response()->json(['error' => 'No resource found.'], 404);

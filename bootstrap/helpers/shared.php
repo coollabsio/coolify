@@ -463,7 +463,7 @@ function getResourceByUuid(string $uuid, ?int $teamId = null)
 {
     $resource = queryResourcesByUuid($uuid);
     if (!is_null($teamId)) {
-        if ($resource->environment->project->team_id === $teamId) {
+        if (!is_null($resource) && $resource->environment->project->team_id === $teamId) {
             return $resource;
         }
         return null;
