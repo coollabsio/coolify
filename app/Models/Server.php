@@ -122,9 +122,9 @@ class Server extends BaseModel
     public function databases()
     {
         return $this->destinations()->map(function ($standaloneDocker) {
-            $postgresqls = $standaloneDocker->postgresqls;
-            $redis = $standaloneDocker->redis;
-            $mongodbs = $standaloneDocker->mongodbs;
+            $postgresqls = data_get($standaloneDocker,'postgresqls',collect([]));
+            $redis = data_get($standaloneDocker,'redis',collect([]));
+            $mongodbs = data_get($standaloneDocker,'mongodbs',collect([]));
             return $postgresqls->concat($redis)->concat($mongodbs);
         })->flatten();
     }
