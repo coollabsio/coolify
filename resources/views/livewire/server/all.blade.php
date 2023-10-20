@@ -18,7 +18,7 @@
                     <div class="font-bold text-white">
                         {{ $server->name }}
                     </div>
-                    <div class="text-xs group-hover:text-white">
+                    <div class="description">
                         {{ $server->description }}</div>
                     <div class="flex gap-1 text-xs text-error">
                         @if (!$server->settings->is_reachable)
