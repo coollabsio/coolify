@@ -1,6 +1,6 @@
 <template>
     <Transition name="fade">
-        <div >
+        <div>
             <div class="flex items-center p-1 px-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
                 @click="showCommandPalette = true">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24" stroke-width="2"
@@ -54,11 +54,12 @@
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
                                                 <span class="inline-block text-warning">{{ search }}</span>
-                                                </span>
+                                            </span>
                                             <span v-else><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">randomly generated (type to change)</span>
+                                                <span class="inline-block text-warning">randomly generated (type to
+                                                    change)</span>
                                             </span>
                                         </span>
                                     </li>
@@ -414,6 +415,13 @@ const magicActions = [{
     name: 'Goto: Boarding process',
     icon: 'goto',
     sequence: ['main', 'redirect']
+},
+{
+    id: 24,
+    name: 'Goto: API Tokens',
+    tags: 'api,tokens,rest',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
 }
 ]
 const initialState = {
@@ -643,6 +651,9 @@ async function redirect() {
             break;
         case 23:
             targetUrl.pathname = `/boarding`
+            break;
+        case 24:
+            targetUrl.pathname = `/security/api-tokens`
             break;
     }
     window.location.href = targetUrl;
