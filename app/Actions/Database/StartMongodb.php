@@ -2,7 +2,6 @@
 
 namespace App\Actions\Database;
 
-use App\Models\Server;
 use App\Models\StandaloneMongodb;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -16,7 +15,7 @@ class StartMongodb
     public array $commands = [];
     public string $configuration_dir;
 
-    public function handle(Server $server, StandaloneMongodb $database)
+    public function handle(StandaloneMongodb $database)
     {
         $this->database = $database;
 
@@ -102,7 +101,7 @@ class StartMongodb
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo '####### {$database->name} started.'";
-        return remote_process($this->commands, $server);
+        return remote_process($this->commands, $database->destination->server);
     }
 
     private function generate_local_persistent_volumes()
@@ -160,6 +159,5 @@ class StartMongodb
         $content = $this->database->mongo_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
-
     }
 }

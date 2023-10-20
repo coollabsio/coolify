@@ -100,9 +100,6 @@
     </a>
 @endforeach
 </div>
-{{-- <h3 class="py-4">Tokens</h3>
-    {{auth()->user()->tokens}}
-    <x-forms.button wire:click='createToken'>Create Token</x-forms.button> --}}
 <script>
     function gotoProject(uuid, environment = 'production') {
         window.location.href = '/project/' + uuid + '/' + environment;
