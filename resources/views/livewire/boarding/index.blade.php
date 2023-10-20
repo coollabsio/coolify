@@ -230,7 +230,7 @@
                     Let's do it!</x-forms.button>
                     @if ($dockerInstallationStarted)
                         <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
-                            Next</x-forms.button>
+                            Validate Server & Continue</x-forms.button>
                     @endif
                 </x-slot:actions>
                 <x-slot:explanation>
