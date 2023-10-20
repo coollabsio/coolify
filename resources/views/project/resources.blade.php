@@ -9,6 +9,10 @@
                     class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
                     New</a>
             @endif
+            <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                href="{{ route('project.clone', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                Clone
+            </a>
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex items-center">
