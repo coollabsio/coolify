@@ -1,0 +1,18 @@
+# documentation: https://github.com/linuxserver/Heimdall
+# slogan: Heimdall is a self-hosted dashboard for managing and organizing your server applications, providing a centralized and efficient interface.
+
+services:
+  heimdall:
+    image: lscr.io/linuxserver/heimdall:latest
+    environment:
+      - SERVICE_FQDN_HEIMDALL
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - heimdall-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

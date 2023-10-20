@@ -1,0 +1,19 @@
+# documentation: https://docs.baby-buddy.net
+# slogan: Baby Buddy is an open-source web application that helps parents track their baby's daily activities, growth, and health with ease.
+
+services:
+  babybuddy:
+    image: lscr.io/linuxserver/babybuddy:latest
+    environment:
+      - SERVICE_FQDN_BABYBUDDY
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - CSRF_TRUSTED_ORIGINS=$SERVICE_FQDN_BABYBUDDY
+    volumes:
+      - babybuddy-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

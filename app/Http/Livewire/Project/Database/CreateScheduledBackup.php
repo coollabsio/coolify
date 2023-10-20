@@ -22,6 +22,11 @@ class CreateScheduledBackup extends Component
         'frequency' => 'Backup Frequency',
         'save_s3' => 'Save to S3',
     ];
+    public function mount() {
+        if ($this->s3s->count() > 0) {
+            $this->s3_storage_id = $this->s3s->first()->id;
+        }
+    }
 
     public function submit(): void
     {

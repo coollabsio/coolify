@@ -1,0 +1,21 @@
+# documentation: https://coder.com/docs/code-server/latest/guide
+# slogan: Code-Server is a self-hosted, web-based code editor that enables remote coding and collaboration from any device, anywhere.
+
+services:
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    environment:
+      - SERVICE_FQDN_CODESERVER
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - PASSWORD=$SERVICE_PASSWORD_64_PASSWORDCODESERVER
+      - SUDO_PASSWORD=$SERVICE_PASSWORD_SUDOCODESERVER
+      - DEFAULT_WORKSPACE=/config/workspace
+    volumes:
+      - code-server-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8443"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

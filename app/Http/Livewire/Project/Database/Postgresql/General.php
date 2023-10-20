@@ -49,15 +49,7 @@ class General extends Component
     ];
     public function mount()
     {
-        $this->getDbUrl();
-    }
-    public function getDbUrl() {
-
-        if ($this->database->is_public) {
-            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->destination->server->getIp}:{$this->database->public_port}/{$this->database->postgres_db}";
-        } else {
-            $this->db_url = "postgres://{$this->database->postgres_user}:{$this->database->postgres_password}@{$this->database->uuid}:5432/{$this->database->postgres_db}";
-        }
+        $this->db_url = $this->database->getDbUrl();
     }
     public function instantSave()
     {
@@ -75,7 +67,7 @@ class General extends Component
                 StopDatabaseProxy::run($this->database);
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
-            $this->getDbUrl();
+            $this->db_url = $this->database->getDbUrl();
             $this->database->save();
         } catch(\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;

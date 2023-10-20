@@ -1,7 +1,12 @@
 <?php
 
+use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\StandaloneMongodb;
+use App\Models\StandalonePostgresql;
+use App\Models\StandaloneRedis;
 use App\Models\Team;
 use App\Models\User;
 use App\Notifications\Channels\DiscordChannel;
@@ -437,9 +442,6 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
-        $deprecated = File::get(base_path('templates/deprecated.json'));
-        $deprecated = collect(json_decode($deprecated))->sortKeys();
-        $services = $services->merge($deprecated);
         $version = config('version');
         $services = $services->map(function ($service) use ($version) {
             if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
@@ -455,4 +457,32 @@ function getServiceTemplates()
         $services = collect($services->json())->sortKeys();
     }
     return $services;
+}
+
+function getResourceByUuid(string $uuid, ?int $teamId = null)
+{
+    $resource = queryResourcesByUuid($uuid);
+    if (!is_null($teamId)) {
+        if (!is_null($resource) && $resource->environment->project->team_id === $teamId) {
+            return $resource;
+        }
+        return null;
+    } else {
+        return $resource;
+    }
+}
+function queryResourcesByUuid(string $uuid)
+{
+    $resource = null;
+    $application = Application::whereUuid($uuid)->first();
+    if ($application) return $application;
+    $service = Service::whereUuid($uuid)->first();
+    if ($service) return $service;
+    $postgresql = StandalonePostgresql::whereUuid($uuid)->first();
+    if ($postgresql) return $postgresql;
+    $redis = StandaloneRedis::whereUuid($uuid)->first();
+    if ($redis) return $redis;
+    $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
+    if ($mongodb) return $mongodb;
+    return $resource;
 }

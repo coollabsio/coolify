@@ -24,7 +24,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Public Repository
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy any kind of public repositories from the supported git providers.
                         </div>
                     </div>
@@ -34,7 +34,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Private Repository (with GitHub App)
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy public & private repositories through your GitHub Apps.
                         </div>
                     </div>
@@ -44,7 +44,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Private Repository (with deploy key)
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy public & private repositories with a simple deploy key (SSH key).
                         </div>
                     </div>
@@ -56,7 +56,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Based on a Dockerfile
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy a simple Dockerfile, without Git.
                         </div>
                     </div>
@@ -66,7 +66,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Based on a Docker Compose
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy complex application easily with Docker Compose.
                         </div>
                     </div>
@@ -76,7 +76,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             Based on an existing Docker Image
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             You can deploy an existing Docker Image form any Registry.
                         </div>
                     </div>
@@ -89,7 +89,7 @@
                         <div class="font-bold text-white group-hover:text-white">
                             New PostgreSQL
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             The most loved relational database in the world.
                         </div>
                     </div>
@@ -99,8 +99,18 @@
                         <div class="font-bold text-white group-hover:text-white">
                             New Redis
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="description">
                             The open source, in-memory data store for cache, streaming engine, and message broker.
+                        </div>
+                    </div>
+                </div>
+                <div class="box group" wire:click="setType('mongodb')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New MongoDB
+                        </div>
+                        <div class="description">
+                            MongoDB is a source-available cross-platform document-oriented database program.
                         </div>
                     </div>
                 </div>
@@ -125,10 +135,9 @@
                 @else
                     @foreach ($services as $serviceName => $service)
                         @if (data_get($service, 'disabled'))
-                            <button class="text-left bg-black cursor-not-allowed bg-coolgray-200/20 box-without-bg"
-                                disabled>
+                            <button class="text-left cursor-not-allowed bg-coolgray-200/20 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
-                                    <div class="font-bold text-coolgray-500">
+                                    <div class="font-bold">
                                         {{ Str::headline($serviceName) }}
                                     </div>
                                     You need to upgrade to {{ data_get($service, 'minVersion') }} to use this service.
@@ -137,12 +146,12 @@
                         @else
                             <button class="text-left box group" wire:loading.attr="disabled"
                                 wire:click="setType('one-click-service-{{ $serviceName }}')">
-                                <div class="flex flex-col mx-6">
+                                <div class="flex flex-col mx-2">
                                     <div class="font-bold text-white group-hover:text-white">
                                         {{ Str::headline($serviceName) }}
                                     </div>
                                     @if (data_get($service, 'slogan'))
-                                        <div class="text-xs">
+                                        <div class="description">
                                             {{ data_get($service, 'slogan') }}
                                         </div>
                                     @endif

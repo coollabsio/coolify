@@ -63,6 +63,8 @@ class ProjectController extends Controller
                 $database = create_standalone_postgresql($environment->id, $destination_uuid);
             } else if ($type->value() === 'redis') {
                 $database = create_standalone_redis($environment->id, $destination_uuid);
+            }  else if ($type->value() === 'mongodb') {
+                $database = create_standalone_mongodb($environment->id, $destination_uuid);
             }
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,

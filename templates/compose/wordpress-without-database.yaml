@@ -1,0 +1,10 @@
+# documentation: https://wordpress.org/documentation/
+# slogan: "WordPress is open source software you can use to create a beautiful website, blog, or app."
+
+services:
+   wordpress:
+     image: wordpress:latest
+     volumes:
+       - wordpress-files:/var/www/html
+     environment:
+       SERVICE_FQDN:

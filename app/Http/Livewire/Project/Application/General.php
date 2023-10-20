@@ -19,6 +19,7 @@ class General extends Component
     public string $git_branch;
     public ?string $git_commit_sha = null;
     public string $build_pack;
+    public ?string $ports_exposes = null;
 
     public $customLabels;
     public bool $labelsChanged = false;
@@ -80,6 +81,7 @@ class General extends Component
 
     public function mount()
     {
+        $this->ports_exposes = $this->application->ports_exposes;
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->application->isConfigurationChanged(true);
         }
@@ -156,6 +158,7 @@ class General extends Component
     public function resetDefaultLabels($showToaster = true)
     {
         $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+        $this->ports_exposes = $this->application->ports_exposes;
         $this->submit($showToaster);
     }
 
@@ -168,6 +171,9 @@ class General extends Component
     {
         try {
             $this->validate();
+            if ($this->ports_exposes !== $this->application->ports_exposes) {
+                $this->resetDefaultLabels(false);
+            }
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',

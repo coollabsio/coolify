@@ -10,7 +10,9 @@ use App\Http\Livewire\Project\Service\Index as ServiceIndex;
 use App\Http\Livewire\Project\Service\Show as ServiceShow;
 use App\Http\Livewire\Dev\Compose as Compose;
 use App\Http\Livewire\Dashboard;
+use App\Http\Livewire\Project\CloneProject;
 use App\Http\Livewire\Project\Shared\Logs;
+use App\Http\Livewire\Security\ApiTokens;
 use App\Http\Livewire\Server\All;
 use App\Http\Livewire\Server\Create;
 use App\Http\Livewire\Server\Destination\Show as DestinationShow;
@@ -91,8 +93,10 @@ Route::prefix('magic')->middleware(['auth'])->group(function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/projects', [ProjectController::class, 'all'])->name('projects');
-    Route::get('/project/{project_uuid}/edit', [ProjectController::class, 'edit'])->name('project.edit');
     Route::get('/project/{project_uuid}', [ProjectController::class, 'show'])->name('project.show');
+    Route::get('/project/{project_uuid}/edit', [ProjectController::class, 'edit'])->name('project.edit');
+    Route::get('/project/{project_uuid}/{environment_name}/clone', CloneProject::class)->name('project.clone');
+
     Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
 
@@ -161,6 +165,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/security/private-key/{private_key_uuid}', fn () => view('security.private-key.show', [
         'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail()
     ]))->name('security.private-key.show');
+    Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
+
 });
 
 

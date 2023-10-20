@@ -9,6 +9,10 @@
                     class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
                     New</a>
             @endif
+            <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                href="{{ route('project.clone', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                Clone
+            </a>
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex items-center">
@@ -42,8 +46,7 @@
                 href="{{ route('project.application.configuration', [$project->uuid, $environment->name, $application->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $application->name }}</div>
-                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $application->description }}</div>
-
+                    <div class="description">{{ $application->description }}</div>
                 </div>
                 @if (Str::of(data_get($application, 'status'))->startsWith('running'))
                     <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
@@ -59,7 +62,7 @@
                 href="{{ route('project.database.configuration', [$project->uuid, $environment->name, $database->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $database->name }}</div>
-                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $database->description }}</div>
+                    <div class="description">{{ $database->description }}</div>
                 </div>
                 @if (Str::of(data_get($database, 'status'))->startsWith('running'))
                     <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
@@ -75,7 +78,7 @@
                 href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $service->name }}</div>
-                    <div class="text-xs text-gray-400 group-hover:text-white">{{ $service->description }}</div>
+                    <div class="description">{{ $service->description }}</div>
                 </div>
                 @if (Str::of(serviceStatus($service))->startsWith('running'))
                     <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>

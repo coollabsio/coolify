@@ -1,0 +1,26 @@
+# documentation: https://wordpress.org/documentation/
+# slogan: "WordPress is open source software you can use to create a beautiful website, blog, or app."
+
+services:
+   wordpress:
+     image: wordpress:latest
+     volumes:
+       - wordpress-files:/var/www/html
+     environment:
+       SERVICE_FQDN:
+       WORDPRESS_DB_HOST: mysql
+       WORDPRESS_DB_USER: $SERVICE_USER_WORDPRESS
+       WORDPRESS_DB_PASSWORD: $SERVICE_PASSWORD_WORDPRESS
+       WORDPRESS_DB_NAME: wordpress
+     depends_on:
+       - mysql
+
+   mysql:
+     image: mysql:5.7
+     volumes:
+       - mysql-data:/var/lib/mysql
+     environment:
+       MYSQL_ROOT_PASSWORD: $SERVICE_PASSWORD_ROOT
+       MYSQL_DATABASE: wordpress
+       MYSQL_USER: $SERVICE_USER_WORDPRESS
+       MYSQL_PASSWORD: $SERVICE_PASSWORD_WORDPRESS

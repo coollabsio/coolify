@@ -14,7 +14,11 @@ class Environment extends Model
 
     public function can_delete_environment()
     {
-        return $this->applications()->count() == 0 && $this->redis()->count() == 0 && $this->postgresqls()->count() == 0 && $this->services()->count() == 0;
+        return $this->applications()->count() == 0 &&
+            $this->redis()->count() == 0 &&
+            $this->postgresqls()->count() == 0 &&
+            $this->mongodbs()->count() == 0 &&
+            $this->services()->count() == 0;
     }
 
     public function applications()
@@ -30,12 +34,17 @@ class Environment extends Model
     {
         return $this->hasMany(StandaloneRedis::class);
     }
+    public function mongodbs()
+    {
+        return $this->hasMany(StandaloneMongodb::class);
+    }
 
     public function databases()
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
-        return $postgresqls->concat($redis);
+        $mongodbs = $this->mongodbs;
+        return $postgresqls->concat($redis)->concat($mongodbs);
     }
 
     public function project()

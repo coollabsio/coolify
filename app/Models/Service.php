@@ -50,7 +50,7 @@ class Service extends BaseModel
 
     public function documentation()
     {
-        $services = Cache::get('services', []);
+        $services = getServiceTemplates();
         $service = data_get($services, Str::of($this->name)->beforeLast('-')->value, []);
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }

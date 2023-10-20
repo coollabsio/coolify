@@ -2,7 +2,6 @@
 
 namespace App\Actions\Database;
 
-use App\Models\Server;
 use App\Models\StandaloneRedis;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
@@ -17,7 +16,7 @@ class StartRedis
     public string $configuration_dir;
 
 
-    public function handle(Server $server, StandaloneRedis $database)
+    public function handle(StandaloneRedis $database)
     {
         $this->database = $database;
 
@@ -104,7 +103,7 @@ class StartRedis
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo '####### {$database->name} started.'";
-        return remote_process($this->commands, $server);
+        return remote_process($this->commands, $database->destination->server);
     }
 
     private function generate_local_persistent_volumes()

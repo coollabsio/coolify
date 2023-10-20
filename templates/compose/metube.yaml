@@ -1,0 +1,17 @@
+# documentation: https://github.com/alexta69/metube
+# slogan: A web GUI for youtube-dl with playlist support. It enables you to effortlessly download videos from YouTube and dozens of other sites.
+
+services:
+  metube:
+    image: ghcr.io/alexta69/metube:latest
+    environment:
+      - SERVICE_FQDN_METUBE
+      - UID=1000
+      - GID=1000
+    volumes:
+      - metube-downloads:/downloads
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
