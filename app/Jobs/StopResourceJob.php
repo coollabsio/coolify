@@ -7,6 +7,7 @@ use App\Actions\Database\StopDatabase;
 use App\Actions\Service\StopService;
 use App\Models\Application;
 use App\Models\Service;
+use App\Models\StandaloneMongodb;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Bus\Queueable;
@@ -20,7 +21,7 @@ class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis $resource)
+    public function __construct(public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb $resource)
     {
     }
 
@@ -39,6 +40,9 @@ class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
                     StopDatabase::run($this->resource);
                     break;
                 case 'standalone-redis':
+                    StopDatabase::run($this->resource);
+                    break;
+                case 'standalone-mongodb':
                     StopDatabase::run($this->resource);
                     break;
                 case 'service':

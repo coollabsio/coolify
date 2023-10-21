@@ -10,8 +10,15 @@
         </ol>
     </nav>
     <nav class="navbar-main">
-        <a class="{{ request()->routeIs('security.private-key.index') ? 'text-white' : '' }}" href="{{ route('security.private-key.index') }}">
+        <a href="{{ route('security.private-key.index') }}">
             <button>Private Keys</button>
         </a>
+        <a href="{{ route('security.api-tokens') }}">
+            <button>API tokens</button>
+        </a>
+        <div class="flex-1"></div>
+        <div class="-mt-9">
+            <livewire:switch-team />
+        </div>
     </nav>
 </div>

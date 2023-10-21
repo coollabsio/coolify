@@ -1,6 +1,9 @@
+# documentation: https://docs.min.io/docs/minio-docker-quickstart-guide.html
+# slogan: MinIO is a high performance object storage server compatible with Amazon S3 APIs.
+
 services:
   minio:
-    image: quay.io/minio/minio:RELEASE.2023-09-30T07-02-29Z
+    image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
       SERVICE_FQDN_MINIO_9000:

@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Livewire\Project\Database\Redis;
+namespace App\Http\Livewire\Project\Database\Mongodb;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Models\StandaloneRedis;
+use App\Models\StandaloneMongodb;
 use Exception;
 use Livewire\Component;
 
@@ -12,14 +12,16 @@ class General extends Component
 {
     protected $listeners = ['refresh'];
 
-    public StandaloneRedis $database;
+    public StandaloneMongodb $database;
     public string $db_url;
 
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
-        'database.redis_conf' => 'nullable',
-        'database.redis_password' => 'required',
+        'database.mongo_conf' => 'nullable',
+        'database.mongo_initdb_root_username' => 'required',
+        'database.mongo_initdb_root_password' => 'required',
+        'database.mongo_initdb_database' => 'required',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
         'database.is_public' => 'nullable|boolean',
@@ -28,8 +30,10 @@ class General extends Component
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
-        'database.redis_conf' => 'Redis Configuration',
-        'database.redis_password' => 'Redis Password',
+        'database.mongo_conf' => 'Mongo Configuration',
+        'database.mongo_initdb_root_username' => 'Root Username',
+        'database.mongo_initdb_root_password' => 'Root Password',
+        'database.mongo_initdb_database' => 'Database',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',
@@ -38,8 +42,8 @@ class General extends Component
     public function submit() {
         try {
             $this->validate();
-            if ($this->database->redis_conf === "") {
-                $this->database->redis_conf = null;
+            if ($this->database->mongo_conf === "") {
+                $this->database->mongo_conf = null;
             }
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');
@@ -79,8 +83,9 @@ class General extends Component
     {
         $this->db_url = $this->database->getDbUrl();
     }
+
     public function render()
     {
-        return view('livewire.project.database.redis.general');
+        return view('livewire.project.database.mongodb.general');
     }
 }

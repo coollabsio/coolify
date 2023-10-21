@@ -2,41 +2,44 @@
 
 namespace App\Actions\Database;
 
-use App\Models\StandalonePostgresql;
+use App\Models\StandaloneMongodb;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
 
-class StartPostgresql
+class StartMongodb
 {
     use AsAction;
 
-    public StandalonePostgresql $database;
+    public StandaloneMongodb $database;
     public array $commands = [];
-    public array $init_scripts = [];
     public string $configuration_dir;
 
-    public function handle(StandalonePostgresql $database)
+    public function handle(StandaloneMongodb $database)
     {
         $this->database = $database;
+
+        $startCommand = "mongod";
+
         $container_name = $this->database->uuid;
         $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
             "echo '####### Starting {$database->name}.'",
             "mkdir -p $this->configuration_dir",
-            "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/"
         ];
 
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
-        $this->generate_init_scripts();
+        $this->add_custom_mongo_conf();
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
                 $container_name => [
                     'image' => $this->database->image,
+                    'command' => $startCommand,
                     'container_name' => $container_name,
                     'environment' => $environment_variables,
                     'restart' => RESTART_MODE,
@@ -49,11 +52,7 @@ class StartPostgresql
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
-                            'pg_isready',
-                            '-d',
-                            $this->database->postgres_db,
-                            '-U',
-                            $this->database->postgres_user,
+                            'mongo --eval "printjson(db.serverStatus())" | grep uptime | grep -v grep'
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
@@ -86,15 +85,14 @@ class StartPostgresql
         if (count($volume_names) > 0) {
             $docker_compose['volumes'] = $volume_names;
         }
-        if (count($this->init_scripts) > 0) {
-            foreach ($this->init_scripts as $init_script) {
-                $docker_compose['services'][$container_name]['volumes'][] = [
-                    'type' => 'bind',
-                    'source' => $init_script,
-                    'target' => '/docker-entrypoint-initdb.d/' . basename($init_script),
-                    'read_only' => true,
-                ];
-            }
+        if (!is_null($this->database->mongo_conf)) {
+            $docker_compose['services'][$container_name]['volumes'][] = [
+                'type' => 'bind',
+                'source' => $this->configuration_dir . '/mongod.conf',
+                'target' => '/etc/mongo/mongod.conf',
+                'read_only' => true,
+            ];
+            $docker_compose['services'][$container_name]['command'] =  $startCommand . ' --config /etc/mongo/mongod.conf';
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -135,40 +133,31 @@ class StartPostgresql
     private function generate_environment_variables()
     {
         $environment_variables = collect();
-        ray('Generate Environment Variables')->green();
-        ray($this->database->runtime_environment_variables)->green();
         foreach ($this->database->runtime_environment_variables as $env) {
             $environment_variables->push("$env->key=$env->value");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_USER'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_USER={$this->database->postgres_user}");
-        }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PGUSER'))->isEmpty()) {
-            $environment_variables->push("PGUSER={$this->database->postgres_user}");
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_ROOT_USERNAME'))->isEmpty()) {
+            $environment_variables->push("MONGO_INITDB_ROOT_USERNAME={$this->database->mongo_initdb_root_username}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_PASSWORD'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_PASSWORD={$this->database->postgres_password}");
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_ROOT_PASSWORD'))->isEmpty()) {
+            $environment_variables->push("MONGO_INITDB_ROOT_PASSWORD={$this->database->mongo_initdb_root_password}");
         }
 
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('POSTGRES_DB'))->isEmpty()) {
-            $environment_variables->push("POSTGRES_DB={$this->database->postgres_db}");
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MONGO_INITDB_DATABASE'))->isEmpty()) {
+            $environment_variables->push("MONGO_INITDB_DATABASE={$this->database->mongo_initdb_database}");
         }
         return $environment_variables->all();
     }
-
-    private function generate_init_scripts()
+    private function add_custom_mongo_conf()
     {
-        if (is_null($this->database->init_scripts) || count($this->database->init_scripts) === 0) {
+        if (is_null($this->database->mongo_conf)) {
             return;
         }
-        foreach ($this->database->init_scripts as $init_script) {
-            $filename = data_get($init_script, 'filename');
-            $content = data_get($init_script, 'content');
-            $content_base64 = base64_encode($content);
-            $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
-            $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
-        }
+        $filename = 'mongod.conf';
+        $content = $this->database->mongo_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
     }
 }

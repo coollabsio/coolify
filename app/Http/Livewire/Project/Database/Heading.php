@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\Database;
 
+use App\Actions\Database\StartMongodb;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
@@ -46,11 +47,15 @@ class Heading extends Component
     public function start()
     {
         if ($this->database->type() === 'standalone-postgresql') {
-            $activity = StartPostgresql::run($this->database->destination->server, $this->database);
+            $activity = StartPostgresql::run($this->database);
             $this->emit('newMonitorActivity', $activity->id);
         }
         if ($this->database->type() === 'standalone-redis') {
-            $activity = StartRedis::run($this->database->destination->server, $this->database);
+            $activity = StartRedis::run($this->database);
+            $this->emit('newMonitorActivity', $activity->id);
+        }
+        if ($this->database->type() === 'standalone-mongodb') {
+            $activity = StartMongodb::run($this->database);
             $this->emit('newMonitorActivity', $activity->id);
         }
     }

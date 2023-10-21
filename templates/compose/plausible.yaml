@@ -1,3 +1,7 @@
+# ignore: true
+# documentation: https://plausible.io/docs/self-hosting
+# slogan: "Plausible Analytics is a simple, open-source, lightweight (< 1 KB) and privacy-friendly web analytics alternative to Google Analytics."
+
 version: "3.3"
 services:
   plausible:

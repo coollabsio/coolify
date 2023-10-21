@@ -1,5 +1,6 @@
 # documentation: https://appwrite.io/docs
 # slogan: Appwrite is a self-hosted backend-as-a-service platform that simplifies the development of web and mobile applications by providing a range of features and APIs.
+# env_file: appwrite.env
 
 
 x-logging: &x-logging
@@ -12,7 +13,7 @@ version: '3'
 
 services:
   appwrite:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     container_name: appwrite
     <<: *x-logging
     labels:

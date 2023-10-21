@@ -1,6 +1,6 @@
 <template>
     <Transition name="fade">
-        <div >
+        <div>
             <div class="flex items-center p-1 px-2 overflow-hidden transition-all transform rounded cursor-pointer bg-coolgray-200"
                 @click="showCommandPalette = true">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 icon" viewBox="0 0 24 24" stroke-width="2"
@@ -54,11 +54,12 @@
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
                                                 <span class="inline-block text-warning">{{ search }}</span>
-                                                </span>
+                                            </span>
                                             <span v-else><span class="capitalize ">{{
                                                 sequenceState.sequence[sequenceState.currentActionIndex] }}</span> name
                                                 will be:
-                                                <span class="inline-block text-warning">randomly generated (type to change)</span>
+                                                <span class="inline-block text-warning">randomly generated (type to
+                                                    change)</span>
                                             </span>
                                         </span>
                                     </li>
@@ -338,80 +339,94 @@ const magicActions = [{
 },
 {
     id: 11,
-    name: 'Goto: Dashboard',
+    name: 'Goto: S3 Storage',
+    tags: 's3,storage',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 12,
-    name: 'Goto: Servers',
+    name: 'Goto: Dashboard',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
     id: 13,
+    name: 'Goto: Servers',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 14,
     name: 'Goto: Private Keys',
     tags: 'destination,docker,network,new,create,ssh,private,key',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 14,
+    id: 15,
     name: 'Goto: Projects',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 15,
+    id: 16,
     name: 'Goto: Sources',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 16,
+    id: 17,
     name: 'Goto: Destinations',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 17,
+    id: 18,
     name: 'Goto: Settings',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 18,
+    id: 19,
     name: 'Goto: Command Center',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 19,
+    id: 20,
     name: 'Goto: Notifications',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 20,
+    id: 21,
     name: 'Goto: Profile',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 21,
+    id: 22,
     name: 'Goto: Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 22,
+    id: 23,
     name: 'Goto: Switch Teams',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
 {
-    id: 23,
+    id: 24,
     name: 'Goto: Boarding process',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
+},
+{
+    id: 25,
+    name: 'Goto: API Tokens',
+    tags: 'api,tokens,rest',
     icon: 'goto',
     sequence: ['main', 'redirect']
 }
@@ -606,43 +621,49 @@ async function redirect() {
             targetUrl.pathname = `/team/storages/new`
             break;
         case 11:
-            targetUrl.pathname = `/`
+            targetUrl.pathname = `/team/storages/`
             break;
         case 12:
-            targetUrl.pathname = `/servers`
+            targetUrl.pathname = `/`
             break;
         case 13:
-            targetUrl.pathname = `/security/private-key`
+            targetUrl.pathname = `/servers`
             break;
         case 14:
-            targetUrl.pathname = `/projects`
+            targetUrl.pathname = `/security/private-key`
             break;
         case 15:
-            targetUrl.pathname = `/sources`
+            targetUrl.pathname = `/projects`
             break;
         case 16:
-            targetUrl.pathname = `/destinations`
+            targetUrl.pathname = `/sources`
             break;
         case 17:
-            targetUrl.pathname = `/settings`
+            targetUrl.pathname = `/destinations`
             break;
         case 18:
-            targetUrl.pathname = `/command-center`
+            targetUrl.pathname = `/settings`
             break;
         case 19:
-            targetUrl.pathname = `/team/notifications`
+            targetUrl.pathname = `/command-center`
             break;
         case 20:
-            targetUrl.pathname = `/profile`
+            targetUrl.pathname = `/team/notifications`
             break;
         case 21:
-            targetUrl.pathname = `/team`
+            targetUrl.pathname = `/profile`
             break;
         case 22:
             targetUrl.pathname = `/team`
             break;
         case 23:
+            targetUrl.pathname = `/team`
+            break;
+        case 24:
             targetUrl.pathname = `/boarding`
+            break;
+        case 25:
+            targetUrl.pathname = `/security/api-tokens`
             break;
     }
     window.location.href = targetUrl;

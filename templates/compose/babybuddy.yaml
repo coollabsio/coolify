@@ -1,5 +1,5 @@
 # documentation: https://docs.baby-buddy.net
-# slogan: Baby Buddy is an open-source web application that helps parents track their baby's daily activities, growth, and health with ease. It's a handy tool for new parents to keep a close eye on their little one's development.
+# slogan: Baby Buddy is an open-source web application that helps parents track their baby's daily activities, growth, and health with ease.
 
 services:
   babybuddy:

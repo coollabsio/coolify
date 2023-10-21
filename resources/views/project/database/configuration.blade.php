@@ -40,6 +40,9 @@
                 @if ($database->type() === 'standalone-redis')
                     <livewire:project.database.redis.general :database="$database" />
                 @endif
+                @if ($database->type() === 'standalone-mongodb')
+                <livewire:project.database.mongodb.general :database="$database" />
+            @endif
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$database" />

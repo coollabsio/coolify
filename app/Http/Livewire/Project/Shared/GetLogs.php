@@ -13,6 +13,7 @@ class GetLogs extends Component
     public Server $server;
     public ?string $container = null;
     public ?bool $streamLogs = false;
+    public ?bool $showTimeStamps = true;
     public int $numberOfLines = 100;
     public function doSomethingWithThisChunkOfOutput($output)
     {
@@ -24,7 +25,11 @@ class GetLogs extends Component
     public function getLogs($refresh = false)
     {
         if ($this->container) {
-            $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");
+            if ($this->showTimeStamps) {
+                $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");
+            } else {
+                $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} {$this->container}");
+            }
             if ($refresh) {
                 $this->outputs = '';
             }

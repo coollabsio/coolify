@@ -25,9 +25,21 @@
             </x-forms.select>
         </div>
     @endif
-    <div class="flex gap-2">
-        <x-forms.input label="Databases To Backup" helper="Comma separated list of databases to backup. Empty will include the default one." id="backup.databases_to_backup" />
-        <x-forms.input label="Frequency" id="backup.frequency" />
-        <x-forms.input label="Number of backups to keep (locally)" id="backup.number_of_backups_locally" />
+    <div class="flex flex-col gap-2">
+        <div class="flex gap-2">
+            @if ($backup->database_type === 'App\Models\StandalonePostgresql')
+                <x-forms.input label="Databases To Backup"
+                    helper="Comma separated list of databases to backup. Empty will include the default one."
+                    id="backup.databases_to_backup" />
+            @elseif($backup->database_type === 'App\Models\StandaloneMongodb')
+                <x-forms.input label="Databases To Include"
+                    helper="A list of databases to backup. You can specify which collection(s) per database to exclude from the backup. Empty will include all databases and collections.<br><br>Example:<br><br>database1:collection1,collection2|database2:collection3,collection4<br><br> database1 will include all collections except collection1 and collection2. <br>database2 will include all collections except collection3 and collection4.<br><br>Another Example:<br><br>database1:collection1|database2<br><br> database1 will include all collections except collection1.<br>database2 will include ALL collections."
+                    id="backup.databases_to_backup" />
+            @endif
+        </div>
+        <div class="flex gap-2">
+            <x-forms.input label="Frequency" id="backup.frequency" />
+            <x-forms.input label="Number of backups to keep (locally)" id="backup.number_of_backups_locally" />
+        </div>
     </div>
 </form>

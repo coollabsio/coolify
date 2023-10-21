@@ -6,22 +6,17 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StandalonePostgresql extends BaseModel
+class StandaloneMongodb extends BaseModel
 {
     use HasFactory;
-
     protected $guarded = [];
-    protected $casts = [
-        'init_scripts' => 'array',
-        'postgres_password' => 'encrypted',
-    ];
 
     protected static function booted()
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-' . $database->uuid,
-                'mount_path' => '/var/lib/postgresql/data',
+                'name' => 'mongodb-data-' . $database->uuid,
+                'mount_path' => '/data',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
@@ -29,11 +24,11 @@ class StandalonePostgresql extends BaseModel
             ]);
         });
         static::deleting(function ($database) {
+            $database->scheduledBackups()->delete();
             $storages = $database->persistentStorages()->get();
             foreach ($storages as $storage) {
                 instant_remote_process(["docker volume rm -f $storage->name"], $database->destination->server, false);
             }
-            $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
         });
@@ -45,8 +40,6 @@ class StandalonePostgresql extends BaseModel
             set: fn ($value) => $value === "" ? null : $value,
         );
     }
-
-    // Normal Deployments
 
     public function portsMappingsArray(): Attribute
     {
@@ -60,17 +53,15 @@ class StandalonePostgresql extends BaseModel
 
     public function type(): string
     {
-        return 'standalone-postgresql';
+        return 'standalone-mongodb';
     }
-    public function getDbUrl(): string
-    {
+    public function getDbUrl() {
         if ($this->is_public) {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
         } else {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}";
+            return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->uuid}:27017/?directConnection=true";
         }
     }
-
     public function environment()
     {
         return $this->belongsTo(Environment::class);
