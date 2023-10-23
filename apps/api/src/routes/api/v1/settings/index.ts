@@ -43,11 +43,6 @@ const root: FastifyPluginAsync = async (fastify): Promise<void> => {
 			}
 			const x509 = new X509Certificate(cert);
 			const cn = x509.subject.split('\n').find((s) => s.startsWith('CN=')).replace('CN=', '')
-			if (cns.includes(cn)) {
-				throw {
-					message: `A certificate with ${cn} common name already exists.`
-				}
-			}
 			await prisma.certificate.create({ data: { cert, key: encrypt(key), team: { connect: { id: teamId } } } })
 			await prisma.applicationSettings.updateMany({ where: { application: { AND: [{ fqdn: { endsWith: cn } }, { fqdn: { startsWith: 'https' } }] } }, data: { isCustomSSL: true } })
 			return { message: 'Certificated uploaded' }

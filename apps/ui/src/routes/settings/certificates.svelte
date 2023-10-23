@@ -67,7 +67,7 @@
 		<table class="table w-full">
 			<thead>
 				<tr>
-					<th>Common Name</th>
+					<th>Hosts</th>
 					<th>CreatedAt</th>
 					<th>Actions</th>
 				</tr>
@@ -75,7 +75,7 @@
 			<tbody>
 				{#each certificates as cert}
 					<tr>
-						<td>{cert.commonName}</td>
+						<td>{cert.hosts}</td>
 						<td>{cert.createdAt}</td>
 						<td
 							><button on:click={() => deleteCertificate(cert.id)} class="btn btn-sm btn-error"
