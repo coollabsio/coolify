@@ -1,0 +1,18 @@
+# documentation: https://github.com/mregni/EmbyStat/wiki/docker
+# slogan: EmyStat is an open-source, self-hosted web analytics tool, designed to provide insight into website traffic and user behavior, of your local Emby deployement, all within your control.
+
+services:
+  embystat:
+    image: lscr.io/linuxserver/embystat:latest
+    environment:
+      - SERVICE_FQDN_EMBYSTAT
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - embystat-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6555"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
