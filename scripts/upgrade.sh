@@ -5,7 +5,7 @@
 ## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" if you update this file.
 ###########
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 CDN="https://cdn.coollabs.io/coolify"
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
