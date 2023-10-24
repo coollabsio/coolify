@@ -1,5 +1,6 @@
 # documentation: https://github.com/linuxserver/Heimdall
 # slogan: Heimdall is a self-hosted dashboard for managing and organizing your server applications, providing a centralized and efficient interface.
+# tags: dashboard, server, applications, interface
 
 services:
   heimdall:

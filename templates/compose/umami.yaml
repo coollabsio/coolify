@@ -1,5 +1,6 @@
 # documentation: https://umami.is/docs/getting-started
 # slogan: Umami is a lightweight, self-hosted web analytics platform designed to provide website owners with insights into visitor behavior without compromising user privacy.
+# tags: analytics, insights, privacy
 
 services:
   umami:

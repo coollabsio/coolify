@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.loadThings">
+<div x-data x-init="$wire.loadServers">
     <div class="flex gap-2 ">
         <h1>New Resource</h1>
         <div class="w-96">
@@ -128,12 +128,15 @@
             <div class="flex items-center gap-2">
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click='loadServices(true)'>Reload Services List</x-forms.button>
+                <input
+                    class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+                    wire:model.debounce.200ms="search" placeholder="Search..."></input>
             </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 @if ($loadingServices)
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
-                    @foreach ($services as $serviceName => $service)
+                    @forelse ($services as $serviceName => $service)
                         @if (data_get($service, 'disabled'))
                             <button class="text-left cursor-not-allowed bg-coolgray-200/20 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
@@ -158,7 +161,9 @@
                                 </div>
                             </button>
                         @endif
-                    @endforeach
+                        @empty
+                        <div>No service found.</div>
+                    @endforelse
                 @endif
             </div>
             <div class="py-4 pb-10">Trademarks Policy: The respective trademarks mentioned here are owned by the
