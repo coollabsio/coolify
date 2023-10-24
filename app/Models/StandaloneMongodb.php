@@ -42,6 +42,20 @@ class StandaloneMongodb extends BaseModel
         });
     }
 
+    public function mongoInitdbRootPassword(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                try {
+                    return decrypt($value);
+                } catch (\Throwable $th) {
+                    $this->mongo_initdb_root_password = encrypt($value);
+                    $this->save();
+                    return $value;
+                }
+            }
+        );
+    }
     public function portsMappings(): Attribute
     {
         return Attribute::make(
@@ -63,7 +77,8 @@ class StandaloneMongodb extends BaseModel
     {
         return 'standalone-mongodb';
     }
-    public function getDbUrl(bool $useInternal = false) {
+    public function getDbUrl(bool $useInternal = false)
+    {
         if ($this->is_public && !$useInternal) {
             return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";
         } else {
