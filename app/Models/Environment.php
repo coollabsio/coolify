@@ -7,11 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Environment extends Model
 {
-    protected $fillable = [
-        'name',
-        'project_id',
-    ];
-
+    protected $guarded = [];
     public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
