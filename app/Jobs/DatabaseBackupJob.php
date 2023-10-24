@@ -170,7 +170,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
         try {
-            $url = $this->database->getDbUrl();
+            $url = $this->database->getDbUrl(useInternal: true);
             if ($databaseWithCollections === 'all') {
                 $commands[] = "mkdir -p " . $this->backup_dir;
                 $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";
