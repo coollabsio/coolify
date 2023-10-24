@@ -16,7 +16,7 @@ class SyncBunny extends Command
      *
      * @var string
      */
-    protected $signature = 'sync:bunny {--only-template} {--only-version}';
+    protected $signature = 'sync:bunny {templates?} {release?}';
 
     /**
      * The console command description.
@@ -31,8 +31,8 @@ class SyncBunny extends Command
     public function handle()
     {
         $that = $this;
-        $only_template = $this->option('only-template');
-        $only_version = $this->option('only-version');
+        $only_template = $this->argument('templates');
+        $only_version = $this->argument('release');
         $bunny_cdn = "https://cdn.coollabs.io";
         $bunny_cdn_path = "coolify";
         $bunny_cdn_storage_name = "coolcdn";
