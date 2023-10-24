@@ -52,7 +52,7 @@ class StartMongodb
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
-                            'mongo --eval "printjson(db.serverStatus())" | grep uptime | grep -v grep'
+                            'mongosh --eval "printjson(db.runCommand(\"ping\"))"'
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',
