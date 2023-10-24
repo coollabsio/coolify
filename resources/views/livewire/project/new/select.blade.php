@@ -90,7 +90,7 @@
                             New PostgreSQL
                         </div>
                         <div class="description">
-                            The most loved relational database in the world.
+                            PostgreSQL is an open-source, object-relational database management system known for its robustness, advanced features, and strong standards compliance.
                         </div>
                     </div>
                 </div>
@@ -100,7 +100,7 @@
                             New Redis
                         </div>
                         <div class="description">
-                            The open source, in-memory data store for cache, streaming engine, and message broker.
+                            Redis is an open-source, in-memory data structure store used as a database, cache, and message broker, known for its high performance, flexibility, and rich data structures.
                         </div>
                     </div>
                 </div>
@@ -110,7 +110,7 @@
                             New MongoDB
                         </div>
                         <div class="description">
-                            MongoDB is a source-available cross-platform document-oriented database program.
+                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with optional schemas, known for its flexibility, scalability, and wide range of application use cases.
                         </div>
                     </div>
                 </div>
@@ -120,7 +120,7 @@
                             New MySQL
                         </div>
                         <div class="description">
-                            MySQL
+                            MySQL is an open-source relational database management system known for its speed, reliability, and flexibility in managing and accessing data.
                         </div>
                     </div>
                 </div>
@@ -130,7 +130,7 @@
                             New Mariadb
                         </div>
                         <div class="description">
-                            MySQL
+                            MariaDB is an open-source relational database management system that serves as a drop-in replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
                         </div>
                     </div>
                 </div>
