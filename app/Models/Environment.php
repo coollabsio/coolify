@@ -12,7 +12,7 @@ class Environment extends Model
         'project_id',
     ];
 
-    public function can_delete_environment()
+    public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&

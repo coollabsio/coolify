@@ -18,7 +18,7 @@ class Project extends BaseModel
                 'project_id' => $project->id,
             ]);
             Environment::create([
-                'name' => 'Production',
+                'name' => 'production',
                 'project_id' => $project->id,
             ]);
         });

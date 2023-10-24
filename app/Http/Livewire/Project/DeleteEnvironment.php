@@ -21,10 +21,10 @@ class DeleteEnvironment extends Component
             'environment_id' => 'required|int',
         ]);
         $environment = Environment::findOrFail($this->environment_id);
-        if ($environment->applications->count() > 0) {
-            return $this->emit('error', 'Environment has resources defined, please delete them first.');
+        if ($environment->isEmpty()) {
+            $environment->delete();
+            return redirect()->route('project.show', ['project_uuid' => $this->parameters['project_uuid']]);
         }
-        $environment->delete();
-        return redirect()->route('project.show', ['project_uuid' => $this->parameters['project_uuid']]);
+        return $this->emit('error', 'Environment has defined resources, please delete them first.');
     }
 }
