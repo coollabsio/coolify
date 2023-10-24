@@ -2,7 +2,9 @@
 
 namespace App\Http\Livewire\Project\Database;
 
+use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
+use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
@@ -49,13 +51,17 @@ class Heading extends Component
         if ($this->database->type() === 'standalone-postgresql') {
             $activity = StartPostgresql::run($this->database);
             $this->emit('newMonitorActivity', $activity->id);
-        }
-        if ($this->database->type() === 'standalone-redis') {
+        } else if ($this->database->type() === 'standalone-redis') {
             $activity = StartRedis::run($this->database);
             $this->emit('newMonitorActivity', $activity->id);
-        }
-        if ($this->database->type() === 'standalone-mongodb') {
+        } else if ($this->database->type() === 'standalone-mongodb') {
             $activity = StartMongodb::run($this->database);
+            $this->emit('newMonitorActivity', $activity->id);
+        } else if ($this->database->type() === 'standalone-mysql') {
+            $activity = StartMysql::run($this->database);
+            $this->emit('newMonitorActivity', $activity->id);
+        } else if ($this->database->type() === 'standalone-mariadb') {
+            $activity = StartMariadb::run($this->database);
             $this->emit('newMonitorActivity', $activity->id);
         }
     }

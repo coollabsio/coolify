@@ -48,6 +48,10 @@ class CreateScheduledBackup extends Component
             ];
             if ($this->database->type() === 'standalone-postgresql') {
                 $payload['databases_to_backup'] = $this->database->postgres_db;
+            } else if ($this->database->type() === 'standalone-mysql') {
+                $payload['databases_to_backup'] = $this->database->mysql_database;
+            }else if ($this->database->type() === 'standalone-mariadb') {
+                $payload['databases_to_backup'] = $this->database->mariadb_database;
             }
             ScheduledDatabaseBackup::create($payload);
             $this->emit('refreshScheduledBackups');

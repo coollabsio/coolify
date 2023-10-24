@@ -1,5 +1,6 @@
 # documentation: https://fider.io/doc
 # slogan: Fider is an open-source feedback platform for collecting and managing user feedback, helping you prioritize improvements to your products and services.
+# tags: feedback, user-feedback
 
 services:
   fider:

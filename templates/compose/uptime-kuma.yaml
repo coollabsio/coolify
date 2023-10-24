@@ -1,5 +1,6 @@
 # documentation: https://github.com/louislam/uptime-kuma/wiki
 # slogan: Uptime Kuma is a free, self-hosted monitoring tool for tracking the status and performance of your web services and applications in real-time.
+# tags: monitoring, status, performance, web, services, applications, real-time
 
 services:
   uptime-kuma:

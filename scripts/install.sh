@@ -5,7 +5,7 @@
 ## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
 ###########
 
-VERSION="1.0.0"
+VERSION="1.0.1"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
