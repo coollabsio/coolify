@@ -170,18 +170,25 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
         try {
-            $url = $this->database->getDbUrl();
+            $url = $this->database->getDbUrl(useInternal: true);
             if ($databaseWithCollections === 'all') {
                 $commands[] = "mkdir -p " . $this->backup_dir;
                 $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";
             } else {
-                $collectionsToExclude = str($databaseWithCollections)->after(':')->explode(',');
-                $databaseName = str($databaseWithCollections)->before(':');
+                if (str($databaseWithCollections)->contains(':')) {
+                    $databaseName = str($databaseWithCollections)->before(':');
+                    $collectionsToExclude = str($databaseWithCollections)->after(':')->explode(',');
+                } else {
+                    $databaseName = $databaseWithCollections;
+                    $collectionsToExclude = collect();
+                }
                 $commands[] = "mkdir -p " . $this->backup_dir;
-                $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
+                if ($collectionsToExclude->count() === 0) {
+                    $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --archive > $this->backup_location";
+                } else {
+                    $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --db $databaseName --gzip --excludeCollection " . $collectionsToExclude->implode(' --excludeCollection ') . " --archive > $this->backup_location";
+                }
             }
-
-            ray($commands);
             $this->backup_output = instant_remote_process($commands, $this->server);
             $this->backup_output = trim($this->backup_output);
             if ($this->backup_output === '') {

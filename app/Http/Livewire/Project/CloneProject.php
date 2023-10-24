@@ -55,18 +55,21 @@ class CloneProject extends Component
                 'selectedServer' => 'required',
                 'newProjectName' => 'required',
             ]);
+            $foundProject = Project::where('name', $this->newProjectName)->first();
+            if ($foundProject) {
+                throw new \Exception('Project with the same name already exists.');
+            }
             $newProject = Project::create([
                 'name' => $this->newProjectName,
                 'team_id' => currentTeam()->id,
                 'description' => $this->project->description . ' (clone)',
             ]);
-            if ($this->environment->id !== 1) {
+            if ($this->environment->name !== 'production') {
                 $newProject->environments()->create([
                     'name' => $this->environment->name,
                 ]);
-                $newProject->environments()->find(1)->delete();
             }
-            $newEnvironment = $newProject->environments->first();
+            $newEnvironment = $newProject->environments->where('name', $this->environment->name)->first();
             // Clone Applications
             $applications = $this->environment->applications;
             $databases = $this->environment->databases();
@@ -80,7 +83,6 @@ class CloneProject extends Component
                     'environment_id' => $newEnvironment->id,
                     'destination_id' => $this->selectedServer,
                 ]);
-                $newApplication->environment_id = $newProject->environments->first()->id;
                 $newApplication->save();
                 $environmentVaribles = $application->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
@@ -105,7 +107,6 @@ class CloneProject extends Component
                     'environment_id' => $newEnvironment->id,
                     'destination_id' => $this->selectedServer,
                 ]);
-                $newDatabase->environment_id = $newProject->environments->first()->id;
                 $newDatabase->save();
                 $environmentVaribles = $database->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
@@ -128,7 +129,6 @@ class CloneProject extends Component
                     'environment_id' => $newEnvironment->id,
                     'destination_id' => $this->selectedServer,
                 ]);
-                $newService->environment_id = $newProject->environments->first()->id;
                 $newService->save();
                 $newService->parse();
             }

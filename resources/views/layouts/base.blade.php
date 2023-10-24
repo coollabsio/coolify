@@ -96,8 +96,7 @@
             }
 
             function copyToClipboard(text) {
-                navigator.clipboard.writeText(text);
-                Livewire.emit('success', 'Copied to clipboard.');
+                navigator?.clipboard?.writeText(text) && Livewire.emit('success', 'Copied to clipboard.');
             }
 
             Livewire.on('reloadWindow', (timeout) => {

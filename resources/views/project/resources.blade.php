@@ -2,17 +2,21 @@
     <div class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
-            @if ($environment->can_delete_environment())
+            @if ($environment->isEmpty())
+                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                    href="{{ route('project.clone', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                    Clone
+                </a>
                 <livewire:project.delete-environment :environment_id="$environment->id" />
             @else
                 <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
                     class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
                     New</a>
+                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                    href="{{ route('project.clone', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
+                    Clone
+                </a>
             @endif
-            <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
-                href="{{ route('project.clone', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
-                Clone
-            </a>
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex items-center">
@@ -36,7 +40,7 @@
             </ol>
         </nav>
     </div>
-    @if ($environment->can_delete_environment())
+    @if ($environment->isEmpty())
         <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
             class="items-center justify-center box">+ Add New Resource</a>
     @endif

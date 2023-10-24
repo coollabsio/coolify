@@ -7,12 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Environment extends Model
 {
-    protected $fillable = [
-        'name',
-        'project_id',
-    ];
-
-    public function can_delete_environment()
+    protected $guarded = [];
+    public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
