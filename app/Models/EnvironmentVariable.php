@@ -11,7 +11,7 @@ class EnvironmentVariable extends Model
 {
     protected $guarded = [];
     protected $casts = [
-        "key" => 'string',
+        'key' => 'string',
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
     ];
@@ -21,6 +21,10 @@ class EnvironmentVariable extends Model
         static::created(function ($environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
+                $application = Application::find($environment_variable->application_id);
+                if ($application->build_pack === 'dockerfile') {
+                    return;
+                }
                 if (!$found) {
                     ModelsEnvironmentVariable::create([
                         'key' => $environment_variable->key,
@@ -33,7 +37,8 @@ class EnvironmentVariable extends Model
             }
         });
     }
-    public function service() {
+    public function service()
+    {
         return $this->belongsTo(Service::class);
     }
     protected function value(): Attribute
@@ -55,9 +60,9 @@ class EnvironmentVariable extends Model
             $variable = Str::after($environment_variable, 'global.');
             $variable = Str::before($variable, '}}');
             $variable = Str::of($variable)->trim()->value;
-               // $environment_variable = GlobalEnvironmentVariable::where('name', $environment_variable)->where('team_id', $team_id)->first()?->value;
-               ray('global env variable');
-               return $environment_variable;
+            // $environment_variable = GlobalEnvironmentVariable::where('name', $environment_variable)->where('team_id', $team_id)->first()?->value;
+            ray('global env variable');
+            return $environment_variable;
         }
         return $environment_variable;
     }
@@ -77,5 +82,4 @@ class EnvironmentVariable extends Model
             set: fn (string $value) => Str::of($value)->trim(),
         );
     }
-
 }
