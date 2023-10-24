@@ -5,7 +5,9 @@ namespace App\Http\Livewire\Project\Shared;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Livewire\Component;
@@ -13,7 +15,7 @@ use Livewire\Component;
 class Logs extends Component
 {
     public ?string $type = null;
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb $resource;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource;
     public Server $server;
     public ?string $container = null;
     public $parameters;
@@ -41,11 +43,16 @@ class Logs extends Component
                 if (is_null($resource)) {
                     $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
                     if (is_null($resource)) {
-                        abort(404);
+                        $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
+                        if (is_null($resource)) {
+                            $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
+                            if (is_null($resource)) {
+                                abort(404);
+                            }
+                        }
                     }
                 }
             }
-
             $this->resource = $resource;
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;

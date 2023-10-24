@@ -2,7 +2,9 @@
 
 use App\Models\Server;
 use App\Models\StandaloneDocker;
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Visus\Cuid2\Cuid2;
@@ -53,6 +55,36 @@ function create_standalone_mongodb($environment_id, $destination_uuid): Standalo
     return StandaloneMongodb::create([
         'name' => generate_database_name('mongodb'),
         'mongo_initdb_root_password' => \Illuminate\Support\Str::password(symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+function create_standalone_mysql($environment_id, $destination_uuid): StandaloneMysql
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneMysql::create([
+        'name' => generate_database_name('mysql'),
+        'mysql_root_password' => \Illuminate\Support\Str::password(symbols: false),
+        'mysql_password' => \Illuminate\Support\Str::password(symbols: false),
+        'environment_id' => $environment_id,
+        'destination_id' => $destination->id,
+        'destination_type' => $destination->getMorphClass(),
+    ]);
+}
+function create_standalone_mariadb($environment_id, $destination_uuid): StandaloneMariadb
+{
+    $destination = StandaloneDocker::where('uuid', $destination_uuid)->first();
+    if (!$destination) {
+        throw new Exception('Destination not found');
+    }
+    return StandaloneMariadb::create([
+        'name' => generate_database_name('mariadb'),
+        'mariadb_root_password' => \Illuminate\Support\Str::password(symbols: false),
+        'mariadb_password' => \Illuminate\Support\Str::password(symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),

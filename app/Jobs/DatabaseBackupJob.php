@@ -6,7 +6,9 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
 use App\Notifications\Database\BackupFailed;
@@ -28,7 +30,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public ?Team $team = null;
     public Server $server;
     public ScheduledDatabaseBackup $backup;
-    public StandalonePostgresql|StandaloneMongodb $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database;
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
@@ -75,6 +77,10 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     $databasesToBackup = [$this->database->postgres_db];
                 } else if ($databaseType === 'standalone-mongodb') {
                     $databasesToBackup = ['*'];
+                } else if ($databaseType === 'standalone-mysql') {
+                    $databasesToBackup = [$this->database->mysql_database];
+                } else if ($databaseType === 'standalone-mariadb') {
+                    $databasesToBackup = [$this->database->mariadb_database];
                 } else {
                     return;
                 }
@@ -88,6 +94,14 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     $databasesToBackup = explode('|', $databasesToBackup);
                     $databasesToBackup = array_map('trim', $databasesToBackup);
                     ray($databasesToBackup);
+                } else if ($databaseType === 'standalone-mysql') {
+                    // Format: db1,db2,db3
+                    $databasesToBackup = explode(',', $databasesToBackup);
+                    $databasesToBackup = array_map('trim', $databasesToBackup);
+                } else if ($databaseType === 'standalone-mariadb') {
+                    // Format: db1,db2,db3
+                    $databasesToBackup = explode(',', $databasesToBackup);
+                    $databasesToBackup = array_map('trim', $databasesToBackup);
                 } else {
                     return;
                 }
@@ -124,7 +138,6 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                             } else {
                                 $databaseName = $database;
                             }
-                            ray($databaseName);
                         }
                         $this->backup_file = "/mongo-dump-$databaseName-" . Carbon::now()->timestamp . ".tar.gz";
                         $this->backup_location = $this->backup_dir . $this->backup_file;
@@ -134,6 +147,24 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                             'scheduled_database_backup_id' => $this->backup->id,
                         ]);
                         $this->backup_standalone_mongodb($database);
+                    } else if ($databaseType === 'standalone-mysql') {
+                        $this->backup_file = "/mysql-dump-$database-" . Carbon::now()->timestamp . ".dmp";
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                        ]);
+                        $this->backup_standalone_mysql($database);
+                    } else if ($databaseType === 'standalone-mariadb') {
+                        $this->backup_file = "/mariadb-dump-$database-" . Carbon::now()->timestamp . ".dmp";
+                        $this->backup_location = $this->backup_dir . $this->backup_file;
+                        $this->backup_log = ScheduledDatabaseBackupExecution::create([
+                            'database_name' => $database,
+                            'filename' => $this->backup_location,
+                            'scheduled_database_backup_id' => $this->backup->id,
+                        ]);
+                        $this->backup_standalone_mariadb($database);
                     } else {
                         throw new \Exception('Unsupported database type');
                     }
@@ -218,7 +249,42 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             throw $e;
         }
     }
-
+    private function backup_standalone_mysql(string $database): void
+    {
+        try {
+            $commands[] = "mkdir -p " . $this->backup_dir;
+            $commands[] = "docker exec $this->container_name mysqldump -u root -p{$this->database->mysql_root_password} $database > $this->backup_location";
+            ray($commands);
+            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+            ray('Backup done for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location);
+        } catch (\Throwable $e) {
+            $this->add_to_backup_output($e->getMessage());
+            ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());
+            throw $e;
+        }
+    }
+    private function backup_standalone_mariadb(string $database): void
+    {
+        try {
+            $commands[] = "mkdir -p " . $this->backup_dir;
+            $commands[] = "docker exec $this->container_name mariadb-dump -u root -p{$this->database->mariadb_root_password} $database > $this->backup_location";
+            ray($commands);
+            $this->backup_output = instant_remote_process($commands, $this->server);
+            $this->backup_output = trim($this->backup_output);
+            if ($this->backup_output === '') {
+                $this->backup_output = null;
+            }
+            ray('Backup done for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location);
+        } catch (\Throwable $e) {
+            $this->add_to_backup_output($e->getMessage());
+            ray('Backup failed for ' . $this->container_name . ' at ' . $this->server->name . ':' . $this->backup_location . '\n\nError:' . $e->getMessage());
+            throw $e;
+        }
+    }
     private function add_to_backup_output($output): void
     {
         if ($this->backup_output) {

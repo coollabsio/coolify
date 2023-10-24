@@ -117,6 +117,10 @@ class CloneProject extends Component
                         $payload['standalone_redis_id'] = $newDatabase->id;
                     } else if ($database->type() === 'standalone_mongodb') {
                         $payload['standalone_mongodb_id'] = $newDatabase->id;
+                    } else if ($database->type() === 'standalone_mysql') {
+                        $payload['standalone_mysql_id'] = $newDatabase->id;
+                    }else if ($database->type() === 'standalone_mariadb') {
+                        $payload['standalone_mariadb_id'] = $newDatabase->id;
                     }
                     $newEnvironmentVariable =  $environmentVarible->replicate()->fill($payload);
                     $newEnvironmentVariable->save();

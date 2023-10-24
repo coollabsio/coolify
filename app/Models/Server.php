@@ -122,10 +122,12 @@ class Server extends BaseModel
     public function databases()
     {
         return $this->destinations()->map(function ($standaloneDocker) {
-            $postgresqls = data_get($standaloneDocker,'postgresqls',collect([]));
-            $redis = data_get($standaloneDocker,'redis',collect([]));
-            $mongodbs = data_get($standaloneDocker,'mongodbs',collect([]));
-            return $postgresqls->concat($redis)->concat($mongodbs);
+            $postgresqls = data_get($standaloneDocker, 'postgresqls', collect([]));
+            $redis = data_get($standaloneDocker, 'redis', collect([]));
+            $mongodbs = data_get($standaloneDocker, 'mongodbs', collect([]));
+            $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
+            $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
+            return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
         })->flatten();
     }
     public function applications()
@@ -258,7 +260,8 @@ class Server extends BaseModel
         $this->settings->save();
         return true;
     }
-    public function validateCoolifyNetwork() {
+    public function validateCoolifyNetwork()
+    {
         return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
     }
 }

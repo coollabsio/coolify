@@ -6,22 +6,22 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class StandalonePostgresql extends BaseModel
+class StandaloneMysql extends BaseModel
 {
     use HasFactory;
 
     protected $guarded = [];
     protected $casts = [
-        'init_scripts' => 'array',
-        'postgres_password' => 'encrypted',
+        'mysql_password' => 'encrypted',
+        'mysql_root_password' => 'encrypted',
     ];
 
     protected static function booted()
     {
         static::created(function ($database) {
             LocalPersistentVolume::create([
-                'name' => 'postgres-data-' . $database->uuid,
-                'mount_path' => '/var/lib/postgresql/data',
+                'name' => 'mysql-data-' . $database->uuid,
+                'mount_path' => '/var/lib/mysql',
                 'host_path' => null,
                 'resource_id' => $database->id,
                 'resource_type' => $database->getMorphClass(),
@@ -37,6 +37,10 @@ class StandalonePostgresql extends BaseModel
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
         });
+    }
+    public function type(): string
+    {
+        return 'standalone-mysql';
     }
 
     public function portsMappings(): Attribute
@@ -56,16 +60,12 @@ class StandalonePostgresql extends BaseModel
         );
     }
 
-    public function type(): string
-    {
-        return 'standalone-postgresql';
-    }
     public function getDbUrl(bool $useInternal = false): string
     {
         if ($this->is_public && !$useInternal) {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";
+            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";
         } else {
-            return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->uuid}:5432/{$this->postgres_db}";
+            return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->uuid}:3306/{$this->mysql_database}";
         }
     }
 

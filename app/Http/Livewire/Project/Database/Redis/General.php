@@ -35,7 +35,8 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
     ];
-    public function submit() {
+    public function submit()
+    {
         try {
             $this->validate();
             if ($this->database->redis_conf === "") {
@@ -56,7 +57,11 @@ class General extends Component
                 return;
             }
             if ($this->database->is_public) {
-                $this->emit('success', 'Starting TCP proxy...');
+                if (!str($this->database->status)->startsWith('running')) {
+                    $this->emit('error', 'Database must be started to be publicly accessible.');
+                    $this->database->is_public = false;
+                    return;
+                }
                 StartDatabaseProxy::run($this->database);
                 $this->emit('success', 'Database is now publicly accessible.');
             } else {
@@ -65,7 +70,7 @@ class General extends Component
             }
             $this->db_url = $this->database->getDbUrl();
             $this->database->save();
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;
             return handleError($e, $this);
         }

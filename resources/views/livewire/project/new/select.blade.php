@@ -114,6 +114,26 @@
                         </div>
                     </div>
                 </div>
+                <div class="box group" wire:click="setType('mysql')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New MySQL
+                        </div>
+                        <div class="description">
+                            MySQL
+                        </div>
+                    </div>
+                </div>
+                <div class="box group" wire:click="setType('mariadb')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New Mariadb
+                        </div>
+                        <div class="description">
+                            MySQL
+                        </div>
+                    </div>
+                </div>
                 {{-- <div class="box group" wire:click="setType('existing-postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">

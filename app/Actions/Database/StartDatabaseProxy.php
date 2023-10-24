@@ -2,7 +2,9 @@
 
 namespace App\Actions\Database;
 
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -12,7 +14,7 @@ class StartDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database)
     {
         $internalPort = null;
         if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
@@ -21,6 +23,10 @@ class StartDatabaseProxy
             $internalPort = 5432;
         } else if ($database->getMorphClass() === 'App\Models\StandaloneMongodb') {
             $internalPort = 27017;
+        } else if ($database->getMorphClass() === 'App\Models\StandaloneMysql') {
+            $internalPort = 3306;
+        } else if ($database->getMorphClass() === 'App\Models\StandaloneMariadb') {
+            $internalPort = 3306;
         }
         $containerName = "{$database->uuid}-proxy";
         $configuration_dir = database_proxy_dir($database->uuid);

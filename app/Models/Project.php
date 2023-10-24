@@ -56,4 +56,16 @@ class Project extends BaseModel
     {
         return $this->hasManyThrough(StandaloneRedis::class, Environment::class);
     }
+    public function mongodbs()
+    {
+        return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
+    }
+    public function mysqls()
+    {
+        return $this->hasMany(StandaloneMysql::class, Environment::class);
+    }
+    public function mariadbs()
+    {
+        return $this->hasMany(StandaloneMariadb::class, Environment::class);
+    }
 }

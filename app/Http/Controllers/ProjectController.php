@@ -63,8 +63,12 @@ class ProjectController extends Controller
                 $database = create_standalone_postgresql($environment->id, $destination_uuid);
             } else if ($type->value() === 'redis') {
                 $database = create_standalone_redis($environment->id, $destination_uuid);
-            }  else if ($type->value() === 'mongodb') {
+            } else if ($type->value() === 'mongodb') {
                 $database = create_standalone_mongodb($environment->id, $destination_uuid);
+            } else if ($type->value() === 'mysql') {
+                $database = create_standalone_mysql($environment->id, $destination_uuid);
+            }else if ($type->value() === 'mariadb') {
+                $database = create_standalone_mariadb($environment->id, $destination_uuid);
             }
             return redirect()->route('project.database.configuration', [
                 'project_uuid' => $project->uuid,
@@ -72,7 +76,7 @@ class ProjectController extends Controller
                 'database_uuid' => $database->uuid,
             ]);
         }
-        if ($type->startsWith('one-click-service-') && !is_null( (int)$server_id)) {
+        if ($type->startsWith('one-click-service-') && !is_null((int)$server_id)) {
             $oneClickServiceName = $type->after('one-click-service-')->value();
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);

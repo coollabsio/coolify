@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Http\Livewire\Project\Database\Mongodb;
+namespace App\Http\Livewire\Project\Database\Mysql;
 
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Database\StopDatabaseProxy;
-use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use Exception;
 use Livewire\Component;
 
@@ -12,16 +12,17 @@ class General extends Component
 {
     protected $listeners = ['refresh'];
 
-    public StandaloneMongodb $database;
+    public StandaloneMysql $database;
     public string $db_url;
 
     protected $rules = [
         'database.name' => 'required',
         'database.description' => 'nullable',
-        'database.mongo_conf' => 'nullable',
-        'database.mongo_initdb_root_username' => 'required',
-        'database.mongo_initdb_root_password' => 'required',
-        'database.mongo_initdb_database' => 'required',
+        'database.mysql_root_password' => 'required',
+        'database.mysql_user' => 'required',
+        'database.mysql_password' => 'required',
+        'database.mysql_database' => 'required',
+        'database.mysql_conf' => 'nullable',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
         'database.is_public' => 'nullable|boolean',
@@ -30,10 +31,11 @@ class General extends Component
     protected $validationAttributes = [
         'database.name' => 'Name',
         'database.description' => 'Description',
-        'database.mongo_conf' => 'Mongo Configuration',
-        'database.mongo_initdb_root_username' => 'Root Username',
-        'database.mongo_initdb_root_password' => 'Root Password',
-        'database.mongo_initdb_database' => 'Database',
+        'database.mysql_root_password' => 'Root Password',
+        'database.mysql_user' => 'User',
+        'database.mysql_password' => 'Password',
+        'database.mysql_database' => 'Database',
+        'database.mysql_conf' => 'MySQL Configuration',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
         'database.is_public' => 'Is Public',
@@ -43,9 +45,6 @@ class General extends Component
     {
         try {
             $this->validate();
-            if ($this->database->mongo_conf === "") {
-                $this->database->mongo_conf = null;
-            }
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');
         } catch (Exception $e) {
@@ -91,6 +90,6 @@ class General extends Component
 
     public function render()
     {
-        return view('livewire.project.database.mongodb.general');
+        return view('livewire.project.database.mysql.general');
     }
 }
