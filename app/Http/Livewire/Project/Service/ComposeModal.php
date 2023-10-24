@@ -6,8 +6,8 @@ use Livewire\Component;
 
 class ComposeModal extends Component
 {
-    public string $raw;
-    public string $actual;
+    public ?string $raw = null;
+    public ?string $actual = null;
     public function render()
     {
         return view('livewire.project.service.compose-modal');

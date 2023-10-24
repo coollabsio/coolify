@@ -89,7 +89,9 @@ class GenerateServiceTemplates extends Command
             'compose' => $yaml,
         ];
         if ($env_file) {
-            $payload['envs'] = $env_file;
+            $env_file_content = file_get_contents(base_path("templates/compose/$env_file"));
+            $env_file_base64 = base64_encode($env_file_content);
+            $payload['envs'] = $env_file_base64;
         }
         return $payload;
     }
