@@ -28,8 +28,7 @@
         @endif
     @else
         <form wire:submit.prevent='saveVariables(false)' class="flex flex-col gap-2">
-            <x-forms.textarea rows=25 class="whitespace-pre-wrap"
-                id="variables"></x-forms.textarea>
+            <x-forms.textarea rows=25 class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
             <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
         </form>
         @if ($showPreview)
