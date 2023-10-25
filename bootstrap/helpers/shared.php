@@ -4,7 +4,9 @@ use App\Models\Application;
 use App\Models\InstanceSettings;
 use App\Models\Server;
 use App\Models\Service;
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use App\Models\Team;
@@ -484,5 +486,18 @@ function queryResourcesByUuid(string $uuid)
     if ($redis) return $redis;
     $mongodb = StandaloneMongodb::whereUuid($uuid)->first();
     if ($mongodb) return $mongodb;
+    $mysql = StandaloneMysql::whereUuid($uuid)->first();
+    if ($mysql) return $mysql;
+    $mariadb = StandaloneMariadb::whereUuid($uuid)->first();
+    if ($mariadb) return $mariadb;
     return $resource;
+}
+
+function generateDeployWebhook($resource) {
+    $baseUrl = base_url();
+    $api = Url::fromString($baseUrl) . '/api/v1';
+    $endpoint = '/deploy';
+    $uuid = data_get($resource, 'uuid');
+    $url = $api . $endpoint . "?uuid=$uuid&force=false";
+    return $url;
 }

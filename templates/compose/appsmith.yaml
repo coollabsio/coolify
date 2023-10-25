@@ -14,3 +14,5 @@ services:
       - APPSMITH_SMART_LOOK_ID=
     volumes:
       - stacks-data:/appsmith-stacks
+    healthcheck:
+      test: ["NONE"]

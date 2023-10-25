@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Project\Database;
 
+use Illuminate\Support\Facades\Storage;
 use Livewire\Component;
 
 class BackupExecutions extends Component
@@ -22,6 +23,29 @@ class BackupExecutions extends Component
         $execution->delete();
         $this->emit('success', 'Backup deleted successfully.');
         $this->emit('refreshBackupExecutions');
+    }
+    public function download($exeuctionId)
+    {
+        try {
+            $execution = $this->backup->executions()->where('id', $exeuctionId)->first();
+            if (is_null($execution)) {
+                $this->emit('error', 'Backup execution not found.');
+                return;
+            }
+            $filename = data_get($execution, 'filename');
+            $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            $privateKeyLocation = savePrivateKeyToFs($server);
+            $disk = Storage::build([
+                'driver' => 'sftp',
+                'host' => $server->ip,
+                'port' => $server->port,
+                'username' => $server->user,
+                'privateKey' => $privateKeyLocation,
+            ]);
+            return $disk->download($filename);
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
     public function refreshBackupExecutions(): void
     {
