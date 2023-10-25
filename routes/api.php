@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\Database\StartMariadb;
 use App\Actions\Database\StartMongodb;
+use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Service\StartService;
@@ -32,7 +34,6 @@ Route::group([
         $teamId = data_get($token, 'team_id');
         $uuid = $request->query->get('uuid');
         $force = $request->query->get('force') ?? false;
-
         if (is_null($teamId)) {
             return response()->json(['error' => 'Invalid token.'], 400);
         }
@@ -50,29 +51,56 @@ Route::group([
                 );
                 return response()->json(['message' => 'Deployment queued.'], 200);
             } else if ($type === 'App\Models\StandalonePostgresql') {
+                if (str($resource->status)->startsWith('running')) {
+                    return response()->json(['message' => 'Database already running.'], 200);
+                }
                 StartPostgresql::run($resource);
                 $resource->update([
                     'started_at' => now(),
                 ]);
                 return response()->json(['message' => 'Database started.'], 200);
             } else if ($type === 'App\Models\StandaloneRedis') {
+                if (str($resource->status)->startsWith('running')) {
+                    return response()->json(['message' => 'Database already running.'], 200);
+                }
                 StartRedis::run($resource);
                 $resource->update([
                     'started_at' => now(),
                 ]);
                 return response()->json(['message' => 'Database started.'], 200);
             } else if ($type === 'App\Models\StandaloneMongodb') {
+                if (str($resource->status)->startsWith('running')) {
+                    return response()->json(['message' => 'Database already running.'], 200);
+                }
                 StartMongodb::run($resource);
                 $resource->update([
                     'started_at' => now(),
                 ]);
                 return response()->json(['message' => 'Database started.'], 200);
-            }else if ($type === 'App\Models\Service') {
+            } else if ($type === 'App\Models\StandaloneMysql') {
+                if (str($resource->status)->startsWith('running')) {
+                    return response()->json(['message' => 'Database already running.'], 200);
+                }
+                StartMysql::run($resource);
+                $resource->update([
+                    'started_at' => now(),
+                ]);
+                return response()->json(['message' => 'Database started.'], 200);
+            } else if ($type === 'App\Models\StandaloneMariadb') {
+                if (str($resource->status)->startsWith('running')) {
+                    return response()->json(['message' => 'Database already running.'], 200);
+                }
+                StartMariadb::run($resource);
+                $resource->update([
+                    'started_at' => now(),
+                ]);
+                return response()->json(['message' => 'Database started.'], 200);
+            } else if ($type === 'App\Models\Service') {
                 StartService::run($resource);
                 return response()->json(['message' => 'Service started.'], 200);
             }
         }
-        return response()->json(['error' => 'No resource found.'], 404);
+        return response()->json(['error' => "No resource found with {$uuid}."], 404);
     });
 });
 
