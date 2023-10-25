@@ -28,3 +28,4 @@ networks:
     coolify:
         name: coolify
         driver: bridge
+        external: true

@@ -21,14 +21,18 @@ class Select extends Component
     public Collection|array $swarmDockers = [];
     public array $parameters;
     public Collection|array $services = [];
+    public Collection|array $allServices = [];
+
     public bool $loadingServices = true;
     public bool $loading = false;
     public $environments = [];
     public ?string $selectedEnvironment = null;
     public ?string $existingPostgresqlUrl = null;
 
+    public ?string $search = null;
     protected $queryString = [
         'server',
+        'search'
     ];
 
     public function mount()
@@ -41,6 +45,11 @@ class Select extends Component
         $this->environments = Project::whereUuid($projectUuid)->first()->environments;
         $this->selectedEnvironment = data_get($this->parameters, 'environment_name');
     }
+    public function render()
+    {
+        $this->loadServices();
+        return view('livewire.project.new.select');
+    }
 
     public function updatedSelectedEnvironment()
     {
@@ -49,6 +58,7 @@ class Select extends Component
             'environment_name' => $this->selectedEnvironment,
         ]);
     }
+
     // public function addExistingPostgresql()
     // {
     //     try {
@@ -59,19 +69,28 @@ class Select extends Component
     //     }
     // }
 
-    public function loadThings()
-    {
-        $this->loadServices();
-        $this->loadServers();
-    }
-    public function loadServices(bool $forceReload = false)
+    public function loadServices(bool $force = false)
     {
         try {
-            if ($forceReload) {
-                Cache::forget('services');
+            if (count($this->allServices) > 0 && !$force) {
+                if (!$this->search) {
+                    $this->services = $this->allServices;
+                    return;
+                }
+                $this->services = $this->allServices->filter(function ($service, $key) {
+                    $tags = collect(data_get($service, 'tags', []));
+                    return str_contains(strtolower($key), strtolower($this->search)) || $tags->contains(function ($tag) {
+                        return str_contains(strtolower($tag), strtolower($this->search));
+                    });
+                });
+            } else {
+                $this->search = null;
+                $this->allServices = getServiceTemplates();
+                $this->services = $this->allServices->filter(function ($service, $key) {
+                    return str_contains(strtolower($key), strtolower($this->search));
+                });;
+                $this->emit('success', 'Successfully loaded services.');
             }
-            $this->services = getServiceTemplates();
-            $this->emit('success', 'Successfully loaded services.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

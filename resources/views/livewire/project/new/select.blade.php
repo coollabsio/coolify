@@ -1,4 +1,4 @@
-<div x-data x-init="$wire.loadThings">
+<div x-data x-init="$wire.loadServers">
     <div class="flex gap-2 ">
         <h1>New Resource</h1>
         <div class="w-96">
@@ -90,7 +90,7 @@
                             New PostgreSQL
                         </div>
                         <div class="description">
-                            The most loved relational database in the world.
+                            PostgreSQL is an open-source, object-relational database management system known for its robustness, advanced features, and strong standards compliance.
                         </div>
                     </div>
                 </div>
@@ -100,7 +100,7 @@
                             New Redis
                         </div>
                         <div class="description">
-                            The open source, in-memory data store for cache, streaming engine, and message broker.
+                            Redis is an open-source, in-memory data structure store used as a database, cache, and message broker, known for its high performance, flexibility, and rich data structures.
                         </div>
                     </div>
                 </div>
@@ -110,7 +110,27 @@
                             New MongoDB
                         </div>
                         <div class="description">
-                            MongoDB is a source-available cross-platform document-oriented database program.
+                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with optional schemas, known for its flexibility, scalability, and wide range of application use cases.
+                        </div>
+                    </div>
+                </div>
+                <div class="box group" wire:click="setType('mysql')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New MySQL
+                        </div>
+                        <div class="description">
+                            MySQL is an open-source relational database management system known for its speed, reliability, and flexibility in managing and accessing data.
+                        </div>
+                    </div>
+                </div>
+                <div class="box group" wire:click="setType('mariadb')">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white group-hover:text-white">
+                            New Mariadb
+                        </div>
+                        <div class="description">
+                            MariaDB is an open-source relational database management system that serves as a drop-in replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
                         </div>
                     </div>
                 </div>
@@ -128,12 +148,15 @@
             <div class="flex items-center gap-2">
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click='loadServices(true)'>Reload Services List</x-forms.button>
+                <input
+                    class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+                    wire:model.debounce.200ms="search" placeholder="Search..."></input>
             </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 @if ($loadingServices)
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
-                    @foreach ($services as $serviceName => $service)
+                    @forelse ($services as $serviceName => $service)
                         @if (data_get($service, 'disabled'))
                             <button class="text-left cursor-not-allowed bg-coolgray-200/20 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
@@ -158,7 +181,9 @@
                                 </div>
                             </button>
                         @endif
-                    @endforeach
+                        @empty
+                        <div>No service found.</div>
+                    @endforelse
                 @endif
             </div>
             <div class="py-4 pb-10">Trademarks Policy: The respective trademarks mentioned here are owned by the

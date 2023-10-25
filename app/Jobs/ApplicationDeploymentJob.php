@@ -885,14 +885,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function generate_build_env_variables()
     {
-        $this->build_args = collect(["--build-arg SOURCE_COMMIT={$this->commit}"]);
+        $this->build_args = collect(["--build-arg SOURCE_COMMIT=\"{$this->commit}\""]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+                $this->build_args->push("--build-arg {$env->key}=\"{$env->value}\"");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->build_args->push("--build-arg {$env->key}={$env->value}");
+                $this->build_args->push("--build-arg {$env->key}=\"{$env->value}\"");
             }
         }
 

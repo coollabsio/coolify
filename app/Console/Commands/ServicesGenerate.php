@@ -5,7 +5,7 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Symfony\Component\Yaml\Yaml;
 
-class GenerateServiceTemplates extends Command
+class ServicesGenerate extends Command
 {
     /**
      * The name and signature of the console command.
@@ -80,6 +80,14 @@ class GenerateServiceTemplates extends Command
             $env_file = null;
         }
 
+        $tags = collect(preg_grep('/^# tags:/', explode("\n", $content)))->values();
+        if ($tags->count() > 0) {
+            $tags = str($tags[0])->after('# tags:')->trim()->explode(',')->map(function ($tag) {
+                return str($tag)->trim()->lower()->value();
+            })->values();
+        } else {
+            $tags = null;
+        }
         $json = Yaml::parse($content);
         $yaml = base64_encode(Yaml::dump($json, 10, 2));
         $payload = [
@@ -87,9 +95,12 @@ class GenerateServiceTemplates extends Command
             'documentation' => $documentation,
             'slogan' => $slogan,
             'compose' => $yaml,
+            'tags' => $tags,
         ];
         if ($env_file) {
-            $payload['envs'] = $env_file;
+            $env_file_content = file_get_contents(base_path("templates/compose/$env_file"));
+            $env_file_base64 = base64_encode($env_file_content);
+            $payload['envs'] = $env_file_base64;
         }
         return $payload;
     }

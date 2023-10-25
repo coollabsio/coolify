@@ -7,12 +7,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class Environment extends Model
 {
-    protected $fillable = [
-        'name',
-        'project_id',
-    ];
-
-    public function can_delete_environment()
+    protected $guarded = [];
+    public function isEmpty()
     {
         return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
@@ -38,13 +34,23 @@ class Environment extends Model
     {
         return $this->hasMany(StandaloneMongodb::class);
     }
+    public function mysqls()
+    {
+        return $this->hasMany(StandaloneMysql::class);
+    }
+    public function mariadbs()
+    {
+        return $this->hasMany(StandaloneMariadb::class);
+    }
 
     public function databases()
     {
         $postgresqls = $this->postgresqls;
         $redis = $this->redis;
         $mongodbs = $this->mongodbs;
-        return $postgresqls->concat($redis)->concat($mongodbs);
+        $mysqls = $this->mysqls;
+        $mariadbs = $this->mariadbs;
+        return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
     }
 
     public function project()

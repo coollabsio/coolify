@@ -18,7 +18,7 @@ class Project extends BaseModel
                 'project_id' => $project->id,
             ]);
             Environment::create([
-                'name' => 'Production',
+                'name' => 'production',
                 'project_id' => $project->id,
             ]);
         });
@@ -55,5 +55,17 @@ class Project extends BaseModel
     public function redis()
     {
         return $this->hasManyThrough(StandaloneRedis::class, Environment::class);
+    }
+    public function mongodbs()
+    {
+        return $this->hasManyThrough(StandaloneMongodb::class, Environment::class);
+    }
+    public function mysqls()
+    {
+        return $this->hasMany(StandaloneMysql::class, Environment::class);
+    }
+    public function mariadbs()
+    {
+        return $this->hasMany(StandaloneMariadb::class, Environment::class);
     }
 }

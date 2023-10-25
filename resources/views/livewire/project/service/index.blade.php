@@ -4,16 +4,25 @@
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
-            <a :class="activeTab === 'service-stack' && 'text-white'" @click.prevent="activeTab = 'service-stack';
-                window.location.hash = 'service-stack'" href="#">Service Stack</a>
-            <a :class="activeTab === 'storages' && 'text-white'" @click.prevent="activeTab = 'storages';
-                window.location.hash = 'storages'" href="#">Storages</a>
+            <a :class="activeTab === 'service-stack' && 'text-white'"
+                @click.prevent="activeTab = 'service-stack';
+                window.location.hash = 'service-stack'"
+                href="#">Service Stack</a>
+            <a :class="activeTab === 'storages' && 'text-white'"
+                @click.prevent="activeTab = 'storages';
+                window.location.hash = 'storages'"
+                href="#">Storages</a>
+            <a :class="activeTab === 'webhooks' && 'text-white'"
+                @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
+            </a>
             <a :class="activeTab === 'environment-variables' && 'text-white'"
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'danger' && 'text-white'" @click.prevent="activeTab = 'danger';
-                window.location.hash = 'danger'" href="#">Danger Zone
+            <a :class="activeTab === 'danger' && 'text-white'"
+                @click.prevent="activeTab = 'danger';
+                window.location.hash = 'danger'"
+                href="#">Danger Zone
             </a>
         </div>
         <div class="w-full pl-8">
@@ -100,7 +109,9 @@
                 @foreach ($databases as $database)
                     <livewire:project.service.storage wire:key="database-{{ $database->id }}" :resource="$database" />
                 @endforeach
-
+            </div>
+            <div x-cloak x-show="activeTab === 'webhooks'">
+                <livewire:project.shared.webhooks :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <div x-cloak x-show="activeTab === 'environment-variables'">

@@ -19,6 +19,9 @@
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
             </a>
+            <a :class="activeTab === 'webhooks' && 'text-white'"
+                @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
+            </a>
             @if ($application->git_based())
                 <a :class="activeTab === 'previews' && 'text-white'"
                     @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
@@ -56,6 +59,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.service.storage :resource="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'webhooks'">
+                <livewire:project.shared.webhooks :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'previews'">
                 <livewire:project.application.previews :application="$application" />

@@ -1,5 +1,6 @@
 # documentation: https://docs.min.io/docs/minio-docker-quickstart-guide.html
 # slogan: MinIO is a high performance object storage server compatible with Amazon S3 APIs.
+# tags: object, storage, server, s3, api
 
 services:
   minio:

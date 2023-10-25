@@ -1,0 +1,38 @@
+# documentation: https://docs.n8n.io/hosting/
+# slogan: n8n is an extendable workflow automation tool which enables you to connect anything to everything via its open, fair-code model.
+# tags: n8n,workflow,automation,open,source,low,code
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    environment:
+      - SERVICE_FQDN_N8N
+      - N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}
+      - N8N_HOST=${SERVICE_FQDN_N8N}
+      - GENERIC_TIMEZONE="Europe/Berlin"
+      - TZ="Europe/Berlin"
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_DATABASE=${POSTGRES_DB:-umami}
+      - DB_POSTGRESDB_HOST=postgresql
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_USER=$SERVICE_USER_POSTGRES
+      - DB_POSTGRESDB_SCHEMA=public
+      - DB_POSTGRESDB_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+    volumes:
+      - n8n-data:/home/node/.n8n
+    depends_on:
+      - postgresql
+  postgresql:
+    image: postgres:15-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-umami}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+

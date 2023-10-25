@@ -3,11 +3,11 @@
 return [
 
     // @see https://docs.sentry.io/product/sentry-basics/dsn-explainer/
-    'dsn' => 'https://72f02655749d5d687297b6b9f078b8b9@o1082494.ingest.sentry.io/4505347448045568',
+    'dsn' => 'https://c35fe90ee56e18b220bb55e8217d4839@o1082494.ingest.sentry.io/4505347448045568',
 
     // The release version of your application
     // Example with dynamic git hash: trim(exec('git --git-dir ' . base_path('.git') . ' log --pretty="%h" -n1 HEAD'))
-    'release' => '4.0.0-beta.98',
+    'release' => '4.0.0-beta.103',
     // When left empty or `null` the Laravel environment will be used
     'environment' => config('app.env'),
 

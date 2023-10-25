@@ -31,11 +31,17 @@ class All extends Component
     public function getDevView()
     {
         $this->variables = $this->resource->environment_variables->map(function ($item) {
+            if ($item->is_shown_once) {
+                return "$item->key=(locked secret)";
+            }
             return "$item->key=$item->value";
         })->sort()->join('
 ');
         if ($this->showPreview) {
             $this->variablesPreview = $this->resource->environment_variables_preview->map(function ($item) {
+                if ($item->is_shown_once) {
+                    return "$item->key=(locked secret)";
+                }
                 return "$item->key=$item->value";
             })->sort()->join('
 ');
@@ -49,18 +55,26 @@ class All extends Component
     {
         if ($isPreview) {
             $variables = parseEnvFormatToArray($this->variablesPreview);
-            $existingVariables = $this->resource->environment_variables_preview();
-            $this->resource->environment_variables_preview()->delete();
         } else {
             $variables = parseEnvFormatToArray($this->variables);
-            $existingVariables = $this->resource->environment_variables();
-            $this->resource->environment_variables()->delete();
         }
         foreach ($variables as $key => $variable) {
-            $found = $existingVariables->where('key', $key)->first();
+            $found = $this->resource->environment_variables()->where('key', $key)->first();
+            $foundPreview = $this->resource->environment_variables_preview()->where('key', $key)->first();
             if ($found) {
+                if ($found->is_shown_once) {
+                    continue;
+                }
                 $found->value = $variable;
                 $found->save();
+                continue;
+            }
+            if ($foundPreview) {
+                if ($foundPreview->is_shown_once) {
+                    continue;
+                }
+                $foundPreview->value = $variable;
+                $foundPreview->save();
                 continue;
             } else {
                 $environment = new EnvironmentVariable();
@@ -80,6 +94,12 @@ class All extends Component
                         break;
                     case 'standalone-mongodb':
                         $environment->standalone_mongodb_id = $this->resource->id;
+                        break;
+                    case 'standalone-mysql':
+                        $environment->standalone_mysql_id = $this->resource->id;
+                        break;
+                    case 'standalone-mariadb':
+                        $environment->standalone_mariadb_id = $this->resource->id;
                         break;
                     case 'service':
                         $environment->service_id = $this->resource->id;
