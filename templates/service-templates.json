@@ -44,6 +44,17 @@
             "collaboration"
         ]
     },
+    "dashboard": {
+        "documentation": "https:\/\/github.com\/phntxx\/dashboard\/wiki\/Installation#installation-using-docker",
+        "slogan": "A dashboard. Inspired by SUI, it offers simple customization through JSON-files and a handy search bar to help you browse the internet more efficiently.",
+        "compose": "c2VydmljZXM6CiAgZGFzaGJvYXJkOgogICAgaW1hZ2U6ICdwaG50eHgvZGFzaGJvYXJkOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9EQVNIQk9BUkQKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2Rhc2hib2FyZC1kYXRhOi9hcHAvZGF0YScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MDgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "dashboard",
+            "web",
+            "search",
+            "bookmarks"
+        ]
+    },
     "dokuwiki": {
         "documentation": "https:\/\/www.dokuwiki.org\/faq",
         "slogan": "A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases with simplicity and flexibility.",
@@ -53,6 +64,30 @@
             "documentation",
             "knowledge",
             "base"
+        ]
+    },
+    "emby": {
+        "documentation": "https:\/\/emby.media\/support\/articles\/Home.html",
+        "slogan": "A media server software that allows you to organize, stream, and access your multimedia content effortlessly, making it easy to enjoy your favorite movies, TV shows, music, and more.",
+        "compose": "c2VydmljZXM6CiAgZW1ieToKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9lbWJ5OmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9FTUJZCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnZW1ieS1jb25maWc6L2NvbmZpZycKICAgICAgLSAnZW1ieS10dnNob3dzOi90dnNob3dzJwogICAgICAtICdlbWJ5LW1vdmllczovbW92aWVzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwOTYnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "media",
+            "server",
+            "movies",
+            "tv",
+            "music"
+        ]
+    },
+    "embystat": {
+        "documentation": "https:\/\/github.com\/mregni\/EmbyStat\/wiki\/docker",
+        "slogan": "EmyStat is an open-source, self-hosted web analytics tool, designed to provide insight into website traffic and user behavior, of your local Emby deployement, all within your control.",
+        "compose": "c2VydmljZXM6CiAgZW1ieXN0YXQ6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvZW1ieXN0YXQ6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0VNQllTVEFUCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnZW1ieXN0YXQtY29uZmlnOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6NjU1NScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "media",
+            "server",
+            "movies",
+            "tv",
+            "music"
         ]
     },
     "fider": {
@@ -74,6 +109,18 @@
             "content",
             "management",
             "system"
+        ]
+    },
+    "grocy": {
+        "documentation": "https:\/\/github.com\/grocy\/grocy",
+        "slogan": "Grocy is a self-hosted, web-based household management and grocery list application, designed to simplify your household chores and grocery shopping.",
+        "compose": "c2VydmljZXM6CiAgZ3JvY3k6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvZ3JvY3k6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0dST0NZCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnZ3JvY3ktY29uZmlnOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "groceries",
+            "household",
+            "management",
+            "grocery",
+            "shopping"
         ]
     },
     "heimdall": {
@@ -139,7 +186,7 @@
         ]
     },
     "pairdrop": {
-        "documentation": "https:\/\/github.com\/schlagmichdoch\/PairDrop\/blob\/master\/docs\/faq.md",
+        "documentation": "https:\/\/github.com\/schlagmichdoch\/PairDrop",
         "slogan": "Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.",
         "compose": "c2VydmljZXM6CiAgcGFpcmRyb3A6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcGFpcmRyb3A6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BBSVJEUk9QCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIERFQlVHX01PREU9ZmFsc2UKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
         "tags": [
@@ -150,7 +197,7 @@
         ]
     },
     "snapdrop": {
-        "documentation": "https:\/\/github.com\/RobinLinus\/snapdrop\/blob\/master\/docs\/faq.md",
+        "documentation": "https:\/\/github.com\/RobinLinus\/snapdrop",
         "slogan": "A self-hosted file-sharing service for secure and convenient file transfers, whether on a local network or the internet.",
         "compose": "c2VydmljZXM6CiAgc25hcGRyb3A6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvc25hcGRyb3A6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1NOQVBEUk9QCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnc25hcGRyb3AtY29uZmlnOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
@@ -188,7 +235,7 @@
     },
     "wordpress-with-mariadb": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
-        "slogan": "\"WordPress is open source software you can use to create a beautiful website, blog, or app.\"",
+        "slogan": "WordPress with MariaDB. Wordpress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgU0VSVklDRV9GUUROOiBudWxsCiAgICAgIFdPUkRQUkVTU19EQl9IT1NUOiBtYXJpYWRiCiAgICAgIFdPUkRQUkVTU19EQl9VU0VSOiAkU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICBXT1JEUFJFU1NfREJfUEFTU1dPUkQ6ICRTRVJWSUNFX1BBU1NXT1JEX1dPUkRQUkVTUwogICAgICBXT1JEUFJFU1NfREJfTkFNRTogd29yZHByZXNzCiAgICBkZXBlbmRzX29uOgogICAgICAtIG1hcmlhZGIKICBtYXJpYWRiOgogICAgaW1hZ2U6ICdtYXJpYWRiOjExJwogICAgdm9sdW1lczoKICAgICAgLSAnbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIE1ZU1FMX1JPT1RfUEFTU1dPUkQ6ICRTRVJWSUNFX1BBU1NXT1JEX1JPT1QKICAgICAgTVlTUUxfREFUQUJBU0U6IHdvcmRwcmVzcwogICAgICBNWVNRTF9VU0VSOiAkU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICBNWVNRTF9QQVNTV09SRDogJFNFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTCg==",
         "tags": [
             "cms",
@@ -200,7 +247,7 @@
     },
     "wordpress-with-mysql": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
-        "slogan": "\"WordPress is open source software you can use to create a beautiful website, blog, or app.\"",
+        "slogan": "WordPress with MySQL. Wordpress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgU0VSVklDRV9GUUROOiBudWxsCiAgICAgIFdPUkRQUkVTU19EQl9IT1NUOiBteXNxbAogICAgICBXT1JEUFJFU1NfREJfVVNFUjogJFNFUlZJQ0VfVVNFUl9XT1JEUFJFU1MKICAgICAgV09SRFBSRVNTX0RCX1BBU1NXT1JEOiAkU0VSVklDRV9QQVNTV09SRF9XT1JEUFJFU1MKICAgICAgV09SRFBSRVNTX0RCX05BTUU6IHdvcmRwcmVzcwogICAgZGVwZW5kc19vbjoKICAgICAgLSBteXNxbAogIG15c3FsOgogICAgaW1hZ2U6ICdteXNxbDo1LjcnCiAgICB2b2x1bWVzOgogICAgICAtICdteXNxbC1kYXRhOi92YXIvbGliL215c3FsJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIE1ZU1FMX1JPT1RfUEFTU1dPUkQ6ICRTRVJWSUNFX1BBU1NXT1JEX1JPT1QKICAgICAgTVlTUUxfREFUQUJBU0U6IHdvcmRwcmVzcwogICAgICBNWVNRTF9VU0VSOiAkU0VSVklDRV9VU0VSX1dPUkRQUkVTUwogICAgICBNWVNRTF9QQVNTV09SRDogJFNFUlZJQ0VfUEFTU1dPUkRfV09SRFBSRVNTCg==",
         "tags": [
             "cms",
@@ -212,7 +259,7 @@
     },
     "wordpress-without-database": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
-        "slogan": "\"WordPress is open source software you can use to create a beautiful website, blog, or app.\"",
+        "slogan": "WordPress with external database. Wordpress is open source software you can use to create a beautiful website, blog, or app.",
         "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgU0VSVklDRV9GUUROOiBudWxsCg==",
         "tags": [
             "cms",

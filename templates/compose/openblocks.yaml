@@ -1,0 +1,27 @@
+# documentation: https://docs.openblocks.dev/self-hosting
+# slogan: OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.
+# tags: openblocks,low,code,platform,open,source,low,code
+
+services:
+  openblocks:
+    image: openblocksdev/openblocks-ce
+    environment:
+      - SERVICE_FQDN_OPENBLOCKS
+      - REDIS_ENABLED=true
+      - MONGODB_ENABLED=true
+      - API_SERVICE_ENABLED=true
+      - NODE_SERVICE_ENABLED=true
+      - PUID=1000
+      - PGID=1000
+      - MONGODB_URI=mongodb://localhost:27017/openblocks?authSource=admin
+      - REDIS_URL=redis://localhost:6379
+      - JS_EXECUTOR_URI=http://localhost:6060
+      - ENABLE_USER_SIGN_UP=${ENABLE_USER_SIGN_UP:-true}
+      - ENCRYPTION_PASSWORD=$SERVICE_
+    volumes:
+      - openblocks-data:/openblocks-stacks
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10

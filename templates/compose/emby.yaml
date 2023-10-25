@@ -1,0 +1,21 @@
+# documentation: https://emby.media/support/articles/Home.html
+# slogan: A media server software that allows you to organize, stream, and access your multimedia content effortlessly, making it easy to enjoy your favorite movies, TV shows, music, and more.
+# tags: media, server, movies, tv, music
+
+services:
+  emby:
+    image: lscr.io/linuxserver/emby:latest
+    environment:
+      - SERVICE_FQDN_EMBY
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - emby-config:/config
+      - emby-tvshows:/tvshows
+      - emby-movies:/movies
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

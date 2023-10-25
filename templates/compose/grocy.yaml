@@ -1,0 +1,19 @@
+# documentation: https://github.com/grocy/grocy
+# slogan: Grocy is a self-hosted, web-based household management and grocery list application, designed to simplify your household chores and grocery shopping.
+# tags: groceries, household, management, grocery, shopping
+
+services:
+  grocy:
+    image: lscr.io/linuxserver/grocy:latest
+    environment:
+      - SERVICE_FQDN_GROCY
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - grocy-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
