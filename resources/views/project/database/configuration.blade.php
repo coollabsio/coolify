@@ -31,6 +31,9 @@
                 window.location.hash = 'storages'"
                 href="#">Storages
             </a>
+            <a :class="activeTab === 'webhooks' && 'text-white'"
+                @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
+            </a>
             <a :class="activeTab === 'resource-limits' && 'text-white'"
                 @click.prevent="activeTab = 'resource-limits';
                 window.location.hash = 'resource-limits'"
@@ -64,6 +67,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.service.storage :resource="$database" />
+            </div>
+            <div x-cloak x-show="activeTab === 'webhooks'">
+                <livewire:project.shared.webhooks :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.shared.resource-limits :resource="$database" />

@@ -97,7 +97,7 @@ Route::group([
                 return response()->json(['message' => 'Database started.'], 200);
             } else if ($type === 'App\Models\Service') {
                 StartService::run($resource);
-                return response()->json(['message' => 'Service started.'], 200);
+                return response()->json(['message' => 'Service started. It could take a while, be patient.'], 200);
             }
         }
         return response()->json(['error' => "No resource found with {$uuid}."], 404);

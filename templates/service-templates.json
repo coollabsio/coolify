@@ -2,7 +2,7 @@
     "appsmith": {
         "documentation": "https:\/\/docs.appsmith.com",
         "slogan": "Appsmith is an open-source, self-hosted application development platform that enables you to build powerful web applications with ease.",
-        "compose": "c2VydmljZXM6CiAgYXBwc21pdGg6CiAgICBpbWFnZTogJ2luZGV4LmRvY2tlci5pby9hcHBzbWl0aC9hcHBzbWl0aC1jZTpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE4KICAgICAgLSBBUFBTTUlUSF9NQUlMX0VOQUJMRUQ9ZmFsc2UKICAgICAgLSBBUFBTTUlUSF9ESVNBQkxFX1RFTEVNRVRSWT10cnVlCiAgICAgIC0gQVBQU01JVEhfRElTQUJMRV9JTlRFUkNPTT10cnVlCiAgICAgIC0gQVBQU01JVEhfU0VOVFJZX0RTTj0KICAgICAgLSBBUFBTTUlUSF9TTUFSVF9MT09LX0lEPQogICAgdm9sdW1lczoKICAgICAgLSAnc3RhY2tzLWRhdGE6L2FwcHNtaXRoLXN0YWNrcycK",
+        "compose": "c2VydmljZXM6CiAgYXBwc21pdGg6CiAgICBpbWFnZTogJ2luZGV4LmRvY2tlci5pby9hcHBzbWl0aC9hcHBzbWl0aC1jZTpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE4KICAgICAgLSBBUFBTTUlUSF9NQUlMX0VOQUJMRUQ9ZmFsc2UKICAgICAgLSBBUFBTTUlUSF9ESVNBQkxFX1RFTEVNRVRSWT10cnVlCiAgICAgIC0gQVBQU01JVEhfRElTQUJMRV9JTlRFUkNPTT10cnVlCiAgICAgIC0gQVBQU01JVEhfU0VOVFJZX0RTTj0KICAgICAgLSBBUFBTTUlUSF9TTUFSVF9MT09LX0lEPQogICAgdm9sdW1lczoKICAgICAgLSAnc3RhY2tzLWRhdGE6L2FwcHNtaXRoLXN0YWNrcycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gTk9ORQo=",
         "tags": [
             "lowcode",
             "nocode",
@@ -108,6 +108,34 @@
             "server",
             "s3",
             "api"
+        ]
+    },
+    "n8n-with-postgresql": {
+        "documentation": "https:\/\/docs.n8n.io\/hosting\/",
+        "slogan": "n8n is an extendable workflow automation tool which enables you to connect anything to everything via its open, fair-code model.",
+        "compose": "c2VydmljZXM6CiAgbjhuOgogICAgaW1hZ2U6IGRvY2tlci5uOG4uaW8vbjhuaW8vbjhuCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTjhOCiAgICAgIC0gJ044Tl9FRElUT1JfQkFTRV9VUkw9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnTjhOX0hPU1Q9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnR0VORVJJQ19USU1FWk9ORT0iRXVyb3BlL0JlcmxpbiInCiAgICAgIC0gJ1RaPSJFdXJvcGUvQmVybGluIicKICAgICAgLSBEQl9UWVBFPXBvc3RncmVzZGIKICAgICAgLSAnREJfUE9TVEdSRVNEQl9EQVRBQkFTRT0ke1BPU1RHUkVTX0RCOi11bWFtaX0nCiAgICAgIC0gREJfUE9TVEdSRVNEQl9IT1NUPXBvc3RncmVzcWwKICAgICAgLSBEQl9QT1NUR1JFU0RCX1BPUlQ9NTQzMgogICAgICAtIERCX1BPU1RHUkVTREJfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gREJfUE9TVEdSRVNEQl9TQ0hFTUE9cHVibGljCiAgICAgIC0gREJfUE9TVEdSRVNEQl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgdm9sdW1lczoKICAgICAgLSAnbjhuLWRhdGE6L2hvbWUvbm9kZS8ubjhuJwogICAgZGVwZW5kc19vbjoKICAgICAgLSBwb3N0Z3Jlc3FsCiAgcG9zdGdyZXNxbDoKICAgIGltYWdlOiAncG9zdGdyZXM6MTUtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAncG9zdGdyZXNxbC1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LXVtYW1pfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiA1cwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "n8n",
+            "workflow",
+            "automation",
+            "open",
+            "source",
+            "low",
+            "code"
+        ]
+    },
+    "n8n": {
+        "documentation": "https:\/\/docs.n8n.io\/hosting\/",
+        "slogan": "n8n is an extendable workflow automation tool which enables you to connect anything to everything via its open, fair-code model.",
+        "compose": "c2VydmljZXM6CiAgbjhuOgogICAgaW1hZ2U6IGRvY2tlci5uOG4uaW8vbjhuaW8vbjhuCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTjhOCiAgICAgIC0gJ044Tl9FRElUT1JfQkFTRV9VUkw9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnTjhOX0hPU1Q9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnR0VORVJJQ19USU1FWk9ORT0iRXVyb3BlL0JlcmxpbiInCiAgICAgIC0gJ1RaPSJFdXJvcGUvQmVybGluIicKICAgIHZvbHVtZXM6CiAgICAgIC0gJ244bi1kYXRhOi9ob21lL25vZGUvLm44bicK",
+        "tags": [
+            "n8n",
+            "workflow",
+            "automation",
+            "open",
+            "source",
+            "low",
+            "code"
         ]
     },
     "pairdrop": {

@@ -1,0 +1,15 @@
+# documentation: https://docs.n8n.io/hosting/
+# slogan: n8n is an extendable workflow automation tool which enables you to connect anything to everything via its open, fair-code model.
+# tags: n8n,workflow,automation,open,source,low,code
+
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    environment:
+      - SERVICE_FQDN_N8N
+      - N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}
+      - N8N_HOST=${SERVICE_FQDN_N8N}
+      - GENERIC_TIMEZONE="Europe/Berlin"
+      - TZ="Europe/Berlin"
+    volumes:
+      - n8n-data:/home/node/.n8n
