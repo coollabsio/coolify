@@ -10,6 +10,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Storage;
 
 class Init extends Command
 {
@@ -21,8 +22,23 @@ class Init extends Command
         ray()->clearAll();
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_resources();
+        $this->cleanup_ssh();
     }
 
+    private function cleanup_ssh() {
+        try {
+            $files = Storage::allFiles('ssh/keys');
+            foreach ($files as $file) {
+                Storage::delete($file);
+            }
+            $files = Storage::allFiles('ssh/mux');
+            foreach ($files as $file) {
+                Storage::delete($file);
+            }
+        } catch (\Throwable $e) {
+            echo "Error: {$e->getMessage()}\n";
+        }
+    }
     private function cleanup_in_progress_application_deployments()
     {
         // Cleanup any failed deployments
