@@ -6,10 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ServerSetting extends Model
 {
-    protected $fillable = [
-        'server_id',
-        'is_usable',
-    ];
+    protected $guarded = [];
 
     public function server()
     {
