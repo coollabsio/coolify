@@ -21,6 +21,7 @@
         "laravel/ui": "^4.2",
         "lcobucci/jwt": "^5.0.0",
         "league/flysystem-aws-s3-v3": "^3.0",
+        "league/flysystem-sftp-v3": "^3.0",
         "livewire/livewire": "^v2.12.3",
         "lorisleiva/laravel-actions": "^2.7",
         "masmerise/livewire-toaster": "^1.2",

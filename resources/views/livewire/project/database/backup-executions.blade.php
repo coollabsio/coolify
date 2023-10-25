@@ -17,10 +17,10 @@
             <div>Location: {{ data_get($execution, 'filename', 'N/A') }}</div>
             <div class="flex gap-2">
                 <div class="flex-1"></div>
-
-                {{-- @if (data_get($execution, 'status') !== 'failed') --}}
-                {{-- <x-forms.button class="bg-coollabs-100 hover:bg-coollabs" wire:click="download">Download</x-forms.button> --}}
-                {{-- @endif --}}
+                @if (data_get($execution, 'status') === 'success')
+                    <x-forms.button class=" hover:bg-coolgray-400"
+                        wire:click="download({{ data_get($execution, 'id') }})">Download</x-forms.button>
+                @endif
                 <x-forms.button isError onclick="sure({{ data_get($execution, 'id') }})">Delete</x-forms.button>
             </div>
         </form>
