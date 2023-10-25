@@ -1,0 +1,19 @@
+# documentation: https://github.com/linuxserver/budge
+# slogan: BudgE is an open-source 'budgeting with envelopes' personal finance app, helping you manage your finances effectively.
+# tags: personal finance, budgeting, expense tracking
+
+services:
+  budge:
+    image: lscr.io/linuxserver/budge:latest
+    environment:
+      - SERVICE_FQDN_BUDGE
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - budge-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
