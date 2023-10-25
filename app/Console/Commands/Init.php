@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Service;
 use App\Models\StandaloneMongodb;
+use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
@@ -22,10 +23,11 @@ class Init extends Command
         ray()->clearAll();
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_resources();
-        $this->cleanup_ssh();
+        // $this->cleanup_ssh();
     }
 
-    private function cleanup_ssh() {
+    private function cleanup_ssh()
+    {
         try {
             $files = Storage::allFiles('ssh/keys');
             foreach ($files as $file) {
@@ -53,11 +55,12 @@ class Init extends Command
             echo "Error: {$e->getMessage()}\n";
         }
     }
-    private function cleanup_stucked_resources() {
+    private function cleanup_stucked_resources()
+    {
         // Cleanup any resources that are not attached to any environment or destination or server
         try {
             $applications = Application::all();
-            foreach($applications as $application) {
+            foreach ($applications as $application) {
                 if (!$application->environment) {
                     ray('Application without environment', $application->name);
                     $application->delete();
@@ -68,7 +71,7 @@ class Init extends Command
                 }
             }
             $postgresqls = StandalonePostgresql::all();
-            foreach($postgresqls as $postgresql) {
+            foreach ($postgresqls as $postgresql) {
                 if (!$postgresql->environment) {
                     ray('Postgresql without environment', $postgresql->name);
                     $postgresql->delete();
@@ -79,7 +82,7 @@ class Init extends Command
                 }
             }
             $redis = StandaloneRedis::all();
-            foreach($redis as $redis) {
+            foreach ($redis as $redis) {
                 if (!$redis->environment) {
                     ray('Redis without environment', $redis->name);
                     $redis->delete();
@@ -90,7 +93,7 @@ class Init extends Command
                 }
             }
             $mongodbs = StandaloneMongodb::all();
-            foreach($mongodbs as $mongodb) {
+            foreach ($mongodbs as $mongodb) {
                 if (!$mongodb->environment) {
                     ray('Mongodb without environment', $mongodb->name);
                     $mongodb->delete();
@@ -100,8 +103,30 @@ class Init extends Command
                     $mongodb->delete();
                 }
             }
+            $mysqls = StandaloneMysql::all();
+            foreach ($mysqls as $mysql) {
+                if (!$mysql->environment) {
+                    ray('Mysql without environment', $mysql->name);
+                    $mysql->delete();
+                }
+                if (!$mysql->destination()) {
+                    ray('Mysql without destination', $mysql->name);
+                    $mysql->delete();
+                }
+            }
+            $mariadbs = StandaloneMysql::all();
+            foreach ($mariadbs as $mariadb) {
+                if (!$mariadb->environment) {
+                    ray('Mariadb without environment', $mariadb->name);
+                    $mariadb->delete();
+                }
+                if (!$mariadb->destination()) {
+                    ray('Mariadb without destination', $mariadb->name);
+                    $mariadb->delete();
+                }
+            }
             $services = Service::all();
-            foreach($services as $service) {
+            foreach ($services as $service) {
                 if (!$service->environment) {
                     ray('Service without environment', $service->name);
                     $service->delete();
