@@ -1,0 +1,16 @@
+# documentation: https://docs.nocodb.com/
+# slogan: NocoDB is an open source Airtable alternative. Turns any MySQL, PostgreSQL, SQL Server, SQLite & MariaDB into a smart-spreadsheet.
+# tags: nocodb,airtable,mysql,postgresql,sqlserver,sqlite,mariadb
+
+services:
+  nocodb:
+    image: nocodb/nocodb
+    environment:
+      - SERVICE_FQDN_NOCODB
+    volumes:
+      - nocodb-data:/usr/app/data/
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
