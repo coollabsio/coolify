@@ -77,6 +77,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private int $customPort = 22;
 
+    private ?string $fullRepoUrl = null;
+    private ?string $branch = null;
+
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
@@ -350,7 +353,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
         $this->prepare_builder_image();
-        $this->clone_repository();
+        $this->check_git_if_build_needed();
         $this->set_base_dir();
         $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
         if (strlen($tag) > 128) {
@@ -379,6 +382,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]);
             }
         }
+        $this->clone_repository();
         $this->cleanup_git();
         $this->generate_nixpacks_confs();
         $this->generate_compose_file();
@@ -510,27 +514,34 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
     }
-
+    private function check_git_if_build_needed()
+    {
+        $this->generate_git_import_commands();
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "git ls-remote {$this->fullRepoUrl} {$this->branch}"),
+                "hidden" => true,
+                "save" => "git_commit_sha"
+            ],
+        );
+        $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+    }
     private function clone_repository()
     {
+        $importCommands = $this->generate_git_import_commands();
         $this->execute_remote_command(
             [
                 "echo -n 'Importing {$this->application->git_repository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}. '"
             ],
             [
-                $this->importing_git_repository(), "hidden" => true
-            ],
-            [
-                executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git rev-parse HEAD"),
-                "hidden" => true,
-                "save" => "git_commit_sha"
-            ],
+                $importCommands, "hidden" => true
+            ]
         );
-        $this->commit = $this->saved_outputs->get('git_commit_sha');
     }
 
-    private function importing_git_repository()
+    private function generate_git_import_commands()
     {
+        $this->branch = $this->application->git_branch;
         $commands = collect([]);
         $git_clone_command = "git clone -q -b {$this->application->git_branch}";
         if ($this->pull_request_id !== 0) {
@@ -545,6 +556,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
             if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
                 if ($this->source->is_public) {
+                    $this->fullRepoUrl = "{$this->source->html_url}/{$this->application->git_repository}";
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->application->git_repository} {$this->basedir}";
                     $git_clone_command = $this->set_git_import_settings($git_clone_command);
 
@@ -552,14 +564,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $github_access_token = generate_github_installation_token($this->source);
                     $commands->push(executeInDocker($this->deployment_uuid, "git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git {$this->basedir}"));
+                    $this->fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->application->git_repository}.git";
                 }
                 if ($this->pull_request_id !== 0) {
+                    $this->branch = "pull/{$this->pull_request_id}/head:$pr_branch_name";
                     $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
                 }
                 return $commands->implode(' && ');
             }
         }
         if ($this->application->deploymentType() === 'deploy_key') {
+            $this->fullRepoUrl = $this->application->git_repository;
             $private_key = base64_encode($this->application->private_key->private_key);
             $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
@@ -572,10 +587,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             return $commands->implode(' && ');
         }
         if ($this->application->deploymentType() === 'other') {
+            $this->fullRepoUrl = $this->application->git_repository;
             $git_clone_command = "{$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
-            ray($commands);
             return $commands->implode(' && ');
         }
     }
