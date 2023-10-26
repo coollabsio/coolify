@@ -111,6 +111,28 @@
             "system"
         ]
     },
+    "grafana-with-postgresql": {
+        "documentation": "https:\/\/grafana.com\/docs\/grafana\/latest\/installation\/docker\/",
+        "slogan": "Grafana is the open source analytics & monitoring solution for every database.",
+        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiBncmFmYW5hL2dyYWZhbmEtb3NzCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fR1JBRkFOQQogICAgICAtICdHRl9TRVJWRVJfUk9PVF9VUkw9JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFUlZFUl9ET01BSU49JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFQ1VSSVRZX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HUkFGQU5BfScKICAgICAgLSBHRl9EQVRBQkFTRV9UWVBFPXBvc3RncmVzCiAgICAgIC0gR0ZfREFUQUJBU0VfSE9TVD1wb3N0Z3Jlc3FsCiAgICAgIC0gR0ZfREFUQUJBU0VfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gR0ZfREFUQUJBU0VfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnR0ZfREFUQUJBU0VfTkFNRT0ke1BPU1RHUkVTX0RCOi1ncmFmYW5hfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dyYWZhbmEtZGF0YTovdmFyL2xpYi9ncmFmYW5hJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCiAgICBkZXBlbmRzX29uOgogICAgICAtIHBvc3RncmVzcWwKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNS1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotZ3JhZmFuYX0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogNXMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "grafana",
+            "analytics",
+            "monitoring",
+            "dashboard"
+        ]
+    },
+    "grafana": {
+        "documentation": "https:\/\/grafana.com\/docs\/grafana\/latest\/installation\/docker\/",
+        "slogan": "Grafana is the open source analytics & monitoring solution for every database.",
+        "compose": "c2VydmljZXM6CiAgZ3JhZmFuYToKICAgIGltYWdlOiBncmFmYW5hL2dyYWZhbmEtb3NzCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fR1JBRkFOQQogICAgICAtICdHRl9TRVJWRVJfUk9PVF9VUkw9JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFUlZFUl9ET01BSU49JHtTRVJWSUNFX0ZRRE5fR1JBRkFOQX0nCiAgICAgIC0gJ0dGX1NFQ1VSSVRZX0FETUlOX1BBU1NXT1JEPSR7U0VSVklDRV9QQVNTV09SRF9HUkFGQU5BfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ2dyYWZhbmEtZGF0YTovdmFyL2xpYi9ncmFmYW5hJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjMwMDAvYXBpL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDVzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "tags": [
+            "grafana",
+            "analytics",
+            "monitoring",
+            "dashboard"
+        ]
+    },
     "grocy": {
         "documentation": "https:\/\/github.com\/grocy\/grocy",
         "slogan": "Grocy is a self-hosted, web-based household management and grocery list application, designed to simplify your household chores and grocery shopping.",
@@ -179,6 +201,21 @@
             "n8n",
             "workflow",
             "automation",
+            "open",
+            "source",
+            "low",
+            "code"
+        ]
+    },
+    "openblocks": {
+        "documentation": "https:\/\/docs.openblocks.dev\/self-hosting",
+        "slogan": "OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.",
+        "compose": "c2VydmljZXM6CiAgb3BlbmJsb2NrczoKICAgIGltYWdlOiBvcGVuYmxvY2tzZGV2L29wZW5ibG9ja3MtY2UKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUEVOQkxPQ0tTCiAgICAgIC0gJ0VOQUJMRV9VU0VSX1NJR05fVVA9JHtFTkFCTEVfVVNFUl9TSUdOX1VQOi10cnVlfScKICAgICAgLSBFTkNSWVBUSU9OX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX0VOQ1JZUFRJT04KICAgICAgLSBFTkNSWVBUSU9OX1NBTFQ9JFNFUlZJQ0VfUEFTU1dPUkRfU0FMVAogICAgdm9sdW1lczoKICAgICAgLSAnb3BlbmJsb2Nrcy1kYXRhOi9vcGVuYmxvY2tzLXN0YWNrcycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "tags": [
+            "openblocks",
+            "low",
+            "code",
+            "platform",
             "open",
             "source",
             "low",
