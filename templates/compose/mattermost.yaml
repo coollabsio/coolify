@@ -1,0 +1,32 @@
+# ignore: true
+# documentation: https://docs.mattermost.com
+# slogan: Mattermost is an open source, self-hosted Slack-alternative.
+# tags: mattermost,slack,alternative
+
+services:
+  mattermost:
+    image: mattermost/mattermost-team-edition:9.1
+    volumes:
+      - mattermost-data:/mattermost
+    environment:
+      - SERVICE_FQDN_MATTERMOST
+      - TZ=${TZ:-UTC}
+      - MM_SQLSETTINGS_DRIVERNAME=postgres
+      - MM_SQLSETTINGS_DATASOURCE=postgres://$SERVICE_USER_POSTGRES:$SERVICE_PASSWORD_POSTGRES@postgres:5432/$POSTGRES_DB?sslmode=disable&connect_timeout=10
+      - MM_BLEVESETTINGS_INDEXDIR=/mattermost/bleve-indexes
+      - MM_SERVICESETTINGS_SITEURL=$SERVICE_FQDN_MATTERMOST
+    depends_on:
+      - postgres
+  postgres:
+    image: postgres:15-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-mattermost}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
