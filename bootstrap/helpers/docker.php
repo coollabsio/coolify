@@ -212,13 +212,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $onlyPort = $ports[0];
     }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
-    // $container_name = generateApplicationContainerName($application, $pull_request_id);
     $appId = $application->id;
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         $appId = $appId . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
-    $labels = $labels->merge(defaultLabels($appId, $application->uuid, $pull_request_id));
     if ($application->fqdn) {
         if ($pull_request_id !== 0) {
             $domains = Str::of(data_get($preview, 'fqdn'))->explode(',');
