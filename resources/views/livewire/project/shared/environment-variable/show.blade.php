@@ -39,6 +39,9 @@
                     <x-forms.button disabled type="submit">
                         Update
                     </x-forms.button>
+                    <x-forms.button wire:click='lock'>
+                        Lock
+                    </x-forms.button>
                     <x-forms.button disabled isError isModal modalId="{{ $modalId }}">
                         Delete
                     </x-forms.button>
