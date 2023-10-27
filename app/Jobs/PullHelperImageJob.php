@@ -34,7 +34,7 @@ class PullHelperImageJob implements ShouldQueue, ShouldBeEncrypted
         try {
             $helperImage = config('coolify.helper_image');
             ray("Pulling {$helperImage}");
-            instant_remote_process(["docker pull -q {$helperImage}"], $this->server);
+            instant_remote_process(["docker pull -q {$helperImage}"], $this->server, false);
             ray('PullHelperImageJob done');
         } catch (\Throwable $e) {
             send_internal_notification('PullHelperImageJob failed with: ' . $e->getMessage());
