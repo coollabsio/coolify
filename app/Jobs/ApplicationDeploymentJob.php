@@ -517,7 +517,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->generate_git_import_commands();
         $private_key = base64_encode($this->application->private_key->private_key);
-        ray($private_key);
         $this->execute_remote_command(
             [
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh")
