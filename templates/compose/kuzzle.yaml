@@ -7,7 +7,6 @@ services:
   redis:
     image: redis:6.2.4
     command: redis-server --appendonly yes
-    container_name: kuzzle_redis
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
       interval: 1s
@@ -16,7 +15,6 @@ services:
 
   elasticsearch:
     image: kuzzleio/elasticsearch:7
-    container_name: kuzzle_elasticsearch
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
       interval: 2s
@@ -36,7 +34,6 @@ services:
       - kuzzle_server__protocols__mqtt__enabled=true
       - kuzzle_server__protocols__mqtt__developmentMode=false
       - kuzzle_limits__loginsPerSecond=50
-      # - NODE_ENV=${NODE_ENV:-development}
       - NODE_ENV=production
       # - DEBUG=${DEBUG:-kuzzle:*,-kuzzle:network:protocols:websocket,-kuzzle:events}
       - DEBUG=${DEBUG:-kuzzle:cluster:sync}

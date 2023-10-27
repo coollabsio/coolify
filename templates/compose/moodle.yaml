@@ -19,21 +19,19 @@ services:
   moodle:
     image: docker.io/bitnami/moodle:4.3
     environment:
+      - SERVICE_FQDN_MOODLE
       - MOODLE_DATABASE_HOST=mariadb
       - MOODLE_DATABASE_PORT_NUMBER=3306
       - MOODLE_DATABASE_USER=$SERVICE_USER_MARIADB
       - MOODLE_DATABASE_NAME=bitnami_moodle
       - MOODLE_DATABASE_PASSWORD=$SERVICE_PASSWORD_MARIADB
       - ALLOW_EMPTY_PASSWORD=no
-      - SERVICE_FQDN_MOODLE_8080
-      - SERVICE_FQDN_MOODLE_8443
-      - MOODLE_USERNAME=$SERVICE_USER_MOODLE
+      - MOODLE_USERNAME=${MOODLE_USERNAME:-user}
       - MOODLE_PASSWORD=$SERVICE_PASSWORD_MOODLE
       - MOODLE_EMAIL=user@example.com
       - MOODLE_SITE_NAME=${MOODLE_SITE_NAME:-New Site}
-
     volumes:
-      - moodle_data:/bitnami/moodle
-      - moodledata_data:/bitnami/moodledata
+      - moodle-data:/bitnami/moodle
+      - moodledata-data:/bitnami/moodledata
     depends_on:
       - mariadb

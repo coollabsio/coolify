@@ -1,3 +1,4 @@
+# ignore: true
 # documentation: https://hub.docker.com/_/sonarqube/
 # slogan: SonarQube is a self-managed, automatic code review tool that systematically helps you deliver Clean Code
 # tags: sonarqube, code-review, clean-code, quality, code-quality, code-analysis, code-smells, code-coverage, code-security
@@ -5,17 +6,17 @@
 services:
   sonarqube:
     image: sonarqube:community
-    hostname: sonarqube
-    container_name: sonarqube
     environment:
+      - SERVICE_FQDN_SONARQUBE_9000
       - SONAR_JDBC_URL=jdbc:postgresql://postgresql:5432/${POSTGRES_DB:-sonar}
       - SONAR_JDBC_USERNAME=$SERVICE_USER_POSTGRES
       - SONAR_JDBC_PASSWORD=$SERVICE_PASSWORD_POSTGRES
-      - SERVICE_FQDN_SONARQUBE_9000
     volumes:
-      - sonarqube_data:/opt/sonarqube/data
-      - sonarqube_extensions:/opt/sonarqube/extensions
-      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube-data:/opt/sonarqube
+      - sonarqube-conf:/opt/sonarqube/conf
+      - sonarqube-extensions:/opt/sonarqube/extensions
+      - sonarqube-logs:/opt/sonarqube/logs
+      - sonarqube-bundled-plugins:/opt/sonarqube/lib/bundled-plugins
     depends_on:
       postgresql:
         condition: service_healthy
