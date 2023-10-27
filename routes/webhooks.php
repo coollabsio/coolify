@@ -305,11 +305,11 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_plan_id' => $planId,
                     'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                 ]);
-                if ($status === 'paused') {
+                if ($status === 'paused' || $status === 'incomplete_expired') {
                     $subscription->update([
                         'stripe_invoice_paid' => false,
                     ]);
-                    send_internal_notification('Subscription paused for team: ' . $subscription->team->id);
+                    send_internal_notification('Subscription paused or incomplete for team: ' . $subscription->team->id);
                 }
 
                 // Trial ended but subscribed, reactive servers
