@@ -1,5 +1,5 @@
 # documentation: https://filebrowser.org/configuration
-# slogan: FileBrowser simplifies file and folder management on various storage systems.
+# slogan: FileBrowser is a self-hosted, web-based file manager and file explorer with a user-friendly interface. It allows you to manage and organize your files and directories directly from your web browser.
 # tags: file-management, storage-access, data-organization, file-utilization, administration-tool
 
 services:
