@@ -518,7 +518,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_git_import_commands();
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "git ls-remote {$this->fullRepoUrl} {$this->branch}"),
+                executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$this->branch}"),
                 "hidden" => true,
                 "save" => "git_commit_sha"
             ],
