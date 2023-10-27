@@ -1,0 +1,20 @@
+# documentation: https://filebrowser.org/configuration
+# slogan: FileBrowser simplifies file and folder management on various storage systems.
+# tags: file-management, storage-access, data-organization, file-utilization, administration-tool
+
+services:
+  filebrowser:
+    image: filebrowser/filebrowser:latest
+    environment:
+      - SERVICE_FQDN_FILEBROWSER
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - filebrowser-srv:/srv
+      - filebrowser-database:/database/filebrowser.db
+      - filebrowser-config:/config/settings.json
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
