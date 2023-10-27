@@ -1,0 +1,20 @@
+# documentation: https://duplicati.readthedocs.io/en/latest/02-installation/
+# slogan: Duplicati is an open-source backup solution, allowing you to safeguard your data with ease through scheduled backups and encryption.
+# tags: backup, encryption
+
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    environment:
+      - SERVICE_FQDN_DUPLICATI
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+    volumes:
+      - duplicati-config:/config
+      - duplicati-backups:/backups
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

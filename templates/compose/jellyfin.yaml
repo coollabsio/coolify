@@ -1,0 +1,22 @@
+# documentation: https://jellyfin.org/docs/
+# slogan: Jellyfin is an open-source media server for hosting and streaming your media collection, providing an alternative to proprietary media platforms.
+# tags: media, server, movies, tv, music
+
+services:
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    environment:
+      - SERVICE_FQDN_JELLYFIN
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Madrid
+      - JELLYFIN_PublishedServerUrl=$SERVICE_FQDN_JELLYFIN
+    volumes:
+      - jellyfin-config:/config
+      - jellyfin-tvshows:/data/tvshows
+      - jellyfin-movies:/data/movies
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8096"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
