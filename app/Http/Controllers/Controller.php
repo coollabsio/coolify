@@ -39,6 +39,10 @@ class Controller extends BaseController
                 } else {
                     $team = $user->teams()->first();
                 }
+                if (is_null(data_get($user, 'email_verified_at'))){
+                    $user->email_verified_at = now();
+                    $user->save();
+                }
                 Auth::login($user);
                 session(['currentTeam' => $team]);
                 return redirect()->route('dashboard');

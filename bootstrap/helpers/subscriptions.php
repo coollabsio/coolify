@@ -148,6 +148,8 @@ function allowedPathsForInvalidAccounts() {
     return [
         'logout',
         'verify',
+        'force-password-reset',
+        'livewire/message/force-password-reset',
         'livewire/message/verify-email',
         'livewire/message/help'
     ];

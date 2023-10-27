@@ -8,6 +8,7 @@ use App\Jobs\DatabaseBackupJob;
 use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
+use App\Jobs\PullHelperImageJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
@@ -19,20 +20,35 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         if (isDev()) {
+            // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
+
+            // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->cleanup_servers($schedule);
             $this->check_scheduled_backups($schedule);
+            $this->pull_helper_image($schedule);
         } else {
+            // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
+
+            // Server Jobs
             $this->instance_auto_update($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->cleanup_servers($schedule);
+            $this->pull_helper_image($schedule);
+        }
+    }
+    private function pull_helper_image($schedule)
+    {
+        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
+        foreach ($servers as $server) {
+            $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
         }
     }
     private function cleanup_servers($schedule)

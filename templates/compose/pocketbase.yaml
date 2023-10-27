@@ -1,0 +1,11 @@
+# documentation: https://pocketbase.io/docs/
+# slogan: Open Source backend for your next SaaS and Mobile app in 1 file
+# tags: pocketbase,backend,saas,mobile,api
+
+services:
+  pocketbase:
+    image: ghcr.io/coollabsio/pocketbase:latest
+    environment:
+      - SERVICE_FQDN_POCKETBASE
+    volumes:
+      - pocketbase-data:/app/pb_data
