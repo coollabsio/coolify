@@ -281,12 +281,25 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
-                $planId = data_get($data, 'lines.data.0.plan.id');
-                $subscription->update([
-                    'stripe_plan_id' => $planId,
-                    'stripe_invoice_paid' => true,
-                ]);
+                $email = data_get($data, 'customer_email');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if ($subscription) {
+                    $planId = data_get($data, 'lines.data.0.plan.id');
+                    $subscription->update([
+                        'stripe_plan_id' => $planId,
+                        'stripe_invoice_paid' => true,
+                    ]);
+                    break;
+                }
+                $team = Team::where('email', $email)->first();
+                if ($team) {
+                    $subscription = data_get($team, 'subscription');
+                    $planId = data_get($data, 'lines.data.0.plan.id');
+                    $subscription->update([
+                        'stripe_plan_id' => $planId,
+                        'stripe_invoice_paid' => true,
+                    ]);
+                }
                 break;
             case 'payment_intent.payment_failed':
                 $customerId = data_get($data, 'customer');
