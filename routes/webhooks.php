@@ -172,7 +172,7 @@ Route::post('/source/github/events', function () {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
-                        $container_name = generateApplicationContainerName($application,$pull_request_id);
+                        $container_name = generateApplicationContainerName($application, $pull_request_id);
                         // ray('Stopping container: ' . $container_name);
                         instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
                         return response('Preview Deployment closed.');
@@ -288,6 +288,14 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => true,
                 ]);
                 break;
+            case 'payment_intent.payment_failed':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription->update([
+                    'stripe_invoice_paid' => false,
+                ]);
+                send_internal_notification('Subscription payment failed: ' . $subscription->team->id);
+                break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
@@ -305,11 +313,11 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_plan_id' => $planId,
                     'stripe_cancel_at_period_end' => $cancelAtPeriodEnd,
                 ]);
-                if ($status === 'paused') {
+                if ($status === 'paused' || $status === 'incomplete_expired') {
                     $subscription->update([
                         'stripe_invoice_paid' => false,
                     ]);
-                    send_internal_notification('Subscription paused for team: ' . $subscription->team->id);
+                    send_internal_notification('Subscription paused or incomplete for team: ' . $subscription->team->id);
                 }
 
                 // Trial ended but subscribed, reactive servers

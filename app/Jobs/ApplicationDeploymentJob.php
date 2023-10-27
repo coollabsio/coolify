@@ -516,9 +516,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function check_git_if_build_needed()
     {
         $this->generate_git_import_commands();
+        $private_key = base64_encode($this->application->private_key->private_key);
         $this->execute_remote_command(
             [
-                executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git ls-remote {$this->fullRepoUrl} {$this->branch}"),
+                executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh")
+            ],
+            [
+                executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa")
+            ],
+            [
+                executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa")
+            ],
+            [
+                executeInDocker($this->deployment_uuid, "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git ls-remote {$this->fullRepoUrl} {$this->branch}"),
                 "hidden" => true,
                 "save" => "git_commit_sha"
             ],
