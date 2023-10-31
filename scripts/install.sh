@@ -94,8 +94,8 @@ mkdir -p /data/coolify/ssh/mux
 mkdir -p /data/coolify/source
 mkdir -p /data/coolify/proxy/dynamic
 
-chown -R 9999:root /data
-chmod -R 700 /data
+chown -R 9999:root /data/coolify
+chmod -R 700 /data/coolify
 
 echo "Downloading required files from CDN..."
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
