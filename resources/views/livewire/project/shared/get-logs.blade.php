@@ -16,7 +16,7 @@
 
     <div x-data="{ fullscreen: false }" :class="fullscreen ? 'fullscreen' : 'container w-full pt-4 mx-auto'">
         <div
-            class="scrollbar flex flex-col-reverse w-full overflow-y-auto border border-solid rounded border-coolgray-300 max-h-[32rem] p-4 pt-6 text-xs text-white relative">
+            class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-xs text-white border border-solid rounded scrollbar border-coolgray-300" :class="fullscreen ? '' : 'max-h-[32rem]'">
             <button title="Minimize"  x-show="fullscreen" class="absolute top-2 right-2" x-on:click="fullscreen = !fullscreen"><svg
                     class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"

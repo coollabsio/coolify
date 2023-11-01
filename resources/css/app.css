@@ -122,5 +122,5 @@ tr td:first-child {
     @apply pt-2 pb-10;
 }
 .fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-200;
+    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-200 overflow-y-auto scrollbar ;
 }
