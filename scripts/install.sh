@@ -46,7 +46,11 @@ apt install -y curl wget git jq jc >/dev/null 2>&1
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
     curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-    echo "Docker installed successfully"
+    if [ -x "$(command -v docker)" ]; then
+        echo "Docker installed successfully."
+    else
+        echo "Docker installation failed."
+        exit 1
 fi
 echo -e "-------------"
 echo -e "Check Docker Configuration..."
