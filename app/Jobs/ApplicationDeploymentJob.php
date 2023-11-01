@@ -705,7 +705,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build --no-cache -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        $nixpacks_command = "nixpacks build --cache-key '{$this->application->uuid}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
