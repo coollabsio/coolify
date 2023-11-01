@@ -138,11 +138,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
-                $labelId = data_get($labels, 'coolify.applicationId');
-                if ($labelId) {
-                    if (str_contains($labelId, '-pr-')) {
-                        $pullRequestId = data_get($labels, 'coolify.pullRequestId');
-                        $applicationId = (int) Str::before($labelId, '-pr-');
+                $applicationId = data_get($labels, 'coolify.applicationId');
+                if ($applicationId) {
+                    $pullRequestId = data_get($labels, 'coolify.pullRequestId');
+                    if ($pullRequestId) {
                         $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
                         if ($preview) {
                             $foundApplicationPreviews[] = $preview->id;
@@ -154,7 +153,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             //Notify user that this container should not be there.
                         }
                     } else {
-                        $application = $applications->where('id', $labelId)->first();
+                        $application = $applications->where('id', $applicationId)->first();
                         if ($application) {
                             $foundApplications[] = $application->id;
                             $statusFromDb = $application->status;

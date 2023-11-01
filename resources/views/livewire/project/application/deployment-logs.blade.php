@@ -16,14 +16,14 @@
         <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
             class="relative flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto text-xs border border-dotted rounded scrollbar border-coolgray-400"
             :class="fullscreen ? '' : 'max-h-[32rem]'">
-            <button title="Minimize" x-show="fullscreen" class="absolute top-2 right-2"
+            <button title="Minimize" x-show="fullscreen" class="fixed top-2 right-2"
                 x-on:click="fullscreen = !fullscreen"><svg class="icon" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                         stroke-width="2" d="M6 14h4m0 0v4m0-4l-6 6m14-10h-4m0 0V6m0 4l6-6" />
                 </svg></button>
-            <button title="Fullscreen" x-show="!fullscreen" class="absolute top-2 right-2"
-                x-on:click="fullscreen = !fullscreen"><svg class="icon" viewBox="0 0 24 24"
+            <button title="Fullscreen" x-show="!fullscreen" class="absolute top-2 right-8"
+                x-on:click="fullscreen = !fullscreen"><svg class="fixed icon" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <g fill="none">
                         <path

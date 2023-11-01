@@ -487,9 +487,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_pull_request()
     {
-        $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-        $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
-        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->generate_image_names();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->application->git_repository}:{$this->application->git_branch}.'",
         ]);
@@ -505,7 +503,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->stop_running_container();
+        if ($this->currently_running_container_name) {
+            $this->execute_remote_command(
+                ["echo -n 'Removing old version of your application.'"],
+                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+            );
+        }
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
@@ -742,6 +745,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application->save();
         } else {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
+        }
+        if ($this->pull_request_id !== 0) {
+            $labels = $labels->reject(function ($label) {
+                return str($label)->contains('Host');
+            });
+            $newLabels = collect(generateLabelsApplication($this->application, $this->preview));
+            $hostLabels = $newLabels->filter(function ($label) {
+                return str($label)->contains('Host');
+            });
+            $labels = $labels->merge($hostLabels);
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
         $docker_compose = [

@@ -83,6 +83,12 @@
                                 Preview
                             </x-forms.button>
                         @endif
+                        <a
+                            href="{{ route('project.application.deployments', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
+                            <x-forms.button>
+                                Get Deployment Logs
+                            </x-forms.button>
+                        </a>
                     </div>
                 </div>
             @endforeach
