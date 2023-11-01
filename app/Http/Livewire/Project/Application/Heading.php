@@ -65,4 +65,18 @@ class Heading extends Component
         $this->application->save();
         $this->application->refresh();
     }
+    public function restart() {
+        $this->setDeploymentUuid();
+        queue_application_deployment(
+            application_id: $this->application->id,
+            deployment_uuid: $this->deploymentUuid,
+            restart_only: true,
+        );
+        return redirect()->route('project.application.deployment', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $this->deploymentUuid,
+            'environment_name' => $this->parameters['environment_name'],
+        ]);
+    }
 }
