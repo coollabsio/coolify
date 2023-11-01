@@ -51,6 +51,7 @@ if ! [ -x "$(command -v docker)" ]; then
     else
         echo "Docker installation failed."
         exit 1
+   fi
 fi
 echo -e "-------------"
 echo -e "Check Docker Configuration..."
