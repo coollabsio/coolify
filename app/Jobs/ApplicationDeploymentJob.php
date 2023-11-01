@@ -138,9 +138,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         // ray()->measure();
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id);
-        if ($containers->count() > 0) {
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        if ($containers->count() === 1) {
             $this->currently_running_container_name = data_get($containers[0], 'Names');
+        } else {
+            $foundContainer = $containers->filter(function ($container) {
+                return !str(data_get($container, 'Names'))->startsWith("{$this->application->uuid}-pr-");
+            })->first();
+            if ($foundContainer) {
+                $this->currently_running_container_name = data_get($foundContainer, 'Names');
+            }
         }
         if ($this->pull_request_id !== 0 && $this->pull_request_id !== null) {
             $this->currently_running_container_name = $this->container_name;
@@ -747,14 +754,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         if ($this->pull_request_id !== 0) {
+            $newLabels = collect(generateLabelsApplication($this->application, $this->preview));
+            $newHostLabel = $newLabels->filter(function ($label) {
+                return str($label)->contains('Host');
+            });
             $labels = $labels->reject(function ($label) {
                 return str($label)->contains('Host');
             });
-            $newLabels = collect(generateLabelsApplication($this->application, $this->preview));
-            $hostLabels = $newLabels->filter(function ($label) {
-                return str($label)->contains('Host');
+
+            $labels = $labels->map(function ($label) {
+                $pattern = '/([a-zA-Z0-9]+)-(\d+)-(http|https)/';
+                $replacement = "$1-pr-{$this->pull_request_id}-$2-$3";
+                $newLabel = preg_replace($pattern, $replacement, $label);
+                return $newLabel;
             });
-            $labels = $labels->merge($hostLabels);
+            $labels = $labels->merge($newHostLabel);
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
         $docker_compose = [

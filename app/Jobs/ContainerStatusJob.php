@@ -18,7 +18,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -26,6 +25,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
+        $this->handle();
     }
     public function middleware(): array
     {

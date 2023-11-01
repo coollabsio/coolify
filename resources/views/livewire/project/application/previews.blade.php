@@ -78,11 +78,9 @@
                                 Redeploy
                             @endif
                         </x-forms.button>
-                        @if (data_get($preview, 'status') !== 'exited')
-                            <x-forms.button wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove
-                                Preview
-                            </x-forms.button>
-                        @endif
+                        <x-forms.button wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove
+                            Preview
+                        </x-forms.button>
                         <a
                             href="{{ route('project.application.deployments', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
                             <x-forms.button>
