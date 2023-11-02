@@ -90,6 +90,10 @@ class Service extends BaseModel
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
     }
+    public function environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
+    }
     public function workdir()
     {
         return service_configuration_dir() . "/{$this->uuid}";
