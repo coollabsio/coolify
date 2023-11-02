@@ -25,7 +25,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        $this->handle();
     }
     public function middleware(): array
     {

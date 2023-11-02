@@ -23,7 +23,7 @@ class Kernel extends ConsoleKernel
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyMinute();
             $schedule->job(new CleanupInstanceStuffsJob)->everyMinute()->onOneServer();
-
+            // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);

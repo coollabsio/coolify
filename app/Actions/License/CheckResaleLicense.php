@@ -4,26 +4,26 @@ namespace App\Actions\License;
 
 use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Http;
+use Lorisleiva\Actions\Concerns\AsAction;
+
 
 class CheckResaleLicense
 {
-    public function __invoke()
+    use AsAction;
+    public function handle()
     {
         try {
             $settings = InstanceSettings::get();
-            $settings->update([
-                'is_resale_license_active' => false,
-            ]);
             if (isDev()) {
+                $settings->update([
+                    'is_resale_license_active' => true,
+                ]);
                 return;
             }
-            if (!$settings->resale_license) {
-                return;
-            }
+            // if (!$settings->resale_license) {
+            //     return;
+            // }
             $base_url = config('coolify.license_url');
-            if (isDev()) {
-                $base_url = 'http://host.docker.internal:8787';
-            }
             $instance_id = config('app.id');
 
             ray("Checking license key against $base_url/lemon/validate");
