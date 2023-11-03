@@ -1,5 +1,5 @@
 # documentation: https://docs.gitea.com
-# slogan: Gitea (with MariaDB)vis a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# slogan: Gitea (with MariaDB) is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
 # tags: version control, collaboration, code, hosting, lightweight, mariadb
 
 services:
