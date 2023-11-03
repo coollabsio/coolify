@@ -380,6 +380,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
         $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->set_base_dir();
         $this->generate_image_names();
