@@ -12,6 +12,7 @@ use App\Models\Waitlist;
 use App\Models\Webhook;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -281,7 +282,11 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    Sleep::for(5);
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                }
                 $planId = data_get($data, 'lines.data.0.plan.id');
                 $subscription->update([
                     'stripe_plan_id' => $planId,
