@@ -4,11 +4,12 @@
  * @description Send email to all users
  */
 
-use Illuminate\Notifications\Messages\MailMessage;
+use App\Models\User;
+use Illuminate\Support\Facades\Mail;
 
 set_transanctional_email_settings();
 
-$users = User::all();
+$users = User::whereEmail('andras.bacsai@gmail.com');
 foreach ($users as $user) {
   Mail::send([], [], function ($message) use ($user) {
     $message
