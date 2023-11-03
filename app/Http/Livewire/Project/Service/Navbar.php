@@ -19,10 +19,6 @@ class Navbar extends Component
         return view('livewire.project.service.navbar');
     }
 
-    public function checkStatus()
-    {
-        $this->emit('checkStatus');
-    }
     public function deploy()
     {
         $this->service->parse();

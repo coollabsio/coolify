@@ -164,7 +164,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->validate([
             'remoteServerName' => 'required',
-            'remoteServerHost' => 'required|ip',
+            'remoteServerHost' => 'required',
             'remoteServerPort' => 'required|integer',
             'remoteServerUser' => 'required',
         ]);

@@ -32,7 +32,7 @@ class Form extends Component
     protected $validationAttributes = [
         'server.name' => 'Name',
         'server.description' => 'Description',
-        'server.ip' => 'IP address',
+        'server.ip' => 'IP address/Domain',
         'server.user' => 'User',
         'server.port' => 'Port',
         'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
@@ -125,7 +125,7 @@ class Form extends Component
         if(isCloud() && !isDev()) {
             $this->validate();
             $this->validate([
-                'server.ip' => 'required|ip',
+                'server.ip' => 'required',
             ]);
         } else {
             $this->validate();
