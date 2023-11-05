@@ -57,11 +57,10 @@ class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
                     StopService::run($this->resource);
                     break;
             }
+            $this->resource->delete();
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
-        } finally {
-            $this->resource->delete();
         }
     }
 }

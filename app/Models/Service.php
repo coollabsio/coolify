@@ -40,7 +40,6 @@ class Service extends BaseModel
                     instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
                 });
             }
-            instant_remote_process(["docker network rm {$service->uuid}"], $service->server, false);
         });
     }
     public function type()

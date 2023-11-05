@@ -4,7 +4,6 @@ namespace App\Http\Livewire\Project\Service;
 
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
 
@@ -13,12 +12,15 @@ class Navbar extends Component
     public Service $service;
     public array $parameters;
     public array $query;
+    protected $listeners = ["checkStatus"];
 
     public function render()
     {
         return view('livewire.project.service.navbar');
     }
-
+    public function checkStatus() {
+        $this->service->refresh();
+    }
     public function deploy()
     {
         $this->service->parse();
@@ -30,6 +32,6 @@ class Navbar extends Component
         StopService::run($this->service);
         $this->service->refresh();
         $this->emit('success', 'Service stopped successfully.');
-        $this->checkStatus();
+        $this->emit('checkStatus');
     }
 }
