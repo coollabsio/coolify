@@ -65,6 +65,7 @@ Route::get('/source/github/install', function () {
 });
 Route::post('/source/github/events', function () {
     try {
+        $id = null;
         $x_github_delivery = request()->header('X-GitHub-Delivery');
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
         $x_github_hook_installation_target_id = request()->header('X-GitHub-Hook-Installation-Target-Id');
@@ -88,7 +89,6 @@ Route::post('/source/github/events', function () {
                 return response('not cool');
             }
         }
-
         if ($x_github_event === 'push') {
             $id = data_get($payload, 'repository.id');
             $branch = data_get($payload, 'ref');
