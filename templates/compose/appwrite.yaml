@@ -126,10 +126,7 @@ services:
   appwrite-realtime:
     image: appwrite/appwrite:1.4
     entrypoint: realtime
-    container_name: appwrite-realtime
     <<: *x-logging
-    networks:
-      - appwrite
     depends_on:
       - mariadb
       - redis
@@ -157,9 +154,6 @@ services:
     entrypoint: worker-audits
     <<: *x-logging
     container_name: appwrite-worker-audits
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -184,9 +178,6 @@ services:
     entrypoint: worker-webhooks
     <<: *x-logging
     container_name: appwrite-worker-webhooks
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -207,9 +198,6 @@ services:
     entrypoint: worker-deletes
     <<: *x-logging
     container_name: appwrite-worker-deletes
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -263,9 +251,6 @@ services:
     entrypoint: worker-databases
     <<: *x-logging
     container_name: appwrite-worker-databases
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -290,9 +275,6 @@ services:
     entrypoint: worker-builds
     <<: *x-logging
     container_name: appwrite-worker-builds
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -352,9 +334,6 @@ services:
     entrypoint: worker-certificates
     <<: *x-logging
     container_name: appwrite-worker-certificates
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -386,9 +365,6 @@ services:
     entrypoint: worker-functions
     <<: *x-logging
     container_name: appwrite-worker-functions
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
       - mariadb
@@ -423,9 +399,6 @@ services:
     entrypoint: worker-mails
     <<: *x-logging
     container_name: appwrite-worker-mails
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
     environment:
@@ -451,9 +424,6 @@ services:
     entrypoint: worker-messaging
     <<: *x-logging
     container_name: appwrite-worker-messaging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
     environment:
@@ -473,9 +443,6 @@ services:
     entrypoint: worker-migrations
     <<: *x-logging
     container_name: appwrite-worker-migrations
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - mariadb
     environment:
@@ -504,9 +471,6 @@ services:
     entrypoint: maintenance
     <<: *x-logging
     container_name: appwrite-maintenance
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - redis
     environment:
@@ -538,9 +502,6 @@ services:
     entrypoint: usage
     container_name: appwrite-usage
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - influxdb
       - mariadb
@@ -569,9 +530,6 @@ services:
     entrypoint: schedule
     container_name: appwrite-schedule
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
       - mariadb
       - redis
@@ -593,9 +551,7 @@ services:
   #   image: appwrite/assistant:0.2.1
   #   container_name: appwrite-assistant
   #   <<: *x-logging
-  #   restart: unless-stopped
-  #   networks:
-  #     - appwrite
+  #
   #   environment:
   #     - _APP_ASSISTANT_OPENAI_API_KEY
 
@@ -605,9 +561,6 @@ services:
     <<: *x-logging
     stop_signal: SIGINT
     image: openruntimes/executor:0.4.1
-    networks:
-      - appwrite
-      - runtimes
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - appwrite-builds:/storage/builds:rw
@@ -652,9 +605,6 @@ services:
     image: mariadb:10.7 # fix issues when upgrading using: mysql_upgrade -u root -p
     container_name: appwrite-mariadb
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
     environment:
@@ -668,23 +618,18 @@ services:
     image: redis:7.0.4-alpine
     container_name: appwrite-redis
     <<: *x-logging
-    restart: unless-stopped
     command: >
       redis-server
       --maxmemory            512mb
       --maxmemory-policy     allkeys-lru
       --maxmemory-samples    5
-    networks:
-      - appwrite
     volumes:
       - appwrite-redis:/data:rw
 
   # clamav:
   #   image: appwrite/clamav:1.2.0
   #   container_name: appwrite-clamav
-  #   restart: unless-stopped
-  #   networks:
-  #     - appwrite
+  #
   #   volumes:
   #     - appwrite-uploads:/storage/uploads
 
@@ -692,9 +637,6 @@ services:
     image: appwrite/influxdb:1.5.0
     container_name: appwrite-influxdb
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     volumes:
       - appwrite-influxdb:/var/lib/influxdb:rw
 
@@ -702,20 +644,9 @@ services:
     image: appwrite/telegraf:1.4.0
     container_name: appwrite-telegraf
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     environment:
       - _APP_INFLUXDB_HOST
       - _APP_INFLUXDB_PORT
-
-networks:
-  gateway:
-    name: gateway
-  appwrite:
-    name: appwrite
-  runtimes:
-    name: runtimes
 
 volumes:
   appwrite-mariadb:
