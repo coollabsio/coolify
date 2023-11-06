@@ -50,15 +50,16 @@
                 <h3>Build</h3>
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
-                        <div>Nixpacks will detect your package manager/configurations: <a class="underline" href="https://nixpacks.com/docs/providers">Nixpacks documentation</a></div>
+                        <div>Nixpacks will detect your package manager/configurations: <a class="underline"
+                                href="https://nixpacks.com/docs/providers">Nixpacks documentation</a></div>
                         <div class="text-warning">You probably do not need to modify the commands below.</div>
                         <div class="flex flex-col gap-2 xl:flex-row">
-                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.install_command"
-                                label="Install Command" />
-                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.build_command"
-                                label="Build Command" />
-                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.start_command"
-                                label="Start Command" />
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
+                                id="application.install_command" label="Install Command" />
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
+                                id="application.build_command" label="Build Command" />
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
+                                id="application.start_command" label="Start Command" />
                         </div>
                     @endif
                 @endif
@@ -103,11 +104,7 @@
                 <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
                     helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
             </div>
-            @if ($labelsChanged)
-                <x-forms.textarea label="Custom Labels" rows="15" id="customLabels"></x-forms.textarea>
-            @else
-                <x-forms.textarea label="Coolify Generated Labels" rows="15" id="customLabels"></x-forms.textarea>
-            @endif
+            <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
             <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
         </div>
         <h3>Advanced</h3>
