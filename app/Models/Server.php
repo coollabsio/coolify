@@ -109,11 +109,12 @@ class Server extends BaseModel
         return $this->proxy->modelScope();
     }
 
-    public function isEmpty()
+    public function hasDefinedResources()
     {
         $applications = $this->applications()->count() === 0;
         $databases = $this->databases()->count() === 0;
-        if ($applications && $databases) {
+        $services = $this->services()->count() === 0;
+        if ($applications || $databases || $services) {
             return true;
         }
         return false;

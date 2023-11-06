@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 
@@ -23,21 +22,21 @@ class Service extends BaseModel
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
                 }
-                $application->persistentStorages()->delete();
             }
             foreach ($service->databases()->get() as $database) {
                 $storages = $database->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
                 }
-                $database->persistentStorages()->delete();
             }
             $service->environment_variables()->delete();
             $service->applications()->delete();
             $service->databases()->delete();
-            if ($storagesToDelete->count() > 0) {
-                $storagesToDelete->each(function ($storage) use ($service) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
+
+            $server = data_get($service, 'server');
+            if ($server && $storagesToDelete->count() > 0) {
+                $storagesToDelete->each(function ($storage) use ($server) {
+                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
                 });
             }
         });
@@ -257,13 +256,25 @@ class Service extends BaseModel
                         ]);
                     }
                 }
-                $networks = $serviceNetworks->toArray();
-                foreach ($definedNetwork as $key => $network) {
-                    $networks = array_merge($networks, [
-                        $network
-                    ]);
+                $networks = collect();
+                foreach ($serviceNetworks as $key =>$serviceNetwork) {
+                    if (gettype($serviceNetwork) === 'string') {
+                        // networks:
+                        //  - appwrite
+                        $networks->put($serviceNetwork, null);
+                    } else if (gettype($serviceNetwork) === 'array') {
+                        // networks:
+                        //   default:
+                        //     ipv4_address: 192.168.203.254
+                        // $networks->put($serviceNetwork, null);
+                        ray($key);
+                        $networks->put($key,$serviceNetwork);
+                    }
                 }
-                data_set($service, 'networks', $networks);
+                foreach ($definedNetwork as $key => $network) {
+                    $networks->put($network, null);
+                }
+                data_set($service, 'networks', $networks->toArray());
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {

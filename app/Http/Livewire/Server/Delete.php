@@ -14,7 +14,7 @@ class Delete extends Component
     {
         try {
             $this->authorize('delete', $this->server);
-            if (!$this->server->isEmpty()) {
+            if ($this->server->hasDefinedResources()) {
                 $this->emit('error', 'Server has defined resources. Please delete them first.');
                 return;
             }

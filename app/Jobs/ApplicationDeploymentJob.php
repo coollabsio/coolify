@@ -293,7 +293,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
             $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
         }
-        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
     }
     private function just_restart()
     {

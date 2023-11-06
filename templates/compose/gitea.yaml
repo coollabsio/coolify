@@ -1,0 +1,20 @@
+# documentation: https://docs.gitea.com
+# slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# tags: version control, collaboration, code, hosting, lightweight
+
+services:
+  gitea:
+    image: gitea/gitea:latest
+    environment:
+      - SERVICE_FQDN_GITEA_3000
+      - USER_UID=1000
+      - USER_GID=1000
+    volumes:
+      - gitea-data:/var/lib/gitea
+      - gitea-timezone:/etc/timezone:ro
+      - gitea-localtime:/etc/localtime:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

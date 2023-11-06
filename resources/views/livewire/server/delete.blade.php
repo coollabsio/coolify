@@ -11,8 +11,12 @@
         <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
             back!
         </div>
-        <x-forms.button isError isModal modalId="deleteServer">
-            Delete
-        </x-forms.button>
+        @if ($server->hasDefinedResources())
+            <div class="text-warning">Please delete all resources before deleting this server.</div>
+        @else
+            <x-forms.button isError isModal modalId="deleteServer">
+                Delete
+            </x-forms.button>
+        @endif
     @endif
 </div>

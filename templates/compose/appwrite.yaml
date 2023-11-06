@@ -17,19 +17,6 @@ services:
     image: appwrite/appwrite:1.4
     container_name: appwrite
     <<: *x-logging
-    labels:
-      - traefik.constraint-label-stack=appwrite
-      - traefik.docker.network=appwrite
-      - traefik.http.services.appwrite_api.loadbalancer.server.port=80
-      #http
-      - traefik.http.routers.appwrite_api_http.entrypoints=web
-      - traefik.http.routers.appwrite_api_http.rule=PathPrefix(`/`)
-      - traefik.http.routers.appwrite_api_http.service=appwrite_api
-      # https
-      - traefik.http.routers.appwrite_api_https.entrypoints=websecure
-      - traefik.http.routers.appwrite_api_https.rule=PathPrefix(`/`)
-      - traefik.http.routers.appwrite_api_https.service=appwrite_api
-      - traefik.http.routers.appwrite_api_https.tls=true
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-cache:/storage/cache:rw
@@ -37,10 +24,10 @@ services:
       - appwrite-certificates:/storage/certificates:rw
       - appwrite-functions:/storage/functions:rw
     depends_on:
-      - mariadb
-      - redis
-#      - clamav
-      - influxdb
+      - appwrite-mariadb
+      - appwrite-redis
+#      - appwrite-clamav
+      - appwrite-influxdb
     environment:
       - SERVICE_FQDN_APPWRITE=/
       - _APP_ENV
@@ -56,9 +43,9 @@ services:
       - _APP_OPTIONS_ABUSE
       - _APP_OPTIONS_FORCE_HTTPS
       - _APP_OPENSSL_KEY_V1
-      - _APP_DOMAIN
-      - _APP_DOMAIN_TARGET
-      - _APP_DOMAIN_FUNCTIONS
+      - _APP_DOMAIN=$SERVICE_FQDN_APPWRITE
+      - _APP_DOMAIN_TARGET=$SERVICE_FQDN_APPWRITE
+      - _APP_DOMAIN_FUNCTIONS=$SERVICE_FQDN_APPWRITE
       - _APP_REDIS_HOST
       - _APP_REDIS_PORT
       - _APP_REDIS_USER
@@ -137,29 +124,12 @@ services:
       - _APP_ASSISTANT_OPENAI_API_KEY
 
   appwrite-realtime:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: realtime
-    container_name: appwrite-realtime
     <<: *x-logging
-    labels:
-      - "traefik.constraint-label-stack=appwrite"
-      - "traefik.docker.network=appwrite"
-      - "traefik.http.services.appwrite_realtime.loadbalancer.server.port=80"
-      #ws
-      - traefik.http.routers.appwrite_realtime_ws.entrypoints=web
-      - traefik.http.routers.appwrite_realtime_ws.rule=PathPrefix(`/v1/realtime`)
-      - traefik.http.routers.appwrite_realtime_ws.service=appwrite_realtime
-      # wss
-      - traefik.http.routers.appwrite_realtime_wss.entrypoints=websecure
-      - traefik.http.routers.appwrite_realtime_wss.rule=PathPrefix(`/v1/realtime`)
-      - traefik.http.routers.appwrite_realtime_wss.service=appwrite_realtime
-      - traefik.http.routers.appwrite_realtime_wss.tls=true
-      - traefik.http.routers.appwrite_realtime_wss.tls.certresolver=dns
-    networks:
-      - appwrite
     depends_on:
-      - mariadb
-      - redis
+      - appwrite-mariadb
+      - appwrite-redis
     environment:
       - SERVICE_FQDN_APPWRITE=/v1/realtime
       - _APP_ENV
@@ -180,16 +150,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-audits:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-audits
     <<: *x-logging
     container_name: appwrite-worker-audits
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -207,16 +174,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-webhooks:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-webhooks
     <<: *x-logging
     container_name: appwrite-worker-webhooks
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -230,16 +194,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-deletes:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-deletes
     <<: *x-logging
     container_name: appwrite-worker-deletes
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-cache:/storage/cache:rw
@@ -286,16 +247,13 @@ services:
       - _APP_EXECUTOR_HOST
 
   appwrite-worker-databases:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-databases
     <<: *x-logging
     container_name: appwrite-worker-databases
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -313,16 +271,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-builds:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-builds
     <<: *x-logging
     container_name: appwrite-worker-builds
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-functions:/storage/functions:rw
       - appwrite-builds:/storage/builds:rw
@@ -375,16 +330,13 @@ services:
       - _APP_STORAGE_WASABI_BUCKET
 
   appwrite-worker-certificates:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-certificates
     <<: *x-logging
     container_name: appwrite-worker-certificates
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-config:/storage/config:rw
       - appwrite-certificates:/storage/certificates:rw
@@ -409,16 +361,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-functions:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-functions
     <<: *x-logging
     container_name: appwrite-worker-functions
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
       - openruntimes-executor
     environment:
       - _APP_ENV
@@ -446,15 +395,12 @@ services:
       - _APP_LOGGING_PROVIDER
 
   appwrite-worker-mails:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-mails
     <<: *x-logging
     container_name: appwrite-worker-mails
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -474,15 +420,12 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-messaging:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-messaging
     <<: *x-logging
     container_name: appwrite-worker-messaging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -496,15 +439,12 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-worker-migrations:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: worker-migrations
     <<: *x-logging
     container_name: appwrite-worker-migrations
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - mariadb
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -527,15 +467,12 @@ services:
       - _APP_MIGRATIONS_FIREBASE_CLIENT_SECRET
 
   appwrite-maintenance:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: maintenance
     <<: *x-logging
     container_name: appwrite-maintenance
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -561,16 +498,13 @@ services:
       - _APP_MAINTENANCE_RETENTION_SCHEDULES
 
   appwrite-usage:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: usage
     container_name: appwrite-usage
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - influxdb
-      - mariadb
+      - appwrite-influxdb
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -592,16 +526,13 @@ services:
       - _APP_LOGGING_CONFIG
 
   appwrite-schedule:
-    image: appwrite/appwrite:1.4.3
+    image: appwrite/appwrite:1.4
     entrypoint: schedule
     container_name: appwrite-schedule
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     depends_on:
-      - mariadb
-      - redis
+      - appwrite-mariadb
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -616,15 +547,13 @@ services:
       - _APP_DB_USER
       - _APP_DB_PASS
 
-  appwrite-assistant:
-    image: appwrite/assistant:0.2.1
-    container_name: appwrite-assistant
-    <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
-    environment:
-      - _APP_ASSISTANT_OPENAI_API_KEY
+  # appwrite-assistant:
+  #   image: appwrite/assistant:0.2.1
+  #   container_name: appwrite-assistant
+  #   <<: *x-logging
+  #
+  #   environment:
+  #     - _APP_ASSISTANT_OPENAI_API_KEY
 
   openruntimes-executor:
     container_name: openruntimes-executor
@@ -632,9 +561,6 @@ services:
     <<: *x-logging
     stop_signal: SIGINT
     image: openruntimes/executor:0.4.1
-    networks:
-      - appwrite
-      - runtimes
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - appwrite-builds:/storage/builds:rw
@@ -675,13 +601,10 @@ services:
       - OPR_EXECUTOR_STORAGE_WASABI_REGION=$_APP_STORAGE_WASABI_REGION
       - OPR_EXECUTOR_STORAGE_WASABI_BUCKET=$_APP_STORAGE_WASABI_BUCKET
 
-  mariadb:
+  appwrite-mariadb:
     image: mariadb:10.7 # fix issues when upgrading using: mysql_upgrade -u root -p
     container_name: appwrite-mariadb
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     volumes:
       - appwrite-mariadb:/var/lib/mysql:rw
     environment:
@@ -691,58 +614,39 @@ services:
       - MYSQL_PASSWORD=${_APP_DB_PASS}
     command: 'mysqld --innodb-flush-method=fsync'
 
-  redis:
+  appwrite-redis:
     image: redis:7.0.4-alpine
     container_name: appwrite-redis
     <<: *x-logging
-    restart: unless-stopped
     command: >
       redis-server
       --maxmemory            512mb
       --maxmemory-policy     allkeys-lru
       --maxmemory-samples    5
-    networks:
-      - appwrite
     volumes:
       - appwrite-redis:/data:rw
 
-  # clamav:
+  # appwrite-clamav:
   #   image: appwrite/clamav:1.2.0
   #   container_name: appwrite-clamav
-  #   restart: unless-stopped
-  #   networks:
-  #     - appwrite
+  #
   #   volumes:
   #     - appwrite-uploads:/storage/uploads
 
-  influxdb:
+  appwrite-influxdb:
     image: appwrite/influxdb:1.5.0
     container_name: appwrite-influxdb
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     volumes:
       - appwrite-influxdb:/var/lib/influxdb:rw
 
-  telegraf:
+  appwrite-telegraf:
     image: appwrite/telegraf:1.4.0
     container_name: appwrite-telegraf
     <<: *x-logging
-    restart: unless-stopped
-    networks:
-      - appwrite
     environment:
       - _APP_INFLUXDB_HOST
       - _APP_INFLUXDB_PORT
-
-networks:
-  gateway:
-    name: gateway
-  appwrite:
-    name: appwrite
-  runtimes:
-    name: runtimes
 
 volumes:
   appwrite-mariadb:

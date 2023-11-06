@@ -34,8 +34,11 @@ class Application extends BaseModel
         static::deleting(function ($application) {
             $application->settings()->delete();
             $storages = $application->persistentStorages()->get();
-            foreach ($storages as $storage) {
-                instant_remote_process(["docker volume rm -f $storage->name"], $application->destination->server, false);
+            $server = data_get($application, 'destination.server');
+            if ($server) {
+                foreach ($storages as $storage) {
+                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
+                }
             }
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();

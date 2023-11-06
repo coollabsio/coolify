@@ -9,6 +9,13 @@ class ServiceDatabase extends BaseModel
     use HasFactory;
     protected $guarded = [];
 
+    protected static function booted()
+    {
+        static::deleting(function ($service) {
+            $service->persistentStorages()->delete();
+            $service->fileStorages()->delete();
+        });
+    }
     public function type()
     {
         return 'service';
