@@ -231,10 +231,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $name = data_get($exitedService, 'name');
                 $fqdn = data_get($exitedService, 'fqdn');
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
-                $project = data_get($service, 'environment.project');
-                $environment = data_get($service, 'environment');
+                $projectUuid = data_get($service, 'environment.project.uuid');
+                $serviceUuid = data_get($service, 'uuid');
+                $environmentName = data_get($service, 'environment.name');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/service/" . $service->uuid;
+                if ($projectUuid && $serviceUuid && $environmentName) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/service/" . $serviceUuid;
+                }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
                 $exitedService->update(['status' => 'exited']);
             }
@@ -252,10 +255,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
 
-                $project = data_get($application, 'environment.project');
-                $environment = data_get($application, 'environment');
+                $projectUuid = data_get($application, 'environment.project.uuid');
+                $applicationUuid = data_get($application, 'uuid');
+                $environment = data_get($application, 'environment.name');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $application->uuid;
+                if ($projectUuid && $applicationUuid && $environment) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environment . "/application/" . $applicationUuid;
+                }
 
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
@@ -272,10 +278,14 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
 
-                $project = data_get($preview, 'application.environment.project');
-                $environment = data_get($preview, 'application.environment');
+                $projectUuid = data_get($preview, 'application.environment.project.uuid');
+                $environmentName = data_get($preview, 'application.environment.name');
+                $applicationUuid = data_get($preview, 'application.uuid');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $preview->application->uuid;
+                if ($projectUuid && $applicationUuid && $environmentName) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/application/" . $applicationUuid;
+                }
+
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
@@ -291,10 +301,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name;
 
-                $project = data_get($database, 'environment.project');
-                $environment = data_get($database, 'environment');
+                $projectUuid = data_get($database, 'environment.project.uuid');
+                $environmentName = data_get($database, 'environment.name');
+                $databaseUuid = data_get($database, 'uuid');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/database/" . $database->uuid;
+                if ($projectUuid && $databaseUuid && $environmentName) {
+                    $url = base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/database/" . $databaseUuid;
+                }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
         } catch (\Throwable $e) {
