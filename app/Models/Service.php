@@ -118,7 +118,7 @@ class Service extends BaseModel
 
     public function parse(bool $isNew = false): Collection
     {
-        ray()->clearAll();
+        // ray()->clearAll();
         if ($this->docker_compose_raw) {
             try {
                 $yaml = Yaml::parse($this->docker_compose_raw);
@@ -260,7 +260,7 @@ class Service extends BaseModel
                 $networks = $serviceNetworks->toArray();
                 foreach ($definedNetwork as $key => $network) {
                     $networks = array_merge($networks, [
-                        $network => null
+                        $network
                     ]);
                 }
                 data_set($service, 'networks', $networks);

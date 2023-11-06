@@ -81,7 +81,9 @@ class ProjectController extends Controller
             $oneClickService = data_get($services, "$oneClickServiceName.compose");
             $oneClickDotEnvs = data_get($services, "$oneClickServiceName.envs", null);
             if ($oneClickDotEnvs) {
-                $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/');
+                $oneClickDotEnvs = Str::of(base64_decode($oneClickDotEnvs))->split('/\r\n|\r|\n/')->filter(function ($value) {
+                    return !empty($value);
+                });
             }
             if ($oneClickService) {
                 $destination = StandaloneDocker::whereUuid($destination_uuid)->first();
