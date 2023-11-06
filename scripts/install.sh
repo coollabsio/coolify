@@ -5,7 +5,7 @@
 ## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
 ###########
 
-VERSION="1.0.2"
+VERSION="1.0.3"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -50,6 +50,8 @@ if ! [ -x "$(command -v docker)" ]; then
         echo "Docker installed successfully."
     else
         echo "Docker installation failed."
+        echo "Maybe your OS is not supported."
+        echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
         exit 1
    fi
 fi
