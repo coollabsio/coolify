@@ -34,7 +34,9 @@ class EmailChannel
             if (isset($recepients)) {
                 $message .= implode(', ', $recepients);
             }
-            $message .= " with subject: {$mailMessage->subject}";
+            if (isset($mailMessage)) {
+                $message .= " with subject: {$mailMessage->subject}";
+            }
             send_internal_notification($message);
             throw $e;
         }
