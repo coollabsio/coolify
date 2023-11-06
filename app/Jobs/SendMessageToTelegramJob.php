@@ -46,11 +46,12 @@ class SendMessageToTelegramJob implements ShouldQueue, ShouldBeEncrypted
         if (!empty($this->buttons)) {
             foreach ($this->buttons as $button) {
                 $buttonUrl = data_get($button, 'url');
+                $text = data_get($button, 'text', 'Click here');
                 if ($buttonUrl && Str::contains($buttonUrl, 'http://localhost')) {
                     $buttonUrl = str_replace('http://localhost', config('app.url'), $buttonUrl);
                 }
                 $inlineButtons[] = [
-                    'text' => $button['text'],
+                    'text' => $text,
                     'url' => $buttonUrl,
                 ];
             }
