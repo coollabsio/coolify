@@ -7,6 +7,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Service;
 use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -40,7 +41,7 @@ class Init extends Command
                 Storage::delete($file);
             }
         } catch (\Throwable $e) {
-            echo "Error: {$e->getMessage()}\n";
+            echo "Error in cleaning ssh: {$e->getMessage()}\n";
         }
     }
     private function cleanup_in_progress_application_deployments()
@@ -207,6 +208,17 @@ class Init extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in serviceApplications: {$e->getMessage()}\n";
+        }
+        try {
+            $serviceDatabases = ServiceDatabase::all();
+            foreach ($serviceDatabases as $service) {
+                if (!data_get($service, 'service')) {
+                    ray('ServiceDatabase without service', $service->name);
+                    $service->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in ServiceDatabases: {$e->getMessage()}\n";
         }
     }
 }
