@@ -1,6 +1,6 @@
 <div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus" wire:poll.10000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <livewire:project.service.compose-modal :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
+    <livewire:project.service.compose-modal key={{ now() }} :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>
