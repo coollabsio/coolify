@@ -5,9 +5,8 @@
             <x-forms.button wire:click="load_deployments({{ $default_take }})">Next Page
             </x-forms.button>
         @endif
-
     </div>
-    <form wire:submit="filter" class="flex items-end gap-2">
+    <form class="flex items-end gap-2">
         <x-forms.input id="pull_request_id" label="Pull Request"></x-forms.input>
         <x-forms.button type="submit">Filter</x-forms.button>
     </form>
