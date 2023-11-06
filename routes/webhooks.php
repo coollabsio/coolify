@@ -74,7 +74,7 @@ Route::post('/source/github/events', function () {
             // Just pong
             return response('pong');
         }
-        if ($x_github_event === 'installation') {
+        if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
             // Installation handled by setup redirect url. Repositories queried on-demand.
             return response('cool');
         }
