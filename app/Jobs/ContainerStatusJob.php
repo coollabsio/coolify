@@ -25,9 +25,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        if (isDev()) {
-            $this->handle();
-        }
+        $this->handle();
     }
     public function middleware(): array
     {
@@ -61,13 +59,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     'unreachable_count' => 0,
                 ]);
                 // Update all applications, databases and services to exited
-                foreach($this->server->applications() as $application) {
+                foreach ($this->server->applications() as $application) {
                     $application->update(['status' => 'exited']);
                 }
-                foreach($this->server->databases() as $database) {
+                foreach ($this->server->databases() as $database) {
                     $database->update(['status' => 'exited']);
                 }
-                foreach($this->server->services() as $service) {
+                foreach ($this->server->services() as $service) {
                     $apps = $service->applications()->get();
                     $dbs = $service->databases()->get();
                     foreach ($apps as $app) {
