@@ -33,6 +33,16 @@
             "activities"
         ]
     },
+    "budge": {
+        "documentation": "https:\/\/github.com\/linuxserver\/budge",
+        "slogan": "BudgE is an open-source 'budgeting with envelopes' personal finance app, helping you manage your finances effectively.",
+        "compose": "c2VydmljZXM6CiAgYnVkZ2U6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvYnVkZ2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0JVREdFCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnYnVkZ2UtY29uZmlnOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "personal finance",
+            "budgeting",
+            "expense tracking"
+        ]
+    },
     "code-server": {
         "documentation": "https:\/\/coder.com\/docs\/code-server\/latest\/guide",
         "slogan": "Code-Server is a self-hosted, web-based code editor that enables remote coding and collaboration from any device, anywhere.",
@@ -66,6 +76,15 @@
             "base"
         ]
     },
+    "duplicati": {
+        "documentation": "https:\/\/duplicati.readthedocs.io\/en\/latest\/02-installation\/",
+        "slogan": "Duplicati is an open-source backup solution, allowing you to safeguard your data with ease through scheduled backups and encryption.",
+        "compose": "c2VydmljZXM6CiAgZHVwbGljYXRpOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL2R1cGxpY2F0aTpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fRFVQTElDQVRJCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnZHVwbGljYXRpLWNvbmZpZzovY29uZmlnJwogICAgICAtICdkdXBsaWNhdGktYmFja3VwczovYmFja3VwcycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MjAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "backup",
+            "encryption"
+        ]
+    },
     "emby": {
         "documentation": "https:\/\/emby.media\/support\/articles\/Home.html",
         "slogan": "A media server software that allows you to organize, stream, and access your multimedia content effortlessly, making it easy to enjoy your favorite movies, TV shows, music, and more.",
@@ -97,6 +116,18 @@
         "tags": [
             "feedback",
             "user-feedback"
+        ]
+    },
+    "filebrowser": {
+        "documentation": "https:\/\/filebrowser.org\/configuration",
+        "slogan": "FileBrowser is a self-hosted, web-based file manager and file explorer with a user-friendly interface. It allows you to manage and organize your files and directories directly from your web browser.",
+        "compose": "c2VydmljZXM6CiAgZmlsZWJyb3dzZXI6CiAgICBpbWFnZTogJ2ZpbGVicm93c2VyL2ZpbGVicm93c2VyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFQlJPV1NFUgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWJyb3dzZXItc3J2Oi9zcnYnCiAgICAgIC0gJ2ZpbGVicm93c2VyLWRhdGFiYXNlOi9kYXRhYmFzZS9maWxlYnJvd3Nlci5kYicKICAgICAgLSAnZmlsZWJyb3dzZXItY29uZmlnOi9jb25maWcvc2V0dGluZ3MuanNvbicKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "tags": [
+            "file-management",
+            "storage-access",
+            "data-organization",
+            "file-utilization",
+            "administration-tool"
         ]
     },
     "ghost": {
@@ -156,6 +187,35 @@
             "interface"
         ]
     },
+    "jellyfin": {
+        "documentation": "https:\/\/jellyfin.org\/docs\/",
+        "slogan": "Jellyfin is an open-source media server for hosting and streaming your media collection, providing an alternative to proprietary media platforms.",
+        "compose": "c2VydmljZXM6CiAgamVsbHlmaW46CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvamVsbHlmaW46bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0pFTExZRklOCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIEpFTExZRklOX1B1Ymxpc2hlZFNlcnZlclVybD0kU0VSVklDRV9GUUROX0pFTExZRklOCiAgICB2b2x1bWVzOgogICAgICAtICdqZWxseWZpbi1jb25maWc6L2NvbmZpZycKICAgICAgLSAnamVsbHlmaW4tdHZzaG93czovZGF0YS90dnNob3dzJwogICAgICAtICdqZWxseWZpbi1tb3ZpZXM6L2RhdGEvbW92aWVzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwOTYnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "media",
+            "server",
+            "movies",
+            "tv",
+            "music"
+        ]
+    },
+    "kuzzle": {
+        "documentation": "https:\/\/docs.kuzzle.io\/",
+        "slogan": "Kuzzle is a generic backend offering the basic building blocks common to every application.",
+        "compose": "c2VydmljZXM6CiAgcmVkaXM6CiAgICBpbWFnZTogJ3JlZGlzOjYuMi40JwogICAgY29tbWFuZDogJ3JlZGlzLXNlcnZlciAtLWFwcGVuZG9ubHkgeWVzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHJlZGlzLWNsaQogICAgICAgIC0gcGluZwogICAgICBpbnRlcnZhbDogMXMKICAgICAgdGltZW91dDogM3MKICAgICAgcmV0cmllczogMzAKICBlbGFzdGljc2VhcmNoOgogICAgaW1hZ2U6ICdrdXp6bGVpby9lbGFzdGljc2VhcmNoOjcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6OTIwMCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDJzCiAgICAgIHJldHJpZXM6IDEwCiAgICB1bGltaXRzOgogICAgICBub2ZpbGU6IDY1NTM2CiAga3V6emxlOgogICAgaW1hZ2U6ICdrdXp6bGVpby9rdXp6bGU6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0tVWlpMRV83NTEyCiAgICAgIC0gJ2t1enpsZV9zZXJ2aWNlc19fc3RvcmFnZUVuZ2luZV9fY2xpZW50X19ub2RlPWh0dHA6Ly9lbGFzdGljc2VhcmNoOjkyMDAnCiAgICAgIC0ga3V6emxlX3NlcnZpY2VzX19zdG9yYWdlRW5naW5lX19jb21tb25NYXBwaW5nX19keW5hbWljPXRydWUKICAgICAgLSBrdXp6bGVfc2VydmljZXNfX2ludGVybmFsQ2FjaGVfX25vZGVfX2hvc3Q9cmVkaXMKICAgICAgLSBrdXp6bGVfc2VydmljZXNfX21lbW9yeVN0b3JhZ2VfX25vZGVfX2hvc3Q9cmVkaXMKICAgICAgLSBrdXp6bGVfc2VydmVyX19wcm90b2NvbHNfX21xdHRfX2VuYWJsZWQ9dHJ1ZQogICAgICAtIGt1enpsZV9zZXJ2ZXJfX3Byb3RvY29sc19fbXF0dF9fZGV2ZWxvcG1lbnRNb2RlPWZhbHNlCiAgICAgIC0ga3V6emxlX2xpbWl0c19fbG9naW5zUGVyU2Vjb25kPTUwCiAgICAgIC0gTk9ERV9FTlY9cHJvZHVjdGlvbgogICAgICAtICdERUJVRz0ke0RFQlVHOi1rdXp6bGU6Y2x1c3RlcjpzeW5jfScKICAgICAgLSAnREVCVUdfREVQVEg9JHtERUJVR19ERVBUSDotMH0nCiAgICAgIC0gJ0RFQlVHX01BWF9BUlJBWV9MRU5HVEg9JHtERUJVR19NQVhfQVJSQVk6LTEwMH0nCiAgICAgIC0gJ0RFQlVHX0VYUEFORD0ke0RFQlVHX0VYUEFORDotb2ZmfScKICAgICAgLSAnREVCVUdfU0hPV19ISURERU49eyRERUJVR19TSE9XX0hJRERFTjotb259JwogICAgICAtICdERUJVR19DT0xPUlM9JHtERUJVR19DT0xPUlM6LW9ufScKICAgIGNhcF9hZGQ6CiAgICAgIC0gU1lTX1BUUkFDRQogICAgdWxpbWl0czoKICAgICAgbm9maWxlOiA2NTUzNgogICAgc3lzY3RsczoKICAgICAgLSBuZXQuY29yZS5zb21heGNvbm49ODE5MgogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0Ojc1MTIvX2hlYWx0aGNoZWNrJwogICAgICB0aW1lb3V0OiAxcwogICAgICBpbnRlcnZhbDogMnMKICAgICAgcmV0cmllczogMzAKICAgIGRlcGVuZHNfb246CiAgICAgIHJlZGlzOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9oZWFsdGh5CiAgICAgIGVsYXN0aWNzZWFyY2g6CiAgICAgICAgY29uZGl0aW9uOiBzZXJ2aWNlX2hlYWx0aHkK",
+        "tags": [
+            "backend",
+            "api",
+            "realtime",
+            "websocket",
+            "mqtt",
+            "rest",
+            "sdk",
+            "iot",
+            "geofencing",
+            "low-code"
+        ]
+    },
     "metube": {
         "documentation": "https:\/\/github.com\/alexta69\/metube",
         "slogan": "A web GUI for youtube-dl with playlist support. It enables you to effortlessly download videos from YouTube and dozens of other sites.",
@@ -177,6 +237,22 @@
             "server",
             "s3",
             "api"
+        ]
+    },
+    "moodle": {
+        "documentation": "https:\/\/moodle.org",
+        "slogan": "Moodle is the world\u2019s most customisable and trusted eLearning solution that empowers educators to improve our world.",
+        "compose": "c2VydmljZXM6CiAgbWFyaWFkYjoKICAgIGltYWdlOiAnbWFyaWFkYjoxMS4xJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gQUxMT1dfRU1QVFlfUEFTU1dPUkQ9bm8KICAgICAgLSBNWVNRTF9ST09UX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1JPT1QKICAgICAgLSBNWVNRTF9EQVRBQkFTRT1iaXRuYW1pX21vb2RsZQogICAgICAtIE1ZU1FMX1VTRVI9JFNFUlZJQ0VfVVNFUl9NQVJJQURCCiAgICAgIC0gTVlTUUxfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfTUFSSUFEQgogICAgICAtIE1BUklBREJfQ0hBUkFDVEVSX1NFVD11dGY4bWI0CiAgICAgIC0gTUFSSUFEQl9DT0xMQVRFPXV0ZjhtYjRfdW5pY29kZV9jaQogICAgdm9sdW1lczoKICAgICAgLSAnbWFyaWFkYi1kYXRhOi92YXIvbGliL215c3FsJwogIG1vb2RsZToKICAgIGltYWdlOiAnZG9ja2VyLmlvL2JpdG5hbWkvbW9vZGxlOjQuMycKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9NT09ETEUKICAgICAgLSBNT09ETEVfREFUQUJBU0VfSE9TVD1tYXJpYWRiCiAgICAgIC0gTU9PRExFX0RBVEFCQVNFX1BPUlRfTlVNQkVSPTMzMDYKICAgICAgLSBNT09ETEVfREFUQUJBU0VfVVNFUj0kU0VSVklDRV9VU0VSX01BUklBREIKICAgICAgLSBNT09ETEVfREFUQUJBU0VfTkFNRT1iaXRuYW1pX21vb2RsZQogICAgICAtIE1PT0RMRV9EQVRBQkFTRV9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9NQVJJQURCCiAgICAgIC0gQUxMT1dfRU1QVFlfUEFTU1dPUkQ9bm8KICAgICAgLSAnTU9PRExFX1VTRVJOQU1FPSR7TU9PRExFX1VTRVJOQU1FOi11c2VyfScKICAgICAgLSBNT09ETEVfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfTU9PRExFCiAgICAgIC0gTU9PRExFX0VNQUlMPXVzZXJAZXhhbXBsZS5jb20KICAgICAgLSAnTU9PRExFX1NJVEVfTkFNRT0ke01PT0RMRV9TSVRFX05BTUU6LU5ldyBTaXRlfScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ21vb2RsZS1kYXRhOi9iaXRuYW1pL21vb2RsZScKICAgICAgLSAnbW9vZGxlZGF0YS1kYXRhOi9iaXRuYW1pL21vb2RsZWRhdGEnCiAgICBkZXBlbmRzX29uOgogICAgICAtIG1hcmlhZGIK",
+        "tags": [
+            "moodle",
+            "elearning",
+            "education",
+            "lms",
+            "cms",
+            "open",
+            "source",
+            "low",
+            "code"
         ]
     },
     "n8n-with-postgresql": {
@@ -247,6 +323,14 @@
             "teamwork"
         ]
     },
+    "phpmyadmin": {
+        "documentation": "https:\/\/docs.phpmyadmin.net\/en\/latest\/",
+        "slogan": "phpMyAdmin is a web-based database management tool for administering your MySQL and MariaDB databases through a user-friendly interface.",
+        "compose": "c2VydmljZXM6CiAgcGhwbXlhZG1pbjoKICAgIGltYWdlOiAnbHNjci5pby9saW51eHNlcnZlci9waHBteWFkbWluOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9QSFBNWUFETUlOCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIFBNQV9BUkJJVFJBUlk9MQogICAgICAtIFBNQV9BQlNPTFVURV9VUkk9JFNFUlZJQ0VfRlFETl9QSFBNWUFETUlOCiAgICB2b2x1bWVzOgogICAgICAtICdwaHBteWFkbWluLWNvbmZpZzovY29uZmlnJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "database management"
+        ]
+    },
     "pocketbase": {
         "documentation": "https:\/\/pocketbase.io\/docs\/",
         "slogan": "Open Source backend for your next SaaS and Mobile app in 1 file",
@@ -294,6 +378,24 @@
             "services",
             "applications",
             "real-time"
+        ]
+    },
+    "vaultwarden": {
+        "documentation": "https:\/\/github.com\/dani-garcia\/vaultwarden\/wiki\/FAQs",
+        "slogan": "Vaultwarden is an open-source password manager that allows you to securely store and manage your passwords, helping you stay organized and protected.",
+        "compose": "c2VydmljZXM6CiAgdmF1bHR3YXJkZW46CiAgICBpbWFnZTogJ3ZhdWx0d2FyZGVuL3NlcnZlcjpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fVkFVTFRXQVJERU4KICAgIHZvbHVtZXM6CiAgICAgIC0gJ3ZhdWx0d2FyZGVuLWRhdGE6L2RhdGEnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "password manager",
+            "security"
+        ]
+    },
+    "whoogle": {
+        "documentation": "https:\/\/github.com\/benbusby\/whoogle-search#install",
+        "slogan": "Whoogle is a self-hosted, privacy-focused search engine front-end for accessing Google search results without tracking and data collection.",
+        "compose": "c2VydmljZXM6CiAgd2hvb2dsZToKICAgIGltYWdlOiAnYmVuYnVzYnkvd2hvb2dsZS1zZWFyY2g6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1dIT09HTEUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo1MDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "privacy",
+            "search engine"
         ]
     },
     "wordpress-with-mariadb": {

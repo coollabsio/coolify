@@ -18,7 +18,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -26,6 +25,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
+        $this->handle();
     }
     public function middleware(): array
     {
@@ -58,6 +58,23 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->update([
                     'unreachable_count' => 0,
                 ]);
+                // Update all applications, databases and services to exited
+                foreach ($this->server->applications() as $application) {
+                    $application->update(['status' => 'exited']);
+                }
+                foreach ($this->server->databases() as $database) {
+                    $database->update(['status' => 'exited']);
+                }
+                foreach ($this->server->services() as $service) {
+                    $apps = $service->applications()->get();
+                    $dbs = $service->databases()->get();
+                    foreach ($apps as $app) {
+                        $app->update(['status' => 'exited']);
+                    }
+                    foreach ($dbs as $db) {
+                        $db->update(['status' => 'exited']);
+                    }
+                }
                 return;
             }
             $result = $this->server->validateConnection();
@@ -138,11 +155,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $containerStatus = "$containerStatus ($containerHealth)";
                 $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
-                $labelId = data_get($labels, 'coolify.applicationId');
-                if ($labelId) {
-                    if (str_contains($labelId, '-pr-')) {
-                        $pullRequestId = data_get($labels, 'coolify.pullRequestId');
-                        $applicationId = (int) Str::before($labelId, '-pr-');
+                $applicationId = data_get($labels, 'coolify.applicationId');
+                if ($applicationId) {
+                    $pullRequestId = data_get($labels, 'coolify.pullRequestId');
+                    if ($pullRequestId) {
                         $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
                         if ($preview) {
                             $foundApplicationPreviews[] = $preview->id;
@@ -154,7 +170,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             //Notify user that this container should not be there.
                         }
                     } else {
-                        $application = $applications->where('id', $labelId)->first();
+                        $application = $applications->where('id', $applicationId)->first();
                         if ($application) {
                             $foundApplications[] = $application->id;
                             $statusFromDb = $application->status;
@@ -230,10 +246,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $name = data_get($exitedService, 'name');
                 $fqdn = data_get($exitedService, 'fqdn');
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
-                $project = data_get($service, 'environment.project');
-                $environment = data_get($service, 'environment');
+                $projectUuid = data_get($service, 'environment.project.uuid');
+                $serviceUuid = data_get($service, 'uuid');
+                $environmentName = data_get($service, 'environment.name');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/service/" . $service->uuid;
+                if ($projectUuid && $serviceUuid && $environmentName) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/service/" . $serviceUuid;
+                }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
                 $exitedService->update(['status' => 'exited']);
             }
@@ -251,10 +270,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
 
-                $project = data_get($application, 'environment.project');
-                $environment = data_get($application, 'environment');
+                $projectUuid = data_get($application, 'environment.project.uuid');
+                $applicationUuid = data_get($application, 'uuid');
+                $environment = data_get($application, 'environment.name');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $application->uuid;
+                if ($projectUuid && $applicationUuid && $environment) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environment . "/application/" . $applicationUuid;
+                }
 
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
@@ -271,10 +293,14 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name ? "$name ($fqdn)" : $fqdn;
 
-                $project = data_get($preview, 'application.environment.project');
-                $environment = data_get($preview, 'application.environment');
+                $projectUuid = data_get($preview, 'application.environment.project.uuid');
+                $environmentName = data_get($preview, 'application.environment.name');
+                $applicationUuid = data_get($preview, 'application.uuid');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/application/" . $preview->application->uuid;
+                if ($projectUuid && $applicationUuid && $environmentName) {
+                    $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/application/" . $applicationUuid;
+                }
+
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
@@ -290,10 +316,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 $containerName = $name;
 
-                $project = data_get($database, 'environment.project');
-                $environment = data_get($database, 'environment');
+                $projectUuid = data_get($database, 'environment.project.uuid');
+                $environmentName = data_get($database, 'environment.name');
+                $databaseUuid = data_get($database, 'uuid');
 
-                $url =  base_url() . '/project/' . $project->uuid . "/" . $environment->name . "/database/" . $database->uuid;
+                if ($projectUuid && $databaseUuid && $environmentName) {
+                    $url = base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/database/" . $databaseUuid;
+                }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
         } catch (\Throwable $e) {

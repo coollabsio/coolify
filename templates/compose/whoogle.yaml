@@ -1,0 +1,14 @@
+# documentation: https://github.com/benbusby/whoogle-search#install
+# slogan: Whoogle is a self-hosted, privacy-focused search engine front-end for accessing Google search results without tracking and data collection.
+# tags: privacy, search engine
+
+services:
+  whoogle:
+    image: benbusby/whoogle-search:latest
+    environment:
+      - SERVICE_FQDN_WHOOGLE
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

@@ -44,6 +44,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private int $pull_request_id;
     private string $commit;
     private bool $force_rebuild;
+    private bool $restart_only;
 
     private ?string $dockerImage = null;
     private ?string $dockerImageTag = null;
@@ -94,6 +95,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->pull_request_id = $this->application_deployment_queue->pull_request_id;
         $this->commit = $this->application_deployment_queue->commit;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
+        $this->restart_only = $this->application_deployment_queue->restart_only;
 
         $source = data_get($this->application, 'source');
         if ($source) {
@@ -136,9 +138,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         // ray()->measure();
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id);
-        if ($containers->count() > 0) {
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        if ($containers->count() === 1) {
             $this->currently_running_container_name = data_get($containers[0], 'Names');
+        } else {
+            $foundContainer = $containers->filter(function ($container) {
+                return !str(data_get($container, 'Names'))->startsWith("{$this->application->uuid}-pr-");
+            })->first();
+            if ($foundContainer) {
+                $this->currently_running_container_name = data_get($foundContainer, 'Names');
+            }
         }
         if ($this->pull_request_id !== 0 && $this->pull_request_id !== null) {
             $this->currently_running_container_name = $this->container_name;
@@ -182,7 +191,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application->git_repository = "$gitHost:$gitRepo";
         }
         try {
-            if ($this->application->dockerfile) {
+            if ($this->restart_only) {
+                $this->just_restart();
+            } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
             } else if ($this->application->build_pack === 'dockerimage') {
                 $this->deploy_dockerimage_buildpack();
@@ -264,6 +275,49 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     //         [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
     //     );
     // }
+    private function generate_image_names()
+    {
+        if ($this->application->dockerfile) {
+            $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
+            $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+        } else if ($this->application->build_pack === 'dockerimage') {
+            $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
+        } else if ($this->pull_request_id !== 0) {
+            $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
+            $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+        } else {
+            $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
+            if (strlen($tag) > 128) {
+                $tag = $tag->substr(0, 128);
+            }
+            $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
+            $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
+        }
+        ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+    }
+    private function just_restart()
+    {
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->application->git_repository}:{$this->application->git_branch}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
+        $this->set_base_dir();
+        $this->generate_image_names();
+        $this->execute_remote_command([
+            "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
+        ]);
+        if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+            $this->generate_compose_file();
+            $this->rolling_update();
+            return;
+        }
+        $this->execute_remote_command([
+            "echo 'Cannot find image {$this->production_image_name} locally. Please redeploy the application.'",
+        ]);
+    }
     private function save_environment_variables()
     {
         $envs = collect([]);
@@ -291,9 +345,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > $this->workdir/Dockerfile")
             ],
         );
-        $this->build_image_name = Str::lower("{$this->application->git_repository}:build");
-        $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
-        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->generate_image_names();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
@@ -311,7 +363,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag}.'"
             ],
         );
-        $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
+        $this->generate_image_names();
         $this->prepare_builder_image();
         $this->generate_compose_file();
         $this->rolling_update();
@@ -328,16 +380,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
         $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->set_base_dir();
-        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
-        if (strlen($tag) > 128) {
-            $tag = $tag->substr(0, 128);
-        }
-
-        $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
-        $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
-        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->generate_image_names();
         $this->cleanup_git();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
@@ -355,15 +401,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->set_base_dir();
-        $tag = Str::of("{$this->commit}-{$this->application->id}-{$this->pull_request_id}");
-        if (strlen($tag) > 128) {
-            $tag = $tag->substr(0, 128);
-        }
-
-        $this->build_image_name = Str::lower("{$this->application->git_repository}:{$tag}-build");
-        $this->production_image_name = Str::lower("{$this->application->uuid}:{$tag}");
-        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
-
+        $this->generate_image_names();
         if (!$this->force_rebuild) {
             $this->execute_remote_command([
                 "docker images -q {$this->production_image_name} 2>/dev/null", "hidden" => true, "save" => "local_image_found"
@@ -396,7 +434,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         if (count($this->application->ports_mappings_array) > 0) {
             $this->execute_remote_command(
-                ["echo -n 'Application has ports mapped to the host system, rolling update is not supported. Stopping current container.'"],
+                ["echo -n 'Application has ports mapped to the host system, rolling update is not supported.'"],
             );
             $this->stop_running_container(force: true);
             $this->start_by_compose_file();
@@ -457,9 +495,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_pull_request()
     {
-        $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-        $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
-        // ray('Build Image Name: ' . $this->build_image_name . ' & Production Image Name: ' . $this->production_image_name)->green();
+        $this->generate_image_names();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->application->git_repository}:{$this->application->git_branch}.'",
         ]);
@@ -475,7 +511,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->stop_running_container();
+        if ($this->currently_running_container_name) {
+            $this->execute_remote_command(
+                ["echo -n 'Removing old version of your application.'"],
+                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+            );
+        }
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
@@ -545,7 +586,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         }
 
-        $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+        if ($this->saved_outputs->get('git_commit_sha')) {
+            $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
+        }
     }
     private function clone_repository()
     {
@@ -596,7 +639,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if ($this->application->deploymentType() === 'deploy_key') {
             $this->fullRepoUrl = $this->application->git_repository;
-            $private_key = base64_encode($this->application->private_key->private_key);
+            $private_key = data_get($this->application, 'private_key.private_key');
+            if (is_null($private_key)) {
+                throw new Exception('Private key not found. Please add a private key to the application and try again.');
+            }
+            $private_key = base64_encode($private_key);
             $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->application->git_repository} {$this->basedir}";
             $git_clone_command = $this->set_git_import_settings($git_clone_command);
             $commands = collect([
@@ -659,7 +706,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build --no-cache -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        $nixpacks_command = "nixpacks build --cache-key '{$this->application->uuid}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -706,6 +753,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->application->save();
         } else {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
+        }
+        if ($this->pull_request_id !== 0) {
+            $newLabels = collect(generateLabelsApplication($this->application, $this->preview));
+            $newHostLabel = $newLabels->filter(function ($label) {
+                return str($label)->contains('Host');
+            });
+            $labels = $labels->reject(function ($label) {
+                return str($label)->contains('Host');
+            });
+
+            $labels = $labels->map(function ($label) {
+                $pattern = '/([a-zA-Z0-9]+)-(\d+)-(http|https)/';
+                $replacement = "$1-pr-{$this->pull_request_id}-$2-$3";
+                $newLabel = preg_replace($pattern, $replacement, $label);
+                return $newLabel;
+            });
+            $labels = $labels->merge($newHostLabel);
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
         $docker_compose = [
@@ -907,12 +971,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             if ($this->newVersionIsHealthy || $force) {
                 $this->execute_remote_command(
                     ["echo -n 'Removing old version of your application.'"],
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             } else {
                 $this->execute_remote_command(
                     ["echo -n 'New version is not healthy, rolling back to the old version.'"],
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             }
         }

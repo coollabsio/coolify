@@ -40,7 +40,6 @@ class Service extends BaseModel
                     instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
                 });
             }
-            instant_remote_process(["docker network rm {$service->uuid}"], $service->server, false);
         });
     }
     public function type()
@@ -89,6 +88,10 @@ class Service extends BaseModel
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');
+    }
+    public function environment_variables_preview(): HasMany
+    {
+        return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->orderBy('key', 'asc');
     }
     public function workdir()
     {
@@ -257,7 +260,7 @@ class Service extends BaseModel
                 $networks = $serviceNetworks->toArray();
                 foreach ($definedNetwork as $key => $network) {
                     $networks = array_merge($networks, [
-                        $network
+                        $network => null
                     ]);
                 }
                 data_set($service, 'networks', $networks);

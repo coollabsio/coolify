@@ -32,7 +32,7 @@ class CheckLicense extends Component
         $this->settings->save();
         if ($this->settings->resale_license) {
             try {
-                resolve(CheckResaleLicense::class)();
+                CheckResaleLicense::run();
                 $this->emit('reloadWindow');
             } catch (\Throwable $e) {
                 session()->flash('error', 'Something went wrong. Please contact support. <br>Error: ' . $e->getMessage());

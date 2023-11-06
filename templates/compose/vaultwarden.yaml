@@ -1,0 +1,16 @@
+# documentation: https://github.com/dani-garcia/vaultwarden/wiki/FAQs
+# slogan: Vaultwarden is an open-source password manager that allows you to securely store and manage your passwords, helping you stay organized and protected.
+# tags: password manager, security
+
+services:
+  vaultwarden:
+    image: vaultwarden/server:latest
+    environment:
+      - SERVICE_FQDN_VAULTWARDEN
+    volumes:
+      - vaultwarden-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80"]
+      interval: 2s
+      timeout: 10s
+      retries: 15

@@ -152,7 +152,7 @@ class General extends Component
             $fqdn = generateFqdn($server, $this->application->uuid);
             $this->application->fqdn = $fqdn;
             $this->application->save();
-            $this->emit('success', 'Application settings updated!');
+            $this->updatedApplicationFqdn();
         }
     }
     public function resetDefaultLabels($showToaster = true)

@@ -1,9 +1,4 @@
 <div x-init="$wire.validateServer(false)">
-    <x-modal yesOrNo modalId="deleteServer" modalTitle="Delete Server">
-        <x-slot:modalBody>
-            <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
-        </x-slot:modalBody>
-    </x-modal>
     <x-modal yesOrNo modalId="changeLocalhost" modalTitle="Change Localhost" action="submit">
         <x-slot:modalBody>
             <p>You could lost a lot of functionalities if you change the server details of the server where Coolify is
@@ -47,7 +42,8 @@
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
-                <x-forms.input id="server.ip" label="IP Address" required />
+                <x-forms.input id="server.ip" label="IP Address/Domain"
+                    helper="An IP Address (127.0.0.1) or domain (example.com)." required />
                 <div class="flex gap-2">
                     <x-forms.input id="server.user" label="User" required />
                     <x-forms.input type="number" id="server.port" label="Port" required />
@@ -66,21 +62,9 @@
                 helper="Disk cleanup job will be executed if disk usage is more than this number." />
         @endif
     </form>
-    @if ($server->id !== 0)
-        <h2 class="pt-4">Danger Zone</h2>
-        <div class="">Woah. I hope you know what are you doing.</div>
-        <h4 class="pt-4">Delete Server</h4>
-        <div class="pb-4">This will remove this server from Coolify. Beware! There is no coming
-            back!
-        </div>
-        <x-forms.button isError isModal modalId="deleteServer">
-            Delete
-        </x-forms.button>
-    @endif
-
+    <livewire:server.delete :server="$server" />
     <script>
         Livewire.on('installDocker', () => {
-            console.log('asd');
             installDocker.showModal();
         })
     </script>

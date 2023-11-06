@@ -34,7 +34,9 @@ class EmailChannel
             if (isset($recepients)) {
                 $message .= implode(', ', $recepients);
             }
-            $message .= " with subject: {$mailMessage->subject}";
+            if (isset($mailMessage)) {
+                $message .= " with subject: {$mailMessage->subject}";
+            }
             send_internal_notification($message);
             throw $e;
         }
@@ -49,8 +51,8 @@ class EmailChannel
             }
             return;
         }
-        config()->set('mail.from.address', data_get($notifiable, 'smtp_from_address'));
-        config()->set('mail.from.name', data_get($notifiable, 'smtp_from_name'));
+        config()->set('mail.from.address', data_get($notifiable, 'smtp_from_address', 'test@example.com'));
+        config()->set('mail.from.name', data_get($notifiable, 'smtp_from_name', 'Test'));
         if (data_get($notifiable, 'resend_enabled')) {
             config()->set('mail.default', 'resend');
             config()->set('resend.api_key', data_get($notifiable, 'resend_api_key'));

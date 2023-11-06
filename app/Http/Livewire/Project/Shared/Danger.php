@@ -2,7 +2,7 @@
 
 namespace App\Http\Livewire\Project\Shared;
 
-use App\Jobs\StopResourceJob;
+use App\Jobs\DeleteResourceJob;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -21,7 +21,7 @@ class Danger extends Component
     public function delete()
     {
         try {
-            StopResourceJob::dispatchSync($this->resource);
+            DeleteResourceJob::dispatchSync($this->resource);
             return redirect()->route('project.resources', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'environment_name' => $this->parameters['environment_name']

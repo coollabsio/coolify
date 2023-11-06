@@ -16,7 +16,7 @@ class Form extends Component
     protected $validationAttributes = [
         'destination.name' => 'name',
         'destination.network' => 'network',
-        'destination.server.ip' => 'IP Address',
+        'destination.server.ip' => 'IP Address/Domain',
     ];
 
     public function submit()

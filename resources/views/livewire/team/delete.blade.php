@@ -11,8 +11,7 @@
         <div>This is the default team. You can't delete it.</div>
     @elseif(auth()->user()->teams()->get()->count() === 1)
         <div>You can't delete your last team.</div>
-    @elseif(currentTeam()->subscription &&
-            currentTeam()->subscription?->lemon_status !== 'cancelled')
+    @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
         <div>Please cancel your subscription before delete this team (Manage My Subscription).</div>
     @else
         @if (currentTeam()->isEmpty())
@@ -23,30 +22,38 @@
         @else
             <div>
                 <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>
-                <h4 class="pb-4">Projects:</h4>
-                <ul class="pl-8 list-disc">
-                    @foreach (currentTeam()->projects as $resource)
-                        <li>{{ $resource->name }}</li>
-                    @endforeach
-                </ul>
-                <h4 class="py-4">Servers:</h4>
-                <ul class="pl-8 list-disc">
-                    @foreach (currentTeam()->servers as $resource)
-                        <li>{{ $resource->name }}</li>
-                    @endforeach
-                </ul>
-                <h4 class="py-4">Private Keys:</h4>
-                <ul class="pl-8 list-disc">
-                    @foreach (currentTeam()->privateKeys as $resource)
-                        <li>{{ $resource->name }}</li>
-                    @endforeach
-                </ul>
-                <h4 class="py-4">Sources:</h4>
-                <ul class="pl-8 list-disc">
-                    @foreach (currentTeam()->sources() as $resource)
-                        <li>{{ $resource->name }}</li>
-                    @endforeach
-                </ul>
+                @if (currentTeam()->projects()->count() > 0)
+                    <h4 class="pb-4">Projects:</h4>
+                    <ul class="pl-8 list-disc">
+                        @foreach (currentTeam()->projects as $resource)
+                            <li>{{ $resource->name }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+                @if (currentTeam()->servers()->count() > 0)
+                    <h4 class="py-4">Servers:</h4>
+                    <ul class="pl-8 list-disc">
+                        @foreach (currentTeam()->servers as $resource)
+                            <li>{{ $resource->name }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+                @if (currentTeam()->privateKeys()->count() > 0)
+                    <h4 class="py-4">Private Keys:</h4>
+                    <ul class="pl-8 list-disc">
+                        @foreach (currentTeam()->privateKeys as $resource)
+                            <li>{{ $resource->name }}</li>
+                        @endforeach
+                    </ul>
+                @endif
+                @if (currentTeam()->sources()->count() > 0)
+                    <h4 class="py-4">Sources:</h4>
+                    <ul class="pl-8 list-disc">
+                        @foreach (currentTeam()->sources() as $resource)
+                            <li>{{ $resource->name }}</li>
+                        @endforeach
+                    </ul>
+                @endif
         @endif
     @endif
 

@@ -12,6 +12,7 @@ use App\Models\Waitlist;
 use App\Models\Webhook;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Visus\Cuid2\Cuid2;
 
@@ -64,6 +65,7 @@ Route::get('/source/github/install', function () {
 });
 Route::post('/source/github/events', function () {
     try {
+        $id = null;
         $x_github_delivery = request()->header('X-GitHub-Delivery');
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
         $x_github_hook_installation_target_id = request()->header('X-GitHub-Hook-Installation-Target-Id');
@@ -73,7 +75,7 @@ Route::post('/source/github/events', function () {
             // Just pong
             return response('pong');
         }
-        if ($x_github_event === 'installation') {
+        if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
             // Installation handled by setup redirect url. Repositories queried on-demand.
             return response('cool');
         }
@@ -87,7 +89,6 @@ Route::post('/source/github/events', function () {
                 return response('not cool');
             }
         }
-
         if ($x_github_event === 'push') {
             $id = data_get($payload, 'repository.id');
             $branch = data_get($payload, 'ref');
@@ -281,7 +282,11 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    Sleep::for(5);
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                }
                 $planId = data_get($data, 'lines.data.0.plan.id');
                 $subscription->update([
                     'stripe_plan_id' => $planId,

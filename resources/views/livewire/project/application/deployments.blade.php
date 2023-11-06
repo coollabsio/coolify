@@ -1,10 +1,16 @@
-<div class="flex flex-col gap-2" @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
-    <h2 class="pt-4">Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
-    @if ($show_next)
-        <x-forms.button wire:click="load_deployments({{ $default_take }})">Show More
-        </x-forms.button>
-    @endif
-    @foreach ($deployments as $deployment)
+<div class="flex flex-col gap-2 pb-10" @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
+    <div class="flex items-end gap-2 pt-4">
+        <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
+        @if ($show_next)
+            <x-forms.button wire:click="load_deployments({{ $default_take }})">Next Page
+            </x-forms.button>
+        @endif
+    </div>
+    <form class="flex items-end gap-2">
+        <x-forms.input id="pull_request_id" label="Pull Request"></x-forms.input>
+        <x-forms.button type="submit">Filter</x-forms.button>
+    </form>
+    @forelse ($deployments as $deployment)
         <a @class([
             'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
             'cursor-not-allowed hover:bg-coolgray-200' =>
@@ -16,45 +22,45 @@
                 data_get($deployment, 'status') === 'error',
             'border-success hover:bg-success' =>
                 data_get($deployment, 'status') === 'finished',
-        ]) @if (data_get($deployment, 'status') !== 'cancelled by system' && data_get($deployment, 'status') !== 'queued')
-            href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
-    @endif
-    class="hover:no-underline">
-    <div class="flex flex-col justify-start">
-        <div>
-            {{ $deployment->id }} <span class=" text-warning">></span> {{ $deployment->deployment_uuid }}
-            <span class=" text-warning">></span>
-            {{ $deployment->status }}
-        </div>
-        @if (data_get($deployment, 'pull_request_id'))
-            <div>
-                Pull Request #{{ data_get($deployment, 'pull_request_id') }}
-                @if (data_get($deployment, 'is_webhook'))
-                    (Webhook)
+        ]) href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
+            class="hover:no-underline">
+            <div class="flex flex-col justify-start">
+                <div class="flex gap-1">
+                    {{ $deployment->created_at }} UTC
+                    <span class=" text-warning">></span>
+                    {{ $deployment->status }}
+                </div>
+                @if (data_get($deployment, 'pull_request_id'))
+                    <div>
+                        <span class=" text-warning">></span>
+                        Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                        @if (data_get($deployment, 'is_webhook'))
+                            (Webhook)
+                        @endif
+                        Webhook (SHA
+                        @if (data_get($deployment, 'commit'))
+                            {{ data_get($deployment, 'commit') }})
+                        @else
+                            HEAD)
+                        @endif
+                    </div>
                 @endif
             </div>
-        @elseif (data_get($deployment, 'is_webhook'))
-            <div>Webhook (sha
-                @if (data_get($deployment, 'commit'))
-                    {{ data_get($deployment, 'commit') }})
-                @else
-                    HEAD)
-                @endif
+
+            <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
+                <div>
+                    @if ($deployment->status !== 'in_progress')
+                        Finished <span x-text="measure_since_started()">0s</span> in
+                    @else
+                        Running for
+                    @endif
+                    <span class="font-bold" x-text="measure_finished_time()">0s</span>
+                </div>
             </div>
-        @endif
-        <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">
-            <div>
-                @if ($deployment->status !== 'in_progress')
-                    Finished <span x-text="measure_since_started()">0s</span> in
-                @else
-                    Running for
-                @endif
-                <span class="font-bold" x-text="measure_finished_time()">0s</span>
-            </div>
-        </div>
-    </div>
-    </a>
-    @endforeach
+        </a>
+    @empty
+        <div class="">No deployments found</div>
+    @endforelse
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/utc.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/relativeTime.js"></script>

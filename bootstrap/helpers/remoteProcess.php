@@ -174,8 +174,11 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     return $formatted;
 }
 
-function refresh_server_connection(PrivateKey $private_key)
+function refresh_server_connection(?PrivateKey $private_key = null)
 {
+    if (is_null($private_key)) {
+        return;
+    }
     foreach ($private_key->servers as $server) {
         Storage::disk('ssh-mux')->delete($server->muxFilename());
     }

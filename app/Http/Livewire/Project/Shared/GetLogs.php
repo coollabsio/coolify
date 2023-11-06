@@ -33,9 +33,11 @@ class GetLogs extends Component
             if ($refresh) {
                 $this->outputs = '';
             }
-            Process::run($sshCommand, function (string $type, string $output) {
-                $this->doSomethingWithThisChunkOfOutput($output);
-            });
+            $command = Process::run($sshCommand);
+            $output = $command->output();
+            $error = $command->errorOutput();
+            $this->doSomethingWithThisChunkOfOutput($output);
+            $this->doSomethingWithThisChunkOfOutput($error);
         }
     }
     public function render()

@@ -19,7 +19,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 
-class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
+class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -32,6 +32,7 @@ class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
         try {
             $server = $this->resource->destination->server;
             if (!$server->isFunctional()) {
+                $this->resource->delete();
                 return 'Server is not functional';
             }
             switch ($this->resource->type()) {
@@ -57,11 +58,10 @@ class StopResourceJob implements ShouldQueue, ShouldBeEncrypted
                     StopService::run($this->resource);
                     break;
             }
+            $this->resource->delete();
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
-        } finally {
-            $this->resource->delete();
         }
     }
 }

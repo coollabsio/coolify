@@ -26,14 +26,14 @@ class ByIp extends Component
     protected $rules = [
         'name' => 'required|string',
         'description' => 'nullable|string',
-        'ip' => 'required|ip',
+        'ip' => 'required',
         'user' => 'required|string',
         'port' => 'required|integer',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
         'description' => 'Description',
-        'ip' => 'IP Address',
+        'ip' => 'IP Address/Domain',
         'user' => 'User',
         'port' => 'Port',
     ];

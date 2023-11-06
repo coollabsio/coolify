@@ -32,11 +32,11 @@ class StandaloneMongodb extends BaseModel
             ]);
         });
         static::deleting(function ($database) {
-            $database->scheduledBackups()->delete();
             $storages = $database->persistentStorages()->get();
             foreach ($storages as $storage) {
                 instant_remote_process(["docker volume rm -f $storage->name"], $database->destination->server, false);
             }
+            $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
         });

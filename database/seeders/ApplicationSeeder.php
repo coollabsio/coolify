@@ -26,7 +26,7 @@ class ApplicationSeeder extends Seeder
             'environment_id' => 1,
             'destination_id' => 0,
             'destination_type' => StandaloneDocker::class,
-            'source_id' => 0,
+            'source_id' => 1,
             'source_type' => GithubApp::class
         ]);
         Application::create([

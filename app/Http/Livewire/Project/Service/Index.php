@@ -13,7 +13,7 @@ class Index extends Component
     public $databases;
     public array $parameters;
     public array $query;
-    protected $listeners = ["refreshStacks","checkStatus"];
+    protected $listeners = ["refreshStacks", "checkStatus"];
     public function render()
     {
         return view('livewire.project.service.index');

@@ -6,11 +6,14 @@ use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
-function getCurrentApplicationContainerStatus(Server $server, int $id): Collection
+function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
-    $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
+    if ($pullRequestId) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --filter='label=coolify.pullRequestId={$pullRequestId}' --format '{{json .}}' "], $server);
+    } else {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}'"], $server);
+    }
     if (!$containers) {
         return collect([]);
     }
@@ -77,20 +80,6 @@ function executeInDocker(string $containerId, string $command)
     // return "docker exec {$this->deployment_uuid} bash -c '{$command} |& tee -a /proc/1/fd/1; [ \$PIPESTATUS -eq 0 ] || exit \$PIPESTATUS'";
 }
 
-function getApplicationContainerStatus(Application $application)
-{
-    $server = data_get($application, 'destination.server');
-    $id = $application->id;
-    if (!$server) {
-        return 'exited';
-    }
-    $containers = getCurrentApplicationContainerStatus($server, $id);
-    if ($containers->count() > 0) {
-        $status = data_get($containers[0], 'State', 'exited');
-        return $status;
-    }
-    return 'exited';
-}
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
     $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
@@ -212,9 +201,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         $onlyPort = $ports[0];
     }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);
-    $appId = $application->id;
-    if ($pull_request_id !== 0 && $pull_request_id !== null) {
-        $appId = $appId . '-pr-' . $pull_request_id;
+    $appUuid = $application->uuid;
+    if ($pull_request_id !== 0) {
+        $appUuid = $appUuid . '-pr-' . $pull_request_id;
     }
     $labels = collect([]);
     if ($application->fqdn) {
@@ -224,7 +213,7 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         // Add Traefik labels no matter which proxy is selected
-        $labels = $labels->merge(fqdnLabelsForTraefik($application->uuid, $domains, $application->settings->is_force_https_enabled, $onlyPort));
+        $labels = $labels->merge(fqdnLabelsForTraefik($appUuid, $domains, $application->settings->is_force_https_enabled, $onlyPort));
     }
     return $labels->all();
 }

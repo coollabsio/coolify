@@ -4,7 +4,6 @@ namespace App\Actions\Service;
 
 use Lorisleiva\Actions\Concerns\AsAction;
 use App\Models\Service;
-use App\Notifications\Application\StatusChanged;
 
 class StopService
 {
