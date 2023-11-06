@@ -284,7 +284,7 @@ Route::post('/payments/stripe/events', function () {
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                 if (!$subscription) {
-                    Sleep::for(5);
+                    Sleep::for(5)->seconds();
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 }
                 $planId = data_get($data, 'lines.data.0.plan.id');

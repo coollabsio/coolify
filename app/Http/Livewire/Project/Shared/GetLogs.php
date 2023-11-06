@@ -33,11 +33,16 @@ class GetLogs extends Component
             if ($refresh) {
                 $this->outputs = '';
             }
-            $command = Process::run($sshCommand);
-            $output = $command->output();
-            $error = $command->errorOutput();
-            $this->doSomethingWithThisChunkOfOutput($output);
-            $this->doSomethingWithThisChunkOfOutput($error);
+            Process::run($sshCommand, function (string $type, string $output) {
+                $this->doSomethingWithThisChunkOfOutput($output);
+            });
+            if ($this->showTimeStamps) {
+                $this->outputs = str($this->outputs)->split('/\n/')->sort(function ($a, $b) {
+                    $a = explode(' ', $a);
+                    $b = explode(' ', $b);
+                    return $a[0] <=> $b[0];
+                })->join("\n");
+            }
         }
     }
     public function render()
