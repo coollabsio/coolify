@@ -45,7 +45,7 @@ services:
       - /data/coolify/_volumes/redis/:/data
       # - coolify-redis-data-dev:/data
   vite:
-    image: node:19
+    image: node:20
     working_dir: /var/www/html
     ports:
       - "${VITE_PORT:-5173}:${VITE_PORT:-5173}"

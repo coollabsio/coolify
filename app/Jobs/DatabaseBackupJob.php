@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Database\StopDatabase;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -22,6 +23,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
+use Throwable;
 
 class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -64,6 +66,14 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         try {
+            // Check if team is exists
+            if (is_null($this->team)) {
+                $this->backup->update(['status' => 'failed']);
+                StopDatabase::run($this->database);
+                $this->database->delete();
+                return;
+            }
+
             $status = Str::of(data_get($this->database, 'status'));
             if (!$status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
