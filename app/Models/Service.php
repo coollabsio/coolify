@@ -257,13 +257,25 @@ class Service extends BaseModel
                         ]);
                     }
                 }
-                $networks = $serviceNetworks->toArray();
-                foreach ($definedNetwork as $key => $network) {
-                    $networks = array_merge($networks, [
-                        $network
-                    ]);
+                $networks = collect();
+                foreach ($serviceNetworks as $key =>$serviceNetwork) {
+                    if (gettype($serviceNetwork) === 'string') {
+                        // networks:
+                        //  - appwrite
+                        $networks->put($serviceNetwork, null);
+                    } else if (gettype($serviceNetwork) === 'array') {
+                        // networks:
+                        //   default:
+                        //     ipv4_address: 192.168.203.254
+                        // $networks->put($serviceNetwork, null);
+                        ray($key);
+                        $networks->put($key,$serviceNetwork);
+                    }
                 }
-                data_set($service, 'networks', $networks);
+                foreach ($definedNetwork as $key => $network) {
+                    $networks->put($network, null);
+                }
+                data_set($service, 'networks', $networks->toArray());
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {

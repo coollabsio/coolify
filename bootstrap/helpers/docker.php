@@ -6,6 +6,7 @@ use App\Models\Server;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
+use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
@@ -141,6 +142,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     foreach ($domains as $loop => $domain) {
+        $uuid = new Cuid2(7);
         $url = Url::fromString($domain);
         $host = $url->getHost();
         $path = $url->getPath();
