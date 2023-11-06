@@ -32,8 +32,14 @@ class MagicController extends Controller
 
     public function environments()
     {
+        $project = Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->first();
+        if (!$project) {
+            return response()->json([
+                'environments' => []
+            ]);
+        }
         return response()->json([
-            'environments' => Project::ownedByCurrentTeam()->whereUuid(request()->query('project_uuid'))->first()->environments
+            'environments' => $project->environments
         ]);
     }
 
