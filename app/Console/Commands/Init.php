@@ -67,7 +67,7 @@ class Init extends Command
                     ray('Application without environment', $application->name);
                     $application->delete();
                 }
-                if (!data_get($application, 'server')) {
+                if (!data_get($application, 'destination.server')) {
                     ray('Application without server', $application->name);
                     $application->delete();
                 }
@@ -86,7 +86,7 @@ class Init extends Command
                     ray('Postgresql without environment', $postgresql->name);
                     $postgresql->delete();
                 }
-                if (!data_get($postgresql, 'server')) {
+                if (!data_get($postgresql, 'destination.server')) {
                     ray('Postgresql without server', $postgresql->name);
                     $postgresql->delete();
                 }
@@ -105,7 +105,7 @@ class Init extends Command
                     ray('Redis without environment', $redis->name);
                     $redis->delete();
                 }
-                if (!data_get($redis, 'server')) {
+                if (!data_get($redis, 'destination.server')) {
                     ray('Redis without server', $redis->name);
                     $redis->delete();
                 }
@@ -125,7 +125,7 @@ class Init extends Command
                     ray('Mongodb without environment', $mongodb->name);
                     $mongodb->delete();
                 }
-                if (!data_get($mongodb, 'server')) {
+                if (!data_get($mongodb, 'destination.server')) {
                     ray('Mongodb without server', $mongodb->name);
                     $mongodb->delete();
                 }
@@ -145,7 +145,7 @@ class Init extends Command
                     ray('Mysql without environment', $mysql->name);
                     $mysql->delete();
                 }
-                if (!data_get($mysql, 'server')) {
+                if (!data_get($mysql, 'destination.server')) {
                     ray('Mysql without server', $mysql->name);
                     $mysql->delete();
                 }
@@ -165,7 +165,7 @@ class Init extends Command
                     ray('Mariadb without environment', $mariadb->name);
                     $mariadb->delete();
                 }
-                if (!data_get($mariadb, 'server')) {
+                if (!data_get($mariadb, 'destination.server')) {
                     ray('Mariadb without server', $mariadb->name);
                     $mariadb->delete();
                 }
