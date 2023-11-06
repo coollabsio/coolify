@@ -3,7 +3,7 @@
         <li class="inline-flex items-center">
             <a class="text-xs truncate lg:text-sm"
                 href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
-                {{ $resource->environment->project->name }}</a>
+                {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
         </li>
         <li>
             <div class="flex items-center">
