@@ -24,10 +24,10 @@ services:
       - appwrite-certificates:/storage/certificates:rw
       - appwrite-functions:/storage/functions:rw
     depends_on:
-      - mariadb
-      - redis
-#      - clamav
-      - influxdb
+      - appwrite-mariadb
+      - appwrite-redis
+#      - appwrite-clamav
+      - appwrite-influxdb
     environment:
       - SERVICE_FQDN_APPWRITE=/
       - _APP_ENV
@@ -128,8 +128,8 @@ services:
     entrypoint: realtime
     <<: *x-logging
     depends_on:
-      - mariadb
-      - redis
+      - appwrite-mariadb
+      - appwrite-redis
     environment:
       - SERVICE_FQDN_APPWRITE=/v1/realtime
       - _APP_ENV
@@ -155,8 +155,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-audits
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -179,8 +179,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-webhooks
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -199,8 +199,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-deletes
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-uploads:/storage/uploads:rw
       - appwrite-cache:/storage/cache:rw
@@ -252,8 +252,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-databases
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -276,8 +276,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-builds
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-functions:/storage/functions:rw
       - appwrite-builds:/storage/builds:rw
@@ -335,8 +335,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-certificates
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
     volumes:
       - appwrite-config:/storage/config:rw
       - appwrite-certificates:/storage/certificates:rw
@@ -366,8 +366,8 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-functions
     depends_on:
-      - redis
-      - mariadb
+      - appwrite-redis
+      - appwrite-mariadb
       - openruntimes-executor
     environment:
       - _APP_ENV
@@ -400,7 +400,7 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-mails
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -425,7 +425,7 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-messaging
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -444,7 +444,7 @@ services:
     <<: *x-logging
     container_name: appwrite-worker-migrations
     depends_on:
-      - mariadb
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -472,7 +472,7 @@ services:
     <<: *x-logging
     container_name: appwrite-maintenance
     depends_on:
-      - redis
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -503,8 +503,8 @@ services:
     container_name: appwrite-usage
     <<: *x-logging
     depends_on:
-      - influxdb
-      - mariadb
+      - appwrite-influxdb
+      - appwrite-mariadb
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -531,8 +531,8 @@ services:
     container_name: appwrite-schedule
     <<: *x-logging
     depends_on:
-      - mariadb
-      - redis
+      - appwrite-mariadb
+      - appwrite-redis
     environment:
       - _APP_ENV
       - _APP_WORKER_PER_CORE
@@ -601,7 +601,7 @@ services:
       - OPR_EXECUTOR_STORAGE_WASABI_REGION=$_APP_STORAGE_WASABI_REGION
       - OPR_EXECUTOR_STORAGE_WASABI_BUCKET=$_APP_STORAGE_WASABI_BUCKET
 
-  mariadb:
+  appwrite-mariadb:
     image: mariadb:10.7 # fix issues when upgrading using: mysql_upgrade -u root -p
     container_name: appwrite-mariadb
     <<: *x-logging
@@ -614,7 +614,7 @@ services:
       - MYSQL_PASSWORD=${_APP_DB_PASS}
     command: 'mysqld --innodb-flush-method=fsync'
 
-  redis:
+  appwrite-redis:
     image: redis:7.0.4-alpine
     container_name: appwrite-redis
     <<: *x-logging
@@ -626,21 +626,21 @@ services:
     volumes:
       - appwrite-redis:/data:rw
 
-  # clamav:
+  # appwrite-clamav:
   #   image: appwrite/clamav:1.2.0
   #   container_name: appwrite-clamav
   #
   #   volumes:
   #     - appwrite-uploads:/storage/uploads
 
-  influxdb:
+  appwrite-influxdb:
     image: appwrite/influxdb:1.5.0
     container_name: appwrite-influxdb
     <<: *x-logging
     volumes:
       - appwrite-influxdb:/var/lib/influxdb:rw
 
-  telegraf:
+  appwrite-telegraf:
     image: appwrite/telegraf:1.4.0
     container_name: appwrite-telegraf
     <<: *x-logging
