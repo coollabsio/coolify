@@ -50,7 +50,7 @@
                 <h3>Build</h3>
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
-                        <div>Nixpacks will detect your package manager/configurations: <a class="underline" href="https://nixpacks.com/docs/providersnode">Nixpacks documentation</a></div>
+                        <div>Nixpacks will detect your package manager/configurations: <a class="underline" href="https://nixpacks.com/docs/providers">Nixpacks documentation</a></div>
                         <div class="text-warning">You probably do not need to modify the commands below.</div>
                         <div class="flex flex-col gap-2 xl:flex-row">
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.install_command"
