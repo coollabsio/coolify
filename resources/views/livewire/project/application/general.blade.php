@@ -49,13 +49,20 @@
             @if ($application->build_pack !== 'dockerimage')
                 <h3>Build</h3>
                 @if ($application->could_set_build_commands())
-                    <div class="flex flex-col gap-2 xl:flex-row">
-                        <x-forms.input placeholder="pnpm install" id="application.install_command"
-                            label="Install Command" />
-                        <x-forms.input placeholder="pnpm build" id="application.build_command" label="Build Command" />
-                        <x-forms.input placeholder="pnpm start" id="application.start_command" label="Start Command" />
-                    </div>
+                    @if ($application->build_pack === 'nixpacks')
+                        <div>Nixpacks will detect your package manager/configurations: <a class="underline" href="https://nixpacks.com/docs/providersnode">Nixpacks documentation</a></div>
+                        <div class="text-warning">You probably do not need to modify the commands below.</div>
+                        <div class="flex flex-col gap-2 xl:flex-row">
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.install_command"
+                                label="Install Command" />
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.build_command"
+                                label="Build Command" />
+                            <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml" id="application.start_command"
+                                label="Start Command" />
+                        </div>
+                    @endif
                 @endif
+
 
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
