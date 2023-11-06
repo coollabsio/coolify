@@ -60,6 +60,23 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->update([
                     'unreachable_count' => 0,
                 ]);
+                // Update all applications, databases and services to exited
+                foreach($this->server->applications() as $application) {
+                    $application->update(['status' => 'exited']);
+                }
+                foreach($this->server->databases() as $database) {
+                    $database->update(['status' => 'exited']);
+                }
+                foreach($this->server->services() as $service) {
+                    $apps = $service->applications()->get();
+                    $dbs = $service->databases()->get();
+                    foreach ($apps as $app) {
+                        $app->update(['status' => 'exited']);
+                    }
+                    foreach ($dbs as $db) {
+                        $db->update(['status' => 'exited']);
+                    }
+                }
                 return;
             }
             $result = $this->server->validateConnection();
