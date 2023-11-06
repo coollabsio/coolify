@@ -61,12 +61,14 @@ class ResourcesDelete extends Command
 
         foreach ($serversToDelete as $server) {
             $toDelete = $servers->where('id', $server)->first();
-            $this->info($toDelete);
-            $confirmed = confirm("Are you sure you want to delete all selected resources?");
-            if (!$confirmed) {
-                break;
+            if ($toDelete) {
+                $this->info($toDelete);
+                $confirmed = confirm("Are you sure you want to delete all selected resources?");
+                if (!$confirmed) {
+                    break;
+                }
+                $toDelete->delete();
             }
-            $toDelete->delete();
         }
     }
     private function deleteApplication()
@@ -82,14 +84,15 @@ class ResourcesDelete extends Command
         );
 
         foreach ($applicationsToDelete as $application) {
-            ray($application);
             $toDelete = $applications->where('id', $application)->first();
-            $this->info($toDelete);
-            $confirmed = confirm("Are you sure you want to delete all selected resources? ");
-            if (!$confirmed) {
-                break;
+            if ($toDelete) {
+                $this->info($toDelete);
+                $confirmed = confirm("Are you sure you want to delete all selected resources? ");
+                if (!$confirmed) {
+                    break;
+                }
+                $toDelete->delete();
             }
-            $toDelete->delete();
         }
     }
     private function deleteDatabase()
@@ -106,12 +109,14 @@ class ResourcesDelete extends Command
 
         foreach ($databasesToDelete as $database) {
             $toDelete = $databases->where('id', $database)->first();
-            $this->info($toDelete);
-            $confirmed = confirm("Are you sure you want to delete all selected resources?");
-            if (!$confirmed) {
-                return;
+            if ($toDelete) {
+                $this->info($toDelete);
+                $confirmed = confirm("Are you sure you want to delete all selected resources?");
+                if (!$confirmed) {
+                    return;
+                }
+                $toDelete->delete();
             }
-            $toDelete->delete();
         }
     }
     private function deleteService()
@@ -128,12 +133,14 @@ class ResourcesDelete extends Command
 
         foreach ($servicesToDelete as $service) {
             $toDelete = $services->where('id', $service)->first();
-            $this->info($toDelete);
-            $confirmed = confirm("Are you sure you want to delete all selected resources?");
-            if (!$confirmed) {
-                return;
+            if ($toDelete) {
+                $this->info($toDelete);
+                $confirmed = confirm("Are you sure you want to delete all selected resources?");
+                if (!$confirmed) {
+                    return;
+                }
+                $toDelete->delete();
             }
-            $toDelete->delete();
         }
     }
 }
