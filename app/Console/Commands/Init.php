@@ -18,15 +18,18 @@ use Illuminate\Support\Facades\Storage;
 
 class Init extends Command
 {
-    protected $signature = 'app:init';
+    protected $signature = 'app:init {--cleanup}';
     protected $description = 'Cleanup instance related stuffs';
 
     public function handle()
     {
         ray()->clearAll();
+        $cleanup = $this->option('cleanup');
+        if ($cleanup) {
+            $this->cleanup_stucked_resources();
+            $this->cleanup_ssh();
+        }
         $this->cleanup_in_progress_application_deployments();
-        $this->cleanup_stucked_resources();
-        // $this->cleanup_ssh();
     }
 
     private function cleanup_ssh()
