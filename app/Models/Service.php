@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 
@@ -23,21 +22,21 @@ class Service extends BaseModel
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
                 }
-                $application->persistentStorages()->delete();
             }
             foreach ($service->databases()->get() as $database) {
                 $storages = $database->persistentStorages()->get();
                 foreach ($storages as $storage) {
                     $storagesToDelete->push($storage);
                 }
-                $database->persistentStorages()->delete();
             }
             $service->environment_variables()->delete();
             $service->applications()->delete();
             $service->databases()->delete();
-            if ($storagesToDelete->count() > 0) {
-                $storagesToDelete->each(function ($storage) use ($service) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $service->server, false);
+
+            $server = data_get($service, 'server');
+            if ($server && $storagesToDelete->count() > 0) {
+                $storagesToDelete->each(function ($storage) use ($server) {
+                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
                 });
             }
         });

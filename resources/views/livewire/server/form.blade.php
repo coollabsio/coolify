@@ -62,7 +62,6 @@
                 helper="Disk cleanup job will be executed if disk usage is more than this number." />
         @endif
     </form>
-    <livewire:server.delete :server="$server" />
     <script>
         Livewire.on('installDocker', () => {
             installDocker.showModal();

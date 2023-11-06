@@ -6,6 +6,8 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
@@ -61,8 +63,12 @@ class Init extends Command
         try {
             $applications = Application::all();
             foreach ($applications as $application) {
-                if (!$application->environment) {
+                if (!data_get($application, 'environment')) {
                     ray('Application without environment', $application->name);
+                    $application->delete();
+                }
+                if (!data_get($application, 'server')) {
+                    ray('Application without server', $application->name);
                     $application->delete();
                 }
                 if (!$application->destination()) {
@@ -70,10 +76,18 @@ class Init extends Command
                     $application->delete();
                 }
             }
+        } catch (\Throwable $e) {
+            echo "Error in application: {$e->getMessage()}\n";
+        }
+        try {
             $postgresqls = StandalonePostgresql::all();
             foreach ($postgresqls as $postgresql) {
-                if (!$postgresql->environment) {
+                if (!data_get($postgresql, 'environment')) {
                     ray('Postgresql without environment', $postgresql->name);
+                    $postgresql->delete();
+                }
+                if (!data_get($postgresql, 'server')) {
+                    ray('Postgresql without server', $postgresql->name);
                     $postgresql->delete();
                 }
                 if (!$postgresql->destination()) {
@@ -81,10 +95,18 @@ class Init extends Command
                     $postgresql->delete();
                 }
             }
+        } catch (\Throwable $e) {
+            echo "Error in postgresql: {$e->getMessage()}\n";
+        }
+        try {
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
-                if (!$redis->environment) {
+                if (!data_get($redis, 'environment')) {
                     ray('Redis without environment', $redis->name);
+                    $redis->delete();
+                }
+                if (!data_get($redis, 'server')) {
+                    ray('Redis without server', $redis->name);
                     $redis->delete();
                 }
                 if (!$redis->destination()) {
@@ -92,10 +114,19 @@ class Init extends Command
                     $redis->delete();
                 }
             }
+        } catch (\Throwable $e) {
+            echo "Error in redis: {$e->getMessage()}\n";
+        }
+
+        try {
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
-                if (!$mongodb->environment) {
+                if (!data_get($mongodb, 'environment')) {
                     ray('Mongodb without environment', $mongodb->name);
+                    $mongodb->delete();
+                }
+                if (!data_get($mongodb, 'server')) {
+                    ray('Mongodb without server', $mongodb->name);
                     $mongodb->delete();
                 }
                 if (!$mongodb->destination()) {
@@ -103,10 +134,19 @@ class Init extends Command
                     $mongodb->delete();
                 }
             }
+        } catch (\Throwable $e) {
+            echo "Error in mongodb: {$e->getMessage()}\n";
+        }
+
+        try {
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
-                if (!$mysql->environment) {
+                if (!data_get($mysql, 'environment')) {
                     ray('Mysql without environment', $mysql->name);
+                    $mysql->delete();
+                }
+                if (!data_get($mysql, 'server')) {
+                    ray('Mysql without server', $mysql->name);
                     $mysql->delete();
                 }
                 if (!$mysql->destination()) {
@@ -114,10 +154,19 @@ class Init extends Command
                     $mysql->delete();
                 }
             }
-            $mariadbs = StandaloneMysql::all();
+        } catch (\Throwable $e) {
+            echo "Error in mysql: {$e->getMessage()}\n";
+        }
+
+        try {
+            $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
-                if (!$mariadb->environment) {
+                if (!data_get($mariadb, 'environment')) {
                     ray('Mariadb without environment', $mariadb->name);
+                    $mariadb->delete();
+                }
+                if (!data_get($mariadb, 'server')) {
+                    ray('Mariadb without server', $mariadb->name);
                     $mariadb->delete();
                 }
                 if (!$mariadb->destination()) {
@@ -125,13 +174,18 @@ class Init extends Command
                     $mariadb->delete();
                 }
             }
+        } catch (\Throwable $e) {
+            echo "Error in mariadb: {$e->getMessage()}\n";
+        }
+
+        try {
             $services = Service::all();
             foreach ($services as $service) {
-                if (!$service->environment) {
+                if (!data_get($service, 'environment')) {
                     ray('Service without environment', $service->name);
                     $service->delete();
                 }
-                if (!$service->server) {
+                if (!data_get($service, 'server')) {
                     ray('Service without server', $service->name);
                     $service->delete();
                 }
@@ -141,7 +195,18 @@ class Init extends Command
                 }
             }
         } catch (\Throwable $e) {
-            echo "Error: {$e->getMessage()}\n";
+            echo "Error in service: {$e->getMessage()}\n";
+        }
+        try {
+            $serviceApplications = ServiceApplication::all();
+            foreach ($serviceApplications as $service) {
+                if (!data_get($service, 'service')) {
+                    ray('ServiceApplication without service', $service->name);
+                    $service->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in serviceApplications: {$e->getMessage()}\n";
         }
     }
 }

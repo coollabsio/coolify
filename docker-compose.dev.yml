@@ -60,6 +60,14 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/coolify/:/data/coolify
       # - coolify-data-dev:/data/coolify
+  remote-host:
+    <<: *testing-host-base
+    container_name: coolify-remote-host
+    volumes:
+      - /:/host
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /data/coolify/:/data/coolify
+      # - coolify-data-dev:/data/coolify
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: coolify-mail
