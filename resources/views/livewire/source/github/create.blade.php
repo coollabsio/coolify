@@ -12,7 +12,7 @@
         </div>
         <div class="flex gap-2">
             <x-forms.input id="custom_user" label="Custom Git User" required />
-            <x-forms.input id="custom_port" label="Custom Git Port" required />
+            <x-forms.input id="custom_port" type="number" label="Custom Git Port" required />
         </div>
         @if (!isCloud())
             <x-forms.checkbox class="pt-2" id="is_system_wide" label="System Wide" />

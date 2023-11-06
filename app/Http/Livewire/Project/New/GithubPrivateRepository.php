@@ -11,7 +11,6 @@ use App\Traits\SaveFromRedirect;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Livewire\Component;
-use Spatie\Url\Url;
 
 class GithubPrivateRepository extends Component
 {
