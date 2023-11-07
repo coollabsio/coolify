@@ -69,7 +69,6 @@ class Backup extends Component
         ]);
         $this->database->refresh();
         $this->backup->refresh();
-        ray($this->backup);
         $this->s3s = S3Storage::whereTeamId(0)->get();
     }
 

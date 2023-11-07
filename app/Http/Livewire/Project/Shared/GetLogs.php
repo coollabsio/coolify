@@ -17,7 +17,7 @@ class GetLogs extends Component
     public int $numberOfLines = 100;
     public function doSomethingWithThisChunkOfOutput($output)
     {
-        $this->outputs .= $output;
+        $this->outputs .= removeAnsiColors($output);
     }
     public function instantSave()
     {

@@ -19,7 +19,11 @@ class BackupExecutions extends Component
             $this->emit('error', 'Backup execution not found.');
             return;
         }
-        delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
+        if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->service->destination->server);
+        } else {
+            delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
+        }
         $execution->delete();
         $this->emit('success', 'Backup deleted successfully.');
         $this->emit('refreshBackupExecutions');
@@ -33,7 +37,11 @@ class BackupExecutions extends Component
                 return;
             }
             $filename = data_get($execution, 'filename');
-            $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            if ($execution->scheduledDatabaseBackup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+                $server = $execution->scheduledDatabaseBackup->database->service->destination->server;
+            } else {
+                $server = $execution->scheduledDatabaseBackup->database->destination->server;
+            }
             $privateKeyLocation = savePrivateKeyToFs($server);
             $disk = Storage::build([
                 'driver' => 'sftp',

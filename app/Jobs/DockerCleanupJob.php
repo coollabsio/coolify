@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -22,7 +21,7 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
 
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))];
     }
 
     public function uniqueId(): string

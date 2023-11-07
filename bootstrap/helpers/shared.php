@@ -501,3 +501,6 @@ function generateDeployWebhook($resource) {
     $url = $api . $endpoint . "?uuid=$uuid&force=false";
     return $url;
 }
+function removeAnsiColors($text) {
+    return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
+}

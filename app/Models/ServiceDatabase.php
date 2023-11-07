@@ -20,6 +20,14 @@ class ServiceDatabase extends BaseModel
     {
         return 'service';
     }
+    public function databaseType()
+    {
+        $image = str($this->image)->before(':');
+        if ($image->value() === 'postgres') {
+            $image = 'postgresql';
+        }
+        return "standalone-$image";
+    }
     public function service()
     {
         return $this->belongsTo(Service::class);
@@ -35,5 +43,9 @@ class ServiceDatabase extends BaseModel
     public function getFilesFromServer(bool $isInit = false)
     {
         getFilesystemVolumesFromServer($this, $isInit);
+    }
+    public function scheduledBackups()
+    {
+        return $this->morphMany(ScheduledDatabaseBackup::class, 'database');
     }
 }

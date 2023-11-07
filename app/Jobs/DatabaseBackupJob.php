@@ -7,6 +7,7 @@ use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -32,7 +33,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public ?Team $team = null;
     public Server $server;
     public ScheduledDatabaseBackup $backup;
-    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database;
+    public StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database;
 
     public ?string $container_name = null;
     public ?ScheduledDatabaseBackupExecution $backup_log = null;
@@ -48,9 +49,15 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->backup = $backup;
         $this->team = Team::find($backup->team_id);
-        $this->database = data_get($this->backup, 'database');
-        $this->server = $this->database->destination->server;
-        $this->s3 = $this->backup->s3;
+        if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+            $this->database = data_get($this->backup, 'database');
+            $this->server = $this->database->service->server;
+            $this->s3 = $this->backup->s3;
+        } else {
+            $this->database = data_get($this->backup, 'database');
+            $this->server = $this->database->destination->server;
+            $this->s3 = $this->backup->s3;
+        }
     }
 
     public function middleware(): array
@@ -73,14 +80,38 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $this->database->delete();
                 return;
             }
-
             $status = Str::of(data_get($this->database, 'status'));
             if (!$status->startsWith('running') && $this->database->id !== 0) {
                 ray('database not running');
                 return;
             }
-            $databaseType = $this->database->type();
-            $databasesToBackup = data_get($this->backup, 'databases_to_backup');
+            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+                $databaseType = $this->database->databaseType();
+                $serviceUuid = $this->database->service->uuid;
+                if ($databaseType === 'standalone-postgresql') {
+                    $this->container_name = "postgresql-$serviceUuid";
+                    $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
+                    $envs = instant_remote_process($commands, $this->server);
+                    $databasesToBackup = Str::of($envs)->after('POSTGRES_DB=')->before("\n")->value();
+                    $this->database->postgres_user = Str::of($envs)->after('POSTGRES_USER=')->before("\n")->value();
+                } else if ($databaseType === 'standalone-mysql') {
+                    $this->container_name = "mysql-$serviceUuid";
+                    $commands[] = "docker exec $this->container_name env | grep MYSQL_";
+                    $envs = instant_remote_process($commands, $this->server);
+                    $databasesToBackup = Str::of($envs)->after('MYSQL_DATABASE=')->before("\n")->value();
+                    $this->database->mysql_root_password = Str::of($envs)->after('MYSQL_ROOT_PASSWORD=')->before("\n")->value();
+                } else if ($databaseType === 'standalone-mariadb') {
+                    $this->container_name = "mariadb-$serviceUuid";
+                    $commands[] = "docker exec $this->container_name env | grep MARIADB_";
+                    $envs = instant_remote_process($commands, $this->server);
+                    $databasesToBackup = Str::of($envs)->after('MARIADB_DATABASE=')->before("\n")->value();
+                    $this->database->mysql_root_password = Str::of($envs)->after('MARIADB_ROOT_PASSWORD=')->before("\n")->value();
+                }
+            } else {
+                $this->container_name = $this->database->uuid;
+                $databaseType = $this->database->type();
+                $databasesToBackup = data_get($this->backup, 'databases_to_backup');
+            }
 
             if (is_null($databasesToBackup)) {
                 if ($databaseType === 'standalone-postgresql') {
@@ -116,7 +147,6 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     return;
                 }
             }
-            $this->container_name = $this->database->uuid;
             $this->backup_dir = backup_dir() . "/databases/" . Str::of($this->team->name)->slug() . '-' . $this->team->id . '/' . $this->container_name;
 
             if ($this->database->name === 'coolify-db') {
@@ -314,7 +344,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->backup->number_of_backups_locally === 0) {
             $deletable = $this->backup->executions()->where('status', 'success');
         } else {
-            $deletable = $this->backup->executions()->where('status', 'success')->orderByDesc('created_at')->skip($this->backup->number_of_backups_locally);
+            $deletable = $this->backup->executions()->where('status', 'success')->orderByDesc('created_at')->skip($this->backup->number_of_backups_locally - 1);
         }
         foreach ($deletable->get() as $execution) {
             delete_backup_locally($execution->filename, $this->server);
@@ -334,8 +364,12 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection();
-            $commands[] = "docker run --pull=always -d --network {$this->database->destination->network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper >/dev/null 2>&1";
-
+            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+                $network = $this->database->service->destination->network;
+            } else {
+                $network = $this->database->destination->network;
+            }
+            $commands[] = "docker run --pull=always -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);

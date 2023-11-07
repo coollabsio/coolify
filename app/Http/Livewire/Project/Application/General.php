@@ -55,6 +55,7 @@ class General extends Component
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
         'application.custom_labels' => 'nullable',
+        'application.dockerfile_target_build' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -77,6 +78,7 @@ class General extends Component
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.custom_labels' => 'Custom labels',
+        'application.dockerfile_target_build' => 'Dockerfile target build',
     ];
 
     public function mount()

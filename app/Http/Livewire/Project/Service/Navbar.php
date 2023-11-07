@@ -27,11 +27,15 @@ class Navbar extends Component
         $activity = StartService::run($this->service);
         $this->emit('newMonitorActivity', $activity->id);
     }
-    public function stop()
+    public function stop(bool $forceCleanup = false)
     {
         StopService::run($this->service);
         $this->service->refresh();
-        $this->emit('success', 'Service stopped successfully.');
+        if ($forceCleanup) {
+            $this->emit('success', 'Force cleanup service successfully.');
+        } else {
+            $this->emit('success', 'Service stopped successfully.');
+        }
         $this->emit('checkStatus');
     }
 }
