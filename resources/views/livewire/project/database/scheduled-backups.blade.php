@@ -26,7 +26,7 @@
     </div>
     @if ($type === 'service-database' && $selectedBackup)
         <div class="pt-10">
-            <livewire:project.database.backup-edit key="{{ $selectedBackup->id }}" :backup="$selectedBackup" :s3s="collect()"
+            <livewire:project.database.backup-edit key="{{ $selectedBackup->id }}" :backup="$selectedBackup" :s3s="$s3s"
                 :status="data_get($database, 'status')" />
             <h3 class="py-4">Executions</h3>
             <livewire:project.database.backup-executions key="{{ $selectedBackup->id }}" :backup="$selectedBackup"

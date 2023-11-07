@@ -11,6 +11,7 @@ class ScheduledBackups extends Component
     public $type;
     public $selectedBackup;
     public $selectedBackupId;
+    public $s3s;
     protected $listeners = ['refreshScheduledBackups'];
     protected $queryString = ['selectedBackupId'];
 
@@ -25,6 +26,7 @@ class ScheduledBackups extends Component
         } else {
             $this->type = 'database';
         }
+        $this->s3s = currentTeam()->s3s;
     }
     public function setSelectedBackup($backupId) {
         $this->selectedBackupId = $backupId;

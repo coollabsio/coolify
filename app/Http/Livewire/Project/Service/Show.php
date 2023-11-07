@@ -16,6 +16,8 @@ class Show extends Component
     public array $parameters;
     public array $query;
     public Collection $services;
+    public $s3s;
+
     protected $listeners = ['generateDockerCompose'];
 
     public function mount()
@@ -33,6 +35,7 @@ class Show extends Component
                 $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
                 $this->serviceDatabase->getFilesFromServer();
             }
+            $this->s3s = currentTeam()->s3s;
         } catch(\Throwable $e) {
             return handleError($e, $this);
         }

@@ -364,8 +364,12 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
             $bucket = $this->s3->bucket;
             $endpoint = $this->s3->endpoint;
             $this->s3->testConnection();
-            $commands[] = "docker run --pull=always -d --network {$this->database->destination->network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper >/dev/null 2>&1";
-
+            if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
+                $network = $this->database->service->destination->network;
+            } else {
+                $network = $this->database->destination->network;
+            }
+            $commands[] = "docker run --pull=always -d --network {$network} --name backup-of-{$this->backup->uuid} --rm -v $this->backup_location:$this->backup_location:ro ghcr.io/coollabsio/coolify-helper";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc config host add temporary {$endpoint} $key $secret";
             $commands[] = "docker exec backup-of-{$this->backup->uuid} mc cp $this->backup_location temporary/$bucket{$this->backup_dir}/";
             instant_remote_process($commands, $this->server);

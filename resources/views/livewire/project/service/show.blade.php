@@ -54,7 +54,7 @@
                         <h2 class="pb-4">Scheduled Backups</h2>
                         <x-forms.button onclick="createScheduledBackup.showModal()">+ Add</x-forms.button>
                     </div>
-                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="collect()" />
+                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="$s3s" />
                     <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                 </div>
             @endisset
