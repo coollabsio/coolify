@@ -22,7 +22,7 @@ class StartService
         $commands[] = "docker compose pull";
         $commands[] = "echo '####### Starting containers.'";
         $commands[] = "docker compose up -d --remove-orphans --force-recreate";
-        $commands[] = "docker network connect $service->uuid coolify-proxy  || true";
+        $commands[] = "docker network connect $service->uuid coolify-proxy || true";
         $compose = data_get($service,'docker_compose',[]);
         $serviceNames = data_get(Yaml::parse($compose),'services',[]);
         foreach($serviceNames as $serviceName => $serviceConfig){
