@@ -6,7 +6,7 @@ services:
   gitea:
     image: gitea/gitea:latest
     environment:
-      - SERVICE_FQDN_GITEA
+      - SERVICE_FQDN_GITEA_3000
       - USER_UID=1000
       - USER_GID=1000
       - GITEA__database__DB_TYPE=postgres
@@ -18,8 +18,8 @@ services:
       - gitea-data:/var/lib/gitea
       - gitea-timezone:/etc/timezone:ro
       - gitea-localtime:/etc/localtime:ro
-    labels:
-      - "traefik.http.services.gitea-websecure.loadbalancer.server.port=3000"
+    ports:
+      - 22222:22
     depends_on:
       postgresql:
         condition: service_healthy
