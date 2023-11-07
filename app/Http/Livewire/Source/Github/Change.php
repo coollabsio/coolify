@@ -98,6 +98,7 @@ class Change extends Component
 
     public function instantSave()
     {
+        $this->submit();
     }
 
     public function delete()

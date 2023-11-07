@@ -41,7 +41,7 @@
                     <div class="w-48">
                         <x-forms.checkbox label="System Wide?"
                             helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                            instantSave id="is_system_wide" />
+                            instantSave id="github_app.is_system_wide" />
                     </div>
                 @endif
                 <div class="flex gap-2">
