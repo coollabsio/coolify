@@ -72,6 +72,7 @@
                         <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
                             label="Dockerfile Location"
                             helper="It is calculated together with the Base Directory: {{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}" />
+                        <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target" helper="Useful if you have multi-staged dockerfile." />
                     @endif
                     @if ($application->could_set_build_commands())
                         @if ($application->settings->is_static)

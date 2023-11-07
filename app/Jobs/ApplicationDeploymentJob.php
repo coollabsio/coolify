@@ -69,6 +69,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $docker_compose_base64;
     private string $dockerfile_location = '/Dockerfile';
     private ?string $addHosts = null;
+    private ?string $buildTarget = null;
     private $log_model;
     private Collection $saved_outputs;
 
@@ -177,6 +178,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->addHosts = $ips->map(function ($ip, $name) {
             return "--add-host $name:$ip";
         })->implode(' ');
+
+        if ($this->application->dockerfile_target_build) {
+            $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
+        }
 
         // Get user home directory
         $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
@@ -921,7 +926,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($this->application->settings->is_static) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
             ]);
 
             $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -959,7 +964,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
         } else {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
