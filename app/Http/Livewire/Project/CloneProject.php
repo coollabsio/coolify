@@ -104,6 +104,7 @@ class CloneProject extends Component
                 $uuid = (string)new Cuid2(7);
                 $newDatabase = $database->replicate()->fill([
                     'uuid' => $uuid,
+                    'status' => 'exited',
                     'environment_id' => $newEnvironment->id,
                     'destination_id' => $this->selectedServer,
                 ]);
@@ -111,15 +112,15 @@ class CloneProject extends Component
                 $environmentVaribles = $database->environment_variables()->get();
                 foreach ($environmentVaribles as $environmentVarible) {
                     $payload = [];
-                    if ($database->type() === 'standalone-postgres') {
+                    if ($database->type() === 'standalone-postgresql') {
                         $payload['standalone_postgresql_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone_redis') {
+                    } else if ($database->type() === 'standalone-redis') {
                         $payload['standalone_redis_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone_mongodb') {
+                    } else if ($database->type() === 'standalone-mongodb') {
                         $payload['standalone_mongodb_id'] = $newDatabase->id;
-                    } else if ($database->type() === 'standalone_mysql') {
+                    } else if ($database->type() === 'standalone-mysql') {
                         $payload['standalone_mysql_id'] = $newDatabase->id;
-                    }else if ($database->type() === 'standalone_mariadb') {
+                    } else if ($database->type() === 'standalone-mariadb') {
                         $payload['standalone_mariadb_id'] = $newDatabase->id;
                     }
                     $newEnvironmentVariable =  $environmentVarible->replicate()->fill($payload);
@@ -134,6 +135,16 @@ class CloneProject extends Component
                     'destination_id' => $this->selectedServer,
                 ]);
                 $newService->save();
+                foreach ($newService->applications() as $application) {
+                    $application->update([
+                        'status' => 'exited',
+                    ]);
+                }
+                foreach ($newService->databases() as $database) {
+                    $database->update([
+                        'status' => 'exited',
+                    ]);
+                }
                 $newService->parse();
             }
             return redirect()->route('project.resources', [

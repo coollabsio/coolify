@@ -7,10 +7,14 @@
                 <button><- Back</button>
             </a>
             <a :class="activeTab === 'general' && 'text-white'"
-                @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
+                @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
+                href="#">General</a>
             <a :class="activeTab === 'storages' && 'text-white'"
-                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
+                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'; if(window.location.search) window.location.search = ''"
+                href="#">Storages
             </a>
+            <a :class="activeTab === 'backups' && 'text-white'"
+                @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @if (data_get($parameters, 'service_name'))
                 <a class="{{ request()->routeIs('project.service.logs') ? 'text-white' : '' }}"
                     href="{{ route('project.service.logs', $parameters) }}">
@@ -43,8 +47,15 @@
                     </div>
                     <div class="pb-4">Persistent storage to preserve data between deployments.</div>
                     <span class="text-warning">Please modify storage layout in your Docker Compose file.</span>
-                    <livewire:project.service.storage wire:key="application-{{ $serviceDatabase->id }}"
-                        :resource="$serviceDatabase" />
+                    <livewire:project.service.storage wire:key="application-{{ $serviceDatabase->id }}" :resource="$serviceDatabase" />
+                </div>
+                <div x-cloak x-show="activeTab === 'backups'">
+                    <div class="flex gap-2 ">
+                        <h2 class="pb-4">Scheduled Backups</h2>
+                        <x-forms.button onclick="createScheduledBackup.showModal()">+ Add</x-forms.button>
+                    </div>
+                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="collect()" />
+                    <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                 </div>
             @endisset
         </div>

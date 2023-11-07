@@ -3,6 +3,7 @@
 namespace App\Http\Livewire\Project\Database;
 
 use Livewire\Component;
+use Spatie\Url\Url;
 
 class BackupEdit extends Component
 {
@@ -43,14 +44,23 @@ class BackupEdit extends Component
     {
         // TODO: Delete backup from server and add a confirmation modal
         $this->backup->delete();
-        redirect()->route('project.database.backups.all', $this->parameters);
+        if ($this->backup->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            $previousUrl = url()->previous();
+            $url = Url::fromString($previousUrl);
+            $url = $url->withoutQueryParameter('selectedBackupId');
+            $url = $url->withFragment('backups');
+            $url = $url->getPath() .  "#{$url->getFragment()}";
+            return redirect()->to($url);
+        } else {
+            redirect()->route('project.database.backups.all', $this->parameters);
+        }
+
     }
 
     public function instantSave()
     {
         try {
             $this->custom_validate();
-
             $this->backup->save();
             $this->backup->refresh();
             $this->emit('success', 'Backup updated successfully');

@@ -22,7 +22,8 @@ class CreateScheduledBackup extends Component
         'frequency' => 'Backup Frequency',
         'save_s3' => 'Save to S3',
     ];
-    public function mount() {
+    public function mount()
+    {
         if ($this->s3s->count() > 0) {
             $this->s3_storage_id = $this->s3s->first()->id;
         }
@@ -50,11 +51,16 @@ class CreateScheduledBackup extends Component
                 $payload['databases_to_backup'] = $this->database->postgres_db;
             } else if ($this->database->type() === 'standalone-mysql') {
                 $payload['databases_to_backup'] = $this->database->mysql_database;
-            }else if ($this->database->type() === 'standalone-mariadb') {
+            } else if ($this->database->type() === 'standalone-mariadb') {
                 $payload['databases_to_backup'] = $this->database->mariadb_database;
             }
-            ScheduledDatabaseBackup::create($payload);
-            $this->emit('refreshScheduledBackups');
+
+            $databaseBackup = ScheduledDatabaseBackup::create($payload);
+            if ($this->database->getMorphClass() === 'App\Models\ServiceDatabase') {
+                $this->emit('refreshScheduledBackups', $databaseBackup->id);
+            } else {
+                $this->emit('refreshScheduledBackups');
+            }
         } catch (\Throwable $e) {
             handleError($e, $this);
         } finally {
