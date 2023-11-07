@@ -20,11 +20,10 @@ use App\Http\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
 use App\Http\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Http\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Http\Livewire\Server\Show;
+use App\Http\Livewire\Source\Github\Change as GitHubChange;
 use App\Http\Livewire\Subscription\Show as SubscriptionShow;
 use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
-use App\Models\GithubApp;
 use App\Models\GitlabApp;
-use App\Models\InstanceSettings;
 use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
@@ -178,49 +177,7 @@ Route::middleware(['auth'])->group(function () {
             'sources' => $sources,
         ]);
     })->name('source.all');
-    Route::get('/source/github/{github_app_uuid}', function (Request $request) {
-        $github_app = GithubApp::where('uuid', request()->github_app_uuid)->first();
-        if (!$github_app) {
-            abort(404);
-        }
-        $github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-        $settings = InstanceSettings::get();
-        $name = Str::of(Str::kebab($github_app->name));
-        if ($settings->public_ipv4) {
-            $ipv4 = 'http://' . $settings->public_ipv4 . ':' . config('app.port');
-        }
-        if ($settings->public_ipv6) {
-            $ipv6 = 'http://' . $settings->public_ipv6 . ':' . config('app.port');
-        }
-        if ($github_app->installation_id && session('from')) {
-            $source_id = data_get(session('from'), 'source_id');
-            if (!$source_id || $github_app->id !== $source_id) {
-                session()->forget('from');
-            } else {
-                $parameters = data_get(session('from'), 'parameters');
-                $back = data_get(session('from'), 'back');
-                $environment_name = data_get($parameters, 'environment_name');
-                $project_uuid = data_get($parameters, 'project_uuid');
-                $type = data_get($parameters, 'type');
-                $destination = data_get($parameters, 'destination');
-                session()->forget('from');
-                return redirect()->route($back, [
-                    'environment_name' => $environment_name,
-                    'project_uuid' => $project_uuid,
-                    'type' => $type,
-                    'destination' => $destination,
-                ]);
-            }
-        }
-        return view('source.github.show', [
-            'github_app' => $github_app,
-            'name' => $name,
-            'ipv4' => $ipv4 ?? null,
-            'ipv6' => $ipv6 ?? null,
-            'fqdn' => $settings->fqdn,
-        ]);
-    })->name('source.github.show');
-
+    Route::get('/source/github/{github_app_uuid}', GitHubChange::class)->name('source.github.show');
     Route::get('/source/gitlab/{gitlab_app_uuid}', function (Request $request) {
         $gitlab_app = GitlabApp::where('uuid', request()->gitlab_app_uuid)->first();
         return view('source.gitlab.show', [
