@@ -113,7 +113,11 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     if ($db) {
                         $databasesToBackup = str($db)->after('POSTGRES_DB=')->value();
                     } else {
-                        throw new \Exception('POSTGRES_DB not found');
+                        if ($this->database->postgres_user) {
+                            $databasesToBackup = $this->database->postgres_user;
+                        } else {
+                            $databasesToBackup = 'postgres';
+                        }
                     }
                 } else if ($databaseType === 'standalone-mysql') {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
