@@ -84,11 +84,14 @@ class DeploymentFailed extends Notification implements ShouldQueue
         } else {
             $message = 'Coolify: Deployment failed of **' . $this->application_name . '** (' . $this->fqdn . '): ';
         }
+        $buttons[] = [
+            "text" => "Deployment logs",
+            "url" => $this->deployment_url
+        ];
         return [
             "message" => $message,
             "buttons" => [
-                "text" => "View Deployment Logs",
-                "url" => $this->deployment_url
+                ...$buttons
             ],
         ];
     }
