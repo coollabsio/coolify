@@ -91,26 +91,91 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 $serviceUuid = $this->database->service->uuid;
                 $serviceName = str($this->database->service->name)->slug();
                 if ($databaseType === 'standalone-postgresql') {
-                    $this->container_name = "postgresql-$serviceUuid";
+                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep POSTGRES_";
                     $envs = instant_remote_process($commands, $this->server);
-                    $databasesToBackup = Str::of($envs)->after('POSTGRES_DB=')->before("\n")->value();
-                    $this->database->postgres_user = Str::of($envs)->after('POSTGRES_USER=')->before("\n")->value();
+                    $envs = str($envs)->explode("\n");
+
+                    $user = $envs->filter(function ($env) {
+                        return str($env)->startsWith('POSTGRES_USER=');
+                    })->first();
+                    if ($user) {
+                        $this->database->postgres_user = str($user)->after('POSTGRES_USER=')->value();
+                    } else {
+                        $this->database->postgres_user = 'postgres';
+                    }
+
+                    $db = $envs->filter(function ($env) {
+                        return str($env)->startsWith('POSTGRES_DB=');
+                    })->first();
+
+                    if ($db) {
+                        $databasesToBackup = str($db)->after('POSTGRES_DB=')->value();
+                    } else {
+                        throw new \Exception('POSTGRES_DB not found');
+                    }
                 } else if ($databaseType === 'standalone-mysql') {
-                    $this->container_name = "mysql-$serviceUuid";
+                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MYSQL_";
                     $envs = instant_remote_process($commands, $this->server);
-                    $databasesToBackup = Str::of($envs)->after('MYSQL_DATABASE=')->before("\n")->value();
-                    $this->database->mysql_root_password = Str::of($envs)->after('MYSQL_ROOT_PASSWORD=')->before("\n")->value();
+                    $envs = str($envs)->explode("\n");
+
+                    $rootPassword = $envs->filter(function ($env) {
+                        return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
+                    })->first();
+                    if ($rootPassword) {
+                        $this->database->mysql_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
+                    }
+
+                    $db = $envs->filter(function ($env) {
+                        return str($env)->startsWith('MYSQL_DATABASE=');
+                    })->first();
+
+                    if ($db) {
+                        $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
+                    } else {
+                        throw new \Exception('MYSQL_DATABASE not found');
+                    }
                 } else if ($databaseType === 'standalone-mariadb') {
-                    $this->container_name = "mariadb-$serviceUuid";
+                    $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
                     $commands[] = "docker exec $this->container_name env | grep MARIADB_";
                     $envs = instant_remote_process($commands, $this->server);
-                    $databasesToBackup = Str::of($envs)->after('MARIADB_DATABASE=')->before("\n")->value();
-                    $this->database->mysql_root_password = Str::of($envs)->after('MARIADB_ROOT_PASSWORD=')->before("\n")->value();
+                    $envs = str($envs)->explode("\n");
+
+                    $rootPassword = $envs->filter(function ($env) {
+                        return str($env)->startsWith('MARIADB_ROOT_PASSWORD=');
+                    })->first();
+                    if ($rootPassword) {
+                        $this->database->mysql_root_password = str($rootPassword)->after('MARIADB_ROOT_PASSWORD=')->value();
+                    } else {
+                        $rootPassword = $envs->filter(function ($env) {
+                            return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
+                        })->first();
+                        if ($rootPassword) {
+                            $this->database->mysql_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
+                        }
+                    }
+
+                    $db = $envs->filter(function ($env) {
+                        return str($env)->startsWith('MARIADB_DATABASE=');
+                    })->first();
+
+                    if ($db) {
+                        $databasesToBackup = str($db)->after('MARIADB_DATABASE=')->value();
+                    } else {
+                        $db = $envs->filter(function ($env) {
+                            return str($env)->startsWith('MYSQL_DATABASE=');
+                        })->first();
+
+                        if ($db) {
+                            $databasesToBackup = str($db)->after('MYSQL_DATABASE=')->value();
+                        } else {
+                            throw new \Exception('MARIADB_DATABASE or MYSQL_DATABASE not found');
+                        }
+                    }
                 }
             } else {
                 $databaseName = str($this->database->name)->slug()->value();
