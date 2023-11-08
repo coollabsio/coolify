@@ -31,7 +31,7 @@ class Logs extends Component
             $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;
-            $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id);
+            $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
             if ($containers->count() > 0) {
                 $this->container = data_get($containers[0], 'Names');
             }

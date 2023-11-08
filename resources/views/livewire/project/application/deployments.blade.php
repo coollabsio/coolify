@@ -13,7 +13,7 @@
     @forelse ($deployments as $deployment)
         <a @class([
             'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
-            'cursor-not-allowed hover:bg-coolgray-200' =>
+            'hover:bg-coolgray-200' =>
                 data_get($deployment, 'status') === 'queued' ||
                 data_get($deployment, 'status') === 'cancelled by system',
             'border-warning hover:bg-warning hover:text-black' =>

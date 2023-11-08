@@ -3,7 +3,6 @@
 namespace App\Actions\Application;
 
 use App\Models\Application;
-use App\Notifications\Application\StatusChanged;
 use Lorisleiva\Actions\Concerns\AsAction;
 
 class StopApplication
@@ -12,7 +11,7 @@ class StopApplication
     public function handle(Application $application)
     {
         $server = $application->destination->server;
-        $containers = getCurrentApplicationContainerStatus($server, $application->id);
+        $containers = getCurrentApplicationContainerStatus($server, $application->id, 0);
         if ($containers->count() > 0) {
             foreach ($containers as $container) {
                 $containerName = data_get($container, 'Names');
