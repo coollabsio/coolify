@@ -44,6 +44,9 @@ class General extends Component
     public function submit()
     {
         try {
+            if (str($this->database->public_port)->isEmpty()) {
+                $this->database->public_port = null;
+            }
             $this->validate();
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');

@@ -42,10 +42,13 @@ class General extends Component
     public function submit()
     {
         try {
-            $this->validate();
-            if ($this->database->mongo_conf === "") {
+            if (str($this->database->public_port)->isEmpty()) {
+                $this->database->public_port = null;
+            }
+            if (str($this->database->mongo_conf)->isEmpty()) {
                 $this->database->mongo_conf = null;
             }
+            $this->validate();
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');
         } catch (Exception $e) {
