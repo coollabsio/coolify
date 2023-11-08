@@ -52,7 +52,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private GithubApp|GitlabApp|string $source = 'other';
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
-    private ApplicationPreview|null $preview = null;
+    private ?ApplicationPreview $preview = null;
 
     private string $container_name;
     private ?string $currently_running_container_name = null;
@@ -139,21 +139,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
-        // ray()->measure();
-        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-        if ($containers->count() === 1) {
-            $this->currently_running_container_name = data_get($containers[0], 'Names');
-        } else {
-            $foundContainer = $containers->filter(function ($container) {
-                return !str(data_get($container, 'Names'))->startsWith("{$this->application->uuid}-pr-");
-            })->first();
-            if ($foundContainer) {
-                $this->currently_running_container_name = data_get($foundContainer, 'Names');
-            }
-        }
-        if ($this->pull_request_id !== 0 && $this->pull_request_id !== null) {
-            $this->currently_running_container_name = $this->container_name;
-        }
         $this->application_deployment_queue->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
@@ -502,6 +487,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_pull_request()
     {
+        $this->newVersionIsHealthy = true;
         $this->generate_image_names();
         $this->execute_remote_command([
             "echo 'Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.'",
@@ -518,12 +504,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // $this->generate_build_env_variables();
         // $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        if ($this->currently_running_container_name) {
-            $this->execute_remote_command(
-                ["echo -n 'Removing old version of your application.'"],
-                [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
-            );
-        }
+        $this->stop_running_container();
         $this->execute_remote_command(
             ["echo -n 'Starting preview deployment.'"],
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
@@ -980,18 +961,30 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function stop_running_container(bool $force = false)
     {
-        if ($this->currently_running_container_name) {
-            if ($this->newVersionIsHealthy || $force) {
-                $this->execute_remote_command(
-                    ["echo -n 'Removing old version of your application.'"],
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->currently_running_container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
-                );
+        $this->execute_remote_command(["echo -n 'Removing old version of your application.'"]);
+
+        if ($this->newVersionIsHealthy || $force) {
+            $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+            if ($this->pull_request_id !== 0) {
+                $containers = $containers->filter(function ($container) {
+                    return data_get($container, 'Names') === $this->container_name;
+                });
             } else {
-                $this->execute_remote_command(
-                    ["echo -n 'New version is not healthy, rolling back to the old version.'"],
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
-                );
+                $containers = $containers->filter(function ($container) {
+                    return data_get($container, 'Names') !== $this->container_name;
+                });
             }
+            $containers->each(function ($container) {
+                $containerName = data_get($container, 'Names');
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+                );
+            });
+        } else {
+            $this->execute_remote_command(
+                ["echo -n 'New version is not healthy, rolling back to the old version.'"],
+                [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+            );
         }
     }
 
@@ -1057,8 +1050,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         $this->execute_remote_command(
             ["echo 'Oops something is not okay, are you okay? 😢'"],
-            ["echo '{$exception->getMessage()}'"]
+            ["echo '{$exception->getMessage()}'"],
+            ["echo -n 'Deployment failed. Removing the new version of your application.'"],
+            [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true]
         );
+
         $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }

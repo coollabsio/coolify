@@ -50,9 +50,9 @@
                 <h3>Build</h3>
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
-                        <div>Nixpacks will detect your package manager/configurations: <a class="underline"
-                                href="https://nixpacks.com/docs/providers">Nixpacks documentation</a></div>
-                        <div class="text-warning">You probably do not need to modify the commands below.</div>
+                        <div>Nixpacks will detect the required configuration automatically.
+                            <a class="underline" href="https://coolify.io/docs/frameworks">Framework Specific Docs</a>
+                        </div>
                         <div class="flex flex-col gap-2 xl:flex-row">
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.install_command" label="Install Command" />
@@ -72,7 +72,8 @@
                         <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
                             label="Dockerfile Location"
                             helper="It is calculated together with the Base Directory: {{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}" />
-                        <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target" helper="Useful if you have multi-staged dockerfile." />
+                        <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target"
+                            helper="Useful if you have multi-staged dockerfile." />
                     @endif
                     @if ($application->could_set_build_commands())
                         @if ($application->settings->is_static)

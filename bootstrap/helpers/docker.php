@@ -10,15 +10,24 @@ use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
-    if ($pullRequestId) {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --filter='label=coolify.pullRequestId={$pullRequestId}' --format '{{json .}}' "], $server);
-    } else {
-        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}'"], $server);
-    }
-    if (!$containers) {
-        return collect([]);
-    }
-    return format_docker_command_output_to_json($containers);
+    ray($id, $pullRequestId);
+    $containers = collect([]);
+    $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
+    $containers = format_docker_command_output_to_json($containers);
+    $containers = $containers->map(function ($container) use ($pullRequestId) {
+        $labels = data_get($container, 'Labels');
+        if (!str($labels)->contains("coolify.pullRequestId=")) {
+            data_set($container, 'Labels', $labels . ",coolify.pullRequestId={$pullRequestId}");
+            return $container;
+        }
+        if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
+            return $container;
+        }
+        return null;
+    });
+    $containers = $containers->filter();
+    ray($containers);
+    return $containers;
 }
 
 function format_docker_command_output_to_json($rawOutput): Collection
@@ -128,9 +137,7 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     $labels->push("coolify." . $type . "Id=" . $id);
     $labels->push("coolify.type=$type");
     $labels->push('coolify.name=' . $name);
-    if ($pull_request_id !== 0) {
-        $labels->push('coolify.pullRequestId=' . $pull_request_id);
-    }
+    $labels->push('coolify.pullRequestId=' . $pull_request_id);
     if ($type === 'service') {
         $labels->push('coolify.service.subId=' . $subId);
         $labels->push('coolify.service.subType=' . $subType);
