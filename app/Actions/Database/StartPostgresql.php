@@ -32,6 +32,8 @@ class StartPostgresql
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
         $this->generate_init_scripts();
+        $this->add_custom_conf();
+
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -95,6 +97,19 @@ class StartPostgresql
                     'read_only' => true,
                 ];
             }
+        }
+        if (!is_null($this->database->postgres_conf)) {
+            $docker_compose['services'][$container_name]['volumes'][] = [
+                'type' => 'bind',
+                'source' => $this->configuration_dir . '/custom-postgres.conf',
+                'target' => '/etc/postgresql/postgresql.conf',
+                'read_only' => true,
+            ];
+            $docker_compose['services'][$container_name]['command'] = [
+                'postgres',
+                '-c',
+                'config_file=/etc/postgresql/postgresql.conf',
+            ];
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -170,5 +185,15 @@ class StartPostgresql
             $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
             $this->init_scripts[] = "$this->configuration_dir/docker-entrypoint-initdb.d/{$filename}";
         }
+    }
+    private function add_custom_conf()
+    {
+        if (is_null($this->database->postgres_conf)) {
+            return;
+        }
+        $filename = 'custom-postgres.conf';
+        $content = $this->database->postgres_conf;
+        $content_base64 = base64_encode($content);
+        $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
     }
 }

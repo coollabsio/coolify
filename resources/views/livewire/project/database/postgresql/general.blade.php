@@ -72,6 +72,7 @@
                     type="password" readonly wire:model="db_url_public" />
             @endif
         </div>
+        <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">
