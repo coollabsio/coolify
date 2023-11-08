@@ -14,9 +14,9 @@
                 href="#">Storages
             </a>
             @if (
-                $serviceDatabase->databaseType() === 'standalone-mysql' ||
-                    $serviceDatabase->databaseType() === 'standalone-postgresql' ||
-                    $serviceDatabase->databaseType() === 'standalone-mariadb')
+                $serviceDatabase?->databaseType() === 'standalone-mysql' ||
+                    $serviceDatabase?->databaseType() === 'standalone-postgresql' ||
+                    $serviceDatabase?->databaseType() === 'standalone-mariadb')
                 <a :class="activeTab === 'backups' && 'text-white'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
