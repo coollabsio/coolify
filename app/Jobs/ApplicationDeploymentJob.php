@@ -882,9 +882,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             foreach ($this->application->runtime_environment_variables as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
+            foreach ($this->application->nixpacks_environment_variables as $env) {
+                $environment_variables->push("$env->key=$env->value");
+            }
         } else {
             // ray($this->application->runtime_environment_variables_preview)->green();
             foreach ($this->application->runtime_environment_variables_preview as $env) {
+                $environment_variables->push("$env->key=$env->value");
+            }
+            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
                 $environment_variables->push("$env->key=$env->value");
             }
         }

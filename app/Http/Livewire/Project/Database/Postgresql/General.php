@@ -91,7 +91,6 @@ class General extends Component
         $collection = collect($this->database->init_scripts);
         $found = $collection->firstWhere('filename', $script['filename']);
         if ($found) {
-            ray($collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray());
             $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
             $this->database->save();
             $this->refresh();
@@ -135,6 +134,9 @@ class General extends Component
     public function submit()
     {
         try {
+            if (str($this->database->public_port)->isEmpty()) {
+                $this->database->public_port = null;
+            }
             $this->validate();
             $this->database->save();
             $this->emit('success', 'Database updated successfully.');

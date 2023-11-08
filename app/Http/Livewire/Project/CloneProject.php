@@ -105,6 +105,7 @@ class CloneProject extends Component
                 $newDatabase = $database->replicate()->fill([
                     'uuid' => $uuid,
                     'status' => 'exited',
+                    'started_at' => null,
                     'environment_id' => $newEnvironment->id,
                     'destination_id' => $this->selectedServer,
                 ]);
