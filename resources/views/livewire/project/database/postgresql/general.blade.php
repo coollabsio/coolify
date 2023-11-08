@@ -31,14 +31,15 @@
             <div class="flex gap-2">
                 <x-forms.input label="Initial Username" id="database.postgres_username" placeholder="If empty: postgres"
                     readonly helper="You can only change this in the database." />
-                <x-forms.input label="Initial Password" id="database.postgres_password" type="password" required readonly
-                    helper="You can only change this in the database." />
+                <x-forms.input label="Initial Password" id="database.postgres_password" type="password" required
+                    readonly helper="You can only change this in the database." />
                 <x-forms.input label="Initial Database" id="database.postgres_db"
                     placeholder="If empty, it will be the same as Username." readonly
                     helper="You can only change this in the database." />
             </div>
         @else
-            <div class="pt-8 text-warning">Please verify these values. You can only modify them before the initial start. After that, you need to modify it in the database.
+            <div class="pt-8 text-warning">Please verify these values. You can only modify them before the initial
+                start. After that, you need to modify it in the database.
             </div>
             <div class="flex gap-2 pb-8">
                 <x-forms.input label="Username" id="database.postgres_user" placeholder="If empty: postgres" />
@@ -62,8 +63,16 @@
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
             </div>
-            <x-forms.input label="Postgres URL" helper="If you change the user/password/port, this could be different. This is with the default values." type="password" readonly wire:model="db_url" />
+            <x-forms.input label="Postgres URL (internal)"
+                helper="If you change the user/password/port, this could be different. This is with the default values."
+                type="password" readonly wire:model="db_url" />
+            @if ($db_url_public)
+                <x-forms.input label="Postgres URL (public)"
+                    helper="If you change the user/password/port, this could be different. This is with the default values."
+                    type="password" readonly wire:model="db_url_public" />
+            @endif
         </div>
+        <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">

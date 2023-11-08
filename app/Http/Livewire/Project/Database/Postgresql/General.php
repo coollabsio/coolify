@@ -15,7 +15,8 @@ class General extends Component
     public StandalonePostgresql $database;
     public string $new_filename;
     public string $new_content;
-    public string $db_url;
+    public ?string $db_url = null;
+    public ?string $db_url_public = null;
 
     protected $listeners = ['refresh', 'save_init_script', 'delete_init_script'];
 
@@ -27,6 +28,7 @@ class General extends Component
         'database.postgres_db' => 'required',
         'database.postgres_initdb_args' => 'nullable',
         'database.postgres_host_auth_method' => 'nullable',
+        'database.postgres_conf' => 'nullable',
         'database.init_scripts' => 'nullable',
         'database.image' => 'required',
         'database.ports_mappings' => 'nullable',
@@ -41,6 +43,7 @@ class General extends Component
         'database.postgres_db' => 'Postgres DB',
         'database.postgres_initdb_args' => 'Postgres Initdb Args',
         'database.postgres_host_auth_method' => 'Postgres Host Auth Method',
+        'database.postgres_conf' => 'Postgres Configuration',
         'database.init_scripts' => 'Init Scripts',
         'database.image' => 'Image',
         'database.ports_mappings' => 'Port Mapping',
@@ -49,7 +52,10 @@ class General extends Component
     ];
     public function mount()
     {
-        $this->db_url = $this->database->getDbUrl();
+        $this->db_url = $this->database->getDbUrl(true);
+        if ($this->database->is_public) {
+            $this->db_url_public = $this->database->getDbUrl();
+        }
     }
     public function instantSave()
     {
@@ -66,12 +72,13 @@ class General extends Component
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
+                $this->db_url_public = $this->database->getDbUrl();
                 $this->emit('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
+                $this->db_url_public = null;
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url = $this->database->getDbUrl();
             $this->database->save();
         } catch (\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;
