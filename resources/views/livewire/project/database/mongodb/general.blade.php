@@ -43,9 +43,14 @@
                     label="Public Port" />
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
             </div>
-            <x-forms.input label="Mongo URL"
+            <x-forms.input label="Mongo URL (internal)"
             helper="If you change the user/password/port, this could be different. This is with the default values."
                 type="password" readonly wire:model="db_url" />
+            @if ($db_url_public)
+            <x-forms.input label="Mongo URL (public)"
+            helper="If you change the user/password/port, this could be different. This is with the default values."
+                type="password" readonly wire:model="db_url_public" />
+            @endif
         </div>
         <x-forms.textarea label="Custom MongoDB Configuration" rows="10" id="database.mongo_conf" />
     </form>

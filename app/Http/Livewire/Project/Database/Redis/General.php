@@ -13,7 +13,8 @@ class General extends Component
     protected $listeners = ['refresh'];
 
     public StandaloneRedis $database;
-    public string $db_url;
+    public ?string $db_url = null;
+    public ?string $db_url_public = null;
 
     protected $rules = [
         'database.name' => 'required',
@@ -35,6 +36,13 @@ class General extends Component
         'database.is_public' => 'Is Public',
         'database.public_port' => 'Public Port',
     ];
+    public function mount()
+    {
+        $this->db_url = $this->database->getDbUrl(true);
+        if ($this->database->is_public) {
+            $this->db_url_public = $this->database->getDbUrl();
+        }
+    }
     public function submit()
     {
         try {
@@ -63,12 +71,13 @@ class General extends Component
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
+                $this->db_url_public = $this->database->getDbUrl();
                 $this->emit('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);
+                $this->db_url_public = null;
                 $this->emit('success', 'Database is no longer publicly accessible.');
             }
-            $this->db_url = $this->database->getDbUrl();
             $this->database->save();
         } catch (\Throwable $e) {
             $this->database->is_public = !$this->database->is_public;
@@ -80,10 +89,6 @@ class General extends Component
         $this->database->refresh();
     }
 
-    public function mount()
-    {
-        $this->db_url = $this->database->getDbUrl();
-    }
     public function render()
     {
         return view('livewire.project.database.redis.general');
