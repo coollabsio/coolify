@@ -13,8 +13,13 @@
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'; if(window.location.search) window.location.search = ''"
                 href="#">Storages
             </a>
-            <a :class="activeTab === 'backups' && 'text-white'"
-                @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
+            @if (
+                $serviceDatabase->databaseType() === 'standalone-mysql' ||
+                    $serviceDatabase->databaseType() === 'standalone-postgresql' ||
+                    $serviceDatabase->databaseType() === 'standalone-mariadb')
+                <a :class="activeTab === 'backups' && 'text-white'"
+                    @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
+            @endif
             @if (data_get($parameters, 'service_name'))
                 <a class="{{ request()->routeIs('project.service.logs') ? 'text-white' : '' }}"
                     href="{{ route('project.service.logs', $parameters) }}">
