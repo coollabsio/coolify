@@ -31,7 +31,11 @@ class ServiceDatabase extends BaseModel
     public function getServiceDatabaseUrl() {
         // $type = $this->databaseType();
         $port = $this->public_port;
-        $url = "{$this->service->server->ip}:{$port}";
+        $realIp = $this->service->server->ip;
+        if ($realIp === 'host.docker.internal' || isDev()) {
+            $realIp = base_ip();
+        }
+        $url = "{$realIp}:{$port}";
         return $url;
     }
     public function service()
