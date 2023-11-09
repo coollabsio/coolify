@@ -58,8 +58,9 @@ class StandaloneRedis extends BaseModel
     {
         return 'standalone-redis';
     }
-    public function getDbUrl(): string {
-        if ($this->is_public) {
+    public function getDbUrl(bool $useInternal = false): string
+    {
+        if ($this->is_public && !$useInternal) {
             return "redis://:{$this->redis_password}@{$this->destination->server->getIp}:{$this->public_port}/0";
         } else {
             return "redis://:{$this->redis_password}@{$this->uuid}:6379/0";

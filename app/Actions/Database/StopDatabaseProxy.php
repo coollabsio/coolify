@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -13,9 +14,13 @@ class StopDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database)
     {
-        instant_remote_process(["docker rm -f {$database->uuid}-proxy"], $database->destination->server);
+        $server = data_get($database, 'destination.server');
+        if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            $server = data_get($database, 'service.server');
+        }
+        instant_remote_process(["docker rm -f {$database->uuid}-proxy"], $server);
         $database->is_public = false;
         $database->save();
     }

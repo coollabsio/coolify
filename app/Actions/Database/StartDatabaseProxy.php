@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Models\ServiceDatabase;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
@@ -14,18 +15,44 @@ class StartDatabaseProxy
 {
     use AsAction;
 
-    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $database)
+    public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database)
     {
         $internalPort = null;
-        if ($database->getMorphClass() === 'App\Models\StandaloneRedis') {
+        $type = $database->getMorphClass();
+        $network = data_get($database, 'destination.network');
+        $server = data_get($database, 'destination.server');
+        if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            $databaseType = $database->databaseType();
+            $network = data_get($database, 'service.destination.network');
+            $server = data_get($database, 'service.destination.server');
+            ray($databaseType, $network);
+            switch ($databaseType) {
+                case 'standalone-mariadb':
+                    $type = 'App\Models\StandaloneMariadb';
+                    break;
+                case 'standalone-mongodb':
+                    $type = 'App\Models\StandaloneMongodb';
+                    break;
+                case 'standalone-mysql':
+                    $type = 'App\Models\StandaloneMysql';
+                    break;
+                case 'standalone-postgresql':
+                    $type = 'App\Models\StandalonePostgresql';
+                    break;
+                case 'standalone-redis':
+                    $type = 'App\Models\StandaloneRedis';
+                    break;
+            }
+        }
+        if ($type === 'App\Models\StandaloneRedis') {
             $internalPort = 6379;
-        } else if ($database->getMorphClass() === 'App\Models\StandalonePostgresql') {
+        } else if ($type === 'App\Models\StandalonePostgresql') {
             $internalPort = 5432;
-        } else if ($database->getMorphClass() === 'App\Models\StandaloneMongodb') {
+        } else if ($type === 'App\Models\StandaloneMongodb') {
             $internalPort = 27017;
-        } else if ($database->getMorphClass() === 'App\Models\StandaloneMysql') {
+        } else if ($type === 'App\Models\StandaloneMysql') {
             $internalPort = 3306;
-        } else if ($database->getMorphClass() === 'App\Models\StandaloneMariadb') {
+        } else if ($type === 'App\Models\StandaloneMariadb') {
             $internalPort = 3306;
         }
         $containerName = "{$database->uuid}-proxy";
@@ -66,7 +93,7 @@ class StartDatabaseProxy
                         "$database->public_port:$database->public_port",
                     ],
                     'networks' => [
-                        $database->destination->network,
+                        $network,
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -81,9 +108,9 @@ class StartDatabaseProxy
                 ]
             ],
             'networks' => [
-                $database->destination->network => [
+                $network => [
                     'external' => true,
-                    'name' => $database->destination->network,
+                    'name' => $network,
                     'attachable' => true,
                 ]
             ]
@@ -97,6 +124,6 @@ class StartDatabaseProxy
             "echo '{$nginxconf_base64}' | base64 -d > $configuration_dir/nginx.conf",
             "echo '{$dockercompose_base64}' | base64 -d > $configuration_dir/docker-compose.yaml",
             "docker compose --project-directory {$configuration_dir} up --build -d",
-        ], $database->destination->server);
+        ], $server);
     }
 }
