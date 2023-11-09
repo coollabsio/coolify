@@ -28,6 +28,12 @@ class ServiceDatabase extends BaseModel
         }
         return "standalone-$image";
     }
+    public function getServiceDatabaseUrl() {
+        // $type = $this->databaseType();
+        $port = $this->public_port;
+        $url = "{$this->service->server->ip}:{$port}";
+        return $url;
+    }
     public function service()
     {
         return $this->belongsTo(Service::class);
