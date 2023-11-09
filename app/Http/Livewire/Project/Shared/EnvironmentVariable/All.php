@@ -55,26 +55,23 @@ class All extends Component
     {
         if ($isPreview) {
             $variables = parseEnvFormatToArray($this->variablesPreview);
+            $this->resource->environment_variables_preview()->whereNotIn('key', array_keys($variables))->delete();
         } else {
             $variables = parseEnvFormatToArray($this->variables);
+            $this->resource->environment_variables()->whereNotIn('key', array_keys($variables))->delete();
         }
         foreach ($variables as $key => $variable) {
-            $found = $this->resource->environment_variables()->where('key', $key)->first();
-            $foundPreview = $this->resource->environment_variables_preview()->where('key', $key)->first();
+            if ($isPreview) {
+                $found = $this->resource->environment_variables_preview()->where('key', $key)->first();
+            } else {
+                $found = $this->resource->environment_variables()->where('key', $key)->first();
+            }
             if ($found) {
                 if ($found->is_shown_once) {
                     continue;
                 }
                 $found->value = $variable;
                 $found->save();
-                continue;
-            }
-            if ($foundPreview) {
-                if ($foundPreview->is_shown_once) {
-                    continue;
-                }
-                $foundPreview->value = $variable;
-                $foundPreview->save();
                 continue;
             } else {
                 $environment = new EnvironmentVariable();
