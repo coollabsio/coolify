@@ -5,7 +5,7 @@
 services:
 
   redis:
-    image: redis:6.2.4
+    image: redis:6-alpine
     command: redis-server --appendonly yes
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]

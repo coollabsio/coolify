@@ -1,0 +1,19 @@
+# documentation: https://docs.directus.io/self-hosted/quickstart.html
+# slogan: Directus is an open-source tool that wraps custom SQL databases with a dynamic API, and provides an intuitive admin app for managing its content.
+# tags: directus, cms, database, sql
+
+services:
+  directus:
+    image: directus/directus:10.7
+    volumes:
+      - directus-database:/directus/database
+      - directus-uploads:/directus/uploads
+    environment:
+      - SERVICE_FQDN_DIRECTUS
+      - KEY=$SERVICE_BASE64_64_KEY
+      - SECRET=$SERVICE_BASE64_64_SECRET
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}
+      - ADMIN_PASSWORD=$SERVICE_PASSWORD_ADMIN
+      - DB_CLIENT=sqlite3
+      - DB_FILENAME=/directus/database/data.db
+      - WEBSOCKETS_ENABLED=true
