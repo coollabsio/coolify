@@ -395,6 +395,7 @@ class Service extends BaseModel
                         $key = Str::of($variableName);
                         $value = Str::of($variable);
                     }
+                    // TODO: here is the problem
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if ($isNew || $savedService->fqdn === null) {
                             $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
