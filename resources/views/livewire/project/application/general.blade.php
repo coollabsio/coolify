@@ -52,7 +52,7 @@
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
                         <div>Nixpacks will detect the required configuration automatically.
-                            <a class="underline" href="https://coolify.io/docs/frameworks">Framework Specific Docs</a>
+                            <a class="underline" href="https://coolify.io/docs/frameworks/">Framework Specific Docs</a>
                         </div>
                         <div class="flex flex-col gap-2 xl:flex-row">
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
