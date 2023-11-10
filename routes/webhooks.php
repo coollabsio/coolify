@@ -286,16 +286,17 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
+                $planId = data_get($data, 'lines.data.0.plan.id');
+                if (Str::contains($excludedPlans, $planId)) {
+                    send_internal_notification('Subscription excluded.');
+                    break;
+                }
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                 if (!$subscription) {
                     Sleep::for(5)->seconds();
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 }
-                $planId = data_get($data, 'lines.data.0.plan.id');
-                if (Str::contains($excludedPlans, $planId)) {
-                    send_internal_notification('Subscription excluded: ' . $subscription->team->id);
-                    break;
-                }
+
                 $subscription->update([
                     'stripe_plan_id' => $planId,
                     'stripe_invoice_paid' => true,
@@ -311,15 +312,15 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
-                $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $status = data_get($data, 'status');
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
                 $planId = data_get($data, 'items.data.0.plan.id');
                 if (Str::contains($excludedPlans, $planId)) {
-                    send_internal_notification('Subscription excluded: ' . $subscription->team->id);
+                    send_internal_notification('Subscription excluded.');
                     break;
                 }
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
                 $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
                 $feedback = data_get($data, 'cancellation_details.feedback');
