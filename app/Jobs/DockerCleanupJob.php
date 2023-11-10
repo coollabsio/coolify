@@ -11,6 +11,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -59,11 +60,13 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
                 if ($usageAfter <  $this->usageBefore) {
                     ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                     send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
+                    Log::info('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                 } else {
-                    ray('DockerCleanupJob failed to save disk space on ' . $this->server->name);
+                    Log::info('DockerCleanupJob failed to save disk space on ' . $this->server->name);
                 }
             } else {
                 ray('No need to clean up ' . $this->server->name);
+                Log::info('No need to clean up ' . $this->server->name);
             }
         } catch (\Throwable $e) {
             send_internal_notification('DockerCleanupJob failed with: ' . $e->getMessage());
