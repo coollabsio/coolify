@@ -39,12 +39,12 @@ module.exports = {
         themes: [
             {
                 coollabs: {
-                    primary: "#323232",
+                    primary: "#202020",
                     "primary-focus": "#242424",
                     secondary: "#6B16ED",
                     accent: "#4338ca",
                     neutral: "#1B1D1D",
-                    "base-100": "#181818",
+                    "base-100": "#101010",
                     info: "#2563EB",
                     success: "#16A34A",
                     warning: "#FCD34D",

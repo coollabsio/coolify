@@ -21,26 +21,33 @@ class StartDatabaseProxy
         $type = $database->getMorphClass();
         $network = data_get($database, 'destination.network');
         $server = data_get($database, 'destination.server');
+        $containerName = data_get($database, 'uuid');
+        $proxyContainerName = "{$database->uuid}-proxy";
         if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
             $databaseType = $database->databaseType();
             $network = data_get($database, 'service.destination.network');
             $server = data_get($database, 'service.destination.server');
-            ray($databaseType, $network);
+            $proxyContainerName = "{$database->service->uuid}-proxy";
             switch ($databaseType) {
                 case 'standalone-mariadb':
                     $type = 'App\Models\StandaloneMariadb';
+                    $containerName = "mariadb-{$database->service->uuid}";
                     break;
                 case 'standalone-mongodb':
                     $type = 'App\Models\StandaloneMongodb';
+                    $containerName = "mongodb-{$database->service->uuid}";
                     break;
                 case 'standalone-mysql':
                     $type = 'App\Models\StandaloneMysql';
+                    $containerName = "mysql-{$database->service->uuid}";
                     break;
                 case 'standalone-postgresql':
                     $type = 'App\Models\StandalonePostgresql';
+                    $containerName = "postgresql-{$database->service->uuid}";
                     break;
                 case 'standalone-redis':
                     $type = 'App\Models\StandaloneRedis';
+                    $containerName = "redis-{$database->service->uuid}";
                     break;
             }
         }
@@ -55,7 +62,6 @@ class StartDatabaseProxy
         } else if ($type === 'App\Models\StandaloneMariadb') {
             $internalPort = 3306;
         }
-        $containerName = "{$database->uuid}-proxy";
         $configuration_dir = database_proxy_dir($database->uuid);
         $nginxconf = <<<EOF
     user  nginx;
@@ -69,7 +75,7 @@ class StartDatabaseProxy
     stream {
        server {
             listen $database->public_port;
-            proxy_pass $database->uuid:$internalPort;
+            proxy_pass $containerName:$internalPort;
        }
     }
     EOF;
@@ -81,13 +87,13 @@ class StartDatabaseProxy
         $docker_compose = [
             'version' => '3.8',
             'services' => [
-                $containerName => [
+                $proxyContainerName => [
                     'build' => [
                         'context' => $configuration_dir,
                         'dockerfile' => 'Dockerfile',
                     ],
                     'image' => "nginx:stable-alpine",
-                    'container_name' => $containerName,
+                    'container_name' => $proxyContainerName,
                     'restart' => RESTART_MODE,
                     'ports' => [
                         "$database->public_port:$database->public_port",
