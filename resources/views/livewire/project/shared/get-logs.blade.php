@@ -14,7 +14,7 @@
         <x-forms.button type="submit">Refresh</x-forms.button>
     </form>
     <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'container w-full pt-4 mx-auto'">
-        <div class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-white scrollbar border-coolgray-300"
+        <div class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
             :class="fullscreen ? '' : 'max-h-[40rem] border border-solid rounded'">
             <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg
                     class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">

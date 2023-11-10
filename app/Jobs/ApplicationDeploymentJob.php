@@ -556,7 +556,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "hidden" => true,
             ],
             [
-                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}")
             ],
         );
     }

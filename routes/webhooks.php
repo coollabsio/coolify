@@ -237,7 +237,7 @@ Route::post('/payments/stripe/events', function () {
     try {
         $webhookSecret = config('subscription.stripe_webhook_secret');
         $signature = request()->header('Stripe-Signature');
-
+        $excludedPlans = config('subscription.stripe_excluded_plans');
         $event = \Stripe\Webhook::constructEvent(
             request()->getContent(),
             $signature,
@@ -253,6 +253,10 @@ Route::post('/payments/stripe/events', function () {
         switch ($type) {
             case 'checkout.session.completed':
                 $clientReferenceId = data_get($data, 'client_reference_id');
+                if (is_null($clientReferenceId)) {
+                    send_internal_notification('Checkout session completed without client reference id.');
+                    break;
+                }
                 $userId = Str::before($clientReferenceId, ':');
                 $teamId = Str::after($clientReferenceId, ':');
                 $subscriptionId = data_get($data, 'subscription');
@@ -282,12 +286,17 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.paid':
                 $customerId = data_get($data, 'customer');
+                $planId = data_get($data, 'lines.data.0.plan.id');
+                if (Str::contains($excludedPlans, $planId)) {
+                    send_internal_notification('Subscription excluded.');
+                    break;
+                }
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                 if (!$subscription) {
                     Sleep::for(5)->seconds();
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 }
-                $planId = data_get($data, 'lines.data.0.plan.id');
+
                 $subscription->update([
                     'stripe_plan_id' => $planId,
                     'stripe_invoice_paid' => true,
@@ -303,11 +312,15 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
-                $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $status = data_get($data, 'status');
                 $subscriptionId = data_get($data, 'items.data.0.subscription');
                 $planId = data_get($data, 'items.data.0.plan.id');
+                if (Str::contains($excludedPlans, $planId)) {
+                    send_internal_notification('Subscription excluded.');
+                    break;
+                }
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
                 $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
                 $feedback = data_get($data, 'cancellation_details.feedback');
