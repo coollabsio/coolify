@@ -5,10 +5,12 @@
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a :class="activeTab === 'environment-variables' && 'text-white'"
-                @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
-                href="#">Environment
-                Variables</a>
+            @if ($application->build_pack !== 'static')
+                <a :class="activeTab === 'environment-variables' && 'text-white'"
+                    @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
+                    href="#">Environment
+                    Variables</a>
+            @endif
             @if ($application->git_based())
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
@@ -16,21 +18,25 @@
             <a :class="activeTab === 'server' && 'text-white'"
                 @click.prevent="activeTab = 'server'; window.location.hash = 'server'" href="#">Server
             </a>
-            <a :class="activeTab === 'storages' && 'text-white'"
-                @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
-            </a>
+            @if ($application->build_pack !== 'static')
+                <a :class="activeTab === 'storages' && 'text-white'"
+                    @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
+                </a>
+            @endif
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            @if ($application->git_based())
+            @if ($application->git_based() && $application->build_pack !== 'static')
                 <a :class="activeTab === 'previews' && 'text-white'"
                     @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
                     Deployments
                 </a>
             @endif
-            <a :class="activeTab === 'health' && 'text-white'"
-                @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Health Checks
-            </a>
+            @if ($application->build_pack !== 'static')
+                <a :class="activeTab === 'health' && 'text-white'"
+                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Health Checks
+                </a>
+            @endif
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
