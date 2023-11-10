@@ -1,6 +1,7 @@
 @auth
     <nav class="fixed h-full overflow-hidden overflow-y-auto pt-28 scrollbar">
-        <a href="/" class="fixed top-0 z-50 mx-3 mt-3 cursor-pointer bg-coolgray-100"><img class="transition rounded w-11 h-11" src="{{ asset('coolify-transparent.png') }}"></a>
+        <a href="/" class="fixed top-0 z-50 mx-3 mt-3 bg-transparent cursor-pointer"><img
+                class="transition rounded w-11 h-11" src="{{ asset('coolify-transparent.png') }}"></a>
         <ul class="flex flex-col h-full gap-4 menu flex-nowrap">
             <li title="Dashboard">
                 <a class="hover:bg-transparent" @if (!request()->is('/')) href="/" @endif>
@@ -87,6 +88,18 @@
             @if (isInstanceAdmin() && !isCloud())
                 <livewire:upgrade />
             @endif
+            <li title="Help us!">
+                <a class="hover:bg-transparent"href="https://coolify.io/sponsorships" target="_blank">
+                    <svg class="icon hover:text-pink-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2">
+                            <path d="M19.5 12.572L12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.572" />
+                            <path
+                                d="M12 6L8.707 9.293a1 1 0 0 0 0 1.414l.543.543c.69.69 1.81.69 2.5 0l1-1a3.182 3.182 0 0 1 4.5 0l2.25 2.25m-7 3l2 2M15 13l2 2" />
+                        </g>
+                    </svg>
+                </a>
+            </li>
             <li title="Profile">
                 <a class="hover:bg-transparent" @if (!request()->is('profile')) href="/profile" @endif>
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"

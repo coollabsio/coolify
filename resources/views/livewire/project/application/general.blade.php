@@ -27,10 +27,11 @@
                     <div class="flex gap-2">
                         <x-forms.select wire:model="application.build_pack" label="Build Pack" required>
                             <option value="nixpacks">Nixpacks</option>
+                            <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockerimage">Docker Image</option>
                         </x-forms.select>
-                        @if ($application->settings->is_static)
+                        @if ($application->settings->is_static || $application->build_pack === 'static')
                             <x-forms.select id="application.static_image" label="Static Image" required>
                                 <option value="nginx:alpine">nginx:alpine</option>
                                 <option disabled value="apache:alpine">apache:alpine</option>
@@ -97,7 +98,7 @@
             @endif
             <h3>Network</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
-                @if ($application->settings->is_static)
+                @if ($application->settings->is_static || $application->build_pack === 'static')
                     <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
                 @else
                     <x-forms.input placeholder="3000,3001" id="application.ports_exposes" label="Ports Exposes" required

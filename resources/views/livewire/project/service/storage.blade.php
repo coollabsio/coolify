@@ -2,7 +2,9 @@
     @if (
         $resource->getMorphClass() == 'App\Models\Application' ||
             $resource->getMorphClass() == 'App\Models\StandalonePostgresql' ||
-            $resource->getMorphClass() == 'App\Models\StandaloneRedis')
+            $resource->getMorphClass() == 'App\Models\StandaloneRedis' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneMariadb' ||
+            $resource->getMorphClass() == 'App\Models\StandaloneMongodb')
         <div class="flex items-center gap-2">
             <h2>Storages</h2>
             <x-helper

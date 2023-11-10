@@ -25,7 +25,6 @@
     @endif
 </head>
 @section('body')
-
     <body>
         @livewireScripts
         <dialog id="help" class="modal">

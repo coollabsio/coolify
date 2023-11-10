@@ -66,7 +66,7 @@ class StartPostgresql
                     'memswap_limit' => $this->database->limits_memory_swap,
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
                     'mem_reservation' => $this->database->limits_memory_reservation,
-                    'cpus' => $this->database->limits_cpus,
+                    'cpus' => (int) $this->database->limits_cpus,
                     'cpuset' => $this->database->limits_cpuset,
                     'cpu_shares' => $this->database->limits_cpu_shares,
                 ]

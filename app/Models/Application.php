@@ -213,6 +213,14 @@ class Application extends BaseModel
         return $this->morphTo();
     }
 
+    public function isDeploymentInprogress() {
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'in_progress')->count();
+        if ($deployments > 0) {
+            return true;
+        }
+        return false;
+    }
+
     public function deployments(int $skip = 0, int $take = 10)
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');

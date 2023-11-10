@@ -192,6 +192,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->deploy_dockerimage_buildpack();
             } else if ($this->application->build_pack === 'dockerfile') {
                 $this->deploy_dockerfile_buildpack();
+            } else if ($this->application->build_pack === 'static') {
+                $this->deploy_static_buildpack();
             } else {
                 if ($this->pull_request_id !== 0) {
                     $this->deploy_pull_request();
@@ -227,6 +229,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 [
                     "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
                     "hidden" => true,
+                    "ignore_errors" => true,
+                ]
+            );
+            $this->execute_remote_command(
+                [
+                    "docker image prune -f >/dev/null 2>&1",
+                    "hidden" => true,
+                    "ignore_errors" => true,
                 ]
             );
         }
@@ -419,6 +429,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
+        $this->rolling_update();
+    }
+    private function deploy_static_buildpack()
+    {
+        $this->execute_remote_command(
+            [
+                "echo 'Starting deployment of {$this->customRepository}:{$this->application->git_branch}.'"
+            ],
+        );
+        $this->prepare_builder_image();
+        $this->check_git_if_build_needed();
+        $this->set_base_dir();
+        $this->generate_image_names();
+        $this->clone_repository();
+        $this->cleanup_git();
+        $this->build_image();
+        $this->generate_compose_file();
         $this->rolling_update();
     }
 
@@ -787,7 +814,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'memswap_limit' => $this->application->limits_memory_swap,
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
                     'mem_reservation' => $this->application->limits_memory_reservation,
-                    'cpus' => $this->application->limits_cpus,
+                    'cpus' => (int) $this->application->limits_cpus,
                     'cpuset' => $this->application->limits_cpuset,
                     'cpu_shares' => $this->application->limits_cpu_shares,
                 ]
@@ -910,22 +937,26 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function build_image()
     {
-        $this->execute_remote_command([
-            "echo -n 'Building docker image for your application. To check the current progress, click on Show Debug Logs.'",
-        ]);
-
-        if ($this->application->settings->is_static) {
+        if ($this->application->build_pack === 'static') {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                "echo -n 'Static deployment. Copying static assets to the image.'",
             ]);
+        } else {
+            $this->execute_remote_command([
+                "echo -n 'Building docker image for your application. To check the current progress, click on Show Debug Logs.'",
+            ]);
+        }
 
-            $dockerfile = base64_encode("FROM {$this->application->static_image}
+        if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
+            if ($this->application->build_pack === 'static') {
+                $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
 LABEL coolify.deploymentId={$this->deployment_uuid}
-COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
+COPY . .
+RUN rm -f /usr/share/nginx/html/nginx.conf
+RUN rm -f /usr/share/nginx/html/Dockerfile
 COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
-
-            $nginx_config = base64_encode("server {
+                $nginx_config = base64_encode("server {
                 listen       80;
                 listen  [::]:80;
                 server_name  localhost;
@@ -941,15 +972,43 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     root   /usr/share/nginx/html;
                 }
             }");
+            } else {
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}/{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                ]);
+
+                $dockerfile = base64_encode("FROM {$this->application->static_image}
+WORKDIR /usr/share/nginx/html/
+LABEL coolify.deploymentId={$this->deployment_uuid}
+COPY --from=$this->build_image_name /app/{$this->application->publish_directory} .
+COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
+
+                $nginx_config = base64_encode("server {
+                listen       80;
+                listen  [::]:80;
+                server_name  localhost;
+
+                location / {
+                    root   /usr/share/nginx/html;
+                    index  index.html;
+                    try_files \$uri \$uri.html \$uri/index.html \$uri/ /index.html =404;
+                }
+
+                error_page   500 502 503 504  /50x.html;
+                location = /50x.html {
+                    root   /usr/share/nginx/html;
+                }
+            }");
+            }
             $this->execute_remote_command(
                 [
-                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile-prod")
+                    executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile")
                 ],
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}/Dockerfile-prod {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "docker build $this->addHosts --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]
             );
         } else {
