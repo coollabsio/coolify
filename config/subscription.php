@@ -11,6 +11,7 @@ return [
     'stripe_price_id_pro_yearly' => env('STRIPE_PRICE_ID_PRO_YEARLY', null),
     'stripe_price_id_ultimate_monthly' => env('STRIPE_PRICE_ID_ULTIMATE_MONTHLY', null),
     'stripe_price_id_ultimate_yearly' => env('STRIPE_PRICE_ID_ULTIMATE_YEARLY', null),
+    'stripe_excluded_plans' => env('STRIPE_EXCLUDED_PLANS', null),
 
 
     // Paddle
