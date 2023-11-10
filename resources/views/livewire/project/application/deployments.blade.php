@@ -12,14 +12,14 @@
     </form>
     @forelse ($deployments as $deployment)
         <a @class([
-            'bg-coolgray-200 p-2 border-l border-dashed transition-colors hover:no-underline',
+            'bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline',
             'hover:bg-coolgray-200' =>
-                data_get($deployment, 'status') === 'queued' ||
-                data_get($deployment, 'status') === 'cancelled by system',
+                data_get($deployment, 'status') === 'queued',
             'border-warning hover:bg-warning hover:text-black' =>
-                data_get($deployment, 'status') === 'in_progress',
+                data_get($deployment, 'status') === 'in_progress'  ||
+                data_get($deployment, 'status') === 'cancelled-by-user',
             'border-error hover:bg-error' =>
-                data_get($deployment, 'status') === 'error',
+                data_get($deployment, 'status') === 'failed',
             'border-success hover:bg-success' =>
                 data_get($deployment, 'status') === 'finished',
         ]) href="{{ $current_url . '/' . data_get($deployment, 'deployment_uuid') }}"
