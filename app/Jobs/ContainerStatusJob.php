@@ -159,6 +159,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 if ($applicationId) {
                     $pullRequestId = data_get($labels, 'coolify.pullRequestId');
                     if ($pullRequestId) {
+                        if (str($applicationId)->contains('-')) {
+                            $applicationId = str($applicationId)->before('-');
+                        }
                         $preview = ApplicationPreview::where('application_id', $applicationId)->where('pull_request_id', $pullRequestId)->first();
                         if ($preview) {
                             $foundApplicationPreviews[] = $preview->id;
