@@ -7,6 +7,7 @@ use Livewire\Component;
 class StackForm extends Component
 {
     public $service;
+    public $isConfigurationRequired = false;
     protected $listeners = ["saveCompose"];
     protected $rules = [
         'service.docker_compose_raw' => 'required',
@@ -14,8 +15,14 @@ class StackForm extends Component
         'service.name' => 'required',
         'service.description' => 'nullable',
     ];
+    public function mount () {
+        if ($this->service->applications->filter(fn($app) => str($app->image)->contains('minio/minio'))->count() > 0) {
+            $this->isConfigurationRequired = true;
+        }
+    }
     public function saveCompose($raw)
     {
+
         $this->service->docker_compose_raw = $raw;
         $this->submit();
     }

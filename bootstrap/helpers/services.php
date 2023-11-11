@@ -85,7 +85,6 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
             } else {
                 $fileLocation = $path;
             }
-            ray($path,$fileLocation);
             // Exists and is a file
             $isFile = instant_remote_process(["test -f $fileLocation && echo OK || echo NOK"], $server);
             // Exists and is a directory
@@ -127,6 +126,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
 function updateCompose($resource)
 {
     try {
+        ray($resource);
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         $dockerCompose = Yaml::parse($dockerComposeRaw);
@@ -135,19 +135,21 @@ function updateCompose($resource)
         $image = data_get($resource, 'image');
         data_set($dockerCompose, "services.{$name}.image", $image);
 
-        // Update FQDN
-        $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
-        $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-        if ($generatedEnv) {
-            $generatedEnv->value = $resource->fqdn;
-            $generatedEnv->save();
-        }
-        $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
-        $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
-        if ($generatedEnv) {
-            $url = Str::of($resource->fqdn)->after('://');
-            $generatedEnv->value = $url;
-            $generatedEnv->save();
+        if (!str($resource->fqdn)->contains(',')) {
+            // Update FQDN
+            $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
+            $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+            if ($generatedEnv) {
+                $generatedEnv->value = $resource->fqdn;
+                $generatedEnv->save();
+            }
+            $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
+            $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+            if ($generatedEnv) {
+                $url = Str::of($resource->fqdn)->after('://');
+                $generatedEnv->value = $url;
+                $generatedEnv->save();
+            }
         }
 
         $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);

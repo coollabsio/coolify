@@ -300,6 +300,18 @@
             "playlist"
         ]
     },
+    "minio": {
+        "documentation": "https:\/\/docs.min.io\/docs\/minio-docker-quickstart-guide.html",
+        "slogan": "MinIO is a high performance object storage server compatible with Amazon S3 APIs.",
+        "compose": "c2VydmljZXM6CiAgbWluaW86CiAgICBpbWFnZTogJ3F1YXkuaW8vbWluaW8vbWluaW86bGF0ZXN0JwogICAgY29tbWFuZDogJ3NlcnZlciAvZGF0YSAtLWNvbnNvbGUtYWRkcmVzcyAiOjkwMDEiJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gTUlOSU9fU0VSVkVSX1VSTD0kTUlOSU9fU0VSVkVSX1VSTAogICAgICAtIE1JTklPX0JST1dTRVJfUkVESVJFQ1RfVVJMPSRNSU5JT19CUk9XU0VSX1JFRElSRUNUX1VSTAogICAgICAtIE1JTklPX1JPT1RfVVNFUj0kU0VSVklDRV9VU0VSX01JTklPCiAgICAgIC0gTUlOSU9fUk9PVF9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9NSU5JTwogICAgdm9sdW1lczoKICAgICAgLSAnbWluaW8tZGF0YTovZGF0YScK",
+        "tags": [
+            "object",
+            "storage",
+            "server",
+            "s3",
+            "api"
+        ]
+    },
     "moodle": {
         "documentation": "https:\/\/moodle.org",
         "slogan": "Moodle is the world\u2019s most customisable and trusted eLearning solution that empowers educators to improve our world.",
