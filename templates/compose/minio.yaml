@@ -1,4 +1,3 @@
-# ignore: true
 # documentation: https://docs.min.io/docs/minio-docker-quickstart-guide.html
 # slogan: MinIO is a high performance object storage server compatible with Amazon S3 APIs.
 # tags: object, storage, server, s3, api
@@ -8,12 +7,35 @@ services:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      - SERVICE_FQDN_MINIO_9000
-      - SERVICE_FQDN_CONSOLE_9001
-      - MINIO_DOMAIN=$SERVICE_URL_MINIO_9000
-      - MINIO_SERVER_URL=$SERVICE_FQDN_MINIO_9000
-      - MINIO_BROWSER_REDIRECT_URL=$SERVICE_FQDN_CONSOLE_9001
+      - MINIO_SERVER_URL=$MINIO_SERVER_URL
+      - MINIO_BROWSER_REDIRECT_URL=$MINIO_BROWSER_REDIRECT_URL
       - MINIO_ROOT_USER=$SERVICE_USER_MINIO
       - MINIO_ROOT_PASSWORD=$SERVICE_PASSWORD_MINIO
     volumes:
       - minio-data:/data
+
+# services:
+#   minio:
+#     image: minio/minio
+#     command: server /data --address ":9000" --console-address ":9001"
+#     networks:
+#       - coolify
+#     environment:
+#       - MINIO_SERVER_URL=http://minio.65.21.189.27.sslip.io
+#       - MINIO_BROWSER_REDIRECT_URL=http://console.65.21.189.27.sslip.io
+#       - MINIO_BROWSER=on
+#       - MINIO_ROOT_USER=asd
+#       - MINIO_ROOT_PASSWORD=asdasdasd
+#     labels:
+#       - "traefik.enable=true"
+#       - "traefik.http.routers.minio-console.rule=Host(`console.65.21.189.27.sslip.io`)"
+#       - "traefik.http.routers.minio-console.entrypoints=http"
+#       - "traefik.http.routers.minio-console.service=minio-console"
+#       - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+#       - "traefik.http.routers.minio.rule=Host(`minio.65.21.189.27.sslip.io`)"
+#       - "traefik.http.routers.minio.entrypoints=http"
+#       - "traefik.http.routers.minio.service=minio"
+#       - "traefik.http.services.minio.loadbalancer.server.port=9000"
+# networks:
+#   coolify:
+#     external: true

@@ -453,14 +453,30 @@ class Service extends BaseModel
                             'service_id' => $this->id,
                         ])->first();
                         if ($value->startsWith('SERVICE_')) {
-                            $command = $value->after('SERVICE_')->beforeLast('_');
-                            $forService = $value->afterLast('_');
-                            $generatedValue = null;
+                            // Count _ in $value
+                            $count = substr_count($value->value(), '_');
+                            if ($count === 2) {
+                                // SERVICE_FQDN_UMAMI
+                                $command = $value->after('SERVICE_')->beforeLast('_');
+                                $forService = $value->afterLast('_');
+                                $generatedValue = null;
+                                $port = null;
+                            }
+                            if ($count === 3) {
+                                // SERVICE_FQDN_UMAMI_1000
+                                $command = $value->after('SERVICE_')->before('_');
+                                $forService = $value->after('SERVICE_')->after('_')->before('_');
+                                $generatedValue = null;
+                                $port = $value->afterLast('_');
+                            }
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
                                     $fqdn = generateFqdn($this->server, $containerName);
                                 } else {
                                     $fqdn = generateFqdn($this->server, Str::lower($forService) . '-' . $this->uuid);
+                                }
+                                if ($port) {
+                                    $fqdn = "$fqdn:$port";
                                 }
                                 if ($foundEnv) {
                                     $fqdn = data_get($foundEnv, 'value');
@@ -477,7 +493,7 @@ class Service extends BaseModel
                                     ]);
                                 }
                                 if (!$isDatabase) {
-                                    if ($command->value() === 'FQDN') {
+                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn)) {
                                         $savedService->fqdn = $fqdn;
                                         $savedService->save();
                                     }
