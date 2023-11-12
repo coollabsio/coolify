@@ -12,9 +12,9 @@
         <x-forms.input id="service.name" required label="Service Name" placeholder="My super wordpress site" />
         <x-forms.input id="service.description" label="Description" />
     </div>
-    @if ($isConfigurationRequired)
+    {{-- @if ($isConfigurationRequired)
         <div class="text-warning">This service requires additional confiugration. Please check our <a
                 href="https://coolify.io/docs" class="text-white underline">documentation</a> for further information.
         </div>
-    @endif
+    @endif --}}
 </form>
