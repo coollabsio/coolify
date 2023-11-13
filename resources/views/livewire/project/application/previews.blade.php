@@ -48,7 +48,7 @@
         @endif
     </div>
     @if ($application->previews->count() > 0)
-        <h4 class="py-4">Deployed Previews</h4>
+        <div class="pb-4">Previews</div>
         <div class="flex gap-6 ">
             @foreach ($application->previews as $preview)
                 <div class="flex flex-col p-4 bg-coolgray-200">
@@ -71,19 +71,19 @@
                         </a>
                     </div>
                     <div class="flex items-center gap-2 pt-6">
-                        <x-forms.button wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
+                        <x-forms.button class="bg-coolgray-500" wire:click="deploy({{ data_get($preview, 'pull_request_id') }})">
                             @if (data_get($preview, 'status') === 'exited')
                                 Deploy
                             @else
                                 Redeploy
                             @endif
                         </x-forms.button>
-                        <x-forms.button wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove
+                        <x-forms.button class="bg-coolgray-500" wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove
                             Preview
                         </x-forms.button>
                         <a
                             href="{{ route('project.application.deployments', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
-                            <x-forms.button>
+                            <x-forms.button class="bg-coolgray-500">
                                 Get Deployment Logs
                             </x-forms.button>
                         </a>
