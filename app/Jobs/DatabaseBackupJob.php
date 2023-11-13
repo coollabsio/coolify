@@ -141,21 +141,21 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                 } else if ($databaseType === 'standalone-mariadb') {
                     $this->container_name = "{$this->database->name}-$serviceUuid";
                     $this->directory_name = $serviceName . '-' . $this->container_name;
-                    $commands[] = "docker exec $this->container_name env | grep MARIADB_";
+                    $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server);
                     $envs = str($envs)->explode("\n");
-
+                    ray($envs);
                     $rootPassword = $envs->filter(function ($env) {
                         return str($env)->startsWith('MARIADB_ROOT_PASSWORD=');
                     })->first();
                     if ($rootPassword) {
-                        $this->database->mysql_root_password = str($rootPassword)->after('MARIADB_ROOT_PASSWORD=')->value();
+                        $this->database->mariadb_root_password = str($rootPassword)->after('MARIADB_ROOT_PASSWORD=')->value();
                     } else {
                         $rootPassword = $envs->filter(function ($env) {
                             return str($env)->startsWith('MYSQL_ROOT_PASSWORD=');
                         })->first();
                         if ($rootPassword) {
-                            $this->database->mysql_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
+                            $this->database->mariadb_root_password = str($rootPassword)->after('MYSQL_ROOT_PASSWORD=')->value();
                         }
                     }
 
