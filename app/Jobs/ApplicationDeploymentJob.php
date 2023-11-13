@@ -934,7 +934,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         return implode(' ', $generated_healthchecks_commands);
     }
+    private function pull_latest_image($image)
+    {
+        $this->execute_remote_command(
+            ["echo -n 'Pulling latest image ($image) from the registry.'"],
 
+            [
+                executeInDocker($this->deployment_uuid, "docker pull {$image}"), "hidden" => true
+            ]
+        );
+    }
     private function build_image()
     {
         if ($this->application->build_pack === 'static') {
@@ -948,6 +957,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
 
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
+            if ($this->application->static_image) {
+                $this->pull_latest_image($this->application->static_image);
+            }
             if ($this->application->build_pack === 'static') {
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
@@ -1012,8 +1024,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 ]
             );
         } else {
+            // Pure Dockerfile based deployment
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                executeInDocker($this->deployment_uuid, "docker build --pull $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
             ]);
         }
     }
@@ -1049,6 +1062,17 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function start_by_compose_file()
     {
+        if (
+            !$this->application->dockerfile &&
+            (
+                $this->application->build_pack === 'dockerimage' ||
+                $this->application->build_pack === 'dockerfile')
+        ) {
+            $this->execute_remote_command(
+                ["echo -n 'Pulling latest images from the registry.'"],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
+            );
+        }
         $this->execute_remote_command(
             ["echo -n 'Starting application (could take a while).'"],
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
