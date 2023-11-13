@@ -67,7 +67,7 @@
                         services, called resources. Any CPU intensive process will use the server's CPU where you
                         are deploying your resources.</p>
                     <p>Localhost is the server where Coolify is running on. It is not recommended to use one server
-                        for everyting.</p>
+                        for everything.</p>
                     <p>Remote Server is a server reachable through SSH. It can be hosted at home, or from any cloud
                         provider.</p>
                 </x-slot:explanation>
