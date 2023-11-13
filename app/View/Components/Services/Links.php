@@ -16,22 +16,28 @@ class Links extends Component
     {
         $this->links = collect([]);
         $service->applications()->get()->map(function ($application) {
-            if ($application->fqdn) {
-                $fqdns = collect(Str::of($application->fqdn)->explode(','));
-                $fqdns->map(function ($fqdn) {
-                    $this->links->push(getFqdnWithoutPort($fqdn));
-                });
-            }
-            if ($application->ports) {
-                $portsCollection = collect(Str::of($application->ports)->explode(','));
-                $portsCollection->map(function ($port) {
-                    if (Str::of($port)->contains(':')) {
-                        $hostPort = Str::of($port)->before(':');
-                    } else {
-                        $hostPort = $port;
-                    }
-                    $this->links->push(base_url(withPort:false) . ":{$hostPort}");
-                });
+            $type = $application->serviceType();
+            if ($type) {
+                $links = generateServiceSpecificFqdns($application, false);
+                $this->links = $this->links->merge($links);
+            } else {
+                if ($application->fqdn) {
+                    $fqdns = collect(Str::of($application->fqdn)->explode(','));
+                    $fqdns->map(function ($fqdn) {
+                        $this->links->push(getFqdnWithoutPort($fqdn));
+                    });
+                }
+                if ($application->ports) {
+                    $portsCollection = collect(Str::of($application->ports)->explode(','));
+                    $portsCollection->map(function ($port) {
+                        if (Str::of($port)->contains(':')) {
+                            $hostPort = Str::of($port)->before(':');
+                        } else {
+                            $hostPort = $port;
+                        }
+                        $this->links->push(base_url(withPort: false) . ":{$hostPort}");
+                    });
+                }
             }
         });
     }

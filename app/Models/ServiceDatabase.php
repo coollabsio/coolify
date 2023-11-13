@@ -29,7 +29,6 @@ class ServiceDatabase extends BaseModel
         return "standalone-$image";
     }
     public function getServiceDatabaseUrl() {
-        // $type = $this->databaseType();
         $port = $this->public_port;
         $realIp = $this->service->server->ip;
         if ($realIp === 'host.docker.internal' || isDev()) {
