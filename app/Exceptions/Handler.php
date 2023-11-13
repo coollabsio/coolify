@@ -4,6 +4,7 @@ namespace App\Exceptions;
 
 use App\Models\InstanceSettings;
 use App\Models\User;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Sentry\Laravel\Integration;
 use Sentry\State\Scope;
@@ -40,6 +41,13 @@ class Handler extends ExceptionHandler
     ];
     private InstanceSettings $settings;
 
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        if ($request->is('api/*') || $request->expectsJson() || $this->shouldReturnJson($request, $exception)) {
+            return response()->json(['message' => $exception->getMessage()], 401);
+        }
+        return  redirect()->guest($exception->redirectTo() ?? route('login'));
+    }
     /**
      * Register the exception handling callbacks for the application.
      */
