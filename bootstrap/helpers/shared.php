@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
-use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
@@ -173,7 +172,11 @@ function get_latest_version_of_coolify(): string
 
 function generate_random_name(?string $cuid = null): string
 {
-    $generator = All::create();
+    $generator = new \Nubs\RandomNameGenerator\All(
+        [
+            new \Nubs\RandomNameGenerator\Alliteration(),
+        ]
+    );
     if (is_null($cuid)) {
         $cuid = new Cuid2(7);
     }
@@ -444,20 +447,25 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
-        $version = config('version');
-        $services = $services->map(function ($service) use ($version) {
-            if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
-                $service->disabled = true;
-            }
-            return $service;
-        });
     } else {
-        $services = Http::get(config('constants.services.official'));
-        if ($services->failed()) {
-            throw new \Exception($services->body());
+        try {
+            $response = Http::retry(3, 50)->get(config('constants.services.official'));
+            if ($response->failed()) {
+                return collect([]);
+            }
+            $services = $response->json();
+            $services = collect($services)->sortKeys();
+        } catch (\Throwable $e) {
+            $services = collect([]);
         }
-        $services = collect($services->json())->sortKeys();
     }
+    // $version = config('version');
+    // $services = $services->map(function ($service) use ($version) {
+    //     if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
+    //         $service->disabled = true;
+    //     }
+    //     return $service;
+    // });
     return $services;
 }
 
@@ -493,7 +501,8 @@ function queryResourcesByUuid(string $uuid)
     return $resource;
 }
 
-function generateDeployWebhook($resource) {
+function generateDeployWebhook($resource)
+{
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl) . '/api/v1';
     $endpoint = '/deploy';
@@ -501,6 +510,7 @@ function generateDeployWebhook($resource) {
     $url = $api . $endpoint . "?uuid=$uuid&force=false";
     return $url;
 }
-function removeAnsiColors($text) {
+function removeAnsiColors($text)
+{
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }

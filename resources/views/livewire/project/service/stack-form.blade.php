@@ -12,9 +12,17 @@
         <x-forms.input id="service.name" required label="Service Name" placeholder="My super wordpress site" />
         <x-forms.input id="service.description" label="Description" />
     </div>
-    {{-- @if ($isConfigurationRequired)
-        <div class="text-warning">This service requires additional confiugration. Please check our <a
-                href="https://coolify.io/docs" class="text-white underline">documentation</a> for further information.
+    @if ($fields)
+        <div>
+            <h3>Service Specific Configuration</h3>
         </div>
-    @endif --}}
+        <div class="grid grid-cols-2 gap-2">
+            @foreach ($fields as $serviceName => $fields)
+                <x-forms.input type="{{ data_get($fields, 'isPassword') ? 'password' : 'text' }}" required
+                    helper="Variable name: {{ $serviceName }}"
+                    label="{{ data_get($fields, 'serviceName') }} {{ data_get($fields, 'name') }}"
+                    id="fields.{{ $serviceName }}.value"></x-forms.input>
+            @endforeach
+        </div>
+    @endif
 </form>

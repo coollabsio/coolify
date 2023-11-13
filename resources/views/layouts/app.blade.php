@@ -5,7 +5,7 @@
     <div class="fixed z-50 top-[4.5rem] left-4" id="vue">
         <magic-bar></magic-bar>
     </div>
-    <main class="main max-w-screen-2xl">
+    <main class="pb-10 main max-w-screen-2xl">
         {{ $slot }}
     </main>
 @endsection

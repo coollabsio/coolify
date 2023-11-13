@@ -23,3 +23,6 @@ const DATABASE_DOCKER_IMAGES = [
     'influxdb',
     'clickhouse/clickhouse-server'
 ];
+const SPECIFIC_SERVICES = [
+    'quay.io/minio/minio',
+];

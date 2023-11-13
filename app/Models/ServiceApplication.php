@@ -22,6 +22,16 @@ class ServiceApplication extends BaseModel
     {
         return 'service';
     }
+    public function serviceType()
+    {
+        $found = str(collect(SPECIFIC_SERVICES)->filter(function ($service) {
+            return str($this->image)->before(':')->value() === $service;
+        })->first());
+        if ($found->isNotEmpty()) {
+            return $found;
+        }
+        return null;
+    }
     public function service()
     {
         return $this->belongsTo(Service::class);

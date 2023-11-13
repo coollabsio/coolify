@@ -45,7 +45,168 @@ class Service extends BaseModel
     {
         return 'service';
     }
+    public function extraFields()
+    {
+        $fields = collect([]);
+        $applications = $this->applications()->get();
+        foreach ($applications as $application) {
+            $image = str($application->image)->before(':')->value();
+            switch ($image) {
+                case str($image)->contains('minio'):
+                    $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
+                    $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
+                    $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_MINIO')->first();
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MINIO')->first();
+                    $fields->put('MinIO', [
+                        'Console URL' => [
+                            'key' => data_get($console_url, 'key'),
+                            'value' => data_get($console_url, 'value'),
+                            'rules' => 'required|url',
+                        ],
+                        'S3 API URL' => [
+                            'key' => data_get($s3_api_url, 'key'),
+                            'value' => data_get($s3_api_url, 'value'),
+                            'rules' => 'required|url',
+                        ],
+                        'Admin User' => [
+                            'key' => data_get($admin_user, 'key'),
+                            'value' => data_get($admin_user, 'value'),
+                            'rules' => 'required',
+                        ],
+                        'Admin Password' => [
+                            'key' => data_get($admin_password, 'key'),
+                            'value' => data_get($admin_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
+                    break;
+            }
+        }
+        $databases = $this->databases()->get();
 
+        foreach ($databases as $database) {
+            $image = str($database->image)->before(':')->value();
+            switch ($image) {
+                case str($image)->contains('postgres'):
+                    $userVariables = ['SERVICE_USER_POSTGRES', 'SERVICE_USER_POSTGRESQL'];
+                    $passwordVariables = ['SERVICE_PASSWORD_POSTGRES', 'SERVICE_PASSWORD_POSTGRESQL'];
+                    $dbNameVariables = ['POSTGRESQL_DATABASE', 'POSTGRES_DB'];
+                    $postgres_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
+                    $postgres_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
+                    $postgres_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $fields->put('PostgreSQL', [
+                        'User' => [
+                            'key' => data_get($postgres_user, 'key'),
+                            'value' => data_get($postgres_user, 'value'),
+                            'rules' => 'required',
+                        ],
+                        'Password' => [
+                            'key' => data_get($postgres_password, 'key'),
+                            'value' => data_get($postgres_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                        'Database Name' => [
+                            'key' => data_get($postgres_db_name, 'key'),
+                            'value' => data_get($postgres_db_name, 'value'),
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    break;
+                case str($image)->contains('mysql'):
+                    $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MYSQL', 'SERVICE_PASSWORD_WORDPRESS'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MYSQLROOT', 'SERVICE_PASSWORD_ROOT'];
+                    $dbNameVariables = ['MYSQL_DATABASE'];
+                    $mysql_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
+                    $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
+                    $mysql_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
+                    $mysql_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $fields->put('MySQL', [
+                        'User' => [
+                            'key' => data_get($mysql_user, 'key'),
+                            'value' => data_get($mysql_user, 'value'),
+                            'rules' => 'required',
+                        ],
+                        'Password' => [
+                            'key' => data_get($mysql_password, 'key'),
+                            'value' => data_get($mysql_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                        'Root Password' => [
+                            'key' => data_get($mysql_root_password, 'key'),
+                            'value' => data_get($mysql_root_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                        'Database Name' => [
+                            'key' => data_get($mysql_db_name, 'key'),
+                            'value' => data_get($mysql_db_name, 'value'),
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    break;
+                case str($image)->contains('mariadb'):
+                    $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER'];
+                    $passwordVariables = ['SERVICE_PASSWORD_MARIADB', 'SERVICE_PASSWORD_WORDPRESS', '_APP_DB_PASS'];
+                    $rootPasswordVariables = ['SERVICE_PASSWORD_MARIADBROOT', 'SERVICE_PASSWORD_ROOT', '_APP_DB_ROOT_PASS'];
+                    $dbNameVariables = ['SERVICE_DATABASE_MARIADB', 'SERVICE_DATABASE_WORDPRESS', '_APP_DB_SCHEMA'];
+                    $mariadb_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
+                    $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
+                    $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
+                    $mariadb_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
+                    $fields->put('MariaDB', [
+                        'User' => [
+                            'key' => data_get($mariadb_user, 'key'),
+                            'value' => data_get($mariadb_user, 'value'),
+                            'rules' => 'required',
+                        ],
+                        'Password' => [
+                            'key' => data_get($mariadb_password, 'key'),
+                            'value' => data_get($mariadb_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                        'Root Password' => [
+                            'key' => data_get($mariadb_root_password, 'key'),
+                            'value' => data_get($mariadb_root_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                        'Database Name' => [
+                            'key' => data_get($mariadb_db_name, 'key'),
+                            'value' => data_get($mariadb_db_name, 'value'),
+                            'rules' => data_get($mariadb_db_name, 'value') && 'required',
+                        ],
+                    ]);
+
+                    break;
+            }
+        }
+        return $fields;
+    }
+    public function saveExtraFields($fields)
+    {
+        foreach ($fields as $field) {
+            $key = data_get($field, 'key');
+            $value = data_get($field, 'value');
+            $found = $this->environment_variables()->where('key', $key)->first();
+            if ($found) {
+                $found->value = $value;
+                $found->save();
+            } else {
+                $this->environment_variables()->create([
+                    'key' => $key,
+                    'value' => $value,
+                    'is_build_time' => false,
+                    'service_id' => $this->id,
+                    'is_preview' => false,
+                ]);
+            }
+        }
+    }
     public function documentation()
     {
         $services = getServiceTemplates();
@@ -257,7 +418,7 @@ class Service extends BaseModel
                     }
                 }
                 $networks = collect();
-                foreach ($serviceNetworks as $key =>$serviceNetwork) {
+                foreach ($serviceNetworks as $key => $serviceNetwork) {
                     if (gettype($serviceNetwork) === 'string') {
                         // networks:
                         //  - appwrite
@@ -268,7 +429,7 @@ class Service extends BaseModel
                         //     ipv4_address: 192.168.203.254
                         // $networks->put($serviceNetwork, null);
                         ray($key);
-                        $networks->put($key,$serviceNetwork);
+                        $networks->put($key, $serviceNetwork);
                     }
                 }
                 foreach ($definedNetwork as $key => $network) {
@@ -564,12 +725,18 @@ class Service extends BaseModel
                 }
 
                 // Add labels to the service
-                $fqdns = collect(data_get($savedService, 'fqdns'));
-                $defaultLabels = defaultLabels($this->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
-                $serviceLabels = $serviceLabels->merge($defaultLabels);
-                if (!$isDatabase && $fqdns->count() > 0) {
-                    if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
+                if (!$isDatabase) {
+                    if ($savedService->serviceType()) {
+                        $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
+                    } else {
+                        $fqdns = collect(data_get($savedService, 'fqdns'));
+                    }
+                    $defaultLabels = defaultLabels($this->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+                    $serviceLabels = $serviceLabels->merge($defaultLabels);
+                    if ($fqdns->count() > 0) {
+                        if ($fqdns) {
+                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
+                        }
                     }
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());

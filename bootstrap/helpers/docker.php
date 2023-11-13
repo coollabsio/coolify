@@ -144,6 +144,39 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     }
     return $labels;
 }
+function generateServiceSpecificFqdns($service, $forTraefik = false)
+{
+    $variables = collect($service->service->environment_variables);
+    $type = $service->serviceType();
+    $payload = collect([]);
+    switch ($type) {
+        case $type->contains('minio'):
+            $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
+            if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
+                $MINIO_BROWSER_REDIRECT_URL->update([
+                    "value" => generateFqdn($service->service->server, 'console-' . $service->uuid)
+                ]);
+            }
+            $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
+            if (is_null($MINIO_SERVER_URL?->value)) {
+                $MINIO_SERVER_URL->update([
+                    "value" => generateFqdn($service->service->server, 'minio-' . $service->uuid)
+                ]);
+            }
+            if ($forTraefik) {
+                $payload = collect([
+                    $MINIO_BROWSER_REDIRECT_URL->value . ':9001',
+                    $MINIO_SERVER_URL->value . ':9000',
+                ]);
+            } else {
+                $payload = collect([
+                    $MINIO_BROWSER_REDIRECT_URL->value,
+                    $MINIO_SERVER_URL->value,
+                ]);
+            }
+    }
+    return $payload;
+}
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled, $onlyPort = null)
 {
     $labels = collect([]);

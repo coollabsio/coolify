@@ -3,7 +3,7 @@
         href="{{ route('project.service', $parameters) }}">
         <button>Configuration</button>
     </a>
-    <x-services.links :service="$service" />
+    <x-services.links />
     <div class="flex-1"></div>
     @if (serviceStatus($service) === 'degraded')
         <button wire:click='deploy' onclick="startService.showModal()"

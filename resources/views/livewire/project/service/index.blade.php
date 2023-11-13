@@ -28,7 +28,7 @@
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'service-stack'">
                 <livewire:project.service.stack-form :service="$service" />
-                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-3">
+                <div class="grid grid-cols-1 gap-2 pt-4 xl:grid-cols-1">
                     @foreach ($applications as $application)
                         <div @class([
                             'border-l border-dashed border-red-500' => Str::of(
@@ -58,7 +58,7 @@
                                 @endif
                                 <div class="text-xs">{{ $application->status }}</div>
                             </a>
-                            <a class="flex gap-2 p-1 mx-4 font-bold rounded group-hover:text-white hover:no-underline"
+                            <a class="flex items-center gap-2 p-1 mx-4 font-bold rounded group-hover:text-white hover:no-underline"
                                 href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}"><span
                                     class="hover:text-warning">Logs</span></a>
                         </div>
@@ -88,7 +88,7 @@
                                 @endif
                                 <div class="text-xs">{{ $database->status }}</div>
                             </a>
-                            <a class="flex gap-2 p-1 mx-4 font-bold rounded hover:no-underline group-hover:text-white"
+                            <a class="flex items-center gap-2 p-1 mx-4 font-bold rounded hover:no-underline group-hover:text-white"
                                 href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}"><span
                                     class="hover:text-warning">Logs</span></a>
                         </div>
