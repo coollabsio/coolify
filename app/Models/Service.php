@@ -111,24 +111,36 @@ class Service extends BaseModel
                     $postgres_user = $this->environment_variables()->whereIn('key', $userVariables)->first();
                     $postgres_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $postgres_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
-                    $fields->put('PostgreSQL', [
-                        'User' => [
-                            'key' => data_get($postgres_user, 'key'),
-                            'value' => data_get($postgres_user, 'value'),
-                            'rules' => 'required',
-                        ],
-                        'Password' => [
-                            'key' => data_get($postgres_password, 'key'),
-                            'value' => data_get($postgres_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                        'Database Name' => [
-                            'key' => data_get($postgres_db_name, 'key'),
-                            'value' => data_get($postgres_db_name, 'value'),
-                            'rules' => 'required',
-                        ],
-                    ]);
+                    $data = collect([]);
+                    if ($postgres_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => data_get($postgres_user, 'key'),
+                                'value' => data_get($postgres_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($postgres_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($postgres_password, 'key'),
+                                'value' => data_get($postgres_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($postgres_db_name) {
+                        $data = $data->merge([
+                            'Database Name' => [
+                                'key' => data_get($postgres_db_name, 'key'),
+                                'value' => data_get($postgres_db_name, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    $fields->put('PostgreSQL', $data->toArray());
                     break;
                 case str($image)->contains('mysql'):
                     $userVariables = ['SERVICE_USER_MYSQL', 'SERVICE_USER_WORDPRESS'];
@@ -139,30 +151,46 @@ class Service extends BaseModel
                     $mysql_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mysql_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
                     $mysql_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
-                    $fields->put('MySQL', [
-                        'User' => [
-                            'key' => data_get($mysql_user, 'key'),
-                            'value' => data_get($mysql_user, 'value'),
-                            'rules' => 'required',
-                        ],
-                        'Password' => [
-                            'key' => data_get($mysql_password, 'key'),
-                            'value' => data_get($mysql_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                        'Root Password' => [
-                            'key' => data_get($mysql_root_password, 'key'),
-                            'value' => data_get($mysql_root_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                        'Database Name' => [
-                            'key' => data_get($mysql_db_name, 'key'),
-                            'value' => data_get($mysql_db_name, 'value'),
-                            'rules' => 'required',
-                        ],
-                    ]);
+                    $data = collect([]);
+                    if ($mysql_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => data_get($mysql_user, 'key'),
+                                'value' => data_get($mysql_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($mysql_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($mysql_password, 'key'),
+                                'value' => data_get($mysql_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($mysql_root_password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($mysql_root_password, 'key'),
+                                'value' => data_get($mysql_root_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($mysql_db_name) {
+                        $data = $data->merge([
+                            'Database Name' => [
+                                'key' => data_get($mysql_db_name, 'key'),
+                                'value' => data_get($mysql_db_name, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    $fields->put('MySQL', $data->toArray());
                     break;
                 case str($image)->contains('mariadb'):
                     $userVariables = ['SERVICE_USER_MARIADB', 'SERVICE_USER_WORDPRESS', '_APP_DB_USER'];
@@ -173,31 +201,47 @@ class Service extends BaseModel
                     $mariadb_password = $this->environment_variables()->whereIn('key', $passwordVariables)->first();
                     $mariadb_root_password = $this->environment_variables()->whereIn('key', $rootPasswordVariables)->first();
                     $mariadb_db_name = $this->environment_variables()->whereIn('key', $dbNameVariables)->first();
-                    $fields->put('MariaDB', [
-                        'User' => [
-                            'key' => data_get($mariadb_user, 'key'),
-                            'value' => data_get($mariadb_user, 'value'),
-                            'rules' => 'required',
-                        ],
-                        'Password' => [
-                            'key' => data_get($mariadb_password, 'key'),
-                            'value' => data_get($mariadb_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                        'Root Password' => [
-                            'key' => data_get($mariadb_root_password, 'key'),
-                            'value' => data_get($mariadb_root_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                        'Database Name' => [
-                            'key' => data_get($mariadb_db_name, 'key'),
-                            'value' => data_get($mariadb_db_name, 'value'),
-                            'rules' => data_get($mariadb_db_name, 'value') && 'required',
-                        ],
-                    ]);
+                    $data = collect([]);
 
+                    if ($mariadb_user) {
+                        $data = $data->merge([
+                            'User' => [
+                                'key' => data_get($mariadb_user, 'key'),
+                                'value' => data_get($mariadb_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($mariadb_password) {
+                        $data = $data->merge([
+                            'Password' => [
+                                'key' => data_get($mariadb_password, 'key'),
+                                'value' => data_get($mariadb_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($mariadb_root_password) {
+                        $data = $data->merge([
+                            'Root Password' => [
+                                'key' => data_get($mariadb_root_password, 'key'),
+                                'value' => data_get($mariadb_root_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($mariadb_db_name) {
+                        $data = $data->merge([
+                            'Database Name' => [
+                                'key' => data_get($mariadb_db_name, 'key'),
+                                'value' => data_get($mariadb_db_name, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    $fields->put('MariaDB', $data->toArray());
                     break;
             }
         }
