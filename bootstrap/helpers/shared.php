@@ -447,20 +447,25 @@ function getServiceTemplates()
     if (isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
-        $version = config('version');
-        $services = $services->map(function ($service) use ($version) {
-            if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
-                $service->disabled = true;
-            }
-            return $service;
-        });
     } else {
-        $services = Http::get(config('constants.services.official'));
-        if ($services->failed()) {
-            throw new \Exception($services->body());
+        try {
+            $response = Http::retry(3, 50)->get(config('constants.services.official'));
+            if ($response->failed()) {
+                return collect([]);
+            }
+            $services = $response->json();
+            $services = collect($services)->sortKeys();
+        } catch (\Throwable $e) {
+            $services = collect([]);
         }
-        $services = collect($services->json())->sortKeys();
     }
+    // $version = config('version');
+    // $services = $services->map(function ($service) use ($version) {
+    //     if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
+    //         $service->disabled = true;
+    //     }
+    //     return $service;
+    // });
     return $services;
 }
 

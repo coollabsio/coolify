@@ -182,7 +182,7 @@
                             </button>
                         @endif
                         @empty
-                        <div>No service found.</div>
+                        <div>No service found. Please try to reload the list!</div>
                     @endforelse
                 @endif
             </div>
