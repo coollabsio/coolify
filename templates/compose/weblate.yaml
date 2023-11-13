@@ -1,0 +1,50 @@
+# documentation: https://docs.weblate.org/en/latest/admin/install/docker.html
+# slogan: Weblate is a libre software web-based continuous localization system.
+# tags: localization, translation, web, web-based, continuous, libre, software
+
+services:
+  weblate:
+    image: weblate/weblate:latest
+    environment:
+      - SERVICE_FQDN_WEBLATE
+      - WEBLATE_SITE_DOMAIN=$SERVICE_URL_WEBLATE
+      - WEBLATE_ADMIN_NAME=${WEBLATE_ADMIN_NAME:-Admin}
+      - WEBLATE_ADMIN_EMAIL=${WEBLATE_ADMIN_EMAIL:-admin@example.com}
+      - WEBLATE_ADMIN_PASSWORD=$SERVICE_PASSWORD_WEBLATE
+      - DEFAULT_FROM_EMAIL=${WEBLATE_ADMIN_EMAIL:-admin@example.com}
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_DATABASE=${POSTGRES_DB:-weblate}
+      - POSTGRES_HOST=postgresql
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+    volumes:
+      - weblate-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+  postgresql:
+    image: postgres:15-alpine
+    volumes:
+      - postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=$SERVICE_USER_POSTGRES
+      - POSTGRES_PASSWORD=$SERVICE_PASSWORD_POSTGRES
+      - POSTGRES_DB=${POSTGRES_DB:-weblate}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - weblate-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

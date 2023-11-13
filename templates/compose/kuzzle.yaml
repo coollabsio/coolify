@@ -3,15 +3,16 @@
 # tags: backend, api, realtime, websocket, mqtt, rest, sdk, iot, geofencing, low-code
 
 services:
-
   redis:
-    image: redis:6-alpine
+    image: redis:7-alpine
     command: redis-server --appendonly yes
+    volumes:
+      - elastic-redis-data:/data
     healthcheck:
       test: [ "CMD", "redis-cli", "ping" ]
-      interval: 1s
-      timeout: 3s
-      retries: 30
+      interval: 5s
+      timeout: 20s
+      retries: 10
 
   elasticsearch:
     image: kuzzleio/elasticsearch:7
