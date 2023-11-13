@@ -126,7 +126,6 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
 function updateCompose($resource)
 {
     try {
-        ray($resource);
         $name = data_get($resource, 'name');
         $dockerComposeRaw = data_get($resource, 'service.docker_compose_raw');
         $dockerCompose = Yaml::parse($dockerComposeRaw);

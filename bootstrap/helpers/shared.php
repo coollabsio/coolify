@@ -27,7 +27,6 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
-use Nubs\RandomNameGenerator\All;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
@@ -173,7 +172,11 @@ function get_latest_version_of_coolify(): string
 
 function generate_random_name(?string $cuid = null): string
 {
-    $generator = All::create();
+    $generator = new \Nubs\RandomNameGenerator\All(
+        [
+            new \Nubs\RandomNameGenerator\Alliteration(),
+        ]
+    );
     if (is_null($cuid)) {
         $cuid = new Cuid2(7);
     }
@@ -493,7 +496,8 @@ function queryResourcesByUuid(string $uuid)
     return $resource;
 }
 
-function generateDeployWebhook($resource) {
+function generateDeployWebhook($resource)
+{
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl) . '/api/v1';
     $endpoint = '/deploy';
@@ -501,6 +505,7 @@ function generateDeployWebhook($resource) {
     $url = $api . $endpoint . "?uuid=$uuid&force=false";
     return $url;
 }
-function removeAnsiColors($text) {
+function removeAnsiColors($text)
+{
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
