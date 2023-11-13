@@ -55,6 +55,7 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             if (isDev()) {
+                ray($e);
                 return;
             }
             $this->settings = InstanceSettings::get();
