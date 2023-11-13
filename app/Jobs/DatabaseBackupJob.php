@@ -144,7 +144,6 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     $commands[] = "docker exec $this->container_name env";
                     $envs = instant_remote_process($commands, $this->server);
                     $envs = str($envs)->explode("\n");
-                    ray($envs);
                     $rootPassword = $envs->filter(function ($env) {
                         return str($env)->startsWith('MARIADB_ROOT_PASSWORD=');
                     })->first();
