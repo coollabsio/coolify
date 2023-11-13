@@ -119,11 +119,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $this->preview = ApplicationPreview::findPreviewByApplicationAndPullId($this->application->id, $this->pull_request_id);
             if ($this->application->fqdn) {
-                if (data_get($this->preview, 'fqdn')) {
-                    $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
+                if (str($this->application->fqdn)->contains(',')) {
+                    $url = Url::fromString(str($this->application->fqdn)->explode(',')[0]);
+                    $preview_fqdn = getFqdnWithoutPort(str($this->application->fqdn)->explode(',')[0]);
+                } else {
+                    $url = Url::fromString($this->application->fqdn);
+                    if (data_get($this->preview, 'fqdn')) {
+                        $preview_fqdn = getFqdnWithoutPort(data_get($this->preview, 'fqdn'));
+                    }
                 }
                 $template = $this->application->preview_url_template;
-                $url = Url::fromString($this->application->fqdn);
                 $host = $url->getHost();
                 $schema = $url->getScheme();
                 $random = new Cuid2(7);
@@ -770,21 +775,22 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         if ($this->pull_request_id !== 0) {
-            $newLabels = collect(generateLabelsApplication($this->application, $this->preview));
-            $newHostLabel = $newLabels->filter(function ($label) {
-                return str($label)->contains('Host');
-            });
-            $labels = $labels->reject(function ($label) {
-                return str($label)->contains('Host');
-            });
+            $labels = collect(generateLabelsApplication($this->application, $this->preview));
 
-            $labels = $labels->map(function ($label) {
-                $pattern = '/([a-zA-Z0-9]+)-(\d+)-(http|https)/';
-                $replacement = "$1-pr-{$this->pull_request_id}-$2-$3";
-                $newLabel = preg_replace($pattern, $replacement, $label);
-                return $newLabel;
-            });
-            $labels = $labels->merge($newHostLabel);
+            // $newHostLabel = $newLabels->filter(function ($label) {
+            //     return str($label)->contains('Host');
+            // });
+            // $labels = $labels->reject(function ($label) {
+            //     return str($label)->contains('Host');
+            // });
+            // ray($labels,$newLabels);
+            // $labels = $labels->map(function ($label) {
+            //     $pattern = '/([a-zA-Z0-9]+)-(\d+)-(http|https)/';
+            //     $replacement = "$1-pr-{$this->pull_request_id}-$2-$3";
+            //     $newLabel = preg_replace($pattern, $replacement, $label);
+            //     return $newLabel;
+            // });
+            // $labels = $labels->merge($newHostLabel);
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
         $docker_compose = [
