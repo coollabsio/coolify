@@ -81,6 +81,22 @@ class Service extends BaseModel
                         ],
                     ]);
                     break;
+                case str($image)->contains('weblate'):
+                    $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
+                    $fields->put('Weblate', [
+                        'Admin Email' => [
+                            'key' => data_get($admin_email, 'key'),
+                            'value' => data_get($admin_email, 'value'),
+                            'rules' => 'required|email',
+                        ],
+                        'Admin Password' => [
+                            'key' => data_get($admin_password, 'key'),
+                            'value' => data_get($admin_password, 'value'),
+                            'rules' => 'required',
+                            'isPassword' => true,
+                        ],
+                    ]);
             }
         }
         $databases = $this->databases()->get();
@@ -725,18 +741,16 @@ class Service extends BaseModel
                 }
 
                 // Add labels to the service
-                if (!$isDatabase) {
-                    if ($savedService->serviceType()) {
-                        $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
-                    } else {
-                        $fqdns = collect(data_get($savedService, 'fqdns'));
-                    }
-                    $defaultLabels = defaultLabels($this->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
-                    $serviceLabels = $serviceLabels->merge($defaultLabels);
-                    if ($fqdns->count() > 0) {
-                        if ($fqdns) {
-                            $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
-                        }
+                if ($savedService->serviceType()) {
+                    $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
+                } else {
+                    $fqdns = collect(data_get($savedService, 'fqdns'));
+                }
+                $defaultLabels = defaultLabels($this->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
+                $serviceLabels = $serviceLabels->merge($defaultLabels);
+                if (!$isDatabase && $fqdns->count() > 0) {
+                    if ($fqdns) {
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
                     }
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());
