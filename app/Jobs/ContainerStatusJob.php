@@ -255,6 +255,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 if ($projectUuid && $serviceUuid && $environmentName) {
                     $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/service/" . $serviceUuid;
+                } else {
+                    $url = null;
                 }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
                 $exitedService->update(['status' => 'exited']);
@@ -279,6 +281,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 if ($projectUuid && $applicationUuid && $environment) {
                     $url =  base_url() . '/project/' . $projectUuid . "/" . $environment . "/application/" . $applicationUuid;
+                } else {
+                    $url = null;
                 }
 
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
@@ -302,6 +306,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 if ($projectUuid && $applicationUuid && $environmentName) {
                     $url =  base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/application/" . $applicationUuid;
+                } else {
+                    $url = null;
                 }
 
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
@@ -325,6 +331,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
                 if ($projectUuid && $databaseUuid && $environmentName) {
                     $url = base_url() . '/project/' . $projectUuid . "/" . $environmentName . "/database/" . $databaseUuid;
+                } else {
+                    $url = null;
                 }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }

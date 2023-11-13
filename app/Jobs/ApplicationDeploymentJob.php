@@ -1076,7 +1076,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         ) {
             $this->execute_remote_command(
                 ["echo -n 'Pulling latest images from the registry.'"],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir}"), "hidden" => true],
             );
         }
         $this->execute_remote_command(
