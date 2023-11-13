@@ -5,7 +5,7 @@ namespace App\Http\Livewire\Project\Application;
 use App\Models\Application;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Livewire\Componwent;
+use Livewire\Component;
 
 class General extends Component
 {
