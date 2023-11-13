@@ -152,14 +152,18 @@ function generateServiceSpecificFqdns($service, $forTraefik = false)
     switch ($type) {
         case $type->contains('minio'):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
+            $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
+            return $payload;
+            if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
+                return $payload;
+            }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
-                $MINIO_BROWSER_REDIRECT_URL->update([
+                $MINIO_BROWSER_REDIRECT_URL?->update([
                     "value" => generateFqdn($service->service->server, 'console-' . $service->uuid)
                 ]);
             }
-            $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
             if (is_null($MINIO_SERVER_URL?->value)) {
-                $MINIO_SERVER_URL->update([
+                $MINIO_SERVER_URL?->update([
                     "value" => generateFqdn($service->service->server, 'minio-' . $service->uuid)
                 ]);
             }
