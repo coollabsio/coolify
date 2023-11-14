@@ -218,12 +218,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } finally {
             if (isset($this->docker_compose_base64)) {
                 $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+                $composeFileName = "$this->configuration_dir/docker-compose.yml";
+                if ($this->pull_request_id !== 0) {
+                    $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yml";
+                }
                 $this->execute_remote_command(
                     [
                         "mkdir -p $this->configuration_dir"
                     ],
                     [
-                        "echo '{$this->docker_compose_base64}' | base64 -d > $this->configuration_dir/docker-compose.yml",
+                        "echo '{$this->docker_compose_base64}' | base64 -d > $composeFileName",
                     ],
                     [
                         "echo '{$readme}' > $this->configuration_dir/README.md",
