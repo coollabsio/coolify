@@ -192,7 +192,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->customRepository = $this->application->git_repository;
         }
         try {
-            if ($this->restart_only) {
+            if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
