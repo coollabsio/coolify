@@ -511,6 +511,9 @@ function generateDeployWebhook($resource)
     return $url;
 }
 function generateGitManualWebhook($resource, $type) {
+    if ($resource->source_id !== 0) {
+        return null;
+    }
     if ($resource->getMorphClass() === 'App\Models\Application') {
         $baseUrl = base_url();
         $api = Url::fromString($baseUrl) . "/webhooks/source/$type/events/manual";
