@@ -53,6 +53,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
     private ?ApplicationPreview $preview = null;
+    private ?string $git_type = null;
 
     private string $container_name;
     private ?string $currently_running_container_name = null;
@@ -98,6 +99,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->commit = $this->application_deployment_queue->commit;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
+
+        $this->git_type = data_get($this->application_deployment_queue, 'git_type');
 
         $source = data_get($this->application, 'source');
         if ($source) {
@@ -656,7 +659,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 if ($this->pull_request_id !== 0) {
                     $this->branch = "pull/{$this->pull_request_id}/head:$pr_branch_name";
-                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git fetch origin pull/{$this->pull_request_id}/head:$pr_branch_name && git checkout $pr_branch_name"));
+                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git fetch origin $this->branch && git checkout $pr_branch_name"));
                 }
                 return $commands->implode(' && ');
             }
@@ -668,14 +671,28 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 throw new Exception('Private key not found. Please add a private key to the application and try again.');
             }
             $private_key = base64_encode($private_key);
-            $git_clone_command = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->customRepository} {$this->basedir}";
-            $git_clone_command = $this->set_git_import_settings($git_clone_command);
+            $git_clone_command_base = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->customRepository} {$this->basedir}";
+            $git_clone_command = $this->set_git_import_settings($git_clone_command_base);
             $commands = collect([
                 executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
                 executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
                 executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
-                executeInDocker($this->deployment_uuid, $git_clone_command)
             ]);
+            if ($this->pull_request_id !== 0) {
+                ray($this->git_type);
+                if ($this->git_type === 'gitlab') {
+                    $this->branch = "merge-requests/{$this->pull_request_id}/head:$pr_branch_name";
+                    $commands->push(executeInDocker($this->deployment_uuid, "echo 'Checking out $this->branch'"));
+                    $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $this->branch && git checkout $pr_branch_name";
+                }
+                if ($this->git_type === 'github') {
+                    $this->branch = "pull/{$this->pull_request_id}/head:$pr_branch_name";
+                    $commands->push(executeInDocker($this->deployment_uuid, "echo 'Checking out $this->branch'"));
+                    $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $this->branch && git checkout $pr_branch_name";
+                }
+            }
+
+            $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
             return $commands->implode(' && ');
         }
         if ($this->application->deploymentType() === 'other') {
