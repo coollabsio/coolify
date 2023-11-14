@@ -111,9 +111,9 @@ class Server extends BaseModel
 
     public function hasDefinedResources()
     {
-        $applications = $this->applications()->count() === 0;
-        $databases = $this->databases()->count() === 0;
-        $services = $this->services()->count() === 0;
+        $applications = $this->applications()->count() > 0;
+        $databases = $this->databases()->count() > 0;
+        $services = $this->services()->count() > 0;
         if ($applications || $databases || $services) {
             return true;
         }
