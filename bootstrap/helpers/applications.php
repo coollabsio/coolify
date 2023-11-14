@@ -4,7 +4,7 @@ use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 
-function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false)
+function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null)
 {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,
@@ -14,6 +14,7 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         'is_webhook' => $is_webhook,
         'restart_only' => $restart_only,
         'commit' => $commit,
+        'git_type' => $git_type
     ]);
     $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'queued')->get()->sortByDesc('created_at');
     $running_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'in_progress')->get()->sortByDesc('created_at');

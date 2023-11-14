@@ -85,6 +85,18 @@ class Application extends BaseModel
         );
     }
 
+    public function gitWebhook(): Attribute
+    {
+        return Attribute::make(
+            get: function () {
+                if (!is_null($this->source?->html_url) && !is_null($this->git_repository) && !is_null($this->git_branch)) {
+                    return "{$this->source->html_url}/{$this->git_repository}/settings/hooks";
+                }
+                return $this->git_repository;
+            }
+        );
+    }
+
     public function gitCommits(): Attribute
     {
         return Attribute::make(

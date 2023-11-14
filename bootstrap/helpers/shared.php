@@ -510,6 +510,17 @@ function generateDeployWebhook($resource)
     $url = $api . $endpoint . "?uuid=$uuid&force=false";
     return $url;
 }
+function generateGitManualWebhook($resource, $type) {
+    if ($resource->source_id !== 0) {
+        return null;
+    }
+    if ($resource->getMorphClass() === 'App\Models\Application') {
+        $baseUrl = base_url();
+        $api = Url::fromString($baseUrl) . "/webhooks/source/$type/events/manual";
+        return $api;
+    }
+    return null;
+}
 function removeAnsiColors($text)
 {
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);

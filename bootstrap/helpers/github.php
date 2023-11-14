@@ -50,8 +50,11 @@ function generate_github_jwt_token(GithubApp $source)
     return $issuedToken;
 }
 
-function githubApi(GithubApp|GitlabApp $source, string $endpoint, string $method = 'get', array|null $data = null, bool $throwError = true)
+function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $method = 'get', array|null $data = null, bool $throwError = true)
 {
+    if (is_null($source)) {
+        throw new \Exception('Not implemented yet.');
+    }
     if ($source->getMorphClass() == 'App\Models\GithubApp') {
         if ($source->is_public) {
             $response = Http::github($source->api_url)->$method($endpoint);
