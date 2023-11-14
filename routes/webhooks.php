@@ -94,7 +94,7 @@ Route::post('/source/gitlab/events/manual', function () {
             }
             ray('Webhook GitHub Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
         }
-        $applications = Application::whereNotNull('private_key_id')->where('git_repository', 'like', "%$full_name%");
+        $applications = Application::where('git_repository', 'like', "%$full_name%");
         if ($x_gitlab_event === 'push') {
             $applications = $applications->where('git_branch', $branch)->get();
             if ($applications->isEmpty()) {
@@ -192,7 +192,6 @@ Route::post('/source/github/events/manual', function () {
         if ($content_type !== 'application/json') {
             $payload = json_decode(data_get($payload, 'payload'), true);
         }
-        ray($payload);
         if ($x_github_event === 'push') {
             $branch = data_get($payload, 'ref');
             $full_name = data_get($payload, 'repository.full_name');
@@ -213,8 +212,7 @@ Route::post('/source/github/events/manual', function () {
         if (!$branch) {
             return response('Nothing to do. No branch found in the request.');
         }
-        $applications = Application::whereNotNull('private_key_id')->where('git_repository', 'like', "%$full_name%");
-
+        $applications = Application::where('git_repository', 'like', "%$full_name%");
         if ($x_github_event === 'push') {
             $applications = $applications->where('git_branch', $branch)->get();
             if ($applications->isEmpty()) {
@@ -227,6 +225,7 @@ Route::post('/source/github/events/manual', function () {
                 return response("Nothing to do. No applications found with branch '$base_branch'.");
             }
         }
+        ray($applications);
         foreach ($applications as $application) {
             ray($application);
             $webhook_secret = data_get($application, 'manual_webhook_secret_github');
