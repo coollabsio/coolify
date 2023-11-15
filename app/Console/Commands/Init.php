@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -35,6 +36,11 @@ class Init extends Command
     private function alive()
     {
         $id = config('app.id');
+        $settings = InstanceSettings::get();
+        $do_not_track = data_get($settings, 'do_not_track');
+        if ($do_not_track) {
+            return;
+        }
         try {
             Http::get("https://get.coollabs.io/coolify/v4/alive?appId=$id");
         } catch (\Throwable $e) {
