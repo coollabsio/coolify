@@ -511,7 +511,8 @@ function generateDeployWebhook($resource)
     return $url;
 }
 function generateGitManualWebhook($resource, $type) {
-    if ($resource->source_id !== 0) {
+    ray($resource);
+    if ($resource->source_id !== 0 && !is_null($resource->source_id)) {
         return null;
     }
     if ($resource->getMorphClass() === 'App\Models\Application') {
