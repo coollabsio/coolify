@@ -511,7 +511,6 @@ function generateDeployWebhook($resource)
     return $url;
 }
 function generateGitManualWebhook($resource, $type) {
-    ray($resource);
     if ($resource->source_id !== 0 && !is_null($resource->source_id)) {
         return null;
     }

@@ -33,7 +33,7 @@ class Index extends Component
     public ?string $remoteServerUser = 'root';
     public ?Server $createdServer = null;
 
-    public Collection|array $projects = [];
+    public Collection $projects;
     public ?int $selectedExistingProject = null;
     public ?Project $createdProject = null;
 
