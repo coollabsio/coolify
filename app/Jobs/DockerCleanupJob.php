@@ -21,15 +21,6 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
     public ?string $dockerRootFilesystem = null;
     public ?int $usageBefore = null;
 
-    public function middleware(): array
-    {
-        return [(new WithoutOverlapping($this->server->uuid))];
-    }
-
-    public function uniqueId(): string
-    {
-        return $this->server->uuid;
-    }
     public function __construct(public Server $server)
     {
     }
