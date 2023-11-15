@@ -827,6 +827,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
+                    'logging' => [
+                        'driver' => 'fluentd',
+                        'options' => [
+                            'fluentd-async' => 'true',
+                            'tag' => $this->application->name . '-' . $this->application->uuid
+                        ]
+                    ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
