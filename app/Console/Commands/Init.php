@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
+use App\Models\InstanceSettings;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -14,6 +15,7 @@ use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 class Init extends Command
@@ -23,7 +25,7 @@ class Init extends Command
 
     public function handle()
     {
-        ray()->clearAll();
+        $this->alive();
         $cleanup = $this->option('cleanup');
         if ($cleanup) {
             $this->cleanup_stucked_resources();
@@ -31,7 +33,22 @@ class Init extends Command
         }
         $this->cleanup_in_progress_application_deployments();
     }
-
+    private function alive()
+    {
+        $id = config('app.id');
+        $settings = InstanceSettings::get();
+        $do_not_track = data_get($settings, 'do_not_track');
+        if ($do_not_track == true) {
+            echo "Skipping alive as do_not_track is enabled\n";
+            return;
+        }
+        try {
+            echo "I am alive!\n";
+            Http::get("https://get.coollabs.io/coolify/v4/alive?appId=$id");
+        } catch (\Throwable $e) {
+            echo "Error in alive: {$e->getMessage()}\n";
+        }
+    }
     private function cleanup_ssh()
     {
         try {
