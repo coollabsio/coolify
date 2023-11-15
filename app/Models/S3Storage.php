@@ -36,14 +36,13 @@ class S3Storage extends BaseModel
         return "{$this->endpoint}/{$this->bucket}";
     }
 
-    public function testConnection()
+    public function testConnection(bool $shouldSave = false)
     {
         try {
             set_s3_target($this);
             Storage::disk('custom-s3')->files();
             $this->unusable_email_sent = false;
             $this->is_usable = true;
-            return;
         } catch (\Throwable $e) {
             $this->is_usable = false;
             if ($this->unusable_email_sent === false && is_transactional_emails_active()) {
@@ -65,7 +64,9 @@ class S3Storage extends BaseModel
 
             throw $e;
         } finally {
-            $this->save();
+            if ($shouldSave) {
+                $this->save();
+            }
         }
     }
 }

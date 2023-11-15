@@ -32,7 +32,7 @@ class Form extends Component
     public function test_s3_connection()
     {
         try {
-            $this->storage->testConnection();
+            $this->storage->testConnection(shouldSave: true);
             return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -53,10 +53,7 @@ class Form extends Component
     {
         $this->validate();
         try {
-            $this->storage->testConnection();
-            $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
-            $this->storage->save();
-            $this->emit('success', 'Storage settings saved.');
+            $this->test_s3_connection();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

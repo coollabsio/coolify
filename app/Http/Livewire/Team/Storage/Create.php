@@ -64,19 +64,8 @@ class Create extends Component
             }
             $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
-            $this->storage->is_usable = true;
             $this->storage->save();
             return redirect()->route('team.storages.show', $this->storage->uuid);
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        }
-    }
-
-    private function test_s3_connection()
-    {
-        try {
-            $this->storage->testConnection();
-            return $this->emit('success', 'Connection is working. Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
