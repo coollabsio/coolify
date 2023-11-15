@@ -35,10 +35,11 @@ class Init extends Command
     }
     private function alive()
     {
+        echo "Sending alive request.\n";
         $id = config('app.id');
         $settings = InstanceSettings::get();
         $do_not_track = data_get($settings, 'do_not_track');
-        if ($do_not_track) {
+        if ($do_not_track == true) {
             return;
         }
         try {
