@@ -35,14 +35,15 @@ class Init extends Command
     }
     private function alive()
     {
-        echo "Sending alive request.\n";
         $id = config('app.id');
         $settings = InstanceSettings::get();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
+            echo "Skipping alive as do_not_track is enabled\n";
             return;
         }
         try {
+            echo "I am alive!\n";
             Http::get("https://get.coollabs.io/coolify/v4/alive?appId=$id");
         } catch (\Throwable $e) {
             echo "Error in alive: {$e->getMessage()}\n";
