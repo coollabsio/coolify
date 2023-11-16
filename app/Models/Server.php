@@ -112,6 +112,12 @@ class Server extends BaseModel
         return $this->proxy->modelScope();
     }
 
+    public function isLocalhost() {
+        if (isDev()) {
+            return $this->ip === 'coolify-testing-host';
+        }
+        return $this->ip === 'host.docker.internal';
+    }
     public function checkServerRediness()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
