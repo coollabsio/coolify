@@ -3,9 +3,11 @@
 namespace App\Console\Commands;
 
 use App\Enums\ApplicationDeploymentStatus;
+use App\Jobs\CleanupHelperContainersJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\InstanceSettings;
+use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -32,6 +34,16 @@ class Init extends Command
             $this->cleanup_ssh();
         }
         $this->cleanup_in_progress_application_deployments();
+        $this->cleanup_stucked_helper_containers();
+    }
+    private function cleanup_stucked_helper_containers() {
+        $servers = Server::all();
+        foreach ($servers as $server) {
+            if ($server->isFunctional()) {
+                CleanupHelperContainersJob::dispatch($server);
+            }
+        }
+
     }
     private function alive()
     {
