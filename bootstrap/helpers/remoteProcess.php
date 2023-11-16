@@ -191,7 +191,7 @@ function refresh_server_connection(?PrivateKey $private_key = null)
 //         if (!$uptime) {
 //             $server->settings->is_reachable = false;
 //             $server->team->notify(new Unreachable($server));
-//             $server->unreachable_email_sent = true;
+//             $server->unreachable_notification_sent = true;
 //             $server->save();
 //             return [
 //                 "uptime" => null,
@@ -213,9 +213,9 @@ function refresh_server_connection(?PrivateKey $private_key = null)
 //             $server->settings->is_usable = false;
 //         } else {
 //             $server->settings->is_usable = true;
-//             if (data_get($server, 'unreachable_email_sent') === true) {
+//             if (data_get($server, 'unreachable_notification_sent') === true) {
 //                 $server->team->notify(new Revived($server));
-//                 $server->unreachable_email_sent = false;
+//                 $server->unreachable_notification_sent = false;
 //                 $server->save();
 //             }
 //         }

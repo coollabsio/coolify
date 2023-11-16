@@ -33,6 +33,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ExecuteRemoteCommand;
 
+    public $timeout = 3600;
+
     public static int $batch_counter = 0;
 
     private int $application_deployment_queue_id;
@@ -827,6 +829,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
+                    // 'logging' => [
+                    //     'driver' => 'fluentd',
+                    //     'options' => [
+                    //         'fluentd-async' => 'true',
+                    //         'tag' => $this->application->name . '-' . $this->application->uuid
+                    //     ]
+                    // ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
@@ -1089,21 +1098,19 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function start_by_compose_file()
     {
-        if (
-            !$this->application->dockerfile &&
-            (
-                $this->application->build_pack === 'dockerimage' ||
-                $this->application->build_pack === 'dockerfile')
-        ) {
+        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile') {
+            $this->execute_remote_command(
+                ["echo -n 'Starting application (could take a while).'"],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+            );
+        } else if ($this->application->build_pack === 'dockerimage') {
             $this->execute_remote_command(
                 ["echo -n 'Pulling latest images from the registry.'"],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir}"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
+                ["echo -n 'Starting application (could take a while).'"],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         }
-        $this->execute_remote_command(
-            ["echo -n 'Starting application (could take a while).'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
-        );
     }
 
     private function generate_build_env_variables()

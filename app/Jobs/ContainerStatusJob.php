@@ -8,8 +8,6 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -41,76 +39,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         // ray("checking server status for {$this->server->id}");
         try {
-            // ray()->clearAll();
-            $serverUptimeCheckNumber = $this->server->unreachable_count;
-            $serverUptimeCheckNumberMax = 3;
-
-            // ray('checking # ' . $serverUptimeCheckNumber);
-            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
-                if ($this->server->unreachable_email_sent === false) {
-                    ray('Server unreachable, sending notification...');
-                    $this->server->team->notify(new Unreachable($this->server));
-                    $this->server->update(['unreachable_email_sent' => true]);
-                }
-                $this->server->settings()->update([
-                    'is_reachable' => false,
-                ]);
-                $this->server->update([
-                    'unreachable_count' => 0,
-                ]);
-                // Update all applications, databases and services to exited
-                foreach ($this->server->applications() as $application) {
-                    $application->update(['status' => 'exited']);
-                }
-                foreach ($this->server->databases() as $database) {
-                    $database->update(['status' => 'exited']);
-                }
-                foreach ($this->server->services() as $service) {
-                    $apps = $service->applications()->get();
-                    $dbs = $service->databases()->get();
-                    foreach ($apps as $app) {
-                        $app->update(['status' => 'exited']);
-                    }
-                    foreach ($dbs as $db) {
-                        $db->update(['status' => 'exited']);
-                    }
-                }
-                return;
-            }
-            $result = $this->server->validateConnection();
-            if ($result) {
-                $this->server->settings()->update([
-                    'is_reachable' => true,
-                ]);
-                $this->server->update([
-                    'unreachable_count' => 0,
-                ]);
-            } else {
-                $serverUptimeCheckNumber++;
-                $this->server->settings()->update([
-                    'is_reachable' => false,
-                ]);
-                $this->server->update([
-                    'unreachable_count' => $serverUptimeCheckNumber,
-                ]);
-                return;
-            }
-
-            if (data_get($this->server, 'unreachable_email_sent') === true) {
-                ray('Server is reachable again, sending notification...');
-                $this->server->team->notify(new Revived($this->server));
-                $this->server->update(['unreachable_email_sent' => false]);
-            }
-            if (
-                data_get($this->server, 'settings.is_reachable') === false ||
-                data_get($this->server, 'settings.is_usable') === false
-            ) {
-                $this->server->settings()->update([
-                    'is_reachable' => true,
-                    'is_usable' => true
-                ]);
-            }
-            // $this->server->validateDockerEngine(true);
+            $this->server->checkServerRediness();
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;
