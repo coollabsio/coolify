@@ -21,8 +21,6 @@ Thank you so much!
 
 If you do not want to self-host Coolify, there is a paid cloud version available: https://app.coolify.io
 
-You can easily attach your own servers, get all the automations, free email notifications, etc.
-
 For more information & pricing, take a look at our landing page [here](https://coolify.io).
 
 ## Why should I use the Cloud version?
