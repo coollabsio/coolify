@@ -2,10 +2,8 @@
 
 namespace App\Console;
 
-use App\Jobs\CheckResaleLicenseJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
-use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
@@ -28,7 +26,6 @@ class Kernel extends ConsoleKernel
             // Server Jobs
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
-            $this->cleanup_servers($schedule);
             $this->check_scheduled_backups($schedule);
             $this->pull_helper_image($schedule);
         } else {
@@ -41,7 +38,6 @@ class Kernel extends ConsoleKernel
             $this->instance_auto_update($schedule);
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
-            $this->cleanup_servers($schedule);
             $this->pull_helper_image($schedule);
         }
     }
@@ -52,13 +48,6 @@ class Kernel extends ConsoleKernel
             $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
         }
     }
-    private function cleanup_servers($schedule)
-    {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
-        foreach ($servers as $server) {
-            $schedule->job(new DockerCleanupJob($server))->everyTenMinutes()->onOneServer();
-        }
-    }
     private function check_resources($schedule)
     {
         if (isCloud()) {
@@ -67,8 +56,8 @@ class Kernel extends ConsoleKernel
             $servers = Server::all();
         }
         foreach ($servers as $server) {
+            $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
-            $schedule->job(new ServerStatusJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)

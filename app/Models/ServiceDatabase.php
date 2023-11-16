@@ -36,7 +36,7 @@ class ServiceDatabase extends BaseModel
     {
         $port = $this->public_port;
         $realIp = $this->service->server->ip;
-        if ($realIp === 'host.docker.internal' || isDev()) {
+        if ($this->service->server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
         $url = "{$realIp}:{$port}";

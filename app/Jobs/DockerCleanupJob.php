@@ -40,12 +40,13 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
             if (!$this->server->isFunctional()) {
                 return;
             }
-
+            $this->usageBefore = $this->server->getDiskUsage();
+            ray('Usage before: ' . $this->usageBefore);
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
                 ray('Cleaning up ' . $this->server->name);
-                instant_remote_process(['docker image prune -af'], $this->server);
-                instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $this->server);
-                instant_remote_process(['docker builder prune -af'], $this->server);
+                instant_remote_process(['docker image prune -af'], $this->server, false);
+                instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $this->server, false);
+                instant_remote_process(['docker builder prune -af'], $this->server, false);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter <  $this->usageBefore) {
                     ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);

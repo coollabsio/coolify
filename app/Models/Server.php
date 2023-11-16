@@ -112,17 +112,19 @@ class Server extends BaseModel
         return $this->proxy->modelScope();
     }
 
-    public function isLocalhost() {
-        if (isDev()) {
-            return $this->ip === 'coolify-testing-host';
-        }
-        return $this->ip === 'host.docker.internal';
+    public function isLocalhost()
+    {
+        return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
     public function checkServerRediness()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
         $serverUptimeCheckNumberMax = 5;
-        while (true) {
+
+        $currentTime = now()->timestamp;
+        $runtime5Minutes = 5 * 60;
+        // Run for 5 minutes max and check every 5 seconds
+        while ($currentTime + $runtime5Minutes > now()->timestamp) {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
@@ -226,7 +228,7 @@ class Server extends BaseModel
                 if (isDev()) {
                     return '127.0.0.1';
                 }
-                if ($this->ip === 'host.docker.internal') {
+                if ($this->isLocalhost()) {
                     return base_ip();
                 }
                 return $this->ip;
