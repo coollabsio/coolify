@@ -4,8 +4,11 @@ namespace App\Models;
 
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
+use App\Notifications\Server\Revived;
+use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -109,6 +112,75 @@ class Server extends BaseModel
         return $this->proxy->modelScope();
     }
 
+    public function checkServerRediness()
+    {
+        $serverUptimeCheckNumber = $this->unreachable_count;
+        $serverUptimeCheckNumberMax = 5;
+        while (true) {
+            if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
+                if ($this->unreachable_notification_sent === false) {
+                    ray('Server unreachable, sending notification...');
+                    $this->team->notify(new Unreachable($this));
+                    $this->update(['unreachable_notification_sent' => true]);
+                }
+                $this->settings()->update([
+                    'is_reachable' => false,
+                ]);
+                $this->update([
+                    'unreachable_count' => 0,
+                ]);
+                foreach ($this->applications() as $application) {
+                    $application->update(['status' => 'exited']);
+                }
+                foreach ($this->databases() as $database) {
+                    $database->update(['status' => 'exited']);
+                }
+                foreach ($this->services() as $service) {
+                    $apps = $service->applications()->get();
+                    $dbs = $service->databases()->get();
+                    foreach ($apps as $app) {
+                        $app->update(['status' => 'exited']);
+                    }
+                    foreach ($dbs as $db) {
+                        $db->update(['status' => 'exited']);
+                    }
+                }
+                throw new \Exception('Server is not reachable.');
+            }
+            $result = $this->validateConnection();
+            ray('validateConnection: ' . $result);
+            if (!$result) {
+                $serverUptimeCheckNumber++;
+                $this->update([
+                    'unreachable_count' => $serverUptimeCheckNumber,
+                ]);
+                Sleep::for(5)->seconds();
+                return;
+            }
+            $this->update([
+                'unreachable_count' => 0,
+            ]);
+            if (data_get($this, 'unreachable_notification_sent') === true) {
+                ray('Server is reachable again, sending notification...');
+                $this->team->notify(new Revived($this));
+                $this->update(['unreachable_notification_sent' => false]);
+            }
+            if (
+                data_get($this, 'settings.is_reachable') === false ||
+                data_get($this, 'settings.is_usable') === false
+            ) {
+                $this->settings()->update([
+                    'is_reachable' => true,
+                    'is_usable' => true
+                ]);
+            }
+            break;
+        }
+    }
+    public function getDiskUsage()
+    {
+        return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
+    }
     public function hasDefinedResources()
     {
         $applications = $this->applications()->count() > 0;

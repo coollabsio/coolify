@@ -9,6 +9,7 @@ use App\Jobs\DockerCleanupJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
+use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
@@ -67,6 +68,7 @@ class Kernel extends ConsoleKernel
         }
         foreach ($servers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)

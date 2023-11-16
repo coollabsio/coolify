@@ -11,14 +11,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class Revived extends Notification implements ShouldQueue
+class HighDiskUsage extends Notification implements ShouldQueue
 {
     use Queueable;
 
     public $tries = 1;
-    public function __construct(public Server $server)
+    public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage)
     {
-        if ($this->server->unreachable_notification_sent === false) {
+        if ($this->server->high_disk_usage_notification_sent === false) {
             return;
         }
     }
@@ -33,7 +33,7 @@ class Revived extends Notification implements ShouldQueue
         if ($isDiscordEnabled) {
             $channels[] = DiscordChannel::class;
         }
-        if ($isEmailEnabled ) {
+        if ($isEmailEnabled) {
             $channels[] = EmailChannel::class;
         }
         if ($isTelegramEnabled) {
@@ -45,22 +45,24 @@ class Revived extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("Coolify: Server ({$this->server->name}) revived.");
-        $mail->view('emails.server-revived', [
+        $mail->subject("Coolify: Server ({$this->server->name}) high disk usage detected!");
+        $mail->view('emails.high-disk-usage', [
             'name' => $this->server->name,
+            'disk_usage' => $this->disk_usage,
+            'threshold' => $this->cleanup_after_percentage,
         ]);
         return $mail;
     }
 
     public function toDiscord(): string
     {
-        $message = "Coolify:  Server '{$this->server->name}' revived. All automations & integrations are turned on again!";
+        $message = "Coolify: Server '{$this->server->name}' high disk usage detected! \nDisk usage: {$this->disk_usage}";
         return $message;
     }
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!"
+            "message" => "Coolify: Server '{$this->server->name}' high disk usage detected! \n Disk usage: {$this->disk_usage}"
         ];
     }
 }
