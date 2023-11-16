@@ -33,6 +33,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels, ExecuteRemoteCommand;
 
+    public $timeout = 3600;
+
     public static int $batch_counter = 0;
 
     private int $application_deployment_queue_id;
