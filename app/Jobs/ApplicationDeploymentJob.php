@@ -498,7 +498,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->full_healthcheck_url) {
                 $this->execute_remote_command(
                     [
-                        "echo 'Healthcheck URL inside your container: {$this->full_healthcheck_url}'"
+                        "echo 'Healthcheck URL (inside the container): {$this->full_healthcheck_url}'"
                     ]
                 );
             }
@@ -837,13 +837,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
-                    // 'logging' => [
-                    //     'driver' => 'fluentd',
-                    //     'options' => [
-                    //         'fluentd-async' => 'true',
-                    //         'tag' => $this->application->name . '-' . $this->application->uuid
-                    //     ]
-                    // ],
+                    'logging' => [
+                        'driver' => 'fluentd',
+                        'options' => [
+                            'fluentd-address' => "tcp://127.0.0.1:24224",
+                            'fluentd-async' => "true",
+                            'fluentd-sub-second-precision' => "true",
+
+                        ]
+                    ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',

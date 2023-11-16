@@ -1,9 +1,0 @@
-version: '3'
-services:
-  coolify-fluent-bit:
-    image: cr.fluentbit.io/fluent/fluent-bit:2.0
-    command: -c /fluent-bit.conf
-    volumes:
-      - ./fluent-bit.conf:/fluent-bit.conf
-    ports:
-      - 24224:24224

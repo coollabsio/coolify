@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\InstallNewRelic;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
@@ -295,6 +297,10 @@ class Server extends BaseModel
         //     }
         // }
         return true;
+    }
+    public function logDrain($type)
+    {
+        InstallLogDrain::run($this, $type);
     }
     public function isFunctional()
     {
