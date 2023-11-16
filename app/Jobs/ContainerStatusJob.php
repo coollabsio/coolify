@@ -8,8 +8,6 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
-use App\Notifications\Server\Revived;
-use App\Notifications\Server\Unreachable;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
