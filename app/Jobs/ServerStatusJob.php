@@ -33,11 +33,13 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         ray("checking server status for {$this->server->id}");
         try {
-
             $this->server->checkServerRediness();
             $disk_usage = $this->server->getDiskUsage();
-            ray($this->server->settings->cleanup_after_percentage);
             if ($disk_usage >= $this->server->settings->cleanup_after_percentage) {
+                if ($this->server->high_disk_usage_notification_sent) {
+                    ray('high disk usage notification already sent');
+                    return;
+                }
                 $this->server->high_disk_usage_notification_sent = true;
                 $this->server->save();
                 $this->server->team->notify(new HighDiskUsage($this->server, $disk_usage, $this->server->settings->cleanup_after_percentage));

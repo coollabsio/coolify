@@ -18,9 +18,6 @@ class HighDiskUsage extends Notification implements ShouldQueue
     public $tries = 1;
     public function __construct(public Server $server, public int $disk_usage, public int $cleanup_after_percentage)
     {
-        if ($this->server->high_disk_usage_notification_sent === false) {
-            return;
-        }
     }
 
     public function via(object $notifiable): array
@@ -56,13 +53,13 @@ class HighDiskUsage extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "Coolify: Server '{$this->server->name}' high disk usage detected! \nDisk usage: {$this->disk_usage}";
+        $message = "Coolify: Server '{$this->server->name}' high disk usage detected! \nDisk usage: {$this->disk_usage}. Please cleanup your disk to prevent data-loss. Here are some tips: https://coolify.io/docs/automated-cleanup.";
         return $message;
     }
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' high disk usage detected! \n Disk usage: {$this->disk_usage}"
+            "message" => "Coolify: Server '{$this->server->name}' high disk usage detected! \n Disk usage: {$this->disk_usage}. Please cleanup your disk to prevent data-loss. Here are some tips: https://coolify.io/docs/automated-cleanup."
         ];
     }
 }
