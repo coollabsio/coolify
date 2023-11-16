@@ -29,9 +29,10 @@ For more information & pricing, take a look at our landing page [here](https://c
 The recommended way to use Coolify is to have one server for Coolify and one (or more) for the resources you are deploying. A server is around 4-5$/month.
 
 By subscribing to the cloud version, you get the Coolify server for the same price, but with:
-- highly availability
-- free email notifications
-- etc
+- High-availability
+- Free email notifications
+- Better support
+- Less maintenance for you
 
 # Installation
 
