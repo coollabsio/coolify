@@ -122,8 +122,8 @@ class Server extends BaseModel
         $serverUptimeCheckNumberMax = 5;
 
         $currentTime = now()->timestamp;
-        $runtime5Minutes = 5 * 60;
-        // Run for 5 minutes max and check every 5 seconds
+        $runtime5Minutes = 1 * 60;
+        // Run for 1 minutes max and check every 5 seconds
         while ($currentTime + $runtime5Minutes > now()->timestamp) {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
