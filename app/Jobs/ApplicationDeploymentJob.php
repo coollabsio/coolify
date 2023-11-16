@@ -75,6 +75,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ?string $buildTarget = null;
     private $log_model;
     private Collection $saved_outputs;
+    private ?string $full_healthcheck_url = null;
 
     private string $serverUser = 'root';
     private string $serverUserHomeDir = '/root';
@@ -492,8 +493,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->execute_remote_command(
                 [
                     "echo 'Waiting for healthcheck to pass on the new version of your application.'"
-                ],
+                ]
             );
+            if ($this->full_healthcheck_url) {
+                $this->execute_remote_command(
+                    [
+                        "echo 'Healthcheck URL inside your container: {$this->full_healthcheck_url}'"
+                    ]
+                );
+            }
             while ($counter < $this->application->health_check_retries) {
                 $this->execute_remote_command(
                     [
@@ -960,10 +968,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $health_check_port = $this->application->health_check_port;
         }
         if ($this->application->health_check_path) {
+            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
                 "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path} > /dev/null"
             ];
         } else {
+            $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/";
             $generated_healthchecks_commands = [
                 "curl -s -X {$this->application->health_check_method} -f {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}/"
             ];
@@ -1098,15 +1108,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function start_by_compose_file()
     {
-        if ($this->application->dockerfile || $this->application->build_pack === 'dockerfile') {
-            $this->execute_remote_command(
-                ["echo -n 'Starting application (could take a while).'"],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
-            );
-        } else if ($this->application->build_pack === 'dockerimage') {
+        if ($this->application->build_pack === 'dockerimage') {
             $this->execute_remote_command(
                 ["echo -n 'Pulling latest images from the registry.'"],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
+                ["echo -n 'Starting application (could take a while).'"],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+            );
+        } else {
+            $this->execute_remote_command(
                 ["echo -n 'Starting application (could take a while).'"],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
