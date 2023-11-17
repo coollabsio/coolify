@@ -18,6 +18,10 @@ class ServiceApplication extends BaseModel
             $service->fileStorages()->delete();
         });
     }
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
     public function type()
     {
         return 'service';

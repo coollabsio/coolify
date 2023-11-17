@@ -16,6 +16,7 @@ class Application extends Component
         'application.image' => 'required',
         'application.exclude_from_status' => 'required|boolean',
         'application.required_fqdn' => 'required|boolean',
+        'application.is_log_drain_enabled' => 'nullable|boolean',
     ];
     public function render()
     {
@@ -25,7 +26,11 @@ class Application extends Component
     {
         $this->submit();
     }
-
+    public function instantSaveAdvanced()
+    {
+        $this->submit();
+        $this->emit('success', 'You need to restart the service for the changes to take effect.');
+    }
     public function delete()
     {
         try {
@@ -44,6 +49,11 @@ class Application extends Component
     {
         try {
             $this->validate();
+            if (!$this->application->service->destination->server->isLogDrainEnabled()) {
+                $this->application->is_log_drain_enabled = false;
+                $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
+                return;
+            }
             $this->application->save();
             updateCompose($this->application);
             $this->emit('success', 'Application saved successfully.');

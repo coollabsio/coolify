@@ -41,6 +41,10 @@ class StandaloneMariadb extends BaseModel
             $database->environment_variables()->delete();
         });
     }
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
     public function type(): string
     {
         return 'standalone-mariadb';

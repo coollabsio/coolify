@@ -32,7 +32,7 @@ class General extends Component
     public bool $is_preview_deployments_enabled;
     public bool $is_auto_deploy_enabled;
     public bool $is_force_https_enabled;
-
+    public bool $is_log_drain_enabled;
 
     protected $rules = [
         'application.name' => 'required',
@@ -101,6 +101,7 @@ class General extends Component
             $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
             $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
             $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+            $this->is_log_drain_enabled = $this->application->settings->is_log_drain_enabled;
         }
         $this->checkLabelUpdates();
     }
@@ -136,6 +137,14 @@ class General extends Component
         $this->application->settings->is_preview_deployments_enabled = $this->is_preview_deployments_enabled;
         $this->application->settings->is_auto_deploy_enabled = $this->is_auto_deploy_enabled;
         $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
+        $this->application->settings->is_log_drain_enabled = $this->is_log_drain_enabled;
+        if ($this->is_log_drain_enabled) {
+            if (!$this->application->destination->server->isLogDrainEnabled()) {
+                $this->application->settings->is_log_drain_enabled =  $this->is_log_drain_enabled = false;
+                $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
+                return;
+            }
+        }
         $this->application->settings->save();
         $this->application->save();
         $this->application->refresh();

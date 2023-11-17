@@ -52,29 +52,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $databases = $this->server->databases();
             $services = $this->server->services()->get();
             $previews = $this->server->previews();
-            $this->server->proxyType();
-            /// Check if proxy is running
-            $foundProxyContainer = $containers->filter(function ($value, $key) {
-                return data_get($value, 'Name') === '/coolify-proxy';
-            })->first();
-            if (!$foundProxyContainer) {
-                try {
-                    $shouldStart = CheckProxy::run($this->server);
-                    if ($shouldStart) {
-                        StartProxy::run($this->server, false);
-                        $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
-                    } else {
-                        ray('Proxy could not be started.');
-                    }
-                } catch (\Throwable $e) {
-                    ray($e);
-                }
-            } else {
-                $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
-                $this->server->save();
-                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
-                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
-            }
+
             $foundApplications = [];
             $foundApplicationPreviews = [];
             $foundDatabases = [];
@@ -266,6 +244,30 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $url = null;
                 }
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+            }
+
+            // Check if proxy is running
+            $this->server->proxyType();
+            $foundProxyContainer = $containers->filter(function ($value, $key) {
+                return data_get($value, 'Name') === '/coolify-proxy';
+            })->first();
+            if (!$foundProxyContainer) {
+                try {
+                    $shouldStart = CheckProxy::run($this->server);
+                    if ($shouldStart) {
+                        StartProxy::run($this->server, false);
+                        $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                    } else {
+                        ray('Proxy could not be started.');
+                    }
+                } catch (\Throwable $e) {
+                    ray($e);
+                }
+            } else {
+                $this->server->proxy->status = data_get($foundProxyContainer, 'State.Status');
+                $this->server->save();
+                $connectProxyToDockerNetworks = connectProxyToNetworks($this->server);
+                instant_remote_process($connectProxyToDockerNetworks, $this->server, false);
             }
         } catch (\Throwable $e) {
             send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());

@@ -42,6 +42,11 @@ class StandalonePostgresql extends BaseModel
         });
     }
 
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
+
     public function portsMappings(): Attribute
     {
         return Attribute::make(

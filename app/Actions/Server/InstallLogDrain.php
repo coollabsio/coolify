@@ -8,8 +8,17 @@ use App\Models\Server;
 class InstallLogDrain
 {
     use AsAction;
-    public function handle(Server $server, string $type)
+    public function handle(Server $server)
     {
+        if ($server->settings->is_logdrain_newrelic_enabled) {
+            $type = 'newrelic';
+        } else if ($server->settings->is_logdrain_highlight_enabled) {
+            $type = 'highlight';
+        } else if ($server->settings->is_logdrain_axiom_enabled) {
+            $type = 'axiom';
+        } else {
+            $type = 'none';
+        }
         try {
             if ($type === 'none') {
                 $command = [
@@ -127,6 +136,7 @@ services:
       - ./parsers.conf:/parsers.conf
     ports:
       - 127.0.0.1:24224:24224
+    restart: unless-stopped
 ");
             $readme = base64_encode('# New Relic Log Drain
 This log drain is based on [Fluent Bit](https://fluentbit.io/) and New Relic Log Forwarder.

@@ -2,6 +2,7 @@
 
 namespace App\Http\Livewire\Server;
 
+use App\Actions\Server\InstallLogDrain;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -46,14 +47,8 @@ class LogDrains extends Component
     public function configureLogDrain()
     {
         try {
-            if ($this->server->settings->is_logdrain_newrelic_enabled) {
-                $this->server->logDrain('newrelic');
-            } else if ($this->server->settings->is_logdrain_highlight_enabled) {
-                $this->server->logDrain('highlight');
-            } else if ($this->server->settings->is_logdrain_axiom_enabled) {
-                $this->server->logDrain('axiom');
-            } else {
-                $this->server->logDrain('none');
+            InstallLogDrain::run($this->server);
+            if (!$this->server->isLogDrainEnabled()) {
                 $this->emit('serverRefresh');
                 $this->emit('success', 'Log drain service stopped.');
                 return;

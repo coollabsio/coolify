@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\InstanceAutoUpdateJob;
@@ -61,6 +62,9 @@ class Kernel extends ConsoleKernel
         foreach ($servers as $server) {
             $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
+            if ($server->isLogDrainEnabled()) {
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
+            }
         }
     }
     private function instance_auto_update($schedule)

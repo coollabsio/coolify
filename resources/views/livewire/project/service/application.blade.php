@@ -36,6 +36,8 @@
             <x-forms.checkbox instantSave label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
                 id="application.exclude_from_status"></x-forms.checkbox>
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave="instantSaveAdvanced" id="application.is_log_drain_enabled" label="Drain Logs" />
         </div>
     </form>
 </div>

@@ -797,7 +797,7 @@ class Service extends BaseModel
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
                     }
                 }
-                if ($this->server->isDrainLogActivated()) {
+                if ($this->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
                     data_set($service, 'logging', [
                         'driver' => 'fluentd',
                         'options' => [

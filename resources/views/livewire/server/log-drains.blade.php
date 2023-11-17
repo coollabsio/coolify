@@ -1,7 +1,7 @@
 <div>
     <x-server.navbar :server="$server" :parameters="$parameters" />
     <h2>Log Drains</h2>
-    <div class="pb-4">Sends resource logs to external services.</div>
+    <div class="pb-4">Sends service logs to 3rd party tools.</div>
     <div class="flex flex-col gap-4 pt-4">
         <div class="p-4 border border-coolgray-500">
             <form wire:submit.prevent='submit("newrelic")' class="flex flex-col">

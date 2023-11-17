@@ -46,6 +46,11 @@ class StandaloneMysql extends BaseModel
         return 'standalone-mysql';
     }
 
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'is_log_drain_enabled', false);
+    }
+
     public function portsMappings(): Attribute
     {
         return Attribute::make(

@@ -33,5 +33,10 @@
         <x-forms.textarea
             helper="<a target='_blank' class='text-white underline' href='https://raw.githubusercontent.com/redis/redis/7.2/redis.conf'>Redis Default Configuration</a>"
             label="Custom Redis Configuration" rows="10" id="database.redis_conf" />
+        <h3 class="pt-4">Advanced</h3>
+        <div class="flex flex-col">
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+        </div>
     </form>
 </div>
