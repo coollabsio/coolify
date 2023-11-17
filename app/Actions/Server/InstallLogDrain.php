@@ -26,6 +26,8 @@ class InstallLogDrain
     Flush     5
     Daemon    off
     Tag container_logs
+    Log_Level debug
+    Parsers_File  parsers.conf
 [INPUT]
     Name              forward
     Buffer_Chunk_Size 1M
@@ -38,7 +40,6 @@ class InstallLogDrain
     Name                modify
     Match               *
     Set                 server_name {$server->name}
-
 [OUTPUT]
     Name nrlogs
     Match *
@@ -53,9 +54,10 @@ class InstallLogDrain
                 }
                 $config = base64_encode("
 [SERVICE]
-    Flush     1
+    Flush     5
     Daemon    off
     Log_Level debug
+    Parsers_File  parsers.conf
 [INPUT]
     Name              forward
     tag               \${HIGHLIGHT_PROJECT_ID}
@@ -75,6 +77,8 @@ class InstallLogDrain
 [SERVICE]
     Flush     5
     Daemon    off
+    Log_Level debug
+    Parsers_File  parsers.conf
 [INPUT]
     Name              forward
     Buffer_Chunk_Size 1M
@@ -104,7 +108,12 @@ class InstallLogDrain
             } else {
                 throw new \Exception('Unknown log drain type.');
             }
-
+            $parsers = base64_encode("
+[PARSER]
+    Name        empty_line_skipper
+    Format      regex
+    Regex       /^(?!\s*$).+/
+");
             $compose = base64_encode("
 services:
   coolify-log-drain:
@@ -115,6 +124,7 @@ services:
       - .env
     volumes:
       - ./fluent-bit.conf:/fluent-bit.conf
+      - ./parsers.conf:/parsers.conf
     ports:
       - 127.0.0.1:24224:24224
 ");
@@ -132,11 +142,13 @@ Files:
 
             $config_path = $base_path . '/log-drains';
             $fluent_bit_config = $config_path . '/fluent-bit.conf';
+            $parsers_config = $config_path . '/parsers.conf';
             $compose_path = $config_path . '/docker-compose.yml';
             $readme_path = $config_path . '/README.md';
             $command = [
                 "echo 'Saving configuration'",
                 "mkdir -p $config_path",
+                "echo '{$parsers}' | base64 -d > $parsers_config",
                 "echo '{$config}' | base64 -d > $fluent_bit_config",
                 "echo '{$compose}' | base64 -d > $compose_path",
                 "echo '{$readme}' | base64 -d > $readme_path",
