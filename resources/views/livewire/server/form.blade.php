@@ -42,7 +42,7 @@
                     label="Is it part of a Swarm cluster?" /> --}}
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
-                <x-forms.input id="server.ip" pattern="^(?!10\.(\d{1,3}\.){2}\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.(\d{1,3}\.){1}\d{1,3}|192\.168\.(\d{1,3}\.){1}\d{1,3}|(?:[Ff][Cc00]|[Ff][Dd])[0-9a-fA-F]{2}:|fe80:).*$" label="IP Address/Domain"
+                <x-forms.input id="server.ip" label="IP Address/Domain"
                     helper="An IP Address (127.0.0.1) or domain (example.com)." required />
                 <div class="flex gap-2">
                     <x-forms.input id="server.user" label="User" required />

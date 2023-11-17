@@ -10,7 +10,7 @@
                 <x-forms.input id="description" label="Description" />
             </div>
             <div class="flex gap-2">
-                <x-forms.input pattern="^(?!10\.(\d{1,3}\.){2}\d{1,3}|172\.(1[6-9]|2[0-9]|3[0-1])\.(\d{1,3}\.){1}\d{1,3}|192\.168\.(\d{1,3}\.){1}\d{1,3}|(?:[Ff][Cc00]|[Ff][Dd])[0-9a-fA-F]{2}:|fe80:).*$" id="ip" label="IP Address/Domain" required
+                <x-forms.input id="ip" label="IP Address/Domain" required
                     helper="An IP Address (127.0.0.1) or domain (example.com)." />
                 <x-forms.input id="user" label  ="User" required />
                 <x-forms.input type="number" id="port" label="Port" required />
