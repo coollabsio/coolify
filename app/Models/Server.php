@@ -169,23 +169,6 @@ class Server extends BaseModel
                 Sleep::for(5)->seconds();
                 return;
             }
-            $this->update([
-                'unreachable_count' => 0,
-            ]);
-            if (data_get($this, 'unreachable_notification_sent') === true) {
-                ray('Server is reachable again, sending notification...');
-                $this->team->notify(new Revived($this));
-                $this->update(['unreachable_notification_sent' => false]);
-            }
-            if (
-                data_get($this, 'settings.is_reachable') === false ||
-                data_get($this, 'settings.is_usable') === false
-            ) {
-                $this->settings()->update([
-                    'is_reachable' => true,
-                    'is_usable' => true
-                ]);
-            }
             break;
         }
     }
@@ -308,19 +291,37 @@ class Server extends BaseModel
     {
         return $this->settings->is_reachable && $this->settings->is_usable;
     }
-    public function isDrainLogActivated() {
+    public function isDrainLogActivated()
+    {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
     public function validateConnection()
     {
         $uptime = instant_remote_process(['uptime'], $this, false);
         if (!$uptime) {
-            $this->settings->is_reachable = false;
-            $this->settings->save();
+            $this->settings()->update([
+                'is_reachable' => false,
+                'is_usable' => false
+            ]);
             return false;
         }
-        $this->settings->is_reachable = true;
-        $this->settings->save();
+
+        if (data_get($this, 'unreachable_notification_sent') === true) {
+            $this->team->notify(new Revived($this));
+            $this->update(['unreachable_notification_sent' => false]);
+        }
+        if (
+            data_get($this, 'settings.is_reachable') === false ||
+            data_get($this, 'settings.is_usable') === false
+        ) {
+            $this->settings()->update([
+                'is_reachable' => true,
+                'is_usable' => true
+            ]);
+        }
+        $this->update([
+            'unreachable_count' => 0,
+        ]);
         return true;
     }
     public function validateDockerEngine($throwError = false)
