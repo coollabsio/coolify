@@ -120,8 +120,19 @@ class Server extends BaseModel
     {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
+    public function skipServer()
+    {
+        if ($this->ip === '1.2.3.4') {
+            ray('skipping 1.2.3.4');
+            return true;
+        }
+        return false;
+    }
     public function checkServerRediness()
     {
+        if ($this->skipServer()) {
+            return;
+        }
         $serverUptimeCheckNumber = $this->unreachable_count;
         $serverUptimeCheckNumberMax = 5;
 
@@ -297,6 +308,10 @@ class Server extends BaseModel
     }
     public function validateConnection()
     {
+        if ($this->skipServer()) {
+            return false;
+        }
+
         $uptime = instant_remote_process(['uptime'], $this, false);
         if (!$uptime) {
             $this->settings()->update([
