@@ -39,7 +39,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         ray("checking container statuses for {$this->server->id}");
         try {
-            $this->server->checkServerRediness();
+            if (!$this->server->isServerReady()) {
+                return;
+            };
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;
@@ -266,7 +268,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
             }
         } catch (\Throwable $e) {
-            send_internal_notification('ContainerStatusJob failed with: ' . $e->getMessage());
+            send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
             ray($e->getMessage());
             handleError($e);
         }

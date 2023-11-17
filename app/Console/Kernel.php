@@ -11,6 +11,7 @@ use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
+use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
 
@@ -52,6 +53,8 @@ class Kernel extends ConsoleKernel
     {
         if (isCloud()) {
             $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
+            $own = Team::find(0)->servers;
+            $servers = $servers->merge($own);
         } else {
             $servers = Server::all()->where('ip', '!=', '1.2.3.4');
         }
