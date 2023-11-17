@@ -21,18 +21,31 @@ class Database extends Component
         'database.exclude_from_status' => 'required|boolean',
         'database.public_port' => 'nullable|integer',
         'database.is_public' => 'required|boolean',
+        'database.is_log_drain_enabled' => 'required|boolean',
     ];
     public function render()
     {
         return view('livewire.project.service.database');
     }
-    public function mount() {
+    public function mount()
+    {
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->getServiceDatabaseUrl();
         }
         $this->refreshFileStorages();
     }
-    public function instantSave() {
+    public function instantSaveAdvanced()
+    {
+        if (!$this->database->service->destination->server->isLogDrainEnabled()) {
+            $this->database->is_log_drain_enabled = false;
+            $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
+            return;
+        }
+        $this->submit();
+        $this->emit('success', 'You need to restart the service for the changes to take effect.');
+    }
+    public function instantSave()
+    {
         if ($this->database->is_public && !$this->database->public_port) {
             $this->emit('error', 'Public port is required.');
             $this->database->is_public = false;

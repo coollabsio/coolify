@@ -127,6 +127,7 @@ services:
       - ./parsers.conf:/parsers.conf
     ports:
       - 127.0.0.1:24224:24224
+    restart: unless-stopped
 ");
             $readme = base64_encode('# New Relic Log Drain
 This log drain is based on [Fluent Bit](https://fluentbit.io/) and New Relic Log Forwarder.

@@ -78,7 +78,7 @@ class StartRedis
                 ]
             ]
         ];
-        if ($this->database->destination->server->isDrainLogActivated()) {
+        if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
@@ -166,6 +166,5 @@ class StartRedis
         $content = $this->database->redis_conf;
         $content_base64 = base64_encode($content);
         $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
-
     }
 }

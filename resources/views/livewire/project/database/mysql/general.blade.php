@@ -59,5 +59,10 @@
             @endif
         </div>
         <x-forms.textarea label="Custom Mysql Configuration" rows="10" id="database.mysql_conf" />
+        <h3 class="pt-4">Advanced</h3>
+        <div class="flex flex-col">
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+        </div>
     </form>
 </div>

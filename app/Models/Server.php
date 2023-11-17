@@ -304,7 +304,7 @@ class Server extends BaseModel
     {
         return $this->settings->is_reachable && $this->settings->is_usable;
     }
-    public function isDrainLogActivated()
+    public function isLogDrainEnabled()
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }

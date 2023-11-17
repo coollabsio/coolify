@@ -114,6 +114,8 @@
         </div>
         <h3>Advanced</h3>
         <div class="flex flex-col">
+            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings." instantSave
+                id="is_log_drain_enabled" label="Drain Logs" />
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="is_force_https_enabled" label="Force Https" />

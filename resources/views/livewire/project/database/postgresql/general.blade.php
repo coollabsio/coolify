@@ -74,6 +74,11 @@
         </div>
         <x-forms.textarea label="Custom PostgreSQL Configuration" rows="10" id="database.postgres_conf" />
     </form>
+    <h3 class="pt-4">Advanced</h3>
+    <div class="flex flex-col">
+        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings." instantSave="instantSaveAdvanced"
+            id="database.is_log_drain_enabled" label="Drain Logs" />
+    </div>
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">
             <h3>Initialization scripts</h3>
@@ -87,4 +92,5 @@
             @endforelse
         </div>
     </div>
+
 </div>

@@ -28,6 +28,7 @@ class General extends Component
         'database.ports_mappings' => 'nullable',
         'database.is_public' => 'nullable|boolean',
         'database.public_port' => 'nullable|integer',
+        'database.is_log_drain_enabled' => 'nullable|boolean',
     ];
     protected $validationAttributes = [
         'database.name' => 'Name',
@@ -48,6 +49,20 @@ class General extends Component
         $this->db_url = $this->database->getDbUrl(true);
         if ($this->database->is_public) {
             $this->db_url_public = $this->database->getDbUrl();
+        }
+    }
+    public function instantSaveAdvanced() {
+        try {
+            if (!$this->database->destination->server->isLogDrainEnabled()) {
+                $this->database->is_log_drain_enabled = false;
+                $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
+                return;
+            }
+            $this->database->save();
+            $this->emit('success', 'Database updated successfully.');
+            $this->emit('success', 'You need to restart the service for the changes to take effect.');
+        } catch (Exception $e) {
+            return handleError($e, $this);
         }
     }
     public function submit()

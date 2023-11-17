@@ -69,7 +69,7 @@ class StartMariadb
                 ]
             ]
         ];
-        if ($this->database->destination->server->isDrainLogActivated()) {
+        if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',
                 'options' => [
