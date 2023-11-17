@@ -168,7 +168,7 @@ class Server extends BaseModel
                         $db->update(['status' => 'exited']);
                     }
                 }
-                throw new \Exception('Server is not reachable.');
+                return false;
             }
             $result = $this->validateConnection();
             ray('validateConnection: ' . $result);
