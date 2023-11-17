@@ -48,7 +48,7 @@ class Init extends Command
     private function alive()
     {
         $id = config('app.id');
-        $version = config('app.version');
+        $version = config('version');
         $settings = InstanceSettings::get();
         $do_not_track = data_get($settings, 'do_not_track');
         if ($do_not_track == true) {
