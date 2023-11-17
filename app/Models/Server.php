@@ -182,6 +182,7 @@ class Server extends BaseModel
             }
             break;
         }
+        return true;
     }
     public function getDiskUsage()
     {
