@@ -797,6 +797,16 @@ class Service extends BaseModel
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($this->uuid, $fqdns, true));
                     }
                 }
+                if ($this->server->isDrainLogActivated()) {
+                    data_set($service, 'logging', [
+                        'driver' => 'fluentd',
+                        'options' => [
+                            'fluentd-address' => "tcp://127.0.0.1:24224",
+                            'fluentd-async' => "true",
+                            'fluentd-sub-second-precision' => "true",
+                        ]
+                    ]);
+                }
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
                 data_set($service, 'restart', RESTART_MODE);

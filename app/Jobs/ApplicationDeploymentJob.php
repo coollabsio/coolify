@@ -864,7 +864,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        ray($this->server->isDrainLogActivated());
         if ($this->server->isDrainLogActivated()) {
             $docker_compose['services'][$this->container_name]['logging'] = [
                 'driver' => 'fluentd',
