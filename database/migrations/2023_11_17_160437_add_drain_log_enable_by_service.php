@@ -35,7 +35,9 @@ return new class extends Migration
         Schema::table('service_databases', function (Blueprint $table) {
             $table->boolean('is_log_drain_enabled')->default(false);
         });
-
+        Schema::table('servers', function (Blueprint $table) {
+            $table->boolean('log_drain_notification_sent')->default(false);
+        });
     }
 
     /**
@@ -67,6 +69,8 @@ return new class extends Migration
         Schema::table('service_databases', function (Blueprint $table) {
             $table->dropColumn('is_log_drain_enabled');
         });
-
+        Schema::table('servers', function (Blueprint $table) {
+            $table->dropColumn('log_drain_notification_sent');
+        });
     }
 };
