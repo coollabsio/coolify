@@ -68,7 +68,6 @@ class LogDrains extends Component
     {
         try {
             $ok = $this->submit($type);
-            ray($ok);
             if (!$ok) {
                 return;
             }
