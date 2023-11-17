@@ -837,14 +837,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
-                    'logging' => [
-                        'driver' => 'fluentd',
-                        'options' => [
-                            'fluentd-address' => "tcp://127.0.0.1:24224",
-                            'fluentd-async' => "true",
-                            'fluentd-sub-second-precision' => "true",
-                        ]
-                    ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
@@ -872,6 +864,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        ray($this->server->isDrainLogActivated());
+        if ($this->server->isDrainLogActivated()) {
+            $docker_compose['services'][$this->container_name]['logging'] = [
+                'driver' => 'fluentd',
+                'options' => [
+                    'fluentd-address' => "tcp://127.0.0.1:24224",
+                    'fluentd-async' => "true",
+                    'fluentd-sub-second-precision' => "true",
+                ]
+            ];
+        }
         if ($this->application->isHealthcheckDisabled()) {
             data_forget($docker_compose, 'services.' . $this->container_name . '.healthcheck');
         }
