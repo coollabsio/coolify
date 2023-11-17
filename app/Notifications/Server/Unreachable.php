@@ -43,7 +43,7 @@ class Unreachable extends Notification implements ShouldQueue
     public function toMail(): MailMessage
     {
         $mail = new MailMessage();
-        $mail->subject("Coolify: Server ({$this->server->name}) is unreachable after trying to connect to it 5 times");
+        $mail->subject("Coolify: Server ({$this->server->name}) is unreachable after trying to connect to it 3 times");
         $mail->view('emails.server-lost-connection', [
             'name' => $this->server->name,
         ]);
@@ -52,13 +52,13 @@ class Unreachable extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "Coolify: Server '{$this->server->name}' is unreachable after trying to connect to it 5 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations.";
+        $message = "Coolify: Server '{$this->server->name}' is unreachable after trying to connect to it 3 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations.";
         return $message;
     }
     public function toTelegram(): array
     {
         return [
-            "message" => "Coolify: Server '{$this->server->name}' is unreachable after trying to connect to it 5 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations."
+            "message" => "Coolify: Server '{$this->server->name}' is unreachable after trying to connect to it 3 times. All automations & integrations are turned off! Please check your server! IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations."
         ];
     }
 }

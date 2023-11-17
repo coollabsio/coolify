@@ -40,7 +40,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         ray("checking container statuses for {$this->server->id}");
         try {
             if (!$this->server->isServerReady()) {
-                throw new \Exception('Server is not ready.');
+                return;
             };
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
