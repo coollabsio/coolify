@@ -1022,10 +1022,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 listen  [::]:80;
                 server_name  localhost;
 
-                // real_ip_header    X-Forwarded-For;
-                // proxy_set_header        X-Real-IP       \$remote_addr;
-                // proxy_set_header        X-Forwarded-For \$proxy_add_x_forwarded_for;
-
                 location / {
                     root   /usr/share/nginx/html;
                     index  index.html;

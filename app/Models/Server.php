@@ -130,9 +130,6 @@ class Server extends BaseModel
     }
     public function checkServerRediness()
     {
-        if ($this->skipServer()) {
-            return false;
-        }
         $serverUptimeCheckNumber = $this->unreachable_count;
         $serverUptimeCheckNumberMax = 5;
 
@@ -168,7 +165,7 @@ class Server extends BaseModel
                         $db->update(['status' => 'exited']);
                     }
                 }
-                return false;
+                throw new \Exception('Server is not reachable.');
             }
             $result = $this->validateConnection();
             ray('validateConnection: ' . $result);
