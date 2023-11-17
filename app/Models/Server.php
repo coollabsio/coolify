@@ -131,7 +131,7 @@ class Server extends BaseModel
     public function checkServerRediness()
     {
         if ($this->skipServer()) {
-            return;
+            return false;
         }
         $serverUptimeCheckNumber = $this->unreachable_count;
         $serverUptimeCheckNumberMax = 5;
