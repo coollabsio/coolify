@@ -10,7 +10,6 @@ use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
-    ray($id, $pullRequestId);
     $containers = collect([]);
     $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
     $containers = format_docker_command_output_to_json($containers);
@@ -26,7 +25,6 @@ function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pul
         return null;
     });
     $containers = $containers->filter();
-    ray($containers);
     return $containers;
 }
 

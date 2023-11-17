@@ -78,6 +78,16 @@ class StartRedis
                 ]
             ]
         ];
+        if ($this->database->destination->server->isDrainLogActivated()) {
+            $docker_compose['services'][$container_name]['logging'] = [
+                'driver' => 'fluentd',
+                'options' => [
+                    'fluentd-address' => "tcp://127.0.0.1:24224",
+                    'fluentd-async' => "true",
+                    'fluentd-sub-second-precision' => "true",
+                ]
+            ];
+        }
         if (count($this->database->ports_mappings_array) > 0) {
             $docker_compose['services'][$container_name]['ports'] = $this->database->ports_mappings_array;
         }

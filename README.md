@@ -10,35 +10,40 @@ No vendor lock-in, which means that all the configuration for your applications/
 
 For more information, take a look at our landing page [here](https://coolify.io).
 
-> If you are looking for previous (v3) version, it is [here](https://github.com/coollabsio/coolify/tree/v3).
+# Donations
+To stay completely free, open-source, no feature behind paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the future development of the project.
+
+https://coolify.io/sponsorships
+
+Thank you so much!
 
 # Cloud
 
 If you do not want to self-host Coolify, there is a paid cloud version available: https://app.coolify.io
 
-You can easily attach your own servers, get all the automations, free email notifications, etc.
-
 For more information & pricing, take a look at our landing page [here](https://coolify.io).
 
-# Beta
+## Why should I use the Cloud version?
+The recommended way to use Coolify is to have one server for Coolify and one (or more) for the resources you are deploying. A server is around 4-5$/month.
 
-The latest version (v4) is still in beta. That does not mean it is unstable. All the features that are available are stable enough be usable in real-life. 
-
-There are hundreds of people using it for managing their client's applications, freelancers, hobbyists, businesses.
+By subscribing to the cloud version, you get the Coolify server for the same price, but with:
+- High-availability
+- Free email notifications
+- Better support
+- Less maintenance for you
 
 # Installation
 
 ```bash
 curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
 ```
+You can find the installation script source [here](./scripts/install.sh).
 
-You can find the installation script [here](./scripts/install.sh).
-
-## Support
+# Support
 
 Contact us [here](https://coolify.io/docs/contact).
 
-## Recognitions
+# Recognitions
 
 <p>
 <a href="https://news.ycombinator.com/item?id=26624341">
@@ -54,11 +59,11 @@ Contact us [here](https://coolify.io/docs/contact).
 
 <a href="https://trendshift.io/repositories/634" target="_blank"><img src="https://trendshift.io/api/badge/repositories/634" alt="coollabsio%2Fcoolify | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-## 💰 Financial Contributors
+# 💰 Financial Contributors
 
 Become a financial contributor and help us sustain our community. [[Contribute](https://opencollective.com/coollabsio/contribute)]
 
-### Organizations
+## Organizations
 
 Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and [Appwrite](https://appwrite.io)!
 
@@ -78,10 +83,10 @@ Support this project with your organization. Your logo will show up here with a 
 <a href="https://opencollective.com/coollabsio/organization/8/website"><img src="https://opencollective.com/coollabsio/organization/8/avatar.svg"></a>
 <a href="https://opencollective.com/coollabsio/organization/9/website"><img src="https://opencollective.com/coollabsio/organization/9/avatar.svg"></a>
 
-### Individuals
+## Individuals
 
 <a href="https://opencollective.com/coollabsio"><img src="https://opencollective.com/coollabsio/individuals.svg?width=890"></a>
 
-## Star History
+# Star History
 
 [![Star History Chart](https://api.star-history.com/svg?repos=coollabsio/coolify&type=Date)](https://star-history.com/#coollabsio/coolify&Date)

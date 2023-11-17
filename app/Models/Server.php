@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Actions\Server\InstallLogDrain;
+use App\Actions\Server\InstallNewRelic;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
@@ -59,6 +61,8 @@ class Server extends BaseModel
 
     public $casts = [
         'proxy' => SchemalessAttributes::class,
+        'logdrain_axiom_api_key' => 'encrypted',
+        'logdrain_newrelic_license_key' => 'encrypted',
     ];
     protected $schemalessAttributes = [
         'proxy',
@@ -296,9 +300,16 @@ class Server extends BaseModel
         // }
         return true;
     }
+    public function logDrain($type)
+    {
+        InstallLogDrain::run($this, $type);
+    }
     public function isFunctional()
     {
         return $this->settings->is_reachable && $this->settings->is_usable;
+    }
+    public function isDrainLogActivated() {
+        return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
     public function validateConnection()
     {

@@ -498,7 +498,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->full_healthcheck_url) {
                 $this->execute_remote_command(
                     [
-                        "echo 'Healthcheck URL inside your container: {$this->full_healthcheck_url}'"
+                        "echo 'Healthcheck URL (inside the container): {$this->full_healthcheck_url}'"
                     ]
                 );
             }
@@ -837,13 +837,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
-                    // 'logging' => [
-                    //     'driver' => 'fluentd',
-                    //     'options' => [
-                    //         'fluentd-async' => 'true',
-                    //         'tag' => $this->application->name . '-' . $this->application->uuid
-                    //     ]
-                    // ],
                     'healthcheck' => [
                         'test' => [
                             'CMD-SHELL',
@@ -871,6 +864,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if ($this->server->isDrainLogActivated()) {
+            $docker_compose['services'][$this->container_name]['logging'] = [
+                'driver' => 'fluentd',
+                'options' => [
+                    'fluentd-address' => "tcp://127.0.0.1:24224",
+                    'fluentd-async' => "true",
+                    'fluentd-sub-second-precision' => "true",
+                ]
+            ];
+        }
         if ($this->application->isHealthcheckDisabled()) {
             data_forget($docker_compose, 'services.' . $this->container_name . '.healthcheck');
         }
@@ -1018,6 +1021,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 listen       80;
                 listen  [::]:80;
                 server_name  localhost;
+
+                // real_ip_header    X-Forwarded-For;
+                // proxy_set_header        X-Real-IP       \$remote_addr;
+                // proxy_set_header        X-Forwarded-For \$proxy_add_x_forwarded_for;
 
                 location / {
                     root   /usr/share/nginx/html;

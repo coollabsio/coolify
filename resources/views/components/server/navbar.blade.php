@@ -32,6 +32,12 @@
             ]) }}">
             <button>Destinations</button>
         </a>
+        <a class="{{ request()->routeIs('server.log-drains') ? 'text-white' : '' }}"
+            href="{{ route('server.log-drains', [
+                'server_uuid' => data_get($parameters, 'server_uuid'),
+            ]) }}">
+            <button>Log Drains</button>
+        </a>
         <div class="flex-1"></div>
         <livewire:server.proxy.deploy :server="$server" />
     </nav>
