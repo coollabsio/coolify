@@ -52,7 +52,6 @@ class User extends Authenticatable implements SendsEmail
     }
     public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null)
     {
-        ray('asd');
         $plainTextToken = sprintf(
             '%s%s%s',
             config('sanctum.token_prefix', ''),

@@ -37,8 +37,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
-        // ray("checking server status for {$this->server->id}");
+        ray("checking container statuses for {$this->server->id}");
         try {
+            $this->server->checkServerRediness();
             $containers = instant_remote_process(["docker container ls -q"], $this->server);
             if (!$containers) {
                 return;

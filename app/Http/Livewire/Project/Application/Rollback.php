@@ -42,28 +42,31 @@ class Rollback extends Component
     {
         try {
             $image = $this->application->uuid;
-            $output = instant_remote_process([
-                "docker inspect --format='{{.Config.Image}}' {$this->application->uuid}",
-            ], $this->application->destination->server, throwError: false);
-            $current_tag = Str::of($output)->trim()->explode(":");
-            $this->current = data_get($current_tag, 1);
+            if ($this->application->destination->server->isFunctional()) {
+                $output = instant_remote_process([
+                    "docker inspect --format='{{.Config.Image}}' {$this->application->uuid}",
+                ], $this->application->destination->server, throwError: false);
+                $current_tag = Str::of($output)->trim()->explode(":");
+                $this->current = data_get($current_tag, 1);
 
-            $output = instant_remote_process([
-                "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
-            ], $this->application->destination->server);
-            $this->images = Str::of($output)->trim()->explode("\n")->filter(function ($item) use ($image) {
-                return Str::of($item)->contains($image);
-            })->map(function ($item) {
-                $item = Str::of($item)->explode('#');
-                if ($item[1] === $this->current) {
-                    // $is_current = true;
-                }
-                return [
-                    'tag' => $item[1],
-                    'created_at' => $item[2],
-                    'is_current' => $is_current ?? null,
-                ];
-            })->toArray();
+                $output = instant_remote_process([
+                    "docker images --format '{{.Repository}}#{{.Tag}}#{{.CreatedAt}}'",
+                ], $this->application->destination->server);
+                $this->images = Str::of($output)->trim()->explode("\n")->filter(function ($item) use ($image) {
+                    return Str::of($item)->contains($image);
+                })->map(function ($item) {
+                    $item = Str::of($item)->explode('#');
+                    if ($item[1] === $this->current) {
+                        // $is_current = true;
+                    }
+                    return [
+                        'tag' => $item[1],
+                        'created_at' => $item[2],
+                        'is_current' => $is_current ?? null,
+                    ];
+                })->toArray();
+            }
+            return [];
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

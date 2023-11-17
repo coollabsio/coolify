@@ -131,11 +131,11 @@ class Server extends BaseModel
     public function checkServerRediness()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
-        $serverUptimeCheckNumberMax = 5;
+        $serverUptimeCheckNumberMax = 3;
 
         $currentTime = now()->timestamp;
         $runtime5Minutes = 1 * 60;
-        // Run for 1 minutes max and check every 5 seconds
+        // Run for 1 minutes max and check every 5 seconds for 3 times
         while ($currentTime + $runtime5Minutes > now()->timestamp) {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
