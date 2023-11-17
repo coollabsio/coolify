@@ -43,7 +43,7 @@ class Kernel extends ConsoleKernel
     }
     private function pull_helper_image($schedule)
     {
-        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true);
+        $servers = Server::all()->where('settings.is_usable', true)->where('settings.is_reachable', true)->where('ip', '!=', '1.2.3.4');
         foreach ($servers as $server) {
             $schedule->job(new PullHelperImageJob($server))->everyTenMinutes()->onOneServer();
         }
@@ -51,9 +51,9 @@ class Kernel extends ConsoleKernel
     private function check_resources($schedule)
     {
         if (isCloud()) {
-            $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false);
+            $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
         } else {
-            $servers = Server::all();
+            $servers = Server::all()->where('ip', '!=', '1.2.3.4');
         }
         foreach ($servers as $server) {
             $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();

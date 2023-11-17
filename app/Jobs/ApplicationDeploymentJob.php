@@ -1078,9 +1078,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
         } else {
             // Pure Dockerfile based deployment
-            $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "docker build --pull $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
-            ]);
+            if ($this->application->dockerfile) {
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, "docker build --pull $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                ]);
+            } else {
+                $this->execute_remote_command([
+                    executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                ]);
+            }
         }
     }
 
