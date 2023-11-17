@@ -24,7 +24,7 @@
                     </x-forms.button>
                 </div>
             </form>
-            <h3>Highlight.io</h3>
+            {{-- <h3>Highlight.io</h3>
             <div class="w-32">
                 <x-forms.checkbox instantSave='instantSave("highlight")'
                     id="server.settings.is_logdrain_highlight_enabled" label="Enabled" />
@@ -41,7 +41,7 @@
                         Save
                     </x-forms.button>
                 </div>
-            </form>
+            </form> --}}
             <h3>Axiom</h3>
             <div class="w-32">
                 <x-forms.checkbox instantSave='instantSave("axiom")' id="server.settings.is_logdrain_axiom_enabled"
