@@ -61,6 +61,8 @@ class Server extends BaseModel
 
     public $casts = [
         'proxy' => SchemalessAttributes::class,
+        'logdrain_axiom_api_key' => 'encrypted',
+        'logdrain_newrelic_license_key' => 'encrypted',
     ];
     protected $schemalessAttributes = [
         'proxy',

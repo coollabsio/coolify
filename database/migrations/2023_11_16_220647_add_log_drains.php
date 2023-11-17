@@ -18,6 +18,11 @@ return new class extends Migration
 
             $table->boolean('is_logdrain_highlight_enabled')->default(false);
             $table->string('logdrain_highlight_project_id')->nullable();
+
+            $table->boolean('is_logdrain_axiom_enabled')->default(false);
+            $table->string('logdrain_axiom_dataset_name')->nullable();
+            $table->string('logdrain_axiom_api_key')->nullable();
+
         });
     }
 
@@ -33,6 +38,10 @@ return new class extends Migration
 
             $table->dropColumn('is_logdrain_highlight_enabled');
             $table->dropColumn('logdrain_highlight_project_id');
+
+            $table->dropColumn('is_logdrain_axiom_enabled');
+            $table->dropColumn('logdrain_axiom_dataset_name');
+            $table->dropColumn('logdrain_axiom_api_key');
         });
     }
 };

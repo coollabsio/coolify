@@ -843,7 +843,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                             'fluentd-address' => "tcp://127.0.0.1:24224",
                             'fluentd-async' => "true",
                             'fluentd-sub-second-precision' => "true",
-
                         ]
                     ],
                     'healthcheck' => [
@@ -1020,6 +1019,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 listen       80;
                 listen  [::]:80;
                 server_name  localhost;
+
+                // real_ip_header    X-Forwarded-For;
+                // proxy_set_header        X-Real-IP       \$remote_addr;
+                // proxy_set_header        X-Forwarded-For \$proxy_add_x_forwarded_for;
 
                 location / {
                     root   /usr/share/nginx/html;
