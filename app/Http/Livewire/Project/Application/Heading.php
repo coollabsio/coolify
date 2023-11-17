@@ -4,6 +4,7 @@ namespace App\Http\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
 use App\Jobs\ContainerStatusJob;
+use App\Jobs\ServerStatusJob;
 use App\Models\Application;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
@@ -28,6 +29,8 @@ class Heading extends Component
             $this->application->previews->each(function ($preview) {
                 $preview->refresh();
             });
+        } else {
+            dispatch(new ServerStatusJob($this->application->destination->server));
         }
     }
 
