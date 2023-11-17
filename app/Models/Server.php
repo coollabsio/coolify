@@ -128,13 +128,15 @@ class Server extends BaseModel
         }
         return false;
     }
-    public function checkServerRediness()
+    public function isServerReady()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
         $serverUptimeCheckNumberMax = 3;
 
         $currentTime = now()->timestamp;
         $runtime5Minutes = 1 * 60;
+
+        $isReady = false;
         // Run for 1 minutes max and check every 5 seconds for 3 times
         while ($currentTime + $runtime5Minutes > now()->timestamp) {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
@@ -165,7 +167,8 @@ class Server extends BaseModel
                         $db->update(['status' => 'exited']);
                     }
                 }
-                throw new \Exception('Server is not reachable.');
+                $isReady = false;
+                break;
             }
             $result = $this->validateConnection();
             ray('validateConnection: ' . $result);
@@ -177,9 +180,10 @@ class Server extends BaseModel
                 Sleep::for(5)->seconds();
                 return;
             }
+            $isReady = true;
             break;
         }
-        return true;
+        return $isReady;
     }
     public function getDiskUsage()
     {
