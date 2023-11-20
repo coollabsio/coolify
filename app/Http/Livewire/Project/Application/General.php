@@ -26,14 +26,10 @@ class General extends Component
     public bool $isConfigurationChanged = false;
 
     public bool $is_static;
-    public bool $is_git_submodules_enabled;
-    public bool $is_git_lfs_enabled;
-    public bool $is_debug_enabled;
-    public bool $is_preview_deployments_enabled;
-    public bool $is_auto_deploy_enabled;
-    public bool $is_force_https_enabled;
-    public bool $is_log_drain_enabled;
 
+    protected $listeners = [
+        'resetDefaultLabels'
+    ];
     protected $rules = [
         'application.name' => 'required',
         'application.description' => 'nullable',
@@ -56,6 +52,7 @@ class General extends Component
         'application.dockerfile_location' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
+        'application.settings.is_static' => 'boolean|required',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -79,6 +76,7 @@ class General extends Component
         'application.dockerfile_location' => 'Dockerfile location',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
+        'application.settings.is_static' => 'Is static',
     ];
 
     public function mount()
@@ -93,17 +91,12 @@ class General extends Component
         } else {
             $this->customLabels = str($this->application->custom_labels)->replace(',', "\n");
         }
-        if (data_get($this->application, 'settings')) {
-            $this->is_static = $this->application->settings->is_static;
-            $this->is_git_submodules_enabled = $this->application->settings->is_git_submodules_enabled;
-            $this->is_git_lfs_enabled = $this->application->settings->is_git_lfs_enabled;
-            $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
-            $this->is_preview_deployments_enabled = $this->application->settings->is_preview_deployments_enabled;
-            $this->is_auto_deploy_enabled = $this->application->settings->is_auto_deploy_enabled;
-            $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
-            $this->is_log_drain_enabled = $this->application->settings->is_log_drain_enabled;
-        }
         $this->checkLabelUpdates();
+    }
+    public function instantSave()
+    {
+        $this->application->settings->save();
+        $this->emit('success', 'Settings saved.');
     }
     public function updatedApplicationBuildPack()
     {
@@ -119,40 +112,6 @@ class General extends Component
             $this->labelsChanged = true;
         } else {
             $this->labelsChanged = false;
-        }
-    }
-    public function instantSave()
-    {
-        // @TODO: find another way - if possible
-        $force_https = $this->application->settings->is_force_https_enabled;
-        $this->application->settings->is_static = $this->is_static;
-        if ($this->is_static) {
-            $this->application->ports_exposes = 80;
-        } else {
-            $this->application->ports_exposes = 3000;
-        }
-        $this->application->settings->is_git_submodules_enabled = $this->is_git_submodules_enabled;
-        $this->application->settings->is_git_lfs_enabled = $this->is_git_lfs_enabled;
-        $this->application->settings->is_debug_enabled = $this->is_debug_enabled;
-        $this->application->settings->is_preview_deployments_enabled = $this->is_preview_deployments_enabled;
-        $this->application->settings->is_auto_deploy_enabled = $this->is_auto_deploy_enabled;
-        $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
-        $this->application->settings->is_log_drain_enabled = $this->is_log_drain_enabled;
-        if ($this->is_log_drain_enabled) {
-            if (!$this->application->destination->server->isLogDrainEnabled()) {
-                $this->application->settings->is_log_drain_enabled =  $this->is_log_drain_enabled = false;
-                $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
-                return;
-            }
-        }
-        $this->application->settings->save();
-        $this->application->save();
-        $this->application->refresh();
-        $this->emit('success', 'Application settings updated!');
-        $this->checkLabelUpdates();
-        $this->isConfigurationChanged = $this->application->isConfigurationChanged();
-        if ($force_https !== $this->is_force_https_enabled) {
-            $this->resetDefaultLabels(false);
         }
     }
 

@@ -38,7 +38,7 @@ class Textarea extends Component
         if (is_null($this->id)) $this->id = new Cuid2(7);
         if (is_null($this->name)) $this->name = $this->id;
 
-        $this->label = Str::title($this->label);
+        // $this->label = Str::title($this->label);
         return view('components.forms.textarea');
     }
 }

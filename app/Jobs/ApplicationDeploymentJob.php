@@ -873,6 +873,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ];
         }
+        if ($this->application->settings->is_gpu_enabled) {
+            ray('asd');
+            $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
+                [
+                    'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
+                    'capabilities' => ['gpu'],
+                    'options' => data_get($this->application, 'settings.gpu_options', [])
+                ]
+            ];
+            if (data_get($this->application, 'settings.gpu_count')) {
+                $count = data_get($this->application, 'settings.gpu_count');
+                ray($count);
+                if ($count === 'all') {
+                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
+                } else {
+                    $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
+                }
+            } else if (data_get($this->application, 'settings.gpu_device_ids')) {
+                $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this->application, 'settings.gpu_device_ids');
+            }
+        }
         if ($this->application->isHealthcheckDisabled()) {
             data_forget($docker_compose, 'services.' . $this->container_name . '.healthcheck');
         }
@@ -891,6 +912,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //         'dockerfile' => $this->workdir . $this->dockerfile_location,
         //     ];
         // }
+        ray($docker_compose);
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
