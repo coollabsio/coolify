@@ -25,7 +25,7 @@
             @endif
             <form wire:submit.prevent="submit">
                 <div class="flex gap-2">
-                    <x-forms.checkbox helper="Enable GPU usage for this application." instantSave
+                    <x-forms.checkbox helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='text-white underline' target='_blank'>here</a>." instantSave
                         id="application.settings.is_gpu_enabled" label="GPU Enabled Application" />
                     @if ($application->settings->is_gpu_enabled)
                         <x-forms.button type="submiot">Save</x-forms.button>
@@ -37,7 +37,7 @@
                         <x-forms.input label="GPU Count" placeholder="empty means use all GPUs"
                             id="application.settings.gpu_count"> </x-forms.input>
                         <x-forms.input label="GPU Device Ids" placeholder="0,2"
-                            helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/' class='text-white underline' target='_blank'>here</a>."
+                            helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='text-white underline' target='_blank'>here</a>."
                             id="application.settings.gpu_device_ids"> </x-forms.input>
 
                     </div>
