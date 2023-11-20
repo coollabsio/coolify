@@ -275,7 +275,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
                 ["echo -n 'Pushing image to docker registry ({$this->production_image_name}).'"],
                 [
-                    executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"), 'ignore_errors' => true, 'hidden' => true
+                    executeInDocker($this->deployment_uuid, "docker push {$this->production_image_name}"), 'hidden' => true
                 ],
             );
             if ($this->application->docker_registry_image_tag) {
@@ -294,6 +294,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "echo -n 'Image pushed to docker registry.'"
             ]);
         } catch (Exception $e) {
+            $this->execute_remote_command(
+                ["echo -n 'Failed to push image to docker registry. Please check debug logs for more information.'"],
+            );
             ray($e);
         }
     }
@@ -336,13 +339,23 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_image_names()
     {
         if ($this->application->dockerfile) {
-            $this->build_image_name = Str::lower("{$this->application->uuid}:build");
-            $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+            if ($this->application->docker_registry_image_name) {
+                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:build");
+                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:latest");
+            } else {
+                $this->build_image_name = Str::lower("{$this->application->uuid}:build");
+                $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
+            }
         } else if ($this->application->build_pack === 'dockerimage') {
             $this->production_image_name = Str::lower("{$this->dockerImage}:{$this->dockerImageTag}");
         } else if ($this->pull_request_id !== 0) {
-            $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
-            $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+            if ($this->application->docker_registry_image_name) {
+                $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}-build");
+                $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:pr-{$this->pull_request_id}");
+            } else {
+                $this->build_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}-build");
+                $this->production_image_name = Str::lower("{$this->application->uuid}:pr-{$this->pull_request_id}");
+            }
         } else {
             $this->dockerImageTag = str($this->commit)->substr(0, 128);
             if ($this->application->docker_registry_image_name) {
@@ -380,8 +393,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         ]);
         if (str($this->saved_outputs->get('local_image_found'))->isEmpty() && $this->application->docker_registry_image_name) {
             $this->execute_remote_command([
-                "echo 'Cannot find image locally. Pulling from docker registry.'", 'type' => 'err'
-            ], [
                 "docker pull {$this->production_image_name} 2>/dev/null", "ignore_errors" => true, "hidden" => true
             ]);
             $this->execute_remote_command([
@@ -644,7 +655,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [
                 "echo -n 'Setting base directory to {$this->workdir}.'"
             ],
-            ["echo '\n----------------------------------------'"]
         );
     }
     private function check_git_if_build_needed()
