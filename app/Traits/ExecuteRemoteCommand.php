@@ -32,16 +32,20 @@ trait ExecuteRemoteCommand
                 throw new \RuntimeException('Command is not set');
             }
             $hidden = data_get($single_command, 'hidden', false);
+            $customType = data_get($single_command, 'type');
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
             $this->save = data_get($single_command, 'save');
 
             $remote_command = generateSshCommand($this->server, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType) {
                 $output = Str::of($output)->trim();
+                if ($output->startsWith('╔')) {
+                    $output = "\n" . $output;
+                }
                 $new_log_entry = [
-                    'command' => $command,
-                    'output' => $output,
-                    'type' => $type === 'err' ? 'stderr' : 'stdout',
+                    'command' => remove_iip($command),
+                    'output' => remove_iip($output),
+                    'type' => $customType ?? $type === 'err' ? 'stderr' : 'stdout',
                     'timestamp' => Carbon::now('UTC'),
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,

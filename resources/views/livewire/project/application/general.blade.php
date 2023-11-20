@@ -40,12 +40,33 @@
                     </div>
                     @if ($application->could_set_build_commands())
                         <div class="w-64">
-                            <x-forms.checkbox instantSave id="application.settings.is_static" label="Is it a static site?"
+                            <x-forms.checkbox instantSave id="application.settings.is_static"
+                                label="Is it a static site?"
                                 helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                         </div>
                     @endif
                 </div>
             @endif
+            <h3>Docker Registry</h3>
+            @if ($application->build_pack !== 'dockerimage')
+                <div>Push the built image to a docker registry. More info <a class="underline"
+                        href="https://coolify.io/docs/" target="_blank">here</a>.</div>
+            @endif
+            <div class="flex flex-col gap-2 xl:flex-row">
+                @if ($application->build_pack === 'dockerimage')
+                    <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
+                    <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                @else
+                    <x-forms.input id="application.docker_registry_image_name"
+                        helper="Empty means it won't push the image to a docker registry."
+                        placeholder="Empty means it won't push the image to a docker registry." label="Docker Image" />
+                    <x-forms.input id="application.docker_registry_image_tag"
+                        placeholder="Empty means only push commit sha tag."
+                        helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                        label="Docker Image Tag" />
+                @endif
+
+            </div>
 
             @if ($application->build_pack !== 'dockerimage')
                 <h3>Build</h3>
@@ -64,8 +85,6 @@
                         </div>
                     @endif
                 @endif
-
-
                 <div class="flex flex-col gap-2 xl:flex-row">
                     <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
                         helper="Directory to use as root. Useful for monorepos." />
@@ -87,11 +106,6 @@
                                 label="Publish Directory" />
                         @endif
                     @endif
-                </div>
-            @else
-                <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
-                    <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
                 </div>
             @endif
 

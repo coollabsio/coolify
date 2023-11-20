@@ -36,7 +36,7 @@
             @endif
             @if ($application->build_pack !== 'static')
                 <a :class="activeTab === 'health' && 'text-white'"
-                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Health Checks
+                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Healthchecks
                 </a>
             @endif
             <a :class="activeTab === 'rollback' && 'text-white'"
