@@ -12,7 +12,7 @@
             <div>
                 <form action="/reset-password" method="POST" class="flex flex-col gap-2">
                     @csrf
-                    <input hidden id="token" name="token" value="{{ request()->query('token') }}">
+                    <input hidden id="token" name="token" value="{{ request()->route('token') }}">
                     <input hidden value="{{ request()->query('email') }}" type="email" name="email"
                         label="{{ __('input.email') }}" />
                     <div class="flex flex-col gap-2">
