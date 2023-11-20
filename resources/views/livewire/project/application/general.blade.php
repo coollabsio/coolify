@@ -50,7 +50,7 @@
             <h3>Docker Registry</h3>
             @if ($application->build_pack !== 'dockerimage')
                 <div>Push the built image to a docker registry. More info <a class="underline"
-                        href="https://coolify.io/docs/" target="_blank">here</a>.</div>
+                        href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
             @endif
             <div class="flex flex-col gap-2 xl:flex-row">
                 @if ($application->build_pack === 'dockerimage')
