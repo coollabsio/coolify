@@ -53,50 +53,83 @@ class Service extends BaseModel
             $image = str($application->image)->before(':')->value();
             switch ($image) {
                 case str($image)->contains('minio'):
+                    $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
                     $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
                     $admin_user = $this->environment_variables()->where('key', 'SERVICE_USER_MINIO')->first();
+                    if (is_null($admin_user)) {
+                        $admin_user = $this->environment_variables()->where('key', 'MINIO_ROOT_USER')->first();
+                    }
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MINIO')->first();
-                    $fields->put('MinIO', [
-                        'Console URL' => [
-                            'key' => data_get($console_url, 'key'),
-                            'value' => data_get($console_url, 'value'),
-                            'rules' => 'required|url',
-                        ],
-                        'S3 API URL' => [
-                            'key' => data_get($s3_api_url, 'key'),
-                            'value' => data_get($s3_api_url, 'value'),
-                            'rules' => 'required|url',
-                        ],
-                        'Admin User' => [
-                            'key' => data_get($admin_user, 'key'),
-                            'value' => data_get($admin_user, 'value'),
-                            'rules' => 'required',
-                        ],
-                        'Admin Password' => [
-                            'key' => data_get($admin_password, 'key'),
-                            'value' => data_get($admin_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                    ]);
+                    if (is_null($admin_password)) {
+                        $admin_password = $this->environment_variables()->where('key', 'MINIO_ROOT_PASSWORD')->first();
+                    }
+
+                    if ($console_url) {
+                        $data = $data->merge([
+                            'Console URL' => [
+                                'key' => data_get($console_url, 'key'),
+                                'value' => data_get($console_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($s3_api_url) {
+                        $data = $data->merge([
+                            'S3 API URL' => [
+                                'key' => data_get($s3_api_url, 'key'),
+                                'value' => data_get($s3_api_url, 'value'),
+                                'rules' => 'required|url',
+                            ],
+                        ]);
+                    }
+                    if ($admin_user) {
+                        $data = $data->merge([
+                            'Admin User' => [
+                                'key' => data_get($admin_user, 'key'),
+                                'value' => data_get($admin_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => data_get($admin_password, 'key'),
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('MinIO', $data->toArray());
                     break;
                 case str($image)->contains('weblate'):
+                    $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
-                    $fields->put('Weblate', [
-                        'Admin Email' => [
-                            'key' => data_get($admin_email, 'key'),
-                            'value' => data_get($admin_email, 'value'),
-                            'rules' => 'required|email',
-                        ],
-                        'Admin Password' => [
-                            'key' => data_get($admin_password, 'key'),
-                            'value' => data_get($admin_password, 'value'),
-                            'rules' => 'required',
-                            'isPassword' => true,
-                        ],
-                    ]);
+
+                    if ($admin_email) {
+                        $data = $data->merge([
+                            'Admin Email' => [
+                                'key' => data_get($admin_email, 'key'),
+                                'value' => data_get($admin_email, 'value'),
+                                'rules' => 'required|email',
+                            ],
+                        ]);
+                    }
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => data_get($admin_password, 'key'),
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Weblate', $data);
             }
         }
         $databases = $this->databases()->get();
@@ -367,6 +400,19 @@ class Service extends BaseModel
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
+                if ($serviceLabels->count() > 0) {
+                    $removedLabels = collect([]);
+                    $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
+                        if (!str($serviceLabel)->contains('=')) {
+                            $removedLabels->put($serviceLabelName, $serviceLabel);
+                            return false;
+                        }
+                        return $serviceLabel;
+                    });
+                    foreach($removedLabels as $removedLabelName =>$removedLabel) {
+                        $serviceLabels->push("$removedLabelName=$removedLabel");
+                    }
+                }
 
                 $containerName = "$serviceName-{$this->uuid}";
 
