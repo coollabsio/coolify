@@ -93,65 +93,28 @@ function refreshSession(?Team $team = null): void
 }
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
-    ray('handleError');
-    ray($error);
-    if ($error instanceof Throwable) {
-        $message = $error->getMessage();
-    } else {
-        $message = null;
-    }
-    if ($customErrorMessage) {
-        $message = $customErrorMessage . ' ' . $message;
-    }
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
             return $livewire->emit('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
+
+    if ($error instanceof Throwable) {
+        $message = $error->getMessage();
+    } else {
+        $message = null;
+    }
+    if ($customErrorMessage) {
+        $error->message = $customErrorMessage . ' ' . $message;
+        $message = $customErrorMessage . ' ' . $message;
+    }
+
     if (isset($livewire)) {
         return $livewire->emit('error', $message);
     }
-
-    throw new RuntimeException($message);
+    throw $error;
 }
-function general_error_handler(Throwable $err, Livewire\Component $that = null, $isJson = false, $customErrorMessage = null): mixed
-{
-    try {
-        ray($err);
-        ray('ERROR OCCURRED: ' . $err->getMessage());
-        if ($err instanceof QueryException) {
-            if ($err->errorInfo[0] === '23505') {
-                throw new Exception($customErrorMessage ?? 'Duplicate entry found.', '23505');
-            } else if (count($err->errorInfo) === 4) {
-                throw new Exception($customErrorMessage ?? $err->errorInfo[3]);
-            } else {
-                throw new Exception($customErrorMessage ?? $err->errorInfo[2]);
-            }
-        } elseif ($err instanceof TooManyRequestsException) {
-            throw new Exception($customErrorMessage ?? "Too many requests. Please try again in {$err->secondsUntilAvailable} seconds.");
-        } else {
-            if ($err->getMessage() === 'This action is unauthorized.') {
-                return redirect()->route('dashboard')->with('error', $customErrorMessage ?? $err->getMessage());
-            }
-            throw new Exception($customErrorMessage ?? $err->getMessage());
-        }
-    } catch (\Throwable $e) {
-        if ($that) {
-            return $that->emit('error', $customErrorMessage ?? $e->getMessage());
-        } elseif ($isJson) {
-            return response()->json([
-                'code' => $e->getCode(),
-                'error' => $e->getMessage(),
-            ]);
-        } else {
-            ray($customErrorMessage);
-            ray($e);
-            return $customErrorMessage ?? $e->getMessage();
-        }
-    }
-}
-
 function get_route_parameters(): array
 {
     return Route::current()->parameters();

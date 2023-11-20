@@ -1,4 +1,4 @@
-<div x-init="$wire.validateServer(false)">
+<div>
     <x-modal yesOrNo modalId="changeLocalhost" modalTitle="Change Localhost" action="submit">
         <x-slot:modalBody>
             <p>You could lost a lot of functionalities if you change the server details of the server where Coolify is

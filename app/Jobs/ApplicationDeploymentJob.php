@@ -218,7 +218,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
-            ray($e);
             $this->fail($e);
             throw $e;
         } finally {
