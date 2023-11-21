@@ -188,7 +188,6 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     public function validateServer()
     {
         try {
-            $customErrorMessage = "Server is not reachable:";
             config()->set('coolify.mux_enabled', false);
 
             instant_remote_process(['uptime'], $this->createdServer, true);
@@ -198,7 +197,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
         } catch (\Throwable $e) {
             $this->serverReachable = false;
-            return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
+            return handleError(error: $e, livewire: $this);
         }
 
         try {
@@ -206,7 +205,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
                 $this->currentState = 'install-docker';
-                throw new \Exception('Docker version is not supported or not installed.');
+                throw new \Exception('Docker not found or old version is installed.');
             }
             $this->createdServer->settings()->update([
                 'is_usable' => true,
@@ -214,14 +213,20 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->getProxyType();
         } catch (\Throwable $e) {
             // $this->dockerInstallationStarted = false;
-            return handleError(error: $e, customErrorMessage: $customErrorMessage, livewire: $this);
+            return handleError(error: $e, livewire: $this);
         }
     }
     public function installDocker()
     {
-        $this->dockerInstallationStarted = true;
-        $activity = InstallDocker::run($this->createdServer);
-        $this->emit('newMonitorActivity', $activity->id);
+        try {
+            $this->dockerInstallationStarted = true;
+            $activity = InstallDocker::run($this->createdServer);
+            $this->emit('installDocker');
+            $this->emit('newMonitorActivity', $activity->id);
+        } catch (\Throwable $e) {
+            $this->dockerInstallationStarted = false;
+            return handleError(error: $e, livewire: $this);
+        }
     }
     public function dockerInstalledOrSkipped()
     {

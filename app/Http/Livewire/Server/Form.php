@@ -53,11 +53,11 @@ class Form extends Component
         $this->validateServer();
         $this->server->settings->save();
     }
-    public function installDocker($supported_os_type)
+    public function installDocker()
     {
         $this->emit('installDocker');
         $this->dockerInstallationStarted = true;
-        $activity = InstallDocker::run($this->server, $supported_os_type);
+        $activity = InstallDocker::run($this->server);
         $this->emit('newMonitorActivity', $activity->id);
     }
     public function checkLocalhostConnection()
@@ -83,21 +83,21 @@ class Form extends Component
             }
             $supported_os_type = $this->server->validateOS();
             if (!$supported_os_type) {
-                $install && $this->emit('error', 'Server OS is not supported.<br>Please use a supported OS.');
+                $install && $this->emit('error', 'Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/servers#install-docker-engine-manually">documentation</a>.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();
             if ($dockerInstalled) {
                 $install && $this->emit('success', 'Docker Engine is installed.<br> Checking version.');
             } else {
-                $install && $this->installDocker($supported_os_type);
+                $install && $this->installDocker();
                 return;
             }
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if ($dockerVersion) {
                 $install && $this->emit('success', 'Docker Engine version is 23+.');
             } else {
-                $install && $this->installDocker($supported_os_type);
+                $install && $this->installDocker();
                 return;
             }
         } catch (\Throwable $e) {

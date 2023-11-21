@@ -225,8 +225,7 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="installDocker"
-                    onclick="installDocker.showModal()">
+                    <x-forms.button class="justify-center box" wire:click="installDocker">
                     Let's do it!</x-forms.button>
                     @if ($dockerInstallationStarted)
                         <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
@@ -235,9 +234,10 @@
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
-                        to run optimal.</p>
+                        to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install Docker Engine, check <a target="_blank" class="underline text-warning" href="https://coolify.io/docs/servers#install-docker-engine-manually">this documentation</a>.</p>
                 </x-slot:explanation>
             </x-boarding-step>
+
         @endif
     </div>
     <div>

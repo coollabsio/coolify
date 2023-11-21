@@ -64,9 +64,4 @@
                 helper="Disk cleanup job will be executed if disk usage is more than this number." />
         @endif
     </form>
-    <script>
-        Livewire.on('installDocker', () => {
-            installDocker.showModal();
-        })
-    </script>
 </div>

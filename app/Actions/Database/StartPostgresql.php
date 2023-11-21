@@ -23,7 +23,7 @@ class StartPostgresql
         $this->configuration_dir = database_configuration_dir() . '/' . $container_name;
 
         $this->commands = [
-            "echo '####### Starting {$database->name}.'",
+            "echo 'Starting {$database->name}.'",
             "mkdir -p $this->configuration_dir",
             "mkdir -p $this->configuration_dir/docker-entrypoint-initdb.d/"
         ];
@@ -130,7 +130,7 @@ class StartPostgresql
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
-        $this->commands[] = "echo '####### {$database->name} started.'";
+        $this->commands[] = "echo '{$database->name} started.'";
         return remote_process($this->commands, $database->destination->server);
     }
 

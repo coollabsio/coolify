@@ -9,8 +9,12 @@ use App\Models\StandaloneDocker;
 class InstallDocker
 {
     use AsAction;
-    public function handle(Server $server, $supported_os_type)
+    public function handle(Server $server)
     {
+        $supported_os_type = $server->validateOS();
+        if (!$supported_os_type) {
+            throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/servers#install-docker-engine-manually">documentation</a>.');
+        }
         ray('Installing Docker on server: ' . $server->name . ' (' . $server->ip . ')' . ' with OS: ' . $supported_os_type);
         $dockerVersion = '24.0';
         $config = base64_encode('{

@@ -106,14 +106,13 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
         $message = null;
     }
     if ($customErrorMessage) {
-        $error->message = $customErrorMessage . ' ' . $message;
         $message = $customErrorMessage . ' ' . $message;
     }
 
     if (isset($livewire)) {
         return $livewire->emit('error', $message);
     }
-    throw $error;
+    throw new Exception($message);
 }
 function get_route_parameters(): array
 {
