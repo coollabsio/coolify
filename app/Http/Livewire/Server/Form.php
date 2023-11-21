@@ -95,7 +95,7 @@ class Form extends Component
             }
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if ($dockerVersion) {
-                $install && $this->emit('success', 'Docker Engine version is 23+.');
+                $install && $this->emit('success', 'Docker Engine version is 22+.');
             } else {
                 $install && $this->installDocker();
                 return;

@@ -68,6 +68,7 @@ class InstallDocker
                 "cat <<< $(jq . /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json.coolify",
                 "cat <<< $(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) > /etc/docker/daemon.json",
                 "echo 'Restarting Docker Engine...'",
+                "systemctl enable docker >/dev/null 2>&1 || true",
                 "systemctl restart docker",
                 "echo 'Creating default Docker network (coolify)...'",
                 "docker network create --attachable coolify >/dev/null 2>&1 || true",
