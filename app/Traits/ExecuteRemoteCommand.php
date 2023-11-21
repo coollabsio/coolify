@@ -12,7 +12,6 @@ use Illuminate\Support\Str;
 trait ExecuteRemoteCommand
 {
     public ?string $save = null;
-
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;

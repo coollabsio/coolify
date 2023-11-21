@@ -332,4 +332,14 @@ class Application extends BaseModel
             return true;
         }
     }
+    public function isMultipleServerDeployment()
+    {
+        if (isDev()) {
+            return true;
+        }
+        if (data_get($this, 'additional_destinations') && data_get($this, 'docker_registry_image_name')) {
+            return true;
+        }
+        return false;
+    }
 }

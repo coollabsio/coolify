@@ -171,7 +171,7 @@ class Server extends BaseModel
                 break;
             }
             $result = $this->validateConnection();
-            ray('validateConnection: ' . $result);
+            // ray('validateConnection: ' . $result);
             if (!$result) {
                 $serverUptimeCheckNumber++;
                 $this->update([
