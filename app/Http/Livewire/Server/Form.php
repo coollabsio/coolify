@@ -43,9 +43,9 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-    public function serverRefresh()
+    public function serverRefresh($install = true)
     {
-        $this->validateServer();
+        $this->validateServer($install);
     }
     public function instantSave()
     {
@@ -53,11 +53,11 @@ class Form extends Component
         $this->validateServer();
         $this->server->settings->save();
     }
-    public function installDocker()
+    public function installDocker($supported_os_type)
     {
         $this->emit('installDocker');
         $this->dockerInstallationStarted = true;
-        $activity = InstallDocker::run($this->server);
+        $activity = InstallDocker::run($this->server, $supported_os_type);
         $this->emit('newMonitorActivity', $activity->id);
     }
     public function checkLocalhostConnection()
@@ -77,24 +77,27 @@ class Form extends Component
     {
         try {
             $uptime = $this->server->validateConnection();
-            if ($uptime) {
-                $install && $this->emit('success', 'Server is reachable.');
-            } else {
+            if (!$uptime) {
                 $install && $this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
+                return;
+            }
+            $supported_os_type = $this->server->validateOS();
+            if (!$supported_os_type) {
+                $install && $this->emit('error', 'Server OS is not supported.<br>Please use a supported OS.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();
             if ($dockerInstalled) {
                 $install && $this->emit('success', 'Docker Engine is installed.<br> Checking version.');
             } else {
-                $install && $this->installDocker();
+                $install && $this->installDocker($supported_os_type);
                 return;
             }
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if ($dockerVersion) {
                 $install && $this->emit('success', 'Docker Engine version is 23+.');
             } else {
-                $install && $this->installDocker();
+                $install && $this->installDocker($supported_os_type);
                 return;
             }
         } catch (\Throwable $e) {

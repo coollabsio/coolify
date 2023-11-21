@@ -27,3 +27,8 @@ const DATABASE_DOCKER_IMAGES = [
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
 ];
+
+const SUPPORTED_OS = [
+    'debian',
+    'rhel centos fedora'
+];

@@ -25,7 +25,7 @@ class Show extends Component
     }
     public function submit()
     {
-        $this->emit('serverRefresh');
+        $this->emit('serverRefresh',false);
     }
     public function render()
     {
