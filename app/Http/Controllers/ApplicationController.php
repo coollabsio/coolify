@@ -10,23 +10,6 @@ class ApplicationController extends Controller
 {
     use AuthorizesRequests, ValidatesRequests;
 
-    public function configuration()
-    {
-        $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
-        if (!$project) {
-            return redirect()->route('dashboard');
-        }
-        $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
-        if (!$environment) {
-            return redirect()->route('dashboard');
-        }
-        $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
-        if (!$application) {
-            return redirect()->route('dashboard');
-        }
-        return view('project.application.configuration', ['application' => $application]);
-    }
-
     public function deployments()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();

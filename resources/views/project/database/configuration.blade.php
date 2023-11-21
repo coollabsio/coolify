@@ -63,7 +63,7 @@
                 <livewire:project.shared.environment-variable.all :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'server'">
-                <livewire:project.shared.destination :destination="$database->destination" />
+                <livewire:project.shared.destination :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.service.storage :resource="$database" />

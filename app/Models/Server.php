@@ -332,7 +332,6 @@ class Server extends BaseModel
         }
 
         $uptime = instant_remote_process(['uptime'], $this, false);
-        ray($uptime);
         if (!$uptime) {
             $this->settings()->update([
                 'is_reachable' => false,
@@ -345,7 +344,6 @@ class Server extends BaseModel
             $this->update([
                 'unreachable_count' => 0,
             ]);
-            ray($this);
         }
 
         if (data_get($this, 'unreachable_notification_sent') === true) {

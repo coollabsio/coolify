@@ -1,4 +1,4 @@
-<x-layout>
+<div>
     <h1>Configuration</h1>
     <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
@@ -66,7 +66,7 @@
                 </div>
             @endif
             <div x-cloak x-show="activeTab === 'server'">
-                <livewire:project.shared.destination :destination="$application->destination" />
+                <livewire:project.shared.destination :resource="$application" :servers="$servers" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.service.storage :resource="$application" />
@@ -91,4 +91,4 @@
             </div>
         </div>
     </div>
-</x-layout>
+</div>

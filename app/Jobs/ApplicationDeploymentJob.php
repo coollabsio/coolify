@@ -55,6 +55,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private GithubApp|GitlabApp|string $source = 'other';
     private StandaloneDocker|SwarmDocker $destination;
     private Server $server;
+    private Server $mainServer;
     private ?ApplicationPreview $preview = null;
     private ?string $git_type = null;
 
@@ -111,7 +112,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
-        $this->server = $this->destination->server;
+        $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
         $this->basedir = "/artifacts/{$this->deployment_uuid}";
         $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
@@ -180,10 +181,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->dockerfile_target_build) {
             $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
         }
-
-        // Get user home directory
-        $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
-        $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
         // Check custom port
         preg_match('/(?<=:)\d+(?=\/)/', $this->application->git_repository, $matches);
@@ -400,19 +397,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]);
         }
     }
-    private function save_environment_variables()
-    {
-        $envs = collect([]);
-        foreach ($this->application->environment_variables as $env) {
-            $envs->push($env->key . '=' . $env->value);
-        }
-        $envs_base64 = base64_encode($envs->implode("\n"));
-        $this->execute_remote_command(
-            [
-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
-            ],
-        );
-    }
+    // private function save_environment_variables()
+    // {
+    //     $envs = collect([]);
+    //     foreach ($this->application->environment_variables as $env) {
+    //         $envs->push($env->key . '=' . $env->value);
+    //     }
+    //     $envs_base64 = base64_encode($envs->implode("\n"));
+    //     $this->execute_remote_command(
+    //         [
+    //             executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
+    //         ],
+    //     );
+    // }
     private function deploy_simple_dockerfile()
     {
         $dockerfile_base64 = base64_encode($this->application->dockerfile);
@@ -471,7 +468,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        $this->rolling_update();
+        // if ($this->application->additional_destinations) {
+        //     $this->push_to_docker_registry();
+        //     $this->deploy_to_additional_destinations();
+        // } else {
+            $this->rolling_update();
+        // }
     }
     private function deploy_nixpacks_buildpack()
     {
@@ -629,12 +631,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function prepare_builder_image()
     {
         $helperImage = config('coolify.helper_image');
+        // Get user home directory
+        $this->serverUserHomeDir = instant_remote_process(["echo \$HOME"], $this->server);
+        $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
+
         if ($this->dockerConfigFileExists === 'OK') {
             $runCommand = "docker run -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
             $runCommand = "docker run -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         }
-
         $this->execute_remote_command(
             [
                 "echo -n 'Preparing container with helper image: $helperImage.'",
@@ -648,7 +653,31 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
         );
     }
-
+    private function deploy_to_additional_destinations()
+    {
+        $destination_ids = collect(str($this->application->additional_destinations)->explode(','));
+        foreach ($destination_ids as $destination_id) {
+            $destination = StandaloneDocker::find($destination_id);
+            $server = $destination->server;
+            if ($server->team_id !== $this->mainServer->team_id) {
+                $this->execute_remote_command(
+                    [
+                        "echo -n 'Skipping deployment to {$server->name}. Not in the same team?!'",
+                    ],
+                );
+                continue;
+            }
+            $this->server = $server;
+            $this->execute_remote_command(
+                [
+                    "echo -n 'Deploying to {$this->server->name}.'",
+                ],
+            );
+            $this->prepare_builder_image();
+            $this->generate_image_names();
+            $this->rolling_update();
+        }
+    }
     private function set_base_dir()
     {
         $this->execute_remote_command(
