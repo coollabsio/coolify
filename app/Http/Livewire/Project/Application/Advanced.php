@@ -23,7 +23,7 @@ class Advanced extends Component
     ];
     public function instantSave()
     {
-        if ($this->application->settings->is_log_drain_enabled) {
+        if ($this->application->isLogDrainEnabled()) {
             if (!$this->application->destination->server->isLogDrainEnabled()) {
                 $this->application->settings->is_log_drain_enabled = false;
                 $this->emit('error', 'Log drain is not enabled on this server.');
