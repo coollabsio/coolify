@@ -4,12 +4,16 @@ namespace App\Models;
 
 use App\Actions\Server\InstallLogDrain;
 use App\Actions\Server\InstallNewRelic;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
@@ -18,6 +22,7 @@ use Illuminate\Support\Str;
 class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
+    public static $batch_counter = 0;
 
     protected static function booted()
     {
@@ -386,5 +391,62 @@ class Server extends BaseModel
     public function validateCoolifyNetwork()
     {
         return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
+    }
+    public function executeRemoteCommand(Collection $commands, ApplicationDeploymentQueue $logModel)
+    {
+        static::$batch_counter++;
+        foreach ($commands as $command) {
+            $command = data_get($command, 'command') ?? $command[0] ?? null;
+            if (is_null($command)) {
+                continue;
+            }
+            $hidden = data_get($command, 'hidden', false);
+            $ignoreErrors = data_get($command, 'ignoreErrors', false);
+            $customOutputType = data_get($command, 'customOutputType');
+            $saveOutput = data_get($command, 'saveOutput');
+            $remoteCommand = generateSshCommand($this, $command);
+
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($command, $hidden, $customOutputType, $logModel, $saveOutput) {
+                $output = str($output)->trim();
+                if ($output->startsWith('╔')) {
+                    $output = "\n" . $output;
+                }
+                $newLogEntry = [
+                    'command' => remove_iip($command),
+                    'output' => remove_iip($output),
+                    'type' => $customOutputType ?? $type === 'err' ? 'stderr' : 'stdout',
+                    'timestamp' => Carbon::now('UTC'),
+                    'hidden' => $hidden,
+                    'batch' => static::$batch_counter,
+                ];
+                if (!$logModel->logs) {
+                    $new_log_entry['order'] = 1;
+                } else {
+                    $previous_logs = json_decode($this->log_model->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $new_log_entry['order'] = count($previous_logs) + 1;
+                }
+                $previousLogs = json_decode($logModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                $newLogEntry['order'] = count($previousLogs) + 1;
+                $previousLogs[] = $newLogEntry;
+                $logModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+                $logModel->save();
+                if ($saveOutput) {
+                    $this->remoteCommandOutputs[$saveOutput] = str($output)->trim();
+                }
+            });
+            $logModel->update([
+                'current_process_id' => $process->id(),
+            ]);
+
+            $processResult = $process->wait();
+            if ($processResult->exitCode() !== 0) {
+                if (!$ignoreErrors) {
+                    $status = ApplicationDeploymentStatus::FAILED->value;
+                    $logModel->status = $status;
+                    $logModel->save();
+                    throw new \RuntimeException($processResult->errorOutput());
+                }
+            }
+        }
     }
 }

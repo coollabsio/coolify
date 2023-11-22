@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\Application;
+use App\Models\ApplicationDeploymentQueue;
 use App\Traits\ExecuteRemoteCommand;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -23,7 +25,22 @@ class ApplicationDeploySimpleDockerfileJob implements ShouldQueue, ShouldBeEncry
     {
         $this->applicationDeploymentQueueId = $applicationDeploymentQueueId;
     }
-    public function handle() {
+    public function handle()
+    {
         ray('Deploying Simple Dockerfile');
+        $applicationDeploymentQueue = ApplicationDeploymentQueue::find($this->applicationDeploymentQueueId);
+        $application = Application::find($applicationDeploymentQueue->application_id);
+        $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
+        $server = data_get($destination, 'server');
+        $commands = collect([]);
+        $commands->push(
+            [
+                'command' => 'echo "Starting deployment of simple dockerfile."',
+            ],
+            [
+                'command' => 'ls -la',
+            ]
+        );
+        $server->executeRemoteCommand(commands: $commands, logModel: $applicationDeploymentQueue);
     }
 }
