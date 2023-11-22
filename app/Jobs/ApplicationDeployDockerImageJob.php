@@ -33,17 +33,18 @@ class ApplicationDeployDockerImageJob implements ShouldQueue, ShouldBeEncrypted
         ray('Deploying Docker Image');
         try {
             $applicationDeploymentQueue = ApplicationDeploymentQueue::find($this->applicationDeploymentQueueId);
-            $application = Application::find($applicationDeploymentQueue->application_id);
 
             $deploymentUuid = data_get($applicationDeploymentQueue, 'deployment_uuid');
-            $dockerImage = data_get($application, 'docker_registry_image_name');
-            $dockerImageTag = data_get($application, 'docker_registry_image_tag');
-            $productionImageName = str("{$dockerImage}:{$dockerImageTag}");
-            $destination = $application->destination->getMorphClass()::where('id', $application->destination->id)->first();
             $pullRequestId = data_get($applicationDeploymentQueue, 'pull_request_id');
 
-            $server = data_get($destination, 'server');
-            $network = data_get($destination, 'network');
+            $application = Application::find($applicationDeploymentQueue->application_id)->firstOrFail();
+            $server = data_get($application->destination, 'server');
+            $network = data_get($application->destination, 'network');
+
+            $dockerImage = data_get($application, 'docker_registry_image_name');
+            $dockerImageTag = data_get($application, 'docker_registry_image_tag');
+
+            $productionImageName = str("{$dockerImage}:{$dockerImageTag}");
 
             $containerName = generateApplicationContainerName($application, $pullRequestId);
             savePrivateKeyToFs($server);
@@ -53,15 +54,11 @@ class ApplicationDeployDockerImageJob implements ShouldQueue, ShouldBeEncrypted
             $applicationDeploymentQueue->update([
                 'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             ]);
-            $this->executeRemoteCommand(
-                server: $server,
-                logModel: $applicationDeploymentQueue,
-                commands: prepareHelperContainer($server, $network, $deploymentUuid)
+            $server->executeRemoteCommand(
+                commands: prepareHelperContainer($server, $network, $deploymentUuid),
+                loggingModel: $applicationDeploymentQueue
             );
-
-            $this->executeRemoteCommand(
-                server: $server,
-                logModel: $applicationDeploymentQueue,
+            $server->executeRemoteCommand(
                 commands: generateComposeFile(
                     deploymentUuid: $deploymentUuid,
                     server: $server,
@@ -70,13 +67,16 @@ class ApplicationDeployDockerImageJob implements ShouldQueue, ShouldBeEncrypted
                     containerName: $containerName,
                     imageName: $productionImageName,
                     pullRequestId: $pullRequestId
-                )
+                ),
+                loggingModel: $applicationDeploymentQueue
             );
-            $this->executeRemoteCommand(
-                server: $server,
-                logModel: $applicationDeploymentQueue,
-                commands: rollingUpdate(application: $application, deploymentUuid: $deploymentUuid)
+            $server->executeRemoteCommand(
+                commands: rollingUpdate(application: $application, deploymentUuid: $deploymentUuid),
+                loggingModel: $applicationDeploymentQueue
             );
+            $applicationDeploymentQueue->update([
+                'status' => ApplicationDeploymentStatus::FINISHED->value,
+            ]);
         } catch (Throwable $e) {
             $this->executeRemoteCommand(
                 server: $server,

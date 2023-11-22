@@ -392,7 +392,7 @@ class Server extends BaseModel
     {
         return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
     }
-    public function executeRemoteCommand(Collection $commands, ApplicationDeploymentQueue $logModel)
+    public function executeRemoteCommand(Collection $commands, ApplicationDeploymentQueue $loggingModel)
     {
         static::$batch_counter++;
         foreach ($commands as $command) {
@@ -406,7 +406,7 @@ class Server extends BaseModel
             $saveOutput = data_get($command, 'saveOutput');
             $remoteCommand = generateSshCommand($this, $command);
 
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($command, $hidden, $customOutputType, $logModel, $saveOutput) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($command, $hidden, $customOutputType, $loggingModel, $saveOutput) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
                     $output = "\n" . $output;
@@ -419,22 +419,22 @@ class Server extends BaseModel
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (!$logModel->logs) {
+                if (!$loggingModel->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
                     $previous_logs = json_decode($this->log_model->logs, associative: true, flags: JSON_THROW_ON_ERROR);
                     $new_log_entry['order'] = count($previous_logs) + 1;
                 }
-                $previousLogs = json_decode($logModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
                 $newLogEntry['order'] = count($previousLogs) + 1;
                 $previousLogs[] = $newLogEntry;
-                $logModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
-                $logModel->save();
+                $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+                $loggingModel->save();
                 if ($saveOutput) {
                     $this->remoteCommandOutputs[$saveOutput] = str($output)->trim();
                 }
             });
-            $logModel->update([
+            $loggingModel->update([
                 'current_process_id' => $process->id(),
             ]);
 
@@ -442,8 +442,8 @@ class Server extends BaseModel
             if ($processResult->exitCode() !== 0) {
                 if (!$ignoreErrors) {
                     $status = ApplicationDeploymentStatus::FAILED->value;
-                    $logModel->status = $status;
-                    $logModel->save();
+                    $loggingModel->status = $status;
+                    $loggingModel->save();
                     throw new \RuntimeException($processResult->errorOutput());
                 }
             }
