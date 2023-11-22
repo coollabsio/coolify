@@ -8,14 +8,14 @@ use Illuminate\Support\Facades\Hash;
 
 use function Laravel\Prompts\password;
 
-class UsersResetRoot extends Command
+class RootResetPassword extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'users:reset-root';
+    protected $signature = 'root:reset-password';
 
     /**
      * The console command description.

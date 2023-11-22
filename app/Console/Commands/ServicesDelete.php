@@ -12,21 +12,21 @@ use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\select;
 
-class ResourcesDelete extends Command
+class ServicesDelete extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'resources:delete';
+    protected $signature = 'services:delete';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Delete a resource from the database';
+    protected $description = 'Delete a service from the database';
 
     /**
      * Execute the console command.
@@ -34,7 +34,7 @@ class ResourcesDelete extends Command
     public function handle()
     {
         $resource = select(
-            'What resource do you want to delete?',
+            'What service do you want to delete?',
             ['Application', 'Database', 'Service', 'Server'],
         );
         if ($resource === 'Application') {
