@@ -28,7 +28,12 @@ class Application extends Component
     }
     public function instantSaveAdvanced()
     {
-        $this->submit();
+        if (!$this->application->service->destination->server->isLogDrainEnabled()) {
+            $this->application->is_log_drain_enabled = false;
+            $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
+            return;
+        }
+        $this->application->save();
         $this->emit('success', 'You need to restart the service for the changes to take effect.');
     }
     public function delete()
@@ -49,11 +54,6 @@ class Application extends Component
     {
         try {
             $this->validate();
-            if (!$this->application->service->destination->server->isLogDrainEnabled()) {
-                $this->application->is_log_drain_enabled = false;
-                $this->emit('error', 'Log drain is not enabled on the server. Please enable it first.');
-                return;
-            }
             $this->application->save();
             updateCompose($this->application);
             $this->emit('success', 'Application saved successfully.');
