@@ -219,7 +219,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->server->isProxyShouldRun()) {
                 dispatch(new ContainerStatusJob($this->server));
             }
-            if ($this->application->docker_registry_image_name) {
+            if ($this->application->docker_registry_image_name && $this->application->build_pack !== 'dockerimage') {
                 $this->push_to_docker_registry();
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
