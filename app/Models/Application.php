@@ -225,7 +225,8 @@ class Application extends BaseModel
         return $this->morphTo();
     }
 
-    public function isDeploymentInprogress() {
+    public function isDeploymentInprogress()
+    {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'in_progress')->count();
         if ($deployments > 0) {
             return true;
@@ -300,8 +301,9 @@ class Application extends BaseModel
         }
         return false;
     }
-    public function isLogDrainEnabled() {
-       return data_get($this, 'settings.is_log_drain_enabled', false);
+    public function isLogDrainEnabled()
+    {
+        return data_get($this, 'settings.is_log_drain_enabled', false);
     }
     public function isConfigurationChanged($save = false)
     {
@@ -329,5 +331,15 @@ class Application extends BaseModel
             }
             return true;
         }
+    }
+    public function isMultipleServerDeployment()
+    {
+        if (isDev()) {
+            return true;
+        }
+        if (data_get($this, 'additional_destinations') && data_get($this, 'docker_registry_image_name')) {
+            return true;
+        }
+        return false;
     }
 }

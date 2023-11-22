@@ -37,7 +37,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
-        ray("checking container statuses for {$this->server->id}");
+        // ray("checking container statuses for {$this->server->id}");
         try {
             if (!$this->server->isServerReady()) {
                 return;

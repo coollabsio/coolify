@@ -1,12 +1,12 @@
 <div x-init="$wire.loadImages">
     <div class="flex items-center gap-2">
         <h2>Rollback</h2>
-        <x-forms.button wire:click='loadImages'>Reload Available Images</x-forms.button>
+        <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
     </div>
-    <div class="pb-4 ">You can easily rollback to a previously built image quickly.</div>
+    <div class="pb-4 ">You can easily rollback to a previously built <span class="text-warning">(local)</span> images quickly.</div>
     <div wire:target='loadImages'>
         <div class="flex flex-wrap">
-            @foreach ($images as $image)
+            @forelse ($images as $image)
                 <div class="w-2/4 p-2">
                     <div class="rounded shadow-lg bg-coolgray-200">
                         <div class="p-2">
@@ -25,14 +25,16 @@
                                     Rollback
                                 </x-forms.button>
                             @else
-                                <x-forms.button wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
+                                <x-forms.button class="bg-coolgray-100" wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
                                     Rollback
                                 </x-forms.button>
                             @endif
                         </div>
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <div>No images found locally.</div>
+            @endforelse
         </div>
     </div>
 </div>

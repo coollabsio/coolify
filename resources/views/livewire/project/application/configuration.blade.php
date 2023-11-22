@@ -1,10 +1,12 @@
-<x-layout>
+<div>
     <h1>Configuration</h1>
     <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
+            <a :class="activeTab === 'advanced' && 'text-white'"
+                @click.prevent="activeTab = 'advanced'; window.location.hash = 'advanced'" href="#">Advanced</a>
             @if ($application->build_pack !== 'static')
                 <a :class="activeTab === 'environment-variables' && 'text-white'"
                     @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
@@ -34,7 +36,7 @@
             @endif
             @if ($application->build_pack !== 'static')
                 <a :class="activeTab === 'health' && 'text-white'"
-                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Health Checks
+                    @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Healthchecks
                 </a>
             @endif
             <a :class="activeTab === 'rollback' && 'text-white'"
@@ -52,6 +54,9 @@
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
                 <livewire:project.application.general :application="$application" />
             </div>
+            <div x-cloak x-show="activeTab === 'advanced'" class="h-full">
+                <livewire:project.application.advanced :application="$application" />
+            </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$application" />
             </div>
@@ -61,7 +66,7 @@
                 </div>
             @endif
             <div x-cloak x-show="activeTab === 'server'">
-                <livewire:project.shared.destination :destination="$application->destination" />
+                <livewire:project.shared.destination :resource="$application" :servers="$servers" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <livewire:project.service.storage :resource="$application" />
@@ -86,4 +91,4 @@
             </div>
         </div>
     </div>
-</x-layout>
+</div>

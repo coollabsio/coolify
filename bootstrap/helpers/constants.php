@@ -1,5 +1,6 @@
 <?php
 
+const REDACTED = '<REDACTED>';
 const DATABASE_TYPES = ['postgresql', 'redis', 'mongodb', 'mysql', 'mariadb'];
 const VALID_CRON_STRINGS = [
     'every_minute' => '* * * * *',
@@ -25,4 +26,9 @@ const DATABASE_DOCKER_IMAGES = [
 ];
 const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
+];
+
+const SUPPORTED_OS = [
+    'debian',
+    'rhel centos fedora'
 ];

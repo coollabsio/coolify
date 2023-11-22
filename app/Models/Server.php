@@ -171,7 +171,7 @@ class Server extends BaseModel
                 break;
             }
             $result = $this->validateConnection();
-            ray('validateConnection: ' . $result);
+            // ray('validateConnection: ' . $result);
             if (!$result) {
                 $serverUptimeCheckNumber++;
                 $this->update([
@@ -304,6 +304,27 @@ class Server extends BaseModel
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
+    public function validateOS()
+    {
+        $os_release = instant_remote_process(['cat /etc/os-release'], $this);
+        $datas = collect(explode("\n", $os_release));
+        $collectedData = collect([]);
+        foreach ($datas as $data) {
+            $item = Str::of($data)->trim();
+            $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
+        }
+        $ID = data_get($collectedData, 'ID');
+        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+        $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        // ray($ID, $ID_LIKE, $VERSION_ID);
+        if (collect(SUPPORTED_OS)->contains($ID_LIKE)) {
+            ray('supported');
+            return str($ID_LIKE)->explode(' ')->first();
+        } else {
+            ray('not supported');
+            return false;
+        }
+    }
     public function validateConnection()
     {
         if ($this->skipServer()) {
@@ -314,27 +335,22 @@ class Server extends BaseModel
         if (!$uptime) {
             $this->settings()->update([
                 'is_reachable' => false,
-                'is_usable' => false
             ]);
             return false;
+        } else {
+            $this->settings()->update([
+                'is_reachable' => true,
+            ]);
+            $this->update([
+                'unreachable_count' => 0,
+            ]);
         }
 
         if (data_get($this, 'unreachable_notification_sent') === true) {
             $this->team->notify(new Revived($this));
             $this->update(['unreachable_notification_sent' => false]);
         }
-        if (
-            data_get($this, 'settings.is_reachable') === false ||
-            data_get($this, 'settings.is_usable') === false
-        ) {
-            $this->settings()->update([
-                'is_reachable' => true,
-                'is_usable' => true
-            ]);
-        }
-        $this->update([
-            'unreachable_count' => 0,
-        ]);
+
         return true;
     }
     public function validateDockerEngine($throwError = false)
@@ -344,7 +360,7 @@ class Server extends BaseModel
             $this->settings->is_usable = false;
             $this->settings->save();
             if ($throwError) {
-                throw new \Exception('Server is not usable.');
+                throw new \Exception('Server is not usable. Docker Engine is not installed.');
             }
             return false;
         }
@@ -362,6 +378,7 @@ class Server extends BaseModel
             $this->settings->save();
             return false;
         }
+        $this->settings->is_reachable = true;
         $this->settings->is_usable = true;
         $this->settings->save();
         return true;

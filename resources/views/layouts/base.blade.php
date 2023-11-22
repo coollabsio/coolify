@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html data-theme="coollabs" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,6 +26,7 @@
     @endif
 </head>
 @section('body')
+
     <body>
         @livewireScripts
         <dialog id="help" class="modal">
@@ -119,6 +121,9 @@
             })
             Livewire.on('success', (message) => {
                 if (message) Toaster.success(message)
+            })
+            Livewire.on('installDocker', () => {
+                installDocker.showModal();
             })
         </script>
     </body>

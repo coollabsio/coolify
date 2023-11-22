@@ -17,10 +17,10 @@
             <h3>Service Specific Configuration</h3>
         </div>
         <div class="grid grid-cols-2 gap-2">
-            @foreach ($fields as $serviceName => $fields)
-                <x-forms.input type="{{ data_get($fields, 'isPassword') ? 'password' : 'text' }}" required
+            @foreach ($fields as $serviceName => $field)
+                <x-forms.input type="{{ data_get($field, 'isPassword') ? 'password' : 'text' }}" required
                     helper="Variable name: {{ $serviceName }}"
-                    label="{{ data_get($fields, 'serviceName') }} {{ data_get($fields, 'name') }}"
+                    label="{{ data_get($field, 'serviceName') }} {{ data_get($field, 'name') }}"
                     id="fields.{{ $serviceName }}.value"></x-forms.input>
             @endforeach
         </div>

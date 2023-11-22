@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Http\Livewire\Boarding\Index as BoardingIndex;
 use App\Http\Livewire\Project\Service\Index as ServiceIndex;
 use App\Http\Livewire\Project\Service\Show as ServiceShow;
@@ -101,7 +102,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
 
     // Applications
-    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', [ApplicationController::class, 'configuration'])->name('project.application.configuration');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', ApplicationConfiguration::class)->name('project.application.configuration');
+
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment', [ApplicationController::class, 'deployments'])->name('project.application.deployments');
     Route::get(
         '/project/{project_uuid}/{environment_name}/application/{application_uuid}/deployment/{deployment_uuid}',
@@ -167,7 +169,6 @@ Route::middleware(['auth'])->group(function () {
         'private_key' => PrivateKey::ownedByCurrentTeam(['name', 'description', 'private_key', 'is_git_related'])->whereUuid(request()->private_key_uuid)->firstOrFail()
     ]))->name('security.private-key.show');
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
-
 });
 
 

@@ -6,5 +6,7 @@ use Livewire\Component;
 
 class Destination extends Component
 {
-    public $destination;
+    public $resource;
+    public $servers = [];
+    public $additionalServers = [];
 }

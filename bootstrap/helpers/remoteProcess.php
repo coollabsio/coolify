@@ -170,10 +170,13 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
             $i['timestamp'] = Carbon::parse($i['timestamp'])->format('Y-M-d H:i:s.u');
             return $i;
         });
-
     return $formatted;
 }
-
+function remove_iip($text)
+{
+    $text = preg_replace('/x-access-token:.*?(?=@)/', "x-access-token:" . REDACTED, $text);
+    return preg_replace('/\x1b\[[0-9;]*m/', '', $text);
+}
 function refresh_server_connection(?PrivateKey $private_key = null)
 {
     if (is_null($private_key)) {

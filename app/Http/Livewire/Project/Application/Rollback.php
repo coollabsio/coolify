@@ -38,10 +38,10 @@ class Rollback extends Component
         ]);
     }
 
-    public function loadImages()
+    public function loadImages($showToast = false)
     {
         try {
-            $image = $this->application->uuid;
+            $image = $this->application->docker_registry_image_name ?? $this->application->uuid;
             if ($this->application->destination->server->isFunctional()) {
                 $output = instant_remote_process([
                     "docker inspect --format='{{.Config.Image}}' {$this->application->uuid}",
@@ -66,6 +66,7 @@ class Rollback extends Component
                     ];
                 })->toArray();
             }
+            $showToast && $this->emit('success', 'Images loaded.');
             return [];
         } catch (\Throwable $e) {
             return handleError($e, $this);

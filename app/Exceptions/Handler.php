@@ -6,6 +6,7 @@ use App\Models\InstanceSettings;
 use App\Models\User;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use RuntimeException;
 use Sentry\Laravel\Integration;
 use Sentry\State\Scope;
 use Throwable;
@@ -55,7 +56,9 @@ class Handler extends ExceptionHandler
     {
         $this->reportable(function (Throwable $e) {
             if (isDev()) {
-                ray($e);
+                // return;
+            }
+            if ($e instanceof RuntimeException) {
                 return;
             }
             $this->settings = InstanceSettings::get();
@@ -74,6 +77,7 @@ class Handler extends ExceptionHandler
                     );
                 }
             );
+            ray('reporting to sentry');
             Integration::captureUnhandledException($e);
         });
     }

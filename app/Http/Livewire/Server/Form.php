@@ -43,9 +43,9 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-    public function serverRefresh()
+    public function serverRefresh($install = true)
     {
-        $this->validateServer();
+        $this->validateServer($install);
     }
     public function instantSave()
     {
@@ -77,10 +77,13 @@ class Form extends Component
     {
         try {
             $uptime = $this->server->validateConnection();
-            if ($uptime) {
-                $install && $this->emit('success', 'Server is reachable.');
-            } else {
+            if (!$uptime) {
                 $install && $this->emit('error', 'Server is not reachable. Please check your connection and configuration.');
+                return;
+            }
+            $supported_os_type = $this->server->validateOS();
+            if (!$supported_os_type) {
+                $install && $this->emit('error', 'Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/servers#install-docker-engine-manually">documentation</a>.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();
@@ -92,7 +95,7 @@ class Form extends Component
             }
             $dockerVersion = $this->server->validateDockerEngineVersion();
             if ($dockerVersion) {
-                $install && $this->emit('success', 'Docker Engine version is 23+.');
+                $install && $this->emit('success', 'Docker Engine version is 22+.');
             } else {
                 $install && $this->installDocker();
                 return;
