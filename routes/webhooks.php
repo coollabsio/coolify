@@ -317,7 +317,10 @@ Route::post('/source/github/events', function () {
             // Installation handled by setup redirect url. Repositories queried on-demand.
             return response('cool');
         }
-        $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->firstOrFail();
+        $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
+        if (is_null($github_app)) {
+            return response('Nothing to do. No GitHub App found.');
+        }
 
         $webhook_secret = data_get($github_app, 'webhook_secret');
         $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
