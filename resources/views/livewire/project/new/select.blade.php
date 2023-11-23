@@ -145,7 +145,7 @@
                     </div>
                 </div> --}}
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" wire:init='loadServices(true)'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click='loadServices(true)'>Reload Services List</x-forms.button>
                 <input
