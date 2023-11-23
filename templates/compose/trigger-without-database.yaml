@@ -1,0 +1,20 @@
+# documentation: https://trigger.dev/docs/documentation/guides/self-hosting
+# slogan: The open source Background Jobs framework for TypeScript
+# tags: trigger.dev, background jobs, typescript, trigger, jobs, cron, scheduler
+
+services:
+  trigger:
+    image: ghcr.io/triggerdotdev/trigger.dev:latest
+    environment:
+      - SERVICE_FQDN_TRIGGER
+      - LOGIN_ORIGIN=$SERVICE_FQDN_TRIGGER
+      - APP_ORIGIN=$SERVICE_FQDN_TRIGGER
+      - MAGIC_LINK_SECRET=$SERVICE_PASSWORD_64_MAGIC
+      - ENCRYPTION_KEY=$SERVICE_PASSWORD_64_ENCRYPTION
+      - SESSION_SECRET=$SERVICE_PASSWORD_64_SESSION
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DATABASE_URL}
+      - RUNTIME_PLATFORM=docker-compose
+      - NODE_ENV=production
+    healthcheck:
+      test: ["NONE"]
