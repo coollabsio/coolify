@@ -18,15 +18,18 @@ services:
       - POSTGRES_HOST=postgresql
       - POSTGRES_PORT=5432
       - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
     volumes:
       - weblate-data:/app/data
+      - weblate-cache:/app/cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080"]
       interval: 2s
       timeout: 10s
-      retries: 15
+      retries: 30
   postgresql:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     volumes:
       - postgresql-data:/var/lib/postgresql/data
     environment:
@@ -40,7 +43,10 @@ services:
       retries: 10
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    command: >
+      --appendonly yes --requirepass ${SERVICE_PASSWORD_REDIS}
+    environment:
+      - REDIS_PASSWORD=$SERVICE_PASSWORD_REDIS
     volumes:
       - weblate-redis-data:/data
     healthcheck:
