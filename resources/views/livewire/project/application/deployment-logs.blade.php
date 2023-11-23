@@ -49,7 +49,7 @@
                         <div @class([
                             'font-mono whitespace-pre-line',
                             'text-warning' => $line['hidden'],
-                            'text-error' => $line['type'] == 'stderr',
+                            'text-red-500' => $line['type'] == 'stderr',
                         ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                 <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
                                 @endif{{ $line['output'] }}@if ($line['hidden'])

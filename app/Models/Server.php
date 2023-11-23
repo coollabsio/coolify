@@ -396,23 +396,23 @@ class Server extends BaseModel
     {
         static::$batch_counter++;
         foreach ($commands as $command) {
-            $command = data_get($command, 'command') ?? $command[0] ?? null;
-            if (is_null($command)) {
-                continue;
+            $realCommand = data_get($command, 'command');
+            if (is_null($realCommand)) {
+                throw new \RuntimeException('Command is not set');
             }
             $hidden = data_get($command, 'hidden', false);
             $ignoreErrors = data_get($command, 'ignoreErrors', false);
             $customOutputType = data_get($command, 'customOutputType');
-            $saveOutput = data_get($command, 'saveOutput');
-            $remoteCommand = generateSshCommand($this, $command);
+            $name = data_get($command, 'name');
+            $remoteCommand = generateSshCommand($this, $realCommand);
 
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($command, $hidden, $customOutputType, $loggingModel, $saveOutput) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($realCommand, $hidden, $customOutputType, $loggingModel, $name) {
                 $output = str($output)->trim();
                 if ($output->startsWith('╔')) {
                     $output = "\n" . $output;
                 }
                 $newLogEntry = [
-                    'command' => remove_iip($command),
+                    'command' => remove_iip($realCommand),
                     'output' => remove_iip($output),
                     'type' => $customOutputType ?? $type === 'err' ? 'stderr' : 'stdout',
                     'timestamp' => Carbon::now('UTC'),
@@ -420,19 +420,21 @@ class Server extends BaseModel
                     'batch' => static::$batch_counter,
                 ];
                 if (!$loggingModel->logs) {
-                    $new_log_entry['order'] = 1;
+                    $newLogEntry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->log_model->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                    $new_log_entry['order'] = count($previous_logs) + 1;
+                    $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $newLogEntry['order'] = count($previousLogs) + 1;
                 }
-                $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                $newLogEntry['order'] = count($previousLogs) + 1;
+                if ($name) {
+                    $newLogEntry['name'] = $name;
+                }
+
                 $previousLogs[] = $newLogEntry;
                 $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
                 $loggingModel->save();
-                if ($saveOutput) {
-                    $this->remoteCommandOutputs[$saveOutput] = str($output)->trim();
-                }
+                // if ($name) {
+                //     $loggingModel['savedOutputs'][$name] = str($output)->trim();
+                // }
             });
             $loggingModel->update([
                 'current_process_id' => $process->id(),
@@ -448,5 +450,23 @@ class Server extends BaseModel
                 }
             }
         }
+    }
+    public function stopApplicationRelatedRunningContainers(string $applicationId, string $containerName)
+    {
+        $containers = getCurrentApplicationContainerStatus($this, $applicationId, 0);
+        $containers = $containers->filter(function ($container) use ($containerName) {
+            return data_get($container, 'Names') !== $containerName;
+        });
+        $containers->each(function ($container) {
+            $removableContainer = data_get($container, 'Names');
+            $this->server->executeRemoteCommand(
+                commands: collect([
+                    'command' => "docker rm -f $removableContainer >/dev/null 2>&1",
+                    'hidden' => true,
+                    'ignoreErrors' => true
+                ]),
+                loggingModel: $this->deploymentQueueEntry
+            );
+        });
     }
 }

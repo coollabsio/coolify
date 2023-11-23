@@ -342,4 +342,20 @@ class Application extends BaseModel
         }
         return false;
     }
+    public function healthCheckUrl() {
+        if ($this->dockerfile || $this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
+            return null;
+        }
+        if (!$this->health_check_port) {
+            $health_check_port = $this->ports_exposes_array[0];
+        } else {
+            $health_check_port = $this->health_check_port;
+        }
+        if ($this->health_check_path) {
+            $full_healthcheck_url = "{$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}{$this->health_check_path}";
+        } else {
+            $full_healthcheck_url = "{$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}/";
+        }
+        return $full_healthcheck_url;
+    }
 }

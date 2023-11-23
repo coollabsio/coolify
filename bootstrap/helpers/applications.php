@@ -37,7 +37,9 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         return;
     }
     // New deployment
-    // dispatchDeploymentJob($deployment->id);
+    // dispatchDeploymentJob($deployment);
+
+    // Old deployment
     dispatch(new ApplicationDeploymentJob(
         application_deployment_queue_id: $deployment->id,
     ))->onConnection('long-running')->onQueue('long-running');
@@ -48,29 +50,34 @@ function queue_next_deployment(Application $application)
 {
     $next_found = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->first();
     if ($next_found) {
-         // New deployment
+        // New deployment
         // dispatchDeploymentJob($next_found->id);
+
+        // Old deployment
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $next_found->id,
         ))->onConnection('long-running')->onQueue('long-running');
-
     }
 }
-function dispatchDeploymentJob($id)
+function dispatchDeploymentJob(ApplicationDeploymentQueue $deploymentQueueEntry)
 {
-    $applicationQueue = ApplicationDeploymentQueue::find($id);
-    $application = Application::find($applicationQueue->application_id);
+    $application = Application::find($deploymentQueueEntry->application_id);
 
-    $isRestartOnly = data_get($applicationQueue, 'restart_only');
+    $isRestartOnly = data_get($deploymentQueueEntry, 'restart_only');
     $isSimpleDockerFile = data_get($application, 'dockerfile');
     $isDockerImage = data_get($application, 'build_pack') === 'dockerimage';
 
-    if ($isRestartOnly) {
-        ApplicationRestartJob::dispatch(applicationDeploymentQueueId: $id)->onConnection('long-running')->onQueue('long-running');
-    } else if ($isSimpleDockerFile) {
-        ApplicationDeploySimpleDockerfileJob::dispatch(applicationDeploymentQueueId: $id)->onConnection('long-running')->onQueue('long-running');
-    } else if ($isDockerImage) {
-        ApplicationDeployDockerImageJob::dispatch(applicationDeploymentQueueId: $id)->onConnection('long-running')->onQueue('long-running');
+    // if ($isRestartOnly) {
+    //     ApplicationRestartJob::dispatch(queue: $deploymentQueueEntry, application: $application)->onConnection('long-running')->onQueue('long-running');
+    // } else if ($isSimpleDockerFile) {
+    //     ApplicationDeploySimpleDockerfileJob::dispatch(applicationDeploymentQueueId: $id)->onConnection('long-running')->onQueue('long-running');
+    // } else
+
+    if ($isDockerImage) {
+        ApplicationDeployDockerImageJob::dispatch(
+            deploymentQueueEntry: $deploymentQueueEntry,
+            application: $application
+        )->onConnection('long-running')->onQueue('long-running');
     } else {
         throw new Exception('Unknown build pack');
     }
@@ -201,7 +208,6 @@ function generateComposeFile(string $deploymentUuid, Server $server, string $net
         ];
     }
     if ($application->settings->is_gpu_enabled) {
-        ray('asd');
         $docker_compose['services'][$containerName]['deploy']['resources']['reservations']['devices'] = [
             [
                 'driver' => data_get($application, 'settings.gpu_driver', 'nvidia'),
@@ -302,39 +308,37 @@ function generateEnvironmentVariables(Application $application, $ports, int $pul
     return $environment_variables->all();
 }
 
-function rollingUpdate(Application $application, string $deploymentUuid)
+function startNewApplication(Application $application, string $deploymentUuid, ApplicationDeploymentQueue $loggingModel)
 {
     $commands = collect([]);
     $workDir = generateWorkdir($deploymentUuid, $application);
-    if (count($application->ports_mappings_array) > 0) {
-        // $this->execute_remote_command(
-        //     [
-        //         "echo '\n----------------------------------------'",
-        //     ],
-        //     ["echo -n 'Application has ports mapped to the host system, rolling update is not supported.'"],
-        // );
-        // $this->stop_running_container(force: true);
-        // $this->start_by_compose_file();
+    if ($application->build_pack === 'dockerimage') {
+        $loggingModel->addLogEntry('Pulling latest images from the registry.');
+        $commands->push(
+            [
+                "command" => executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} pull"),
+                "hidden" => true
+            ],
+            [
+                "command" => executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} up --build -d"),
+                "hidden" => true
+            ],
+        );
     } else {
         $commands->push(
             [
-                "command" =>  "echo '\n----------------------------------------'"
+                "command" => executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} up --build -d"),
+                "hidden" => true
             ],
-            [
-                "command" =>  "echo -n 'Rolling update started.'"
-            ]
         );
-        if ($application->build_pack === 'dockerimage') {
-            $commands->push(
-                ["echo -n 'Pulling latest images from the registry.'"],
-                [executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} pull"), "hidden" => true],
-                [executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} up --build -d"), "hidden" => true],
-            );
-        } else {
-            $commands->push(
-                [executeInDocker($deploymentUuid, "docker compose --project-directory {$workDir} up --build -d"), "hidden" => true],
-            );
-        }
-        return $commands;
     }
+    return $commands;
+}
+function removeOldDeployment(string $containerName)
+{
+    $commands = collect([]);
+    $commands->push(
+        ["docker rm -f $containerName >/dev/null 2>&1"],
+    );
+    return $commands;
 }
