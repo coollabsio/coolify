@@ -26,7 +26,7 @@ return [
         'server' => [
             'zero' => 0,
             'self-hosted' => 999999999999,
-            'basic' => 1,
+            'basic' => 2,
             'pro' => 10,
             'ultimate' => 25,
         ],
