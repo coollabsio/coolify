@@ -23,7 +23,7 @@ class StackForm extends Component
             foreach ($fields as $fieldKey => $field) {
                 $key = data_get($field, 'key');
                 $value = data_get($field, 'value');
-                $rules = data_get($field, 'rules');
+                $rules = data_get($field, 'rules', 'nullable');
                 $isPassword = data_get($field, 'isPassword');
                 $this->fields[$key] = [
                     "serviceName" => $serviceName,
