@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 trait ExecuteRemoteCommand
 {
     public ?string $save = null;
+    public static int $batch_counter = 0;
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -23,7 +24,6 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
-
 
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;

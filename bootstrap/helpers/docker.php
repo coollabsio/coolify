@@ -3,6 +3,9 @@
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
+use App\Models\Service;
+use App\Models\ServiceApplication;
+use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -137,18 +140,28 @@ function defaultLabels($id, $name, $pull_request_id = 0, string $type = 'applica
     $labels->push('coolify.name=' . $name);
     $labels->push('coolify.pullRequestId=' . $pull_request_id);
     if ($type === 'service') {
-        $labels->push('coolify.service.subId=' . $subId);
-        $labels->push('coolify.service.subType=' . $subType);
+        $subId && $labels->push('coolify.service.subId=' . $subId);
+        $subType && $labels->push('coolify.service.subType=' . $subType);
     }
     return $labels;
 }
-function generateServiceSpecificFqdns($service, $forTraefik = false)
+function generateServiceSpecificFqdns(ServiceApplication|Application $resource, $forTraefik = false)
 {
-    $variables = collect($service->service->environment_variables);
-    $type = $service->serviceType();
+    if ($resource->getMorphClass() === 'App\Models\ServiceApplication') {
+        $uuid = $resource->uuid;
+        $server = $resource->service->server;
+        $environment_variables = $resource->service->environment_variables;
+        $type = $resource->serviceType();
+    } else if ($resource->getMorphClass() === 'App\Models\Application') {
+        $uuid = $resource->uuid;
+        $server = $resource->destination->server;
+        $environment_variables = $resource->environment_variables;
+        $type = $resource->serviceType();
+    }
+    $variables = collect($environment_variables);
     $payload = collect([]);
     switch ($type) {
-        case $type->contains('minio'):
+        case $type?->contains('minio'):
             $MINIO_BROWSER_REDIRECT_URL = $variables->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
             $MINIO_SERVER_URL = $variables->where('key', 'MINIO_SERVER_URL')->first();
             if (is_null($MINIO_BROWSER_REDIRECT_URL) || is_null($MINIO_SERVER_URL)) {
@@ -156,12 +169,12 @@ function generateServiceSpecificFqdns($service, $forTraefik = false)
             }
             if (is_null($MINIO_BROWSER_REDIRECT_URL?->value)) {
                 $MINIO_BROWSER_REDIRECT_URL?->update([
-                    "value" => generateFqdn($service->service->server, 'console-' . $service->uuid)
+                    "value" => generateFqdn($server, 'console-' . $uuid)
                 ]);
             }
             if (is_null($MINIO_SERVER_URL?->value)) {
                 $MINIO_SERVER_URL?->update([
-                    "value" => generateFqdn($service->service->server, 'minio-' . $service->uuid)
+                    "value" => generateFqdn($server, 'minio-' . $uuid)
                 ]);
             }
             if ($forTraefik) {

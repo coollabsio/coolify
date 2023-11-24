@@ -6,6 +6,7 @@ use App\Models\Application;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class General extends Component
 {
@@ -26,6 +27,9 @@ class General extends Component
     public bool $isConfigurationChanged = false;
 
     public bool $is_static;
+
+    public $parsedServices = [];
+    public $parsedServiceDomains = [];
 
     protected $listeners = [
         'resetDefaultLabels'
@@ -50,6 +54,9 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
+        'application.docker_compose_location' => 'nullable',
+        'application.docker_compose' => 'nullable',
+        'application.docker_compose_raw' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
@@ -74,6 +81,9 @@ class General extends Component
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
+        'application.docker_compose_location' => 'Docker compose location',
+        'application.docker_compose' => 'Docker compose',
+        'application.docker_compose_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.settings.is_static' => 'Is static',
@@ -81,6 +91,14 @@ class General extends Component
 
     public function mount()
     {
+        try {
+            $this->parsedServices = $this->application->parseCompose();
+            ray($this->parsedServices);
+        } catch (\Throwable $e) {
+            $this->emit('error', $e->getMessage());
+        }
+        $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+
         $this->ports_exposes = $this->application->ports_exposes;
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->application->isConfigurationChanged(true);
@@ -97,6 +115,38 @@ class General extends Component
     {
         $this->application->settings->save();
         $this->emit('success', 'Settings saved.');
+    }
+    public function loadComposeFile($isInit = false)
+    {
+        if ($isInit && $this->application->docker_compose_raw) {
+            return;
+        }
+        $uuid = new Cuid2();
+        ['commands' => $cloneCommand] = $this->application->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        $workdir = rtrim($this->application->base_directory, '/');
+        $composeFile = $this->application->docker_compose_location;
+        $commands = collect([
+            "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
+            $cloneCommand,
+            "git sparse-checkout init --cone",
+            "git sparse-checkout set .$workdir$composeFile",
+            "git read-tree -mu HEAD",
+            "cat .$workdir$composeFile",
+        ]);
+        $composeFileContent = instant_remote_process($commands, $this->application->destination->server, false);
+        if (!$composeFileContent) {
+            $this->emit('error', "Could not load compose file from $workdir$composeFile");
+            return;
+        } else {
+            $this->application->docker_compose_raw = $composeFileContent;
+            $this->application->save();
+        }
+        $commands = collect([
+            "rm -rf /tmp/{$uuid}",
+        ]);
+        instant_remote_process($commands, $this->application->destination->server, false);
+        $this->parsedServices = $this->application->parseCompose();
+        $this->emit('success', 'Compose file loaded.');
     }
     public function updatedApplicationBuildPack()
     {
@@ -172,8 +222,10 @@ class General extends Component
                 $this->customLabels = str($this->customLabels)->replace(',', "\n");
             }
             $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
+            $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
             $this->application->save();
             $showToaster && $this->emit('success', 'Application settings updated!');
+            $this->parsedServices = $this->application->parseCompose();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

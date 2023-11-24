@@ -12,6 +12,7 @@ function get_proxy_path()
 }
 function connectProxyToNetworks(Server $server)
 {
+    // TODO: Connect to service + compose based application networks as well.
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
     })->unique();

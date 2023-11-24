@@ -392,7 +392,7 @@ class Server extends BaseModel
     {
         return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
     }
-    public function executeRemoteCommand(Collection $commands, ApplicationDeploymentQueue $loggingModel)
+    public function executeRemoteCommand(Collection $commands, ?ApplicationDeploymentQueue $loggingModel = null)
     {
         static::$batch_counter++;
         foreach ($commands as $command) {
@@ -419,33 +419,35 @@ class Server extends BaseModel
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-                if (!$loggingModel->logs) {
-                    $newLogEntry['order'] = 1;
-                } else {
-                    $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                    $newLogEntry['order'] = count($previousLogs) + 1;
-                }
-                if ($name) {
-                    $newLogEntry['name'] = $name;
-                }
+                if ($loggingModel) {
+                    if (!$loggingModel->logs) {
+                        $newLogEntry['order'] = 1;
+                    } else {
+                        $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                        $newLogEntry['order'] = count($previousLogs) + 1;
+                    }
+                    if ($name) {
+                        $newLogEntry['name'] = $name;
+                    }
 
-                $previousLogs[] = $newLogEntry;
-                $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
-                $loggingModel->save();
-                // if ($name) {
-                //     $loggingModel['savedOutputs'][$name] = str($output)->trim();
-                // }
+                    $previousLogs[] = $newLogEntry;
+                    $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+                    $loggingModel->save();
+                }
             });
-            $loggingModel->update([
-                'current_process_id' => $process->id(),
-            ]);
-
+            if ($loggingModel) {
+                $loggingModel->update([
+                    'current_process_id' => $process->id(),
+                ]);
+            }
             $processResult = $process->wait();
             if ($processResult->exitCode() !== 0) {
                 if (!$ignoreErrors) {
-                    $status = ApplicationDeploymentStatus::FAILED->value;
-                    $loggingModel->status = $status;
-                    $loggingModel->save();
+                    if ($loggingModel) {
+                        $status = ApplicationDeploymentStatus::FAILED->value;
+                        $loggingModel->status = $status;
+                        $loggingModel->save();
+                    }
                     throw new \RuntimeException($processResult->errorOutput());
                 }
             }

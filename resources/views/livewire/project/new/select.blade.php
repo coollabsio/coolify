@@ -67,7 +67,7 @@
                             Based on a Docker Compose
                         </div>
                         <div class="description">
-                            You can deploy complex application easily with Docker Compose.
+                            You can deploy complex application easily with Docker Compose, without Git.
                         </div>
                     </div>
                 </div>
@@ -77,7 +77,7 @@
                             Based on an existing Docker Image
                         </div>
                         <div class="description">
-                            You can deploy an existing Docker Image form any Registry.
+                            You can deploy an existing Docker Image form any Registry, without Git.
                         </div>
                     </div>
                 </div>
