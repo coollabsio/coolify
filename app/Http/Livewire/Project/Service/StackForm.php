@@ -31,6 +31,7 @@ class StackForm extends Component
                     "name" => $fieldKey,
                     "value" => $value,
                     "isPassword" => $isPassword,
+                    "rules" => $rules
                 ];
                 $this->rules["fields.$key.value"] = $rules;
                 $this->validationAttributes["fields.$key.value"] = $fieldKey;

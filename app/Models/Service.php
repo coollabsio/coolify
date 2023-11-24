@@ -52,7 +52,7 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
-                case str($image)->contains('minio'):
+                case str($image)?->contains('minio'):
                     $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();
                     $s3_api_url = $this->environment_variables()->where('key', 'MINIO_SERVER_URL')->first();
@@ -105,7 +105,7 @@ class Service extends BaseModel
 
                     $fields->put('MinIO', $data->toArray());
                     break;
-                case str($image)->contains('weblate'):
+                case str($image)?->contains('weblate'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'WEBLATE_ADMIN_EMAIL')->first();
                     $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_WEBLATE')->first();
@@ -130,6 +130,67 @@ class Service extends BaseModel
                         ]);
                     }
                     $fields->put('Weblate', $data);
+                    break;
+                case str($image)?->contains('ghost'):
+                    $data = collect([]);
+                    $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
+                    $MAIL_OPTIONS_AUTH_USER = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_USER')->first();
+                    $MAIL_OPTIONS_SECURE = $this->environment_variables()->where('key', 'MAIL_OPTIONS_SECURE')->first();
+                    $MAIL_OPTIONS_PORT = $this->environment_variables()->where('key', 'MAIL_OPTIONS_PORT')->first();
+                    $MAIL_OPTIONS_SERVICE = $this->environment_variables()->where('key', 'MAIL_OPTIONS_SERVICE')->first();
+                    $MAIL_OPTIONS_HOST = $this->environment_variables()->where('key', 'MAIL_OPTIONS_HOST')->first();
+                    if ($MAIL_OPTIONS_AUTH_PASS) {
+                        $data = $data->merge([
+                            'Mail Password' => [
+                                'key' => data_get($MAIL_OPTIONS_AUTH_PASS, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_AUTH_PASS, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    if ($MAIL_OPTIONS_AUTH_USER) {
+                        $data = $data->merge([
+                            'Mail User' => [
+                                'key' => data_get($MAIL_OPTIONS_AUTH_USER, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_AUTH_USER, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($MAIL_OPTIONS_SECURE) {
+                        $data = $data->merge([
+                            'Mail Secure' => [
+                                'key' => data_get($MAIL_OPTIONS_SECURE, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_SECURE, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($MAIL_OPTIONS_PORT) {
+                        $data = $data->merge([
+                            'Mail Port' => [
+                                'key' => data_get($MAIL_OPTIONS_PORT, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_PORT, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($MAIL_OPTIONS_SERVICE) {
+                        $data = $data->merge([
+                            'Mail Service' => [
+                                'key' => data_get($MAIL_OPTIONS_SERVICE, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_SERVICE, 'value'),
+                            ],
+                        ]);
+                    }
+                    if ($MAIL_OPTIONS_HOST) {
+                        $data = $data->merge([
+                            'Mail Host' => [
+                                'key' => data_get($MAIL_OPTIONS_HOST, 'key'),
+                                'value' => data_get($MAIL_OPTIONS_HOST, 'value'),
+                            ],
+                        ]);
+                    }
+
+                    $fields->put('Ghost', $data);
+                    break;
             }
         }
         $databases = $this->databases()->get();

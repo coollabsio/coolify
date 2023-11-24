@@ -188,6 +188,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
                     $MINIO_SERVER_URL->value,
                 ]);
             }
+            break;
     }
     return $payload;
 }
