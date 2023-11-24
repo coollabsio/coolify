@@ -14,6 +14,12 @@ services:
       - database__connection__user=$SERVICE_USER_MYSQL
       - database__connection__password=$SERVICE_PASSWORD_MYSQL
       - database__connection__database=${MYSQL_DATABASE-ghost}
+      - mail__options__auth__pass=${MAIL_OPTIONS_AUTH_PASS}
+      - mail__options__auth__user=${MAIL_OPTIONS_AUTH_USER}
+      - mail__options__secure=${MAIL_OPTIONS_SECURE:-true}
+      - mail__options__port=${MAIL_OPTIONS_PORT:-465}
+      - mail__options__service=${MAIL_OPTIONS_SERVICE:-Mailgun}
+      - mail__options__host=${MAIL_OPTIONS_HOST}
     depends_on:
       mysql:
         condition: service_healthy
