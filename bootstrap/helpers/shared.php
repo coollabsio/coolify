@@ -1144,14 +1144,21 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($volume->contains(':')) {
                                 $name = $volume->before(':');
                                 $mount = $volume->after(':');
-                                $newName = $name . "-{$resource->uuid}-$pull_request_id";
+                                $newName = $resource->uuid . "-{$name}-pr-$pull_request_id";
                                 $volume = str("$newName:$mount");
                                 $topLevelVolumes->put($newName, [
                                     'name' => $newName,
                                 ]);
                             }
                         } else if (is_array($volume)) {
-                            $volume['source'] = str($volume['source'])->append("-{$resource->uuid}-$pull_request_id");
+                            $source = data_get($volume, 'source');
+                            if ($source) {
+                                $newSource = $resource->uuid . "-{$source}-pr-$pull_request_id";
+                                data_set($volume, 'source', $newSource);
+                                $topLevelVolumes->put($newSource, [
+                                    'name' => $newSource,
+                                ]);
+                            }
                         }
 
 
@@ -1159,6 +1166,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
+            } else {
+
             }
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
@@ -1202,7 +1211,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     if ($pull_request_id !== 0) {
                         $topLevelNetworks->put($network,  [
                             'name' => $network,
-                            'external' => false
+                            'external' => true
                         ]);
                     } else {
                         $topLevelNetworks->put($network,  [

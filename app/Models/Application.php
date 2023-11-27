@@ -48,10 +48,6 @@ class Application extends BaseModel
             $application->environment_variables_preview()->delete();
         });
     }
-    public function deployableComposeBuildPack()
-    {
-        return $this->build_pack === 'dockercompose' && $this->docker_compose_raw;
-    }
     public function link()
     {
         return route('project.application.configuration', [
@@ -262,7 +258,6 @@ class Application extends BaseModel
     {
         return $this->morphTo();
     }
-
     public function isDeploymentInprogress()
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'in_progress')->count();

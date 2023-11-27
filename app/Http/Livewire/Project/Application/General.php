@@ -152,6 +152,10 @@ class General extends Component
             $this->application->settings->is_static = $this->is_static = false;
             $this->application->settings->save();
         }
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->application->fqdn = null;
+            $this->application->settings->save();
+        }
         $this->submit();
     }
     public function checkLabelUpdates()

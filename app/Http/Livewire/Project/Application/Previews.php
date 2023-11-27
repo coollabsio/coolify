@@ -77,7 +77,7 @@ class Previews extends Component
                 $name = str_replace('/', '', $container['Names']);
                 instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
             }
-            ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();
+            ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first()->delete();
             $this->application->refresh();
         } catch (\Throwable $e) {
             return handleError($e, $this);

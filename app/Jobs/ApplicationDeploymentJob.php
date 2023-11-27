@@ -949,7 +949,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ];
         }
         if ($this->application->settings->is_gpu_enabled) {
-            ray('asd');
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
                 [
                     'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
