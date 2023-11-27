@@ -19,6 +19,7 @@ class Show extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.all');
             }
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

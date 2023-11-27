@@ -12,10 +12,16 @@ function get_proxy_path()
 }
 function connectProxyToNetworks(Server $server)
 {
-    // TODO: Connect to service + compose based application networks as well.
+    // TODO: Connect to compose based application networks as well.
+    // Standalone networks
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
-    })->unique();
+    });
+    // Service networks
+    foreach($server->services()->get() as $service) {
+        $networks->push($service->networks());
+    }
+    $networks = collect($networks)->flatten()->unique();
     if ($networks->count() === 0) {
         $networks = collect(['coolify']);
     }

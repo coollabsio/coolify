@@ -495,6 +495,89 @@ function removeAnsiColors($text)
     return preg_replace('/\e[[][A-Za-z0-9];?[0-9]*m?/', '', $text);
 }
 
+function getTopLevelNetworks(Service|Application $resource)
+{
+    if ($resource->getMorphClass() === 'App\Models\Service') {
+        if ($resource->docker_compose_raw) {
+            try {
+                $yaml = Yaml::parse($resource->docker_compose_raw);
+            } catch (\Exception $e) {
+                throw new \Exception($e->getMessage());
+            }
+            $services = data_get($yaml, 'services');
+            $topLevelNetworks = collect(data_get($yaml, 'networks', []));
+            $definedNetwork = collect([$resource->uuid]);
+            $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
+                $serviceNetworks = collect(data_get($service, 'networks', []));
+
+                // Collect/create/update networks
+                if ($serviceNetworks->count() > 0) {
+                    foreach ($serviceNetworks as $networkName => $networkDetails) {
+                        $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
+                            return $value == $networkName || $key == $networkName;
+                        });
+                        if (!$networkExists) {
+                            $topLevelNetworks->put($networkDetails, null);
+                        }
+                    }
+                }
+
+                $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
+                    return $value == $definedNetwork;
+                });
+                if (!$definedNetworkExists) {
+                    foreach ($definedNetwork as $network) {
+                        $topLevelNetworks->put($network,  [
+                            'name' => $network,
+                            'external' => true
+                        ]);
+                    }
+                }
+
+                return $service;
+            });
+            return $topLevelNetworks->keys();
+        }
+    } else if ($resource->getMorphClass() === 'App\Models\Application') {
+        try {
+            $yaml = Yaml::parse($resource->docker_compose_raw);
+        } catch (\Exception $e) {
+            throw new \Exception($e->getMessage());
+        }
+        $server = $resource->destination->server;
+        $topLevelNetworks = collect(data_get($yaml, 'networks', []));
+        $services = data_get($yaml, 'services');
+        $definedNetwork = collect([$resource->uuid]);
+        $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
+            $serviceNetworks = collect(data_get($service, 'networks', []));
+
+            // Collect/create/update networks
+            if ($serviceNetworks->count() > 0) {
+                foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
+                        return $value == $networkName || $key == $networkName;
+                    });
+                    if (!$networkExists) {
+                        $topLevelNetworks->put($networkDetails, null);
+                    }
+                }
+            }
+            $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
+                return $value == $definedNetwork;
+            });
+            if (!$definedNetworkExists) {
+                foreach ($definedNetwork as $network) {
+                    $topLevelNetworks->put($network,  [
+                        'name' => $network,
+                        'external' => true
+                    ]);
+                }
+            }
+            return $service;
+        });
+        return $topLevelNetworks->keys();
+    }
+}
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false)
 {
     ray()->clearAll();
@@ -1010,7 +1093,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
             $resource->save();
             $resource->saveComposeConfigs();
-            return collect([]);
+            return $finalServices;
         } else {
             return collect([]);
         }

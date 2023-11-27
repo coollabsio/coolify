@@ -442,4 +442,10 @@ class Service extends BaseModel
     {
         return parseDockerComposeFile($this, $isNew);
     }
+    public function networks()
+    {
+        $networks = getTopLevelNetworks($this);
+        // ray($networks);
+        return $networks;
+    }
 }
