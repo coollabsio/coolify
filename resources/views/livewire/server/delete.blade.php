@@ -22,7 +22,19 @@
         @endif
         @forelse ($server->definedResources() as $resource)
             @if ($loop->first)
-                <div class="text-warning">Please delete all resources before deleting this server.</div>
+            <h3 class="pt-4">Defined resources</h3>
+                <div class="pt-4 text-warning">Please delete all resources before deleting this server.</div>
+            @endif
+            <div class="flex gap-2">
+                <div class="w-64">{{ str($resource->type())->headline() }}</div>
+                <a class="text-white underline" href="{{ $resource->link() }}">{{ $resource->name }}</a>
+            </div>
+        @empty
+        @endforelse
+    @else
+        @forelse ($server->definedResources() as $resource)
+            @if ($loop->first)
+                <h3 class="pt-4">Defined resources</h3>
             @endif
             <div class="flex gap-2">
                 <div class="w-64">{{ str($resource->type())->headline() }}</div>
