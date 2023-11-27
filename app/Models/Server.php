@@ -194,6 +194,12 @@ class Server extends BaseModel
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
+    public function definedResources() {
+        $applications = $this->applications();
+        $databases = $this->databases();
+        $services = $this->services();
+        return $applications->concat($databases)->concat($services->get());
+    }
     public function hasDefinedResources()
     {
         $applications = $this->applications()->count() > 0;

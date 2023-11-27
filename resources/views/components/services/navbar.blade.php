@@ -1,6 +1,6 @@
 <div class="navbar-main">
-    <a class="{{ request()->routeIs('project.service') ? 'text-white' : '' }}"
-        href="{{ route('project.service', $parameters) }}">
+    <a class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+        href="{{ route('project.service.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
     <x-services.links />

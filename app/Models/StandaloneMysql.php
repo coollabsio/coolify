@@ -41,6 +41,14 @@ class StandaloneMysql extends BaseModel
             $database->environment_variables()->delete();
         });
     }
+    public function link()
+    {
+        return route('project.database.configuration', [
+            'project_uuid' => $this->environment->project->uuid,
+            'environment_name' => $this->environment->name,
+            'database_uuid' => $this->uuid
+        ]);
+    }
     public function type(): string
     {
         return 'standalone-mysql';

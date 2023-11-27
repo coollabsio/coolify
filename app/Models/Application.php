@@ -47,7 +47,14 @@ class Application extends BaseModel
             $application->environment_variables_preview()->delete();
         });
     }
-
+    public function link()
+    {
+        return route('project.application.configuration', [
+            'project_uuid' => $this->environment->project->uuid,
+            'environment_name' => $this->environment->name,
+            'application_uuid' => $this->uuid
+        ]);
+    }
     public function settings()
     {
         return $this->hasOne(ApplicationSetting::class);

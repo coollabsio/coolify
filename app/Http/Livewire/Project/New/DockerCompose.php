@@ -129,7 +129,7 @@ class DockerCompose extends Component
 
             $service->parse(isNew: true);
 
-            return redirect()->route('project.service', [
+            return redirect()->route('project.service.configuration', [
                 'service_uuid' => $service->uuid,
                 'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,

@@ -79,7 +79,7 @@
         @endforeach
         @foreach ($environment->services->sortBy('name') as $service)
             <a class="relative box group"
-                href="{{ route('project.service', [$project->uuid, $environment->name, $service->uuid]) }}">
+                href="{{ route('project.service.configuration', [$project->uuid, $environment->name, $service->uuid]) }}">
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">{{ $service->name }}</div>
                     <div class="description">{{ $service->description }}</div>

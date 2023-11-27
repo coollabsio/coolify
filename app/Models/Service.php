@@ -361,6 +361,14 @@ class Service extends BaseModel
             }
         }
     }
+    public function link()
+    {
+        return route('project.service.configuration', [
+            'project_uuid' => $this->environment->project->uuid,
+            'environment_name' => $this->environment->name,
+            'service_uuid' => $this->uuid
+        ]);
+    }
     public function documentation()
     {
         $services = getServiceTemplates();
