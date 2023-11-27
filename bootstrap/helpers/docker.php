@@ -192,7 +192,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled, $onlyPort = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');

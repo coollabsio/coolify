@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Application;
+use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
 use App\Models\InstanceSettings;
 use App\Models\LocalFileVolume;
@@ -578,7 +579,7 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
-function parseDockerComposeFile(Service|Application $resource, bool $isNew = false)
+function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id)
 {
     // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
@@ -1095,6 +1096,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         }
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
+        if ($pull_request_id !== 0) {
+            $topLevelVolumes = collect([]);
+        }
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
         $services = data_get($yaml, 'services');
@@ -1108,7 +1112,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
         }
         $definedNetwork = collect([$resource->uuid]);
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server) {
+        if ($pull_request_id !== 0) {
+            $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
+        }
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $server, $pull_request_id) {
             $serviceVolumes = collect(data_get($service, 'volumes', []));
             $servicePorts = collect(data_get($service, 'ports', []));
             $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -1127,17 +1134,40 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $serviceLabels->push("$removedLabelName=$removedLabel");
                 }
             }
+            $baseName = generateApplicationContainerName($resource, $pull_request_id);
+            $containerName = "$serviceName-$baseName";
+            if ($pull_request_id !== 0) {
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $pull_request_id, $topLevelVolumes) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':')) {
+                                $name = $volume->before(':');
+                                $mount = $volume->after(':');
+                                $newName = $name . "-{$resource->uuid}-$pull_request_id";
+                                $volume = str("$newName:$mount");
+                                $topLevelVolumes->put($newName, [
+                                    'name' => $newName,
+                                ]);
+                            }
+                        } else if (is_array($volume)) {
+                            $volume['source'] = str($volume['source'])->append("-{$resource->uuid}-$pull_request_id");
+                        }
 
-            $containerName = "$serviceName-{$resource->uuid}";
 
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
+            }
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
-            $image = data_get_str($service, 'image');
             data_set($service, 'is_database', $isDatabase);
 
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
+                    ray($networkDetails);
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
@@ -1169,10 +1199,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             });
             if (!$definedNetworkExists) {
                 foreach ($definedNetwork as $network) {
-                    $topLevelNetworks->put($network,  [
-                        'name' => $network,
-                        'external' => true
-                    ]);
+                    if ($pull_request_id !== 0) {
+                        $topLevelNetworks->put($network,  [
+                            'name' => $network,
+                            'external' => false
+                        ]);
+                    } else {
+                        $topLevelNetworks->put($network,  [
+                            'name' => $network,
+                            'external' => true
+                        ]);
+                    }
                 }
             }
             $networks = collect();
@@ -1368,12 +1405,29 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $fqdns = data_get($domains, "$serviceName.domain");
                     if ($fqdns) {
                         $fqdns = str($fqdns)->explode(',');
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true));
+                        $uuid = new Cuid2(7);
+                        if ($pull_request_id !== 0) {
+                            $fqdns = $fqdns->map(function ($fqdn) use ($pull_request_id, $resource) {
+                                $preview = ApplicationPreview::findPreviewByApplicationAndPullId($resource->id, $pull_request_id);
+                                $url = Url::fromString($fqdn);
+                                $template = $resource->preview_url_template;
+                                $host = $url->getHost();
+                                $schema = $url->getScheme();
+                                $random = new Cuid2(7);
+                                $preview_fqdn = str_replace('{{random}}', $random, $template);
+                                $preview_fqdn = str_replace('{{domain}}', $host, $preview_fqdn);
+                                $preview_fqdn = str_replace('{{pr_id}}', $pull_request_id, $preview_fqdn);
+                                $preview_fqdn = "$schema://$preview_fqdn";
+                                $preview->fqdn = $preview_fqdn;
+                                $preview->save();
+                                return $preview_fqdn;
+                            });
+                        }
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns));
                     }
                 }
             }
-            $defaultLabels = defaultLabels($resource->id, $containerName, type: 'application');
-
+            $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
             if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
@@ -1392,6 +1446,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             data_set($service, 'container_name', $containerName);
             data_forget($service, 'volumes.*.content');
             data_forget($service, 'volumes.*.isDirectory');
+
             return $service;
         });
         $finalServices = [

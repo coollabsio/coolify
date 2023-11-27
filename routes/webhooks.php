@@ -225,13 +225,9 @@ Route::post('/source/github/events/manual', function () {
                 return response("Nothing to do. No applications found with branch '$base_branch'.");
             }
         }
-        ray($applications);
         foreach ($applications as $application) {
-            ray($application);
             $webhook_secret = data_get($application, 'manual_webhook_secret_github');
-            ray($webhook_secret);
             $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
-            ray($hmac, $x_hub_signature_256);
             if (!hash_equals($x_hub_signature_256, $hmac)) {
                 ray('Invalid signature');
                 continue;
@@ -324,7 +320,6 @@ Route::post('/source/github/events', function () {
 
         $webhook_secret = data_get($github_app, 'webhook_secret');
         $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
-        ray($hmac, $x_hub_signature_256)->blue();
         if (config('app.env') !== 'local') {
             if (!hash_equals($x_hub_signature_256, $hmac)) {
                 return response('not cool');
@@ -661,12 +656,10 @@ Route::post('/payments/paddle/events', function () {
         $h1 = Str::of($signature)->after('h1=');
         $signedPayload = $ts->value . ':' . request()->getContent();
         $verify = hash_hmac('sha256', $signedPayload, config('subscription.paddle_webhook_secret'));
-        ray($verify, $h1->value, hash_equals($verify, $h1->value));
         if (!hash_equals($verify, $h1->value)) {
             return response('Invalid signature.', 400);
         }
         $eventType = data_get($payload, 'event_type');
-        ray($eventType);
         $webhook = Webhook::create([
             'type' => 'paddle',
             'payload' => $payload,

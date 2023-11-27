@@ -72,9 +72,11 @@ class Previews extends Component
     public function stop(int $pull_request_id)
     {
         try {
-            $container_name = generateApplicationContainerName($this->application, $pull_request_id);
-
-            instant_remote_process(["docker rm -f $container_name"], $this->application->destination->server, throwError: false);
+            $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id, $pull_request_id);
+            foreach ($containers as $container) {
+                $name = str_replace('/', '', $container['Names']);
+                instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
+            }
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->delete();
             $this->application->refresh();
         } catch (\Throwable $e) {

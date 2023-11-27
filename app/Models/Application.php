@@ -589,10 +589,10 @@ class Application extends BaseModel
         ]);
         return $commands;
     }
-    function parseCompose()
+    function parseCompose(int $pull_request_id = 0)
     {
         if ($this->docker_compose_raw) {
-            return parseDockerComposeFile($this);
+            return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
         } else {
             return collect([]);
         }

@@ -393,9 +393,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function save_environment_variables()
     {
         $envs = collect([]);
-        foreach ($this->application->environment_variables as $env) {
-            $envs->push($env->key . '=' . $env->value);
+        if ($this->pull_request_id !== 0) {
+            foreach ($this->application->environment_variables_preview as $env) {
+                $envs->push($env->key . '=' . $env->value);
+            }
+        } else {
+            foreach ($this->application->environment_variables as $env) {
+                $envs->push($env->key . '=' . $env->value);
+            }
         }
+        ray($envs);
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
@@ -446,7 +453,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (data_get($this->application, 'docker_compose_location')) {
             $this->docker_compose_location = $this->application->docker_compose_location;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
+        if ($this->pull_request_id === 0) {
+            $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
+        } else {
+            ray('asd');
+            $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
+        }
         $this->server->executeRemoteCommand(
             commands: $this->application->prepareHelperImage($this->deployment_uuid),
             loggingModel: $this->application_deployment_queue
@@ -455,19 +467,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->clone_repository();
         $this->generate_image_names();
         $this->cleanup_git();
-        $composeFile = $this->application->parseCompose();
+        $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
         $yaml = Yaml::dump($composeFile->toArray(), 10);
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yaml"), "hidden" => true
         ]);
-        $this->execute_remote_command([
-            "docker network create --attachable '{$this->application->uuid}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
-        ], [
-            "docker network connect {$this->application->uuid} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
-        ]);
         $this->save_environment_variables();
         $this->stop_running_container(force: true);
+
+        $networkId = $this->application->uuid;
+        if ($this->pull_request_id !== 0) {
+            $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
+        }
+        $this->execute_remote_command([
+            "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+        ], [
+            "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
+        ]);
         $this->start_by_compose_file();
         $this->application->loadComposeFile(isInit: false);
     }
@@ -750,6 +767,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $importCommands = $this->generate_git_import_commands();
         $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
         $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
+        if ($this->pull_request_id !== 0) {
+            $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
+        }
         $this->execute_remote_command(
             [
                 $importCommands, "hidden" => true
@@ -1171,11 +1191,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->addLogEntry("Removing old containers.");
         if ($this->newVersionIsHealthy || $force) {
             $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-            if ($this->pull_request_id !== 0) {
-                $containers = $containers->filter(function ($container) {
-                    return data_get($container, 'Names') === $this->container_name;
-                });
-            } else {
+            if ($this->pull_request_id === 0) {
                 $containers = $containers->filter(function ($container) {
                     return data_get($container, 'Names') !== $this->container_name;
                 });

@@ -24,13 +24,16 @@
                     helper="Allow Git LFS during build process." />
             @endif
             <form wire:submit.prevent="submit">
-                <div class="flex gap-2">
-                    <x-forms.checkbox helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='text-white underline' target='_blank'>here</a>." instantSave
-                        id="application.settings.is_gpu_enabled" label="GPU Enabled Application" />
-                    @if ($application->settings->is_gpu_enabled)
-                        <x-forms.button type="submiot">Save</x-forms.button>
-                    @endif
-                </div>
+                @if ($application->build_pack !== 'dockercompose')
+                    <div class="flex gap-2">
+                        <x-forms.checkbox
+                            helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='text-white underline' target='_blank'>here</a>."
+                            instantSave id="application.settings.is_gpu_enabled" label="GPU Enabled Application" />
+                        @if ($application->settings->is_gpu_enabled)
+                            <x-forms.button type="submiot">Save</x-forms.button>
+                        @endif
+                    </div>
+                @endif
                 @if ($application->settings->is_gpu_enabled)
                     <div class="flex flex-col w-full gap-2 p-2 xl:flex-row">
                         <x-forms.input label="GPU Driver" id="application.settings.gpu_driver"> </x-forms.input>

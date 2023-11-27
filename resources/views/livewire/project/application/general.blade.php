@@ -47,6 +47,24 @@
                                 helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
                         </div>
                     @endif
+                    @if ($application->build_pack === 'dockercompose')
+                        @if (count($parsedServices) > 0)
+                            @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
+                                @if (!isDatabaseImage(data_get($service, 'image')))
+                                    <div class="flex items-end gap-2">
+                                        <x-forms.input
+                                            helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
+                                            label="Domains for {{ str($serviceName)->headline() }}"
+                                            id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
+                                        @if (!data_get($parsedServiceDomains, "$serviceName.domain"))
+                                            <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
+                                                Domain</x-forms.button>
+                                        @endif
+                                    </div>
+                                @endif
+                            @endforeach
+                        @endif
+                    @endif
                 </div>
             @endif
             @if ($application->build_pack !== 'dockerimage' && $application->build_pack !== 'dockercompose')
@@ -119,24 +137,9 @@
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
-                @if (count($parsedServices) > 0)
-                    @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
-                        @if (!isDatabaseImage(data_get($service, 'image')))
-                            <div class="flex items-end gap-2">
-                                <x-forms.input
-                                    helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
-                                    label="Domains for {{ str($serviceName)->headline() }}"
-                                    id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
-                                @if (!data_get($parsedServiceDomains, "$serviceName.domain"))
-                                    <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
-                                        Domain</x-forms.button>
-                                @endif
-                            </div>
-                        @endif
-                    @endforeach
-                @endif
-                <x-forms.textarea rows="20" readonly id="application.docker_compose"
-                    label="Docker Compose Content" />
+
+                <x-forms.textarea rows="10" readonly id="application.docker_compose" label="Docker Compose Content"
+                    helper="You need to modify the docker compose file." />
             @endif
 
             @if ($application->dockerfile)
