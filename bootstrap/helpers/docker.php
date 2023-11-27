@@ -274,3 +274,18 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     }
     return $labels->all();
 }
+
+function isDatabaseImage(string $image)
+{
+    $image = str($image);
+    if ($image->contains(':')) {
+        $image = str($image);
+    } else {
+        $image = str($image)->append(':latest');
+    }
+    $imageName = $image->before(':');
+    if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
+        return true;
+    }
+    return false;
+}

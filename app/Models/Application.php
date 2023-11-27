@@ -8,6 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\Yaml\Yaml;
+use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
@@ -46,6 +47,10 @@ class Application extends BaseModel
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
         });
+    }
+    public function deployableComposeBuildPack()
+    {
+        return $this->build_pack === 'dockercompose' && $this->docker_compose_raw;
     }
     public function link()
     {
@@ -590,6 +595,44 @@ class Application extends BaseModel
             return parseDockerComposeFile($this);
         } else {
             return collect([]);
+        }
+    }
+    function loadComposeFile($isInit = false)
+    {
+        $initialDockerComposeLocation = $this->docker_compose_location;
+        if ($this->build_pack === 'dockercompose') {
+            if ($isInit && $this->docker_compose_raw) {
+                return;
+            }
+            $uuid = new Cuid2();
+            ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+            $workdir = rtrim($this->base_directory, '/');
+            $composeFile = $this->docker_compose_location;
+            $commands = collect([
+                "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
+                $cloneCommand,
+                "git sparse-checkout init --cone",
+                "git sparse-checkout set .$workdir$composeFile",
+                "git read-tree -mu HEAD",
+                "cat .$workdir$composeFile",
+            ]);
+            $composeFileContent = instant_remote_process($commands, $this->destination->server, false);
+            if (!$composeFileContent) {
+                $this->docker_compose_location = $initialDockerComposeLocation;
+                $this->save();
+                throw new \Exception("Could not load compose file from $workdir$composeFile");
+            } else {
+                $this->docker_compose_raw = $composeFileContent;
+                $this->save();
+            }
+            $commands = collect([
+                "rm -rf /tmp/{$uuid}",
+            ]);
+            instant_remote_process($commands, $this->destination->server, false);
+            return [
+                'parsedServices' => $this->parseCompose(),
+                'initialDockerComposeLocation' => $this->docker_compose_location
+            ];
         }
     }
 }

@@ -9,7 +9,8 @@ class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
 
-    public function getOutput($name) {
+    public function getOutput($name)
+    {
         if (!$this->logs) {
             return null;
         }
@@ -21,9 +22,13 @@ class ApplicationDeploymentQueue extends Model
         if ($type === 'error') {
             $type = 'stderr';
         }
+        $message = str($message)->trim();
+        if ($message->startsWith('╔')) {
+            $message = "\n" . $message;
+        }
         $newLogEntry = [
             'command' => null,
-            'output' => $message,
+            'output' => remove_iip($message),
             'type' => $type,
             'timestamp' => Carbon::now('UTC'),
             'hidden' => $hidden,

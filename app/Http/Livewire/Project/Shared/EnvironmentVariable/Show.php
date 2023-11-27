@@ -59,6 +59,7 @@ class Show extends Component
     {
         $this->validate();
         $this->env->save();
+        ray($this->env);
         $this->emit('success', 'Environment variable updated successfully.');
         $this->emit('refreshEnvs');
     }

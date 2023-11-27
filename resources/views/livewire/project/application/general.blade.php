@@ -32,7 +32,6 @@
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>
                             <option value="dockercompose">Docker Compose</option>
-                            {{-- <option value="dockerimage">Docker Image</option> --}}
                         </x-forms.select>
                         @if ($application->settings->is_static || $application->build_pack === 'static')
                             <x-forms.select id="application.static_image" label="Static Image" required>
@@ -122,9 +121,17 @@
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
                 @if (count($parsedServices) > 0)
                     @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
-                        @if (!collect(DATABASE_DOCKER_IMAGES)->contains(data_get($service, 'image')))
-                            <x-forms.input  helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " label="Domains for {{ str($serviceName)->headline() }}"
-                                id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
+                        @if (!isDatabaseImage(data_get($service, 'image')))
+                            <div class="flex items-end gap-2">
+                                <x-forms.input
+                                    helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. "
+                                    label="Domains for {{ str($serviceName)->headline() }}"
+                                    id="parsedServiceDomains.{{ $serviceName }}.domain"></x-forms.input>
+                                @if (!data_get($parsedServiceDomains, "$serviceName.domain"))
+                                    <x-forms.button wire:click="generateDomain('{{ $serviceName }}')">Generate
+                                        Domain</x-forms.button>
+                                @endif
+                            </div>
                         @endif
                     @endforeach
                 @endif

@@ -26,6 +26,8 @@ class General extends Component
     public bool $labelsChanged = false;
     public bool $isConfigurationChanged = false;
 
+    public ?string $initialDockerComposeLocation = null;
+
     public bool $is_static;
 
     public $parsedServices = [];
@@ -109,6 +111,7 @@ class General extends Component
         } else {
             $this->customLabels = str($this->application->custom_labels)->replace(',', "\n");
         }
+        $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
     public function instantSave()
@@ -118,35 +121,30 @@ class General extends Component
     }
     public function loadComposeFile($isInit = false)
     {
-        if ($isInit && $this->application->docker_compose_raw) {
-            return;
-        }
-        $uuid = new Cuid2();
-        ['commands' => $cloneCommand] = $this->application->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
-        $workdir = rtrim($this->application->base_directory, '/');
-        $composeFile = $this->application->docker_compose_location;
-        $commands = collect([
-            "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
-            $cloneCommand,
-            "git sparse-checkout init --cone",
-            "git sparse-checkout set .$workdir$composeFile",
-            "git read-tree -mu HEAD",
-            "cat .$workdir$composeFile",
-        ]);
-        $composeFileContent = instant_remote_process($commands, $this->application->destination->server, false);
-        if (!$composeFileContent) {
-            $this->emit('error', "Could not load compose file from $workdir$composeFile");
-            return;
-        } else {
-            $this->application->docker_compose_raw = $composeFileContent;
+        try {
+            if ($isInit && $this->application->docker_compose_raw) {
+                return;
+            }
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
+            $this->emit('success', 'Docker compose file loaded.');
+        } catch (\Throwable $e) {
+            $this->application->docker_compose_location = $this->initialDockerComposeLocation;
             $this->application->save();
+            return handleError($e, $this);
         }
-        $commands = collect([
-            "rm -rf /tmp/{$uuid}",
-        ]);
-        instant_remote_process($commands, $this->application->destination->server, false);
-        $this->parsedServices = $this->application->parseCompose();
-        $this->emit('success', 'Compose file loaded.');
+    }
+    public function generateDomain(string $serviceName)
+    {
+        $domain = $this->parsedServiceDomains[$serviceName]['domain'] ?? null;
+        if (!$domain) {
+            $uuid = new Cuid2(7);
+            $domain = generateFqdn($this->application->destination->server, $uuid);
+            $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
+            $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+            $this->application->save();
+            $this->emit('success', 'Domain generated.');
+        }
+        return $domain;
     }
     public function updatedApplicationBuildPack()
     {
@@ -190,6 +188,9 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
+            if ($this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
+                $this->loadComposeFile();
+            }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {
                 $this->resetDefaultLabels(false);

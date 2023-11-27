@@ -16,22 +16,43 @@
                 </li>
             @endif
             @if (data_get($application, 'fqdn'))
-                @foreach (Str::of(data_get($application, 'fqdn'))->explode(',') as $fqdn)
-                    <li>
-                        <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
-                            target="_blank" href="{{ getFqdnWithoutPort($fqdn) }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M9 15l6 -6" />
-                                <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
-                                <path
-                                    d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
-                            </svg>{{ getFqdnWithoutPort($fqdn) }}
-                        </a>
-                    </li>
-                @endforeach
+                @if (data_get($application, 'build_pack') === 'dockercompose')
+                    @foreach (collect(json_decode($this->application->docker_compose_domains)) as $fqdn)
+                        @if (data_get($fqdn, 'domain'))
+                            <li>
+                                <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
+                                    target="_blank" href="{{ getFqdnWithoutPort(data_get($fqdn, 'domain')) }}">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                        stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M9 15l6 -6" />
+                                        <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
+                                        <path
+                                            d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
+                                    </svg>{{ getFqdnWithoutPort(data_get($fqdn, 'domain')) }}
+                                </a>
+                            </li>
+                        @endif
+                    @endforeach
+                @else
+                    @foreach (Str::of(data_get($application, 'fqdn'))->explode(',') as $fqdn)
+                        <li>
+                            <a class="text-xs text-white rounded-none hover:no-underline hover:bg-coollabs hover:text-white"
+                                target="_blank" href="{{ getFqdnWithoutPort($fqdn) }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24"
+                                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M9 15l6 -6" />
+                                    <path d="M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464" />
+                                    <path
+                                        d="M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463" />
+                                </svg>{{ getFqdnWithoutPort($fqdn) }}
+                            </a>
+                        </li>
+                    @endforeach
+                @endif
             @endif
             @if (data_get($application, 'previews', collect([]))->count() > 0)
                 @foreach (data_get($application, 'previews') as $preview)

@@ -76,7 +76,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $docker_compose_location = '/docker-compose.yml';
     private ?string $addHosts = null;
     private ?string $buildTarget = null;
-    private $log_model;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
 
@@ -93,9 +92,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        // ray()->clearScreen();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
-        $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
 
@@ -187,7 +184,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
         try {
-            ray($this->application->build_pack);
             if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
                 if ($this->server->isProxyShouldRun()) {
@@ -451,7 +447,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->docker_compose_location = $this->application->docker_compose_location;
         }
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
-
         $this->server->executeRemoteCommand(
             commands: $this->application->prepareHelperImage($this->deployment_uuid),
             loggingModel: $this->application_deployment_queue
@@ -474,6 +469,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->save_environment_variables();
         $this->stop_running_container(force: true);
         $this->start_by_compose_file();
+        $this->application->loadComposeFile(isInit: false);
     }
     private function deploy_dockerfile_buildpack()
     {
@@ -752,14 +748,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function clone_repository()
     {
         $importCommands = $this->generate_git_import_commands();
-        ray($importCommands);
+        $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
+        $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
         $this->execute_remote_command(
-            [
-                "echo '\n----------------------------------------'",
-            ],
-            [
-                "echo -n 'Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}. '"
-            ],
             [
                 $importCommands, "hidden" => true
             ]
@@ -768,7 +759,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_git_import_commands()
     {
-
         ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands($this->deployment_uuid, $this->pull_request_id, $this->git_type);
         return $commands;
     }
@@ -1178,10 +1168,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function stop_running_container(bool $force = false)
     {
-        $this->execute_remote_command(["echo -n 'Removing old container.'"]);
+        $this->application_deployment_queue->addLogEntry("Removing old containers.");
         if ($this->newVersionIsHealthy || $force) {
             $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-            ray($containers);
             if ($this->pull_request_id !== 0) {
                 $containers = $containers->filter(function ($container) {
                     return data_get($container, 'Names') === $this->container_name;
@@ -1197,14 +1186,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             });
-            $this->execute_remote_command(
-                [
-                    "echo 'Rolling update completed.'"
-                ],
-            );
+            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
         } else {
+            $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
             $this->execute_remote_command(
-                ["echo -n 'New container is not healthy, rolling back to the old container.'"],
                 [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
             );
         }
@@ -1213,8 +1198,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         if ($this->application->build_pack === 'dockerimage') {
+            $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
-                ["echo -n 'Pulling latest images from the registry.'"],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );

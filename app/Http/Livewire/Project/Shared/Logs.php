@@ -17,13 +17,15 @@ class Logs extends Component
     public ?string $type = null;
     public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource;
     public Server $server;
-    public ?string $container = null;
+    public $container = [];
+    public $containers;
     public $parameters;
     public $query;
     public $status;
 
     public function mount()
     {
+        $this->containers = collect();
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         if (data_get($this->parameters, 'application_uuid')) {
@@ -33,7 +35,9 @@ class Logs extends Component
             $this->server = $this->resource->destination->server;
             $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
             if ($containers->count() > 0) {
-                $this->container = data_get($containers[0], 'Names');
+                $containers->each(function ($container) {
+                    $this->containers->push(str_replace('/', '', $container['Names']));
+                });
             }
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';

@@ -91,7 +91,6 @@ class MultipleApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        // ray()->clearScreen();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
         $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);

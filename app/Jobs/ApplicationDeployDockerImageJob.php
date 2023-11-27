@@ -30,7 +30,7 @@ class ApplicationDeployDockerImageJob implements ShouldQueue, ShouldBeEncrypted
     }
     public function handle()
     {
-        ray()->clearAll();
+        // ray()->clearAll();
         ray('Deploying Docker Image');
         static::$batch_counter = 0;
         try {

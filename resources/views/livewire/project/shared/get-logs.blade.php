@@ -1,6 +1,6 @@
 <div x-init="$wire.getLogs">
     <div class="flex gap-2">
-        <h2>Logs</h2>
+        <h4>Container: {{$container}}</h4>
         @if ($streamLogs)
             <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
         @endif
@@ -13,7 +13,7 @@
         <x-forms.input label="Only Show Number of Lines" placeholder="1000" required id="numberOfLines"></x-forms.input>
         <x-forms.button type="submit">Refresh</x-forms.button>
     </form>
-    <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'container w-full pt-4 mx-auto'">
+    <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'container w-full py-4 mx-auto'">
         <div class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
             :class="fullscreen ? '' : 'max-h-[40rem] border border-solid rounded'">
             <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg

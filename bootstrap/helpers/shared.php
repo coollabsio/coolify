@@ -580,7 +580,7 @@ function getTopLevelNetworks(Service|Application $resource)
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false)
 {
-    ray()->clearAll();
+    // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
             try {
@@ -627,18 +627,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $containerName = "$serviceName-{$resource->uuid}";
 
                 // Decide if the service is a database
-                $isDatabase = false;
+                $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
                 $image = data_get_str($service, 'image');
-                if ($image->contains(':')) {
-                    $image = Str::of($image);
-                } else {
-                    $image = Str::of($image)->append(':latest');
-                }
-                $imageName = $image->before(':');
-
-                if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
-                    $isDatabase = true;
-                }
                 data_set($service, 'is_database', $isDatabase);
 
                 // Create new serviceApplication or serviceDatabase
@@ -1093,7 +1083,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
             $resource->save();
             $resource->saveComposeConfigs();
-            return $finalServices;
+            return collect($finalServices);
         } else {
             return collect([]);
         }
@@ -1141,18 +1131,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $containerName = "$serviceName-{$resource->uuid}";
 
             // Decide if the service is a database
-            $isDatabase = false;
+            $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
             $image = data_get_str($service, 'image');
-            if ($image->contains(':')) {
-                $image = Str::of($image);
-            } else {
-                $image = Str::of($image)->append(':latest');
-            }
-            $imageName = $image->before(':');
-
-            if (collect(DATABASE_DOCKER_IMAGES)->contains($imageName)) {
-                $isDatabase = true;
-            }
             data_set($service, 'is_database', $isDatabase);
 
             // Collect/create/update networks
@@ -1367,14 +1347,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
+                        $isBuildTime = data_get($foundEnv, 'is_build_time', false);
                         EnvironmentVariable::updateOrCreate([
-                            'key' => $key,
+                            'key' => $key->value(),
                             'application_id' => $resource->id,
                         ], [
                             'value' => $defaultValue,
-                            'is_build_time' => false,
-                            'service_id' => $resource->id,
-                            'is_preview' => false,
+                            'is_build_time' => $isBuildTime,
+                            'application_id' => $resource->id,
                         ]);
                     }
                 }

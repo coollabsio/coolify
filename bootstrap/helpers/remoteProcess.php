@@ -151,6 +151,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     if (is_null($application_deployment_queue)) {
         return collect([]);
     }
+    // ray(data_get($application_deployment_queue, 'logs'));
     try {
         $decoded = json_decode(
             data_get($application_deployment_queue, 'logs'),
@@ -160,6 +161,7 @@ function decode_remote_command_output(?ApplicationDeploymentQueue $application_d
     } catch (\JsonException $exception) {
         return collect([]);
     }
+    // ray($decoded );
     $formatted = collect($decoded);
     if (!$is_debug_enabled) {
         $formatted = $formatted->filter(fn ($i) => $i['hidden'] === false ?? false);
