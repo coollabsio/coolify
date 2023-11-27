@@ -456,7 +456,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id === 0) {
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
         } else {
-            ray('asd');
             $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         }
         $this->server->executeRemoteCommand(

@@ -36,10 +36,6 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     if ($running_deployments->count() > 0) {
         return;
     }
-    // New deployment
-    // dispatchDeploymentJob($deployment);
-
-    // Old deployment
     dispatch(new ApplicationDeploymentJob(
         application_deployment_queue_id: $deployment->id,
     ))->onConnection('long-running')->onQueue('long-running');
@@ -50,39 +46,11 @@ function queue_next_deployment(Application $application)
 {
     $next_found = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->first();
     if ($next_found) {
-        // New deployment
-        // dispatchDeploymentJob($next_found->id);
-
-        // Old deployment
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $next_found->id,
         ))->onConnection('long-running')->onQueue('long-running');
     }
 }
-function dispatchDeploymentJob(ApplicationDeploymentQueue $deploymentQueueEntry)
-{
-    $application = Application::find($deploymentQueueEntry->application_id);
-
-    $isRestartOnly = data_get($deploymentQueueEntry, 'restart_only');
-    $isSimpleDockerFile = data_get($application, 'dockerfile');
-    $isDockerImage = data_get($application, 'build_pack') === 'dockerimage';
-
-    // if ($isRestartOnly) {
-    //     ApplicationRestartJob::dispatch(queue: $deploymentQueueEntry, application: $application)->onConnection('long-running')->onQueue('long-running');
-    // } else if ($isSimpleDockerFile) {
-    //     ApplicationDeploySimpleDockerfileJob::dispatch(applicationDeploymentQueueId: $id)->onConnection('long-running')->onQueue('long-running');
-    // } else
-
-    if ($isDockerImage) {
-        ApplicationDeployDockerImageJob::dispatch(
-            deploymentQueueEntry: $deploymentQueueEntry,
-            application: $application
-        )->onConnection('long-running')->onQueue('long-running');
-    } else {
-        throw new Exception('Unknown build pack');
-    }
-}
-
 // Deployment things
 function generateHostIpMapping(Server $server, string $network)
 {

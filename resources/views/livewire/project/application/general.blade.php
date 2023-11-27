@@ -116,9 +116,12 @@
                     @endif
                     @if ($application->build_pack === 'dockercompose')
                         <span wire:init='loadComposeFile(true)'></span>
-                        <x-forms.input placeholder="/docker-compose.yml" id="application.docker_compose_location"
+                        <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
                             label="Docker Compose Location"
                             helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
+                            <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
+                            label="Docker Compose Location For Pull Requests"
+                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" />
                     @endif
                     @if ($application->build_pack === 'dockerfile')
                         <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target"

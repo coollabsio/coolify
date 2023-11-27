@@ -1089,11 +1089,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             return collect([]);
         }
     } else if ($resource->getMorphClass() === 'App\Models\Application') {
-        try {
-            $yaml = Yaml::parse($resource->docker_compose_raw);
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
+        if ($pull_request_id !== 0 && $resource->dockerComposePrLocation() !== $resource->dockerComposeLocation()) {
+
+        } else {
+            try {
+                $yaml = Yaml::parse($resource->docker_compose_raw);
+            } catch (\Exception $e) {
+                throw new \Exception($e->getMessage());
+            }
         }
+
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
         if ($pull_request_id !== 0) {

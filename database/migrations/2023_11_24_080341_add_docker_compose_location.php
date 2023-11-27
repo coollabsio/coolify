@@ -12,11 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('applications', function (Blueprint $table) {
-            $table->string('docker_compose_location')->nullable()->default('/docker-compose.yml')->after('dockerfile_location');
-            $table->longText('docker_compose')->nullable()->after('docker_compose_location');
-            $table->longText('docker_compose_raw')->nullable()->after('docker_compose');
-            $table->text('docker_compose_domains')->nullable()->after('docker_compose_raw');
+            $table->string('docker_compose_location')->nullable()->default('/docker-compose.yaml')->after('dockerfile_location');
+            $table->string('docker_compose_pr_location')->nullable()->default('/docker-compose-pr.yaml')->after('docker_compose_location');
 
+            $table->longText('docker_compose')->nullable()->after('docker_compose_location');
+            $table->longText('docker_compose_pr')->nullable()->after('docker_compose_location');
+            $table->longText('docker_compose_raw')->nullable()->after('docker_compose');
+            $table->longText('docker_compose_pr_raw')->nullable()->after('docker_compose');
+
+            $table->text('docker_compose_domains')->nullable()->after('docker_compose_raw');
         });
     }
 
@@ -27,8 +31,11 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->dropColumn('docker_compose_location');
+            $table->dropColumn('docker_compose_pr_location');
             $table->dropColumn('docker_compose');
+            $table->dropColumn('docker_compose_pr');
             $table->dropColumn('docker_compose_raw');
+            $table->dropColumn('docker_compose_pr_raw');
             $table->dropColumn('docker_compose_domains');
         });
     }

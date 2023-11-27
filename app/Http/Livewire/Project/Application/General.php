@@ -27,6 +27,7 @@ class General extends Component
     public bool $isConfigurationChanged = false;
 
     public ?string $initialDockerComposeLocation = null;
+    public ?string $initialDockerComposePrLocation = null;
 
     public bool $is_static;
 
@@ -57,6 +58,7 @@ class General extends Component
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
         'application.docker_compose_location' => 'nullable',
+        'application.docker_compose_pr_location' => 'nullable',
         'application.docker_compose' => 'nullable',
         'application.docker_compose_raw' => 'nullable',
         'application.custom_labels' => 'nullable',
@@ -84,6 +86,7 @@ class General extends Component
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
         'application.docker_compose_location' => 'Docker compose location',
+        'application.docker_compose_pr_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
         'application.docker_compose_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
@@ -125,10 +128,11 @@ class General extends Component
             if ($isInit && $this->application->docker_compose_raw) {
                 return;
             }
-            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation] = $this->application->loadComposeFile($isInit);
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
             $this->emit('success', 'Docker compose file loaded.');
         } catch (\Throwable $e) {
             $this->application->docker_compose_location = $this->initialDockerComposeLocation;
+            $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
             $this->application->save();
             return handleError($e, $this);
         }
