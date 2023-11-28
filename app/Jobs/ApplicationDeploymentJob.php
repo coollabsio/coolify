@@ -657,8 +657,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->generate_compose_file();
         // Needs separate preview variables
-        // $this->generate_build_env_variables();
-        // $this->add_build_env_variables_to_dockerfile();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
         $this->stop_running_container();
         $this->execute_remote_command(
@@ -810,7 +810,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build --cache-key '{$this->application->uuid}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        $cacheKey = $this->application->uuid;
+        if ($this->pull_request_id !== 0) {
+            $cacheKey = "{$this->application->uuid}-pr-{$this->pull_request_id}";
+        }
+        $nixpacks_command = "nixpacks build --cache-key '{$cacheKey}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -1246,10 +1250,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile'
         ]);
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
-
-        foreach ($this->application->build_environment_variables as $env) {
-            $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->build_environment_variables as $env) {
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+            }
+        } else {
+            foreach ($this->application->build_environment_variables_preview as $env) {
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+            }
         }
+        ray($dockerfile->implode("\n"));
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),
