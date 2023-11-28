@@ -27,7 +27,7 @@
             </x-forms.select>
             <div class="w-64">
                 <x-forms.checkbox type="checkbox" id="is_part_of_swarm"
-                    label="Is it part of a Swarm cluster?" />
+                    label="Is it a Swarm Manager?" />
             </div>
             <x-forms.button type="submit">
                 Save New Server

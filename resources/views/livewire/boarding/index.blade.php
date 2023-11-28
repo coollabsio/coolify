@@ -209,7 +209,7 @@
                         </div>
                         <div class="w-64">
                             <x-forms.checkbox type="checkbox" id="isPartOfSwarm"
-                                label="Is it part of a Swarm cluster?" />
+                                label="Is it a Swarm Manager?" />
                         </div>
                         <x-forms.button type="submit">Check Connection</x-forms.button>
                     </form>

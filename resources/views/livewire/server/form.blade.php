@@ -55,7 +55,7 @@
                         id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                 @endif
                 <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_part_of_swarm"
-                    label="Is it part of a Swarm cluster?" />
+                    label="Is it a Swarm Manager?" />
             </div>
         </div>
 
