@@ -18,6 +18,7 @@ use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
+use Stringable;
 
 class Server extends BaseModel
 {
@@ -333,7 +334,7 @@ class Server extends BaseModel
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
-    public function validateOS(): bool | Str
+    public function validateOS(): bool | Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
         $datas = collect(explode("\n", $os_release));
