@@ -579,7 +579,7 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
-function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id, bool $is_pr = false)
+function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
     // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
@@ -921,22 +921,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'service_id' => $resource->id,
                         ])->first();
                         if ($value->startsWith('SERVICE_')) {
-                            // Count _ in $value
-                            $count = substr_count($value->value(), '_');
-                            if ($count === 2) {
-                                // SERVICE_FQDN_UMAMI
-                                $command = $value->after('SERVICE_')->beforeLast('_');
-                                $forService = $value->afterLast('_');
-                                $generatedValue = null;
-                                $port = null;
-                            }
-                            if ($count === 3) {
-                                // SERVICE_FQDN_UMAMI_1000
-                                $command = $value->after('SERVICE_')->before('_');
-                                $forService = $value->after('SERVICE_')->after('_')->before('_');
-                                $generatedValue = null;
-                                $port = $value->afterLast('_');
-                            }
+                            ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
                                     $fqdn = generateFqdn($resource->server, $containerName);
@@ -967,27 +952,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                 }
                             } else {
-                                switch ($command) {
-                                    case 'PASSWORD':
-                                        $generatedValue = Str::password(symbols: false);
-                                        break;
-                                    case 'PASSWORD_64':
-                                        $generatedValue = Str::password(length: 64, symbols: false);
-                                        break;
-                                    case 'BASE64_64':
-                                        $generatedValue = Str::random(64);
-                                        break;
-                                    case 'BASE64_128':
-                                        $generatedValue = Str::random(128);
-                                        break;
-                                    case 'BASE64':
-                                        $generatedValue = Str::random(32);
-                                        break;
-                                    case 'USER':
-                                        $generatedValue = Str::random(16);
-                                        break;
-                                }
-
+                                $generatedValue = generateEnvValue($command);
                                 if (!$foundEnv) {
                                     EnvironmentVariable::create([
                                         'key' => $key,
@@ -1272,7 +1237,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $key = Str::of($variableName);
                     $value = Str::of($variable);
                 }
-                // TODO: here is the problem
                 if ($key->startsWith('SERVICE_FQDN')) {
                     if ($isNew) {
                         $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
@@ -1315,22 +1279,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         'application_id' => $resource->id,
                     ])->first();
                     if ($value->startsWith('SERVICE_')) {
-                        // Count _ in $value
-                        $count = substr_count($value->value(), '_');
-                        if ($count === 2) {
-                            // SERVICE_FQDN_UMAMI
-                            $command = $value->after('SERVICE_')->beforeLast('_');
-                            $forService = $value->afterLast('_');
-                            $generatedValue = null;
-                            $port = null;
-                        }
-                        if ($count === 3) {
-                            // SERVICE_FQDN_UMAMI_1000
-                            $command = $value->after('SERVICE_')->before('_');
-                            $forService = $value->after('SERVICE_')->after('_')->before('_');
-                            $generatedValue = null;
-                            $port = $value->afterLast('_');
-                        }
+                        ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if ($command->value() === 'FQDN' || $command->value() === 'URL') {
                             if (Str::lower($forService) === $serviceName) {
                                 $fqdn = generateFqdn($server, $containerName);
@@ -1355,27 +1304,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]);
                             }
                         } else {
-                            switch ($command) {
-                                case 'PASSWORD':
-                                    $generatedValue = Str::password(symbols: false);
-                                    break;
-                                case 'PASSWORD_64':
-                                    $generatedValue = Str::password(length: 64, symbols: false);
-                                    break;
-                                case 'BASE64_64':
-                                    $generatedValue = Str::random(64);
-                                    break;
-                                case 'BASE64_128':
-                                    $generatedValue = Str::random(128);
-                                    break;
-                                case 'BASE64':
-                                    $generatedValue = Str::random(32);
-                                    break;
-                                case 'USER':
-                                    $generatedValue = Str::random(16);
-                                    break;
-                            }
-
+                            $generatedValue = generateEnvValue($command);
                             if (!$foundEnv) {
                                 EnvironmentVariable::create([
                                     'key' => $key,
@@ -1494,4 +1423,66 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
         $resource->save();
         return collect($finalServices);
     }
+}
+
+function parseEnvVariable(Str|string $value)
+{
+    $value = str($value);
+    $count = substr_count($value->value(), '_');
+    $command = null;
+    $forService = null;
+    $generatedValue = null;
+    $port = null;
+
+    if ($count === 2) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+            $forService = $value->afterLast('_');
+        } else {
+            // SERVICE_BASE64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+    if ($count === 3) {
+        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+            // SERVICE_FQDN_UMAMI_1000
+            $command = $value->after('SERVICE_')->before('_');
+            $forService = $value->after('SERVICE_')->after('_')->before('_');
+            $port = $value->afterLast('_');
+        } else {
+            // SERVICE_BASE64_64_UMAMI
+            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+    }
+    return [
+        'command' => $command,
+        'forService' => $forService,
+        'generatedValue' => $generatedValue,
+        'port' => $port,
+    ];
+}
+function generateEnvValue(string $command)
+{
+    switch ($command) {
+        case 'PASSWORD':
+            $generatedValue = Str::password(symbols: false);
+            break;
+        case 'PASSWORD_64':
+            $generatedValue = Str::password(length: 64, symbols: false);
+            break;
+        case 'BASE64_64':
+            $generatedValue = Str::random(64);
+            break;
+        case 'BASE64_128':
+            $generatedValue = Str::random(128);
+            break;
+        case 'BASE64':
+            $generatedValue = Str::random(32);
+            break;
+        case 'USER':
+            $generatedValue = Str::random(16);
+            break;
+    }
+    return $generatedValue;
 }

@@ -67,7 +67,7 @@ class ProjectController extends Controller
                 $database = create_standalone_mongodb($environment->id, $destination_uuid);
             } else if ($type->value() === 'mysql') {
                 $database = create_standalone_mysql($environment->id, $destination_uuid);
-            }else if ($type->value() === 'mariadb') {
+            } else if ($type->value() === 'mariadb') {
                 $database = create_standalone_mariadb($environment->id, $destination_uuid);
             }
             return redirect()->route('project.database.configuration', [
@@ -104,27 +104,7 @@ class ProjectController extends Controller
                         $generatedValue = $value;
                         if ($value->contains('SERVICE_')) {
                             $command = $value->after('SERVICE_')->beforeLast('_');
-                            // TODO: make it shared with Service.php
-                            switch ($command->value()) {
-                                case 'PASSWORD':
-                                    $generatedValue = Str::password(symbols: false);
-                                    break;
-                                case 'PASSWORD_64':
-                                    $generatedValue = Str::password(length: 64, symbols: false);
-                                    break;
-                                case 'BASE64_64':
-                                    $generatedValue = Str::random(64);
-                                    break;
-                                case 'BASE64_128':
-                                    $generatedValue = Str::random(128);
-                                    break;
-                                case 'BASE64':
-                                    $generatedValue = Str::random(32);
-                                    break;
-                                case 'USER':
-                                    $generatedValue = Str::random(16);
-                                    break;
-                            }
+                            $generatedValue = generateEnvValue($command->value());
                         }
                         EnvironmentVariable::create([
                             'key' => $key,

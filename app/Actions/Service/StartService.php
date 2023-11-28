@@ -16,13 +16,13 @@ class StartService
         $commands[] = "cd " . $service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
         $commands[] = "echo 'Creating Docker network.'";
-        $commands[] = "docker network create --attachable '{$service->uuid}' >/dev/null || true";
+        $commands[] = "docker network create --attachable '{$service->uuid}' >/dev/null 2>&1 || true";
         $commands[] = "echo 'Starting service {$service->name} on {$service->server->name}.'";
         $commands[] = "echo 'Pulling images.'";
         $commands[] = "docker compose pull";
         $commands[] = "echo 'Starting containers.'";
         $commands[] = "docker compose up -d --remove-orphans --force-recreate";
-        $commands[] = "docker network connect $service->uuid coolify-proxy || true";
+        $commands[] = "docker network connect $service->uuid coolify-proxy >/dev/null 2>&1 || true";
         $compose = data_get($service,'docker_compose',[]);
         $serviceNames = data_get(Yaml::parse($compose),'services',[]);
         foreach($serviceNames as $serviceName => $serviceConfig){
