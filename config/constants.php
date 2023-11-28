@@ -26,9 +26,9 @@ return [
         'server' => [
             'zero' => 0,
             'self-hosted' => 999999999999,
-            'basic' => 1,
-            'pro' => 10,
-            'ultimate' => 25,
+            'basic' => env('LIMIT_SERVER_BASIC', 2),
+            'pro' => env('LIMIT_SERVER_PRO', 10),
+            'ultimate' => env('LIMIT_SERVER_ULTIMATE', 25),
         ],
         'email' => [
             'zero' => true,

@@ -20,7 +20,7 @@
             <a :class="activeTab === 'server' && 'text-white'"
                 @click.prevent="activeTab = 'server'; window.location.hash = 'server'" href="#">Server
             </a>
-            @if ($application->build_pack !== 'static')
+            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
                 <a :class="activeTab === 'storages' && 'text-white'"
                     @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
                 </a>
@@ -34,7 +34,7 @@
                     Deployments
                 </a>
             @endif
-            @if ($application->build_pack !== 'static')
+            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
                 <a :class="activeTab === 'health' && 'text-white'"
                     @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Healthchecks
                 </a>
@@ -42,10 +42,12 @@
             <a :class="activeTab === 'rollback' && 'text-white'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
-            <a :class="activeTab === 'resource-limits' && 'text-white'"
-                @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
-                href="#">Resource Limits
-            </a>
+            @if ($application->build_pack !== 'dockercompose')
+                <a :class="activeTab === 'resource-limits' && 'text-white'"
+                    @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
+                    href="#">Resource Limits
+                </a>
+            @endif
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>

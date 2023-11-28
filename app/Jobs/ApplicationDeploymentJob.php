@@ -73,9 +73,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $docker_compose;
     private $docker_compose_base64;
     private string $dockerfile_location = '/Dockerfile';
+    private string $docker_compose_location = '/docker-compose.yml';
     private ?string $addHosts = null;
     private ?string $buildTarget = null;
-    private $log_model;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
 
@@ -92,9 +92,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     public $tries = 1;
     public function __construct(int $application_deployment_queue_id)
     {
-        // ray()->clearScreen();
         $this->application_deployment_queue = ApplicationDeploymentQueue::find($application_deployment_queue_id);
-        $this->log_model = $this->application_deployment_queue;
         $this->application = Application::find($this->application_deployment_queue->application_id);
         $this->build_pack = data_get($this->application, 'build_pack');
 
@@ -114,7 +112,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
-        $this->basedir = "/artifacts/{$this->deployment_uuid}";
+        $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
         $this->workdir = "{$this->basedir}" . rtrim($this->application->base_directory, '/');
         $this->configuration_dir = application_configuration_dir() . "/{$this->application->uuid}";
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
@@ -183,15 +181,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
 
         // Check custom port
-        preg_match('/(?<=:)\d+(?=\/)/', $this->application->git_repository, $matches);
-        if (count($matches) === 1) {
-            $this->customPort = $matches[0];
-            $gitHost = str($this->application->git_repository)->before(':');
-            $gitRepo = str($this->application->git_repository)->after('/');
-            $this->customRepository = "$gitHost:$gitRepo";
-        } else {
-            $this->customRepository = $this->application->git_repository;
-        }
+        ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
+
         try {
             if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
@@ -203,6 +194,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 return;
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
+            } else if ($this->application->build_pack === 'dockercompose') {
+                $this->deploy_docker_compose_buildpack();
             } else if ($this->application->build_pack === 'dockerimage') {
                 $this->deploy_dockerimage_buildpack();
             } else if ($this->application->build_pack === 'dockerfile') {
@@ -397,19 +390,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]);
         }
     }
-    // private function save_environment_variables()
-    // {
-    //     $envs = collect([]);
-    //     foreach ($this->application->environment_variables as $env) {
-    //         $envs->push($env->key . '=' . $env->value);
-    //     }
-    //     $envs_base64 = base64_encode($envs->implode("\n"));
-    //     $this->execute_remote_command(
-    //         [
-    //             executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
-    //         ],
-    //     );
-    // }
+    private function save_environment_variables()
+    {
+        $envs = collect([]);
+        if ($this->pull_request_id !== 0) {
+            foreach ($this->application->environment_variables_preview as $env) {
+                $envs->push($env->key . '=' . $env->value);
+            }
+        } else {
+            foreach ($this->application->environment_variables as $env) {
+                $envs->push($env->key . '=' . $env->value);
+            }
+        }
+        ray($envs);
+        $envs_base64 = base64_encode($envs->implode("\n"));
+        $this->execute_remote_command(
+            [
+                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d > $this->workdir/.env")
+            ],
+        );
+    }
+
     private function deploy_simple_dockerfile()
     {
         $dockerfile_base64 = base64_encode($this->application->dockerfile);
@@ -447,7 +448,45 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_compose_file();
         $this->rolling_update();
     }
+    private function deploy_docker_compose_buildpack()
+    {
+        if (data_get($this->application, 'docker_compose_location')) {
+            $this->docker_compose_location = $this->application->docker_compose_location;
+        }
+        if ($this->pull_request_id === 0) {
+            $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
+        } else {
+            $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
+        }
+        $this->server->executeRemoteCommand(
+            commands: $this->application->prepareHelperImage($this->deployment_uuid),
+            loggingModel: $this->application_deployment_queue
+        );
+        $this->check_git_if_build_needed();
+        $this->clone_repository();
+        $this->generate_image_names();
+        $this->cleanup_git();
+        $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+        $yaml = Yaml::dump($composeFile->toArray(), 10);
+        $this->docker_compose_base64 = base64_encode($yaml);
+        $this->execute_remote_command([
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yaml"), "hidden" => true
+        ]);
+        $this->save_environment_variables();
+        $this->stop_running_container(force: true);
 
+        $networkId = $this->application->uuid;
+        if ($this->pull_request_id !== 0) {
+            $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
+        }
+        $this->execute_remote_command([
+            "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+        ], [
+            "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
+        ]);
+        $this->start_by_compose_file();
+        $this->application->loadComposeFile(isInit: false);
+    }
     private function deploy_dockerfile_buildpack()
     {
         if (data_get($this->application, 'dockerfile_location')) {
@@ -472,7 +511,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //     $this->push_to_docker_registry();
         //     $this->deploy_to_additional_destinations();
         // } else {
-            $this->rolling_update();
+        $this->rolling_update();
         // }
     }
     private function deploy_nixpacks_buildpack()
@@ -618,8 +657,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         $this->generate_compose_file();
         // Needs separate preview variables
-        // $this->generate_build_env_variables();
-        // $this->add_build_env_variables_to_dockerfile();
+        $this->generate_build_env_variables();
+        $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
         $this->stop_running_container();
         $this->execute_remote_command(
@@ -725,13 +764,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function clone_repository()
     {
         $importCommands = $this->generate_git_import_commands();
+        $this->application_deployment_queue->addLogEntry("\n----------------------------------------");
+        $this->application_deployment_queue->addLogEntry("Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}.");
+        if ($this->pull_request_id !== 0) {
+            $this->application_deployment_queue->addLogEntry("Checking out tag pull/{$this->pull_request_id}/head.");
+        }
         $this->execute_remote_command(
-            [
-                "echo '\n----------------------------------------'",
-            ],
-            [
-                "echo -n 'Importing {$this->customRepository}:{$this->application->git_branch} (commit sha {$this->application->git_commit_sha}) to {$this->basedir}. '"
-            ],
             [
                 $importCommands, "hidden" => true
             ]
@@ -740,90 +778,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_git_import_commands()
     {
-        $this->branch = $this->application->git_branch;
-        $commands = collect([]);
-        $git_clone_command = "git clone -q -b {$this->application->git_branch}";
-        if ($this->pull_request_id !== 0) {
-            $pr_branch_name = "pr-{$this->pull_request_id}-coolify";
-        }
-
-        if ($this->application->deploymentType() === 'source') {
-            $source_html_url = data_get($this->application, 'source.html_url');
-            $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
-            $source_html_url_host = $url['host'];
-            $source_html_url_scheme = $url['scheme'];
-
-            if ($this->source->getMorphClass() == 'App\Models\GithubApp') {
-                if ($this->source->is_public) {
-                    $this->fullRepoUrl = "{$this->source->html_url}/{$this->customRepository}";
-                    $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$this->customRepository} {$this->basedir}";
-                    $git_clone_command = $this->set_git_import_settings($git_clone_command);
-
-                    $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
-                } else {
-                    $github_access_token = generate_github_installation_token($this->source);
-                    $commands->push(executeInDocker($this->deployment_uuid, "git clone -q -b {$this->application->git_branch} $source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->customRepository}.git {$this->basedir}"));
-                    $this->fullRepoUrl = "$source_html_url_scheme://x-access-token:$github_access_token@$source_html_url_host/{$this->customRepository}.git";
-                }
-                if ($this->pull_request_id !== 0) {
-                    $this->branch = "pull/{$this->pull_request_id}/head:$pr_branch_name";
-                    $commands->push(executeInDocker($this->deployment_uuid, "cd {$this->basedir} && git fetch origin $this->branch && git checkout $pr_branch_name"));
-                }
-                return $commands->implode(' && ');
-            }
-        }
-        if ($this->application->deploymentType() === 'deploy_key') {
-            $this->fullRepoUrl = $this->customRepository;
-            $private_key = data_get($this->application, 'private_key.private_key');
-            if (is_null($private_key)) {
-                throw new RuntimeException('Private key not found. Please add a private key to the application and try again.');
-            }
-            $private_key = base64_encode($private_key);
-            $git_clone_command_base = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$this->customRepository} {$this->basedir}";
-            $git_clone_command = $this->set_git_import_settings($git_clone_command_base);
-            $commands = collect([
-                executeInDocker($this->deployment_uuid, "mkdir -p /root/.ssh"),
-                executeInDocker($this->deployment_uuid, "echo '{$private_key}' | base64 -d > /root/.ssh/id_rsa"),
-                executeInDocker($this->deployment_uuid, "chmod 600 /root/.ssh/id_rsa"),
-            ]);
-            if ($this->pull_request_id !== 0) {
-                ray($this->git_type);
-                if ($this->git_type === 'gitlab') {
-                    $this->branch = "merge-requests/{$this->pull_request_id}/head:$pr_branch_name";
-                    $commands->push(executeInDocker($this->deployment_uuid, "echo 'Checking out $this->branch'"));
-                    $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $this->branch && git checkout $pr_branch_name";
-                }
-                if ($this->git_type === 'github') {
-                    $this->branch = "pull/{$this->pull_request_id}/head:$pr_branch_name";
-                    $commands->push(executeInDocker($this->deployment_uuid, "echo 'Checking out $this->branch'"));
-                    $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$this->customPort} -o Port={$this->customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $this->branch && git checkout $pr_branch_name";
-                }
-            }
-
-            $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
-            return $commands->implode(' && ');
-        }
-        if ($this->application->deploymentType() === 'other') {
-            $this->fullRepoUrl = $this->customRepository;
-            $git_clone_command = "{$git_clone_command} {$this->customRepository} {$this->basedir}";
-            $git_clone_command = $this->set_git_import_settings($git_clone_command);
-            $commands->push(executeInDocker($this->deployment_uuid, $git_clone_command));
-            return $commands->implode(' && ');
-        }
+        ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands($this->deployment_uuid, $this->pull_request_id, $this->git_type);
+        return $commands;
     }
 
     private function set_git_import_settings($git_clone_command)
     {
-        if ($this->application->git_commit_sha !== 'HEAD') {
-            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git -c advice.detachedHead=false checkout {$this->application->git_commit_sha} >/dev/null 2>&1";
-        }
-        if ($this->application->settings->is_git_submodules_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git submodule update --init --recursive";
-        }
-        if ($this->application->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$this->basedir} && git lfs pull";
-        }
-        return $git_clone_command;
+        return $this->application->setGitImportSettings($this->deployment_uuid, $git_clone_command);
     }
 
     private function cleanup_git()
@@ -849,7 +810,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $nixpacks_command = "nixpacks build --cache-key '{$this->application->uuid}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        $cacheKey = $this->application->uuid;
+        if ($this->pull_request_id !== 0) {
+            $cacheKey = "{$this->application->uuid}-pr-{$this->pull_request_id}";
+        }
+        $nixpacks_command = "nixpacks build --cache-key '{$cacheKey}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -879,6 +844,26 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_args = $this->env_args->implode(' ');
     }
 
+    private function modify_compose_file()
+    {
+        // ray("{$this->workdir}{$this->docker_compose_location}");
+        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->docker_compose_location}"), "hidden" => true, "save" => 'compose_file']);
+        if ($this->saved_outputs->get('compose_file')) {
+            $compose = $this->saved_outputs->get('compose_file');
+        }
+        try {
+            $yaml = Yaml::parse($compose);
+        } catch (\Exception $e) {
+            throw new \Exception($e->getMessage());
+        }
+        $services = data_get($yaml, 'services');
+        $topLevelNetworks = collect(data_get($yaml, 'networks', []));
+        $definedNetwork = collect([$this->application->uuid]);
+
+        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelNetworks, $definedNetwork) {
+            $serviceNetworks = collect(data_get($service, 'networks', []));
+        });
+    }
     private function generate_compose_file()
     {
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
@@ -967,7 +952,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ];
         }
         if ($this->application->settings->is_gpu_enabled) {
-            ray('asd');
             $docker_compose['services'][$this->container_name]['deploy']['resources']['reservations']['devices'] = [
                 [
                     'driver' => data_get($this->application, 'settings.gpu_driver', 'nvidia'),
@@ -1206,14 +1190,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function stop_running_container(bool $force = false)
     {
-        $this->execute_remote_command(["echo -n 'Removing old container.'"]);
+        $this->application_deployment_queue->addLogEntry("Removing old containers.");
         if ($this->newVersionIsHealthy || $force) {
             $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
-            if ($this->pull_request_id !== 0) {
-                $containers = $containers->filter(function ($container) {
-                    return data_get($container, 'Names') === $this->container_name;
-                });
-            } else {
+            if ($this->pull_request_id === 0) {
                 $containers = $containers->filter(function ($container) {
                     return data_get($container, 'Names') !== $this->container_name;
                 });
@@ -1224,14 +1204,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             });
-            $this->execute_remote_command(
-                [
-                    "echo 'Rolling update completed.'"
-                ],
-            );
+            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
         } else {
+            $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
             $this->execute_remote_command(
-                ["echo -n 'New container is not healthy, rolling back to the old container.'"],
                 [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
             );
         }
@@ -1240,8 +1216,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     private function start_by_compose_file()
     {
         if ($this->application->build_pack === 'dockerimage') {
+            $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
-                ["echo -n 'Pulling latest images from the registry.'"],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
@@ -1274,10 +1250,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile'
         ]);
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
-
-        foreach ($this->application->build_environment_variables as $env) {
-            $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->build_environment_variables as $env) {
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+            }
+        } else {
+            foreach ($this->application->build_environment_variables_preview as $env) {
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+            }
         }
+        ray($dockerfile->implode("\n"));
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),

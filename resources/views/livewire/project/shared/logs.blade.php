@@ -3,7 +3,14 @@
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
         <div class="pt-4">
-            <livewire:project.shared.get-logs :server="$server" :container="$container" />
+            @forelse ($containers as $container)
+                @if ($loop->first)
+                    <h2 class="pb-4">Logs</h2>
+                @endif
+                <livewire:project.shared.get-logs :server="$server" :container="$container" />
+            @empty
+                <div>No containers are not running.</div>
+            @endforelse
         </div>
     @elseif ($type === 'database')
         <h1>Logs</h1>

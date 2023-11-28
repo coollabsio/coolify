@@ -48,6 +48,14 @@ class StandaloneMongodb extends BaseModel
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
+    public function link()
+    {
+        return route('project.database.configuration', [
+            'project_uuid' => $this->environment->project->uuid,
+            'environment_name' => $this->environment->name,
+            'database_uuid' => $this->uuid
+        ]);
+    }
     public function mongoInitdbRootPassword(): Attribute
     {
         return Attribute::make(

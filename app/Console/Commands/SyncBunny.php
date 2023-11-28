@@ -71,6 +71,15 @@ class SyncBunny extends Command
             ]);
         });
         try {
+            if (!$only_template && !$only_version) {
+                $this->info('About to sync files (docker-compose.prod.yaml, upgrade.sh, install.sh, etc) to BunnyCDN.');
+            }
+            if ($only_template) {
+                $this->info('About to sync service-templates.json to BunnyCDN.');
+            }
+            if ($only_version) {
+                $this->info('About to sync versions.json to BunnyCDN.');
+            }
             $confirmed = confirm('Are you sure you want to sync?');
             if (!$confirmed) {
                 return;

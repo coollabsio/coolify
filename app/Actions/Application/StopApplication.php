@@ -25,5 +25,15 @@ class StopApplication
             // TODO: make notification for application
             // $application->environment->project->team->notify(new StatusChanged($application));
         }
+        // Delete Preview Deployments
+        $previewDeployments = $application->previews;
+        foreach ($previewDeployments as $previewDeployment) {
+            $containers = getCurrentApplicationContainerStatus($server, $application->id, $previewDeployment->pull_request_id);
+            foreach ($containers as $container) {
+                $name = str_replace('/', '', $container['Names']);
+                instant_remote_process(["docker rm -f $name"], $application->destination->server, throwError: false);
+            }
+        }
+
     }
 }

@@ -15,7 +15,7 @@ class InstallDocker
         if (!$supported_os_type) {
             throw new \Exception('Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/servers#install-docker-engine-manually">documentation</a>.');
         }
-        ray('Installing Docker on server: ' . $server->name . ' (' . $server->ip . ')' . ' with OS: ' . $supported_os_type);
+        ray('Installing Docker on server: ' . $server->name . ' (' . $server->ip . ')' . ' with OS type: ' . $supported_os_type);
         $dockerVersion = '24.0';
         $config = base64_encode('{
             "log-driver": "json-file",
@@ -44,17 +44,23 @@ class InstallDocker
                 "ls -l /tmp"
             ]);
         } else {
-            if ($supported_os_type === 'debian') {
+            if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || apt-get update",
-                    "command -v jq >/dev/null || apt install -y jq",
+                    "command -v jq >/dev/null || apt-get update -y",
+                    "command -v jq >/dev/null || apt install -y curl wget git jq",
 
                 ]);
-            } else if ($supported_os_type === 'rhel') {
+            } else if ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || dnf install -y jq",
+                    "command -v jq >/dev/null || dnf install -y curl wget git jq",
+                ]);
+            } else if ($supported_os_type->contains('sles')) {
+                $command = $command->merge([
+                    "echo 'Installing Prerequisites...'",
+                    "command -v jq >/dev/null || zypper update -y",
+                    "command -v jq >/dev/null || zypper install -y curl wget git jq",
                 ]);
             } else {
                 throw new \Exception('Unsupported OS');

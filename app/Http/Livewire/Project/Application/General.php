@@ -6,6 +6,7 @@ use App\Models\Application;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Component;
+use Visus\Cuid2\Cuid2;
 
 class General extends Component
 {
@@ -25,7 +26,13 @@ class General extends Component
     public bool $labelsChanged = false;
     public bool $isConfigurationChanged = false;
 
+    public ?string $initialDockerComposeLocation = null;
+    public ?string $initialDockerComposePrLocation = null;
+
     public bool $is_static;
+
+    public $parsedServices = [];
+    public $parsedServiceDomains = [];
 
     protected $listeners = [
         'resetDefaultLabels'
@@ -50,6 +57,12 @@ class General extends Component
         'application.docker_registry_image_name' => 'nullable',
         'application.docker_registry_image_tag' => 'nullable',
         'application.dockerfile_location' => 'nullable',
+        'application.docker_compose_location' => 'nullable',
+        'application.docker_compose_pr_location' => 'nullable',
+        'application.docker_compose' => 'nullable',
+        'application.docker_compose_pr' => 'nullable',
+        'application.docker_compose_raw' => 'nullable',
+        'application.docker_compose_pr_raw' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
@@ -74,6 +87,12 @@ class General extends Component
         'application.docker_registry_image_name' => 'Docker registry image name',
         'application.docker_registry_image_tag' => 'Docker registry image tag',
         'application.dockerfile_location' => 'Dockerfile location',
+        'application.docker_compose_location' => 'Docker compose location',
+        'application.docker_compose_pr_location' => 'Docker compose location',
+        'application.docker_compose' => 'Docker compose',
+        'application.docker_compose_pr' => 'Docker compose',
+        'application.docker_compose_raw' => 'Docker compose raw',
+        'application.docker_compose_pr_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.settings.is_static' => 'Is static',
@@ -81,6 +100,13 @@ class General extends Component
 
     public function mount()
     {
+        try {
+            $this->parsedServices = $this->application->parseCompose();
+        } catch (\Throwable $e) {
+            $this->emit('error', $e->getMessage());
+        }
+        $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
+
         $this->ports_exposes = $this->application->ports_exposes;
         if (str($this->application->status)->startsWith('running') && is_null($this->application->config_hash)) {
             $this->application->isConfigurationChanged(true);
@@ -91,6 +117,7 @@ class General extends Component
         } else {
             $this->customLabels = str($this->application->custom_labels)->replace(',', "\n");
         }
+        $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
     public function instantSave()
@@ -98,10 +125,42 @@ class General extends Component
         $this->application->settings->save();
         $this->emit('success', 'Settings saved.');
     }
+    public function loadComposeFile($isInit = false)
+    {
+        try {
+            if ($isInit && $this->application->docker_compose_raw) {
+                return;
+            }
+            ['parsedServices' => $this->parsedServices, 'initialDockerComposeLocation' => $this->initialDockerComposeLocation, 'initialDockerComposePrLocation' => $this->initialDockerComposePrLocation] = $this->application->loadComposeFile($isInit);
+            $this->emit('success', 'Docker compose file loaded.');
+        } catch (\Throwable $e) {
+            $this->application->docker_compose_location = $this->initialDockerComposeLocation;
+            $this->application->docker_compose_pr_location = $this->initialDockerComposePrLocation;
+            $this->application->save();
+            return handleError($e, $this);
+        }
+    }
+    public function generateDomain(string $serviceName)
+    {
+        $domain = $this->parsedServiceDomains[$serviceName]['domain'] ?? null;
+        if (!$domain) {
+            $uuid = new Cuid2(7);
+            $domain = generateFqdn($this->application->destination->server, $uuid);
+            $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
+            $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+            $this->application->save();
+            $this->emit('success', 'Domain generated.');
+        }
+        return $domain;
+    }
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = $this->is_static = false;
+            $this->application->settings->save();
+        }
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->application->fqdn = null;
             $this->application->settings->save();
         }
         $this->submit();
@@ -140,6 +199,9 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
+            if ($this->application->build_pack === 'dockercompose' && ($this->initialDockerComposeLocation !== $this->application->docker_compose_location || $this->initialDockerComposePrLocation !== $this->application->docker_compose_pr_location)) {
+                $this->loadComposeFile();
+            }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {
                 $this->resetDefaultLabels(false);
@@ -172,6 +234,10 @@ class General extends Component
                 $this->customLabels = str($this->customLabels)->replace(',', "\n");
             }
             $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+                $this->parsedServices = $this->application->parseCompose();
+            }
             $this->application->save();
             $showToaster && $this->emit('success', 'Application settings updated!');
         } catch (\Throwable $e) {

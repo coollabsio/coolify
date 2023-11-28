@@ -67,7 +67,7 @@
                             Based on a Docker Compose
                         </div>
                         <div class="description">
-                            You can deploy complex application easily with Docker Compose.
+                            You can deploy complex application easily with Docker Compose, without Git.
                         </div>
                     </div>
                 </div>
@@ -77,7 +77,7 @@
                             Based on an existing Docker Image
                         </div>
                         <div class="description">
-                            You can deploy an existing Docker Image form any Registry.
+                            You can deploy an existing Docker Image form any Registry, without Git.
                         </div>
                     </div>
                 </div>
@@ -145,9 +145,9 @@
                     </div>
                 </div> --}}
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-2" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
-                <x-forms.button wire:click='loadServices(true)'>Reload Services List</x-forms.button>
+                <x-forms.button wire:click='loadServices'>Reload Services List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
                     wire:model.debounce.200ms="search" placeholder="Search..."></input>

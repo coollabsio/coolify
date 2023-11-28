@@ -35,17 +35,13 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         return $this->server->id;
     }
 
-    public function handle(): void
+    public function handle()
     {
         // ray("checking container statuses for {$this->server->id}");
         try {
             if (!$this->server->isServerReady()) {
                 return;
             };
-            $containers = instant_remote_process(["docker container ls -q"], $this->server);
-            if (!$containers) {
-                return;
-            }
             $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server);
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
@@ -167,7 +163,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $url = null;
                 }
-                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
                 $exitedService->update(['status' => 'exited']);
             }
 
@@ -194,7 +190,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $url = null;
                 }
 
-                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
             foreach ($notRunningApplicationPreviews as $previewId) {
@@ -219,7 +215,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $url = null;
                 }
 
-                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
             $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
             foreach ($notRunningDatabases as $database) {
@@ -243,7 +239,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $url = null;
                 }
-                $this->server->team->notify(new ContainerStopped($containerName, $this->server, $url));
+                $this->server->team?->notify(new ContainerStopped($containerName, $this->server, $url));
             }
 
             // Check if proxy is running
@@ -256,7 +252,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $shouldStart = CheckProxy::run($this->server);
                     if ($shouldStart) {
                         StartProxy::run($this->server, false);
-                        $this->server->team->notify(new ContainerRestarted('coolify-proxy', $this->server));
+                        $this->server->team?->notify(new ContainerRestarted('coolify-proxy', $this->server));
                     } else {
                         ray('Proxy could not be started.');
                     }
@@ -272,7 +268,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification("ContainerStatusJob failed on ({$this->server->id}) with: " . $e->getMessage());
             ray($e->getMessage());
-            handleError($e);
+            return handleError($e);
         }
     }
 }

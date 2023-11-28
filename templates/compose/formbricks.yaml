@@ -1,0 +1,60 @@
+# documentation: https://formbricks.com/docs/self-hosting/docker
+# slogan: Open Source Experience Management
+# tags: form, builder, forms, open source, experience, management, self-hosted, docker
+
+services:
+  formbricks:
+    image: formbricks/formbricks:latest
+    environment:
+      - SERVICE_FQDN_FORMBRICKS
+      - WEBAPP_URL=$SERVICE_FQDN_FORMBRICKS
+      - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgresql:5432/${POSTGRESQL_DATABASE:-formbricks}
+      - NEXTAUTH_SECRET=$SERVICE_BASE64_64_NEXTAUTH
+      - NEXTAUTH_URL=$SERVICE_FQDN_FORMBRICKS
+      - ENCRYPTION_KEY=$SERVICE_BASE64_64_ENCRYPTION
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - MAIL_FROM=${MAIL_FROM:-test@example.com}
+      - SMTP_HOST=${SMTP_HOST:-test.example.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-test}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-test}
+      - SMTP_SECURE_ENABLED=${SMTP_SECURE_ENABLED:-0}
+      - SHORT_URL_BASE=${SHORT_URL_BASE}
+      - EMAIL_VERIFICATION_DISABLED=${EMAIL_VERIFICATION_DISABLED:-1}
+      - PASSWORD_RESET_DISABLED=${PASSWORD_RESET_DISABLED:-1}
+      - SIGNUP_DISABLED=${SIGNUP_DISABLED:-0}
+      - INVITE_DISABLED=${INVITE_DISABLED:-0}
+      - PRIVACY_URL=${PRIVACY_URL}
+      - TERMS_URL=${TERMS_URL}
+      - IMPRINT_URL=${IMPRINT_URL}
+      - GITHUB_AUTH_ENABLED=${GITHUB_AUTH_ENABLED:-0}
+      - GITHUB_ID=${GITHUB_ID}
+      - GITHUB_SECRET=${GITHUB_SECRET}
+      - GOOGLE_AUTH_ENABLED=${GOOGLE_AUTH_ENABLED:-0}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - ASSET_PREFIX_URL=${ASSET_PREFIX_URL}
+    volumes:
+      - formbricks-uploads:/apps/web/uploads/
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
+
+  postgresql:
+    image: postgres:16-alpine
+    volumes:
+      - formbricks-postgresql-data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_USER=${SERVICE_USER_POSTGRESQL}
+      - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRESQL}
+      - POSTGRES_DB=${POSTGRESQL_DATABASE:-formbricks}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10

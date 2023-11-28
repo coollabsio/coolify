@@ -36,7 +36,14 @@ class StandaloneRedis extends BaseModel
             $database->environment_variables()->delete();
         });
     }
-
+    public function link()
+    {
+        return route('project.database.configuration', [
+            'project_uuid' => $this->environment->project->uuid,
+            'environment_name' => $this->environment->name,
+            'database_uuid' => $this->uuid
+        ]);
+    }
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);

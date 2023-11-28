@@ -3,8 +3,6 @@
 namespace App\Jobs;
 
 use App\Models\Server;
-use App\Notifications\Server\HighDiskUsage;
-use Exception;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,6 +11,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -35,7 +34,7 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
                 }
             });
             if ($isInprogress) {
-                throw new Exception('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
+                throw new RuntimeException('DockerCleanupJob: ApplicationDeploymentQueue is not empty, skipping...');
             }
             if (!$this->server->isFunctional()) {
                 return;

@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 trait ExecuteRemoteCommand
 {
     public ?string $save = null;
+    public static int $batch_counter = 0;
     public function execute_remote_command(...$commands)
     {
         static::$batch_counter++;
@@ -23,8 +24,6 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
-
-
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {
@@ -49,32 +48,29 @@ trait ExecuteRemoteCommand
                     'hidden' => $hidden,
                     'batch' => static::$batch_counter,
                 ];
-
-                if (!$this->log_model->logs) {
+                if (!$this->application_deployment_queue->logs) {
                     $new_log_entry['order'] = 1;
                 } else {
-                    $previous_logs = json_decode($this->log_model->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                    $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
                     $new_log_entry['order'] = count($previous_logs) + 1;
                 }
-
                 $previous_logs[] = $new_log_entry;
-                $this->log_model->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
-                $this->log_model->save();
+                $this->application_deployment_queue->logs = json_encode($previous_logs, flags: JSON_THROW_ON_ERROR);
+                $this->application_deployment_queue->save();
 
                 if ($this->save) {
                     $this->saved_outputs[$this->save] = Str::of($output)->trim();
                 }
             });
-            $this->log_model->update([
+            $this->application_deployment_queue->update([
                 'current_process_id' => $process->id(),
             ]);
 
             $process_result = $process->wait();
             if ($process_result->exitCode() !== 0) {
                 if (!$ignore_errors) {
-                    $status = ApplicationDeploymentStatus::FAILED->value;
-                    $this->log_model->status = $status;
-                    $this->log_model->save();
+                    $this->application_deployment_queue->status = ApplicationDeploymentStatus::FAILED->value;
+                    $this->application_deployment_queue->save();
                     throw new \RuntimeException($process_result->errorOutput());
                 }
             }

@@ -41,7 +41,7 @@ class Application extends Component
         try {
             $this->application->delete();
             $this->emit('success', 'Application deleted successfully.');
-            return redirect()->route('project.service', $this->parameters);
+            return redirect()->route('project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

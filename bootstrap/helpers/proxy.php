@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Proxy\SaveConfiguration;
+use App\Models\Application;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
@@ -12,9 +13,32 @@ function get_proxy_path()
 }
 function connectProxyToNetworks(Server $server)
 {
+    // Standalone networks
     $networks = collect($server->standaloneDockers)->map(function ($docker) {
         return $docker['network'];
-    })->unique();
+    });
+    // Service networks
+    foreach ($server->services()->get() as $service) {
+        $networks->push($service->networks());
+    }
+    // Docker compose based apps
+    $docker_compose_apps = $server->dockerComposeBasedApplications();
+    foreach ($docker_compose_apps as $app) {
+        $networks->push($app->uuid);
+    }
+    // Docker compose based preview deployments
+    $docker_compose_previews = $server->dockerComposeBasedPreviewDeployments();
+    foreach ($docker_compose_previews as $preview) {
+        $pullRequestId = $preview->pull_request_id;
+        $applicationId = $preview->application_id;
+        $application = Application::find($applicationId);
+        if (!$application) {
+            continue;
+        }
+        $network = "{$application->uuid}-{$pullRequestId}";
+        $networks->push($network);
+    }
+    $networks = collect($networks)->flatten()->unique();
     if ($networks->count() === 0) {
         $networks = collect(['coolify']);
     }

@@ -4,20 +4,26 @@ namespace App\Models;
 
 use App\Actions\Server\InstallLogDrain;
 use App\Actions\Server\InstallNewRelic;
+use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
+use Stringable;
 
 class Server extends BaseModel
 {
     use SchemalessAttributesTrait;
+    public static $batch_counter = 0;
 
     protected static function booted()
     {
@@ -189,6 +195,13 @@ class Server extends BaseModel
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
+    public function definedResources()
+    {
+        $applications = $this->applications();
+        $databases = $this->databases();
+        $services = $this->services();
+        return $applications->concat($databases)->concat($services->get());
+    }
     public function hasDefinedResources()
     {
         $applications = $this->applications()->count() > 0;
@@ -216,6 +229,23 @@ class Server extends BaseModel
         return $this->destinations()->map(function ($standaloneDocker) {
             return $standaloneDocker->applications;
         })->flatten();
+    }
+    public function dockerComposeBasedApplications()
+    {
+        return $this->applications()->filter(function ($application) {
+            return data_get($application, 'build_pack') === 'dockercompose';
+        });
+    }
+    public function dockerComposeBasedPreviewDeployments()
+    {
+        return $this->previews()->filter(function ($preview) {
+            $applicationId = data_get($preview, 'application_id');
+            $application = Application::find($applicationId);
+            if (!$application) {
+                return false;
+            }
+            return data_get($application, 'build_pack') === 'dockercompose';
+        });
     }
     public function services()
     {
@@ -304,7 +334,7 @@ class Server extends BaseModel
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
-    public function validateOS()
+    public function validateOS(): bool | Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
         $datas = collect(explode("\n", $os_release));
@@ -314,12 +344,16 @@ class Server extends BaseModel
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
-        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        // ray($ID, $ID_LIKE, $VERSION_ID);
-        if (collect(SUPPORTED_OS)->contains($ID_LIKE)) {
+        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
+            if (str($supportedOs)->contains($ID)) {
+                return str($ID);
+            }
+        });
+        if ($supported->count() === 1) {
             ray('supported');
-            return str($ID_LIKE)->explode(' ')->first();
+            return str($supported->first());
         } else {
             ray('not supported');
             return false;
@@ -386,5 +420,84 @@ class Server extends BaseModel
     public function validateCoolifyNetwork()
     {
         return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
+    }
+    public function executeRemoteCommand(Collection $commands, ?ApplicationDeploymentQueue $loggingModel = null)
+    {
+        static::$batch_counter++;
+        foreach ($commands as $command) {
+            $realCommand = data_get($command, 'command');
+            if (is_null($realCommand)) {
+                throw new \RuntimeException('Command is not set');
+            }
+            $hidden = data_get($command, 'hidden', false);
+            $ignoreErrors = data_get($command, 'ignoreErrors', false);
+            $customOutputType = data_get($command, 'customOutputType');
+            $name = data_get($command, 'name');
+            $remoteCommand = generateSshCommand($this, $realCommand);
+
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($realCommand, $hidden, $customOutputType, $loggingModel, $name) {
+                $output = str($output)->trim();
+                if ($output->startsWith('╔')) {
+                    $output = "\n" . $output;
+                }
+                $newLogEntry = [
+                    'command' => remove_iip($realCommand),
+                    'output' => remove_iip($output),
+                    'type' => $customOutputType ?? $type === 'err' ? 'stderr' : 'stdout',
+                    'timestamp' => Carbon::now('UTC'),
+                    'hidden' => $hidden,
+                    'batch' => static::$batch_counter,
+                ];
+                if ($loggingModel) {
+                    if (!$loggingModel->logs) {
+                        $newLogEntry['order'] = 1;
+                    } else {
+                        $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+                        $newLogEntry['order'] = count($previousLogs) + 1;
+                    }
+                    if ($name) {
+                        $newLogEntry['name'] = $name;
+                    }
+
+                    $previousLogs[] = $newLogEntry;
+                    $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
+                    $loggingModel->save();
+                }
+            });
+            if ($loggingModel) {
+                $loggingModel->update([
+                    'current_process_id' => $process->id(),
+                ]);
+            }
+            $processResult = $process->wait();
+            if ($processResult->exitCode() !== 0) {
+                if (!$ignoreErrors) {
+                    if ($loggingModel) {
+                        $status = ApplicationDeploymentStatus::FAILED->value;
+                        $loggingModel->status = $status;
+                        $loggingModel->save();
+                    }
+                    throw new \RuntimeException($processResult->errorOutput());
+                }
+            }
+        }
+    }
+    public function stopApplicationRelatedRunningContainers(string $applicationId, string $containerName)
+    {
+        $containers = getCurrentApplicationContainerStatus($this, $applicationId, 0);
+        $containers = $containers->filter(function ($container) use ($containerName) {
+            return data_get($container, 'Names') !== $containerName;
+        });
+        $containers->each(function ($container) {
+            $removableContainer = data_get($container, 'Names');
+            $this->server->executeRemoteCommand(
+                commands: collect([
+                    'command' => "docker rm -f $removableContainer >/dev/null 2>&1",
+                    'hidden' => true,
+                    'ignoreErrors' => true
+                ]),
+                loggingModel: $this->deploymentQueueEntry
+            );
+        });
     }
 }

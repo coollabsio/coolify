@@ -28,7 +28,9 @@ const SPECIFIC_SERVICES = [
     'quay.io/minio/minio',
 ];
 
+// Based on /etc/os-release
 const SUPPORTED_OS = [
-    'debian',
-    'rhel centos fedora'
+    'ubuntu debian raspbian',
+    'centos fedora rhel ol rocky',
+    'sles opensuse-leap opensuse-tumbleweed'
 ];
