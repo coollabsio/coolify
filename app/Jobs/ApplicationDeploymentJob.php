@@ -290,42 +290,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ray($e);
         }
     }
-    // private function deploy_docker_compose()
-    // {
-    //     $dockercompose_base64 = base64_encode($this->application->dockercompose);
-    //     $this->execute_remote_command(
-    //         [
-    //             "echo 'Starting deployment of {$this->application->name}.'"
-    //         ],
-    //     );
-    //     $this->prepare_builder_image();
-    //     $this->execute_remote_command(
-    //         [
-    //             executeInDocker($this->deployment_uuid, "echo '$dockercompose_base64' | base64 -d > $this->workdir/docker-compose.yaml")
-    //         ],
-    //     );
-    //     $this->build_image_name = Str::lower("{$this->customRepository}:build");
-    //     $this->production_image_name = Str::lower("{$this->application->uuid}:latest");
-    //     $this->save_environment_variables();
-    //     $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id);
-    //     ray($containers);
-    //     if ($containers->count() > 0) {
-    //         foreach ($containers as $container) {
-    //             $containerName = data_get($container, 'Names');
-    //             if ($containerName) {
-    //                 instant_remote_process(
-    //                     ["docker rm -f {$containerName}"],
-    //                     $this->application->destination->server
-    //                 );
-    //             }
-    //         }
-    //     }
-
-    //     $this->execute_remote_command(
-    //         ["echo -n 'Starting services (could take a while)...'"],
-    //         [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
-    //     );
-    // }
     private function generate_image_names()
     {
         if ($this->application->dockerfile) {
@@ -589,6 +553,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->start_by_compose_file();
             $this->health_check();
             $this->stop_running_container();
+            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
         }
     }
     private function health_check()
@@ -1204,7 +1169,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             });
-            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
         } else {
             $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
             $this->execute_remote_command(
@@ -1226,6 +1190,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         }
+        $this->application_deployment_queue->addLogEntry("New container started.");
     }
 
     private function generate_build_env_variables()
