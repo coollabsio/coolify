@@ -24,7 +24,7 @@ function create_standalone_postgresql($environment_id, $destination_uuid): Stand
     }
     return StandalonePostgresql::create([
         'name' => generate_database_name('postgresql'),
-        'postgres_password' => \Illuminate\Support\Str::password(symbols: false),
+        'postgres_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
@@ -39,7 +39,7 @@ function create_standalone_redis($environment_id, $destination_uuid): Standalone
     }
     return StandaloneRedis::create([
         'name' => generate_database_name('redis'),
-        'redis_password' => \Illuminate\Support\Str::password(symbols: false),
+        'redis_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
@@ -54,7 +54,7 @@ function create_standalone_mongodb($environment_id, $destination_uuid): Standalo
     }
     return StandaloneMongodb::create([
         'name' => generate_database_name('mongodb'),
-        'mongo_initdb_root_password' => \Illuminate\Support\Str::password(symbols: false),
+        'mongo_initdb_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
@@ -68,8 +68,8 @@ function create_standalone_mysql($environment_id, $destination_uuid): Standalone
     }
     return StandaloneMysql::create([
         'name' => generate_database_name('mysql'),
-        'mysql_root_password' => \Illuminate\Support\Str::password(symbols: false),
-        'mysql_password' => \Illuminate\Support\Str::password(symbols: false),
+        'mysql_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'mysql_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
@@ -83,8 +83,8 @@ function create_standalone_mariadb($environment_id, $destination_uuid): Standalo
     }
     return StandaloneMariadb::create([
         'name' => generate_database_name('mariadb'),
-        'mariadb_root_password' => \Illuminate\Support\Str::password(symbols: false),
-        'mariadb_password' => \Illuminate\Support\Str::password(symbols: false),
+        'mariadb_root_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
+        'mariadb_password' => \Illuminate\Support\Str::password(length: 64, symbols: false),
         'environment_id' => $environment_id,
         'destination_id' => $destination->id,
         'destination_type' => $destination->getMorphClass(),
