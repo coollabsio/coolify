@@ -877,7 +877,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'container_name' => $this->container_name,
                     'restart' => RESTART_MODE,
                     'environment' => $environment_variables,
-                    'labels' => $labels,
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
@@ -921,7 +920,37 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             data_forget($docker_compose, 'services.' . $this->container_name . '.cpus');
             data_forget($docker_compose, 'services.' . $this->container_name . '.cpuset');
             data_forget($docker_compose, 'services.' . $this->container_name . '.cpu_shares');
+
+            $docker_compose['services'][$this->container_name]['deploy'] = [
+                'placement' => [
+                    'constraints' => [
+                        'node.role == worker'
+                    ]
+                ],
+                'mode' => 'replicated',
+                'replicas' => 1,
+                'update_config' => [
+                    'order' => 'start-first'
+                ],
+                'rollback_config' => [
+                    'order' => 'start-first'
+                ],
+                'labels' => $labels,
+                'resources' => [
+                    'limits' => [
+                        'cpus' => $this->application->limits_cpus,
+                        'memory' => $this->application->limits_memory,
+                    ],
+                    'reservations' => [
+                        'cpus' => $this->application->limits_cpus,
+                        'memory' => $this->application->limits_memory,
+                    ]
+                ]
+            ];
+
         } else {
+            $docker_compose['services'][$this->container_name]['labels'] = $labels;
+
         }
         if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = [
@@ -970,6 +999,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //         'dockerfile' => $this->workdir . $this->dockerfile_location,
         //     ];
         // }
+
+        $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+
+        data_forget($docker_compose, 'services.' . $this->container_name);
+
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);
