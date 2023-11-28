@@ -42,7 +42,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if (!$this->server->isServerReady()) {
                 return;
             };
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server);
+            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
+            if (is_null($containers)) {
+                return;
+            }
             $containers = format_docker_command_output_to_json($containers);
             $applications = $this->server->applications();
             $databases = $this->server->databases();
