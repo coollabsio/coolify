@@ -333,7 +333,7 @@ class Server extends BaseModel
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled;
     }
-    public function validateOS()
+    public function validateOS(): bool | Str
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
         $datas = collect(explode("\n", $os_release));
@@ -352,7 +352,7 @@ class Server extends BaseModel
         });
         if ($supported->count() === 1) {
             ray('supported');
-            return $supported->first();
+            return str($supported->first());
         } else {
             ray('not supported');
             return false;
