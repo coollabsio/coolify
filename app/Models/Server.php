@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use App\Actions\Server\InstallLogDrain;
-use App\Actions\Server\InstallNewRelic;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
@@ -18,7 +16,7 @@ use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
-use Stringable;
+use Illuminate\Support\Stringable;
 
 class Server extends BaseModel
 {
