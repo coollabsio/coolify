@@ -3,8 +3,10 @@
 namespace App\Models;
 
 use App\Notifications\Channels\SendsEmail;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Spatie\Url\Url;
 
 class InstanceSettings extends Model implements SendsEmail
 {
@@ -16,6 +18,18 @@ class InstanceSettings extends Model implements SendsEmail
         'smtp_password' => 'encrypted',
     ];
 
+    public function fqdn(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if ($value) {
+                    $url = Url::fromString($value);
+                    $host = $url->getHost();
+                    return $url->getScheme() . '://' . $host;
+                }
+            }
+        );
+    }
     public static function get()
     {
         return InstanceSettings::findOrFail(0);
