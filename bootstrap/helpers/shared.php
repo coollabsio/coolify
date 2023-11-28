@@ -1072,7 +1072,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 throw new \Exception($e->getMessage());
             }
         }
-        ray($yaml);
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
         if ($pull_request_id !== 0) {

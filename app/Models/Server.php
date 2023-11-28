@@ -228,6 +228,23 @@ class Server extends BaseModel
             return $standaloneDocker->applications;
         })->flatten();
     }
+    public function dockerComposeBasedApplications()
+    {
+        return $this->applications()->filter(function ($application) {
+            return data_get($application, 'build_pack') === 'dockercompose';
+        });
+    }
+    public function dockerComposeBasedPreviewDeployments()
+    {
+        return $this->previews()->filter(function ($preview) {
+            $applicationId = data_get($preview, 'application_id');
+            $application = Application::find($applicationId);
+            if (!$application) {
+                return false;
+            }
+            return data_get($application, 'build_pack') === 'dockercompose';
+        });
+    }
     public function services()
     {
         return $this->hasMany(Service::class);
