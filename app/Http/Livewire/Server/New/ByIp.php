@@ -29,6 +29,7 @@ class ByIp extends Component
         'ip' => 'required',
         'user' => 'required|string',
         'port' => 'required|integer',
+        'is_part_of_swarm' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
@@ -36,6 +37,7 @@ class ByIp extends Component
         'ip' => 'IP Address/Domain',
         'user' => 'User',
         'port' => 'Port',
+        'is_part_of_swarm' => 'Is part of swarm',
     ];
 
     public function mount()
@@ -72,11 +74,11 @@ class ByIp extends Component
                 'proxy' => [
                     "type" => ProxyTypes::TRAEFIK_V2->value,
                     "status" => ProxyStatus::EXITED->value,
-                ]
-
+                ],
             ]);
             $server->settings->is_part_of_swarm = $this->is_part_of_swarm;
             $server->settings->save();
+            $server->addInitialNetwork();
             return redirect()->route('server.show', $server->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);

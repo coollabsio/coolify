@@ -131,16 +131,16 @@
                         </form>
                     </div>
                     @if (!$serverReachable)
-                    This server is not reachable with the following public key.
-                    <br /> <br />
-                    Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
-                    'root' or skip the boarding process and add a new private key manually to Coolify and to the
-                    server.
-                    <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                    <x-forms.button class="box" wire:target="validateServer"
-                        wire:click="validateServer">Check again
-                    </x-forms.button>
-                @endif
+                        This server is not reachable with the following public key.
+                        <br /> <br />
+                        Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
+                        'root' or skip the boarding process and add a new private key manually to Coolify and to the
+                        server.
+                        <x-forms.input readonly id="serverPublicKey"></x-forms.input>
+                        <x-forms.button class="box" wire:target="validateServer" wire:click="validateServer">Check
+                            again
+                        </x-forms.button>
+                    @endif
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>Private Keys are used to connect to a remote server through a secure shell, called SSH.</p>
@@ -200,13 +200,16 @@
                                 label="Description" id="remoteServerDescription" />
                         </div>
                         <div class="flex gap-2">
-                            <x-forms.input required placeholder="127.0.0.1" label="IP Address"
-                                id="remoteServerHost" />
+                            <x-forms.input required placeholder="127.0.0.1" label="IP Address" id="remoteServerHost" />
                             <x-forms.input required placeholder="Port number of your server. Default is 22."
                                 label="Port" id="remoteServerPort" />
                             <x-forms.input required readonly
                                 placeholder="Username to connect to your server. Default is root." label="Username"
                                 id="remoteServerUser" />
+                        </div>
+                        <div class="w-64">
+                            <x-forms.checkbox type="checkbox" id="isPartOfSwarm"
+                                label="Is it part of a Swarm cluster?" />
                         </div>
                         <x-forms.button type="submit">Check Connection</x-forms.button>
                     </form>
@@ -226,7 +229,7 @@
                 </x-slot:question>
                 <x-slot:actions>
                     <x-forms.button class="justify-center box" wire:click="installDocker">
-                    Let's do it!</x-forms.button>
+                        Let's do it!</x-forms.button>
                     @if ($dockerInstallationStarted)
                         <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
                             Validate Server & Continue</x-forms.button>
@@ -234,7 +237,10 @@
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
-                        to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install Docker Engine, check <a target="_blank" class="underline text-warning" href="https://coolify.io/docs/servers#install-docker-engine-manually">this documentation</a>.</p>
+                        to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install Docker
+                        Engine, check <a target="_blank" class="underline text-warning"
+                            href="https://coolify.io/docs/servers#install-docker-engine-manually">this
+                            documentation</a>.</p>
                 </x-slot:explanation>
             </x-boarding-step>
 

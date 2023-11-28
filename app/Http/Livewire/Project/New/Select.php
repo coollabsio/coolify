@@ -126,6 +126,7 @@ class Select extends Component
     {
         $this->server_id = $server->id;
         $this->standaloneDockers = $server->standaloneDockers;
+        ray($server);
         $this->swarmDockers = $server->swarmDockers;
         $this->current_step = 'destinations';
     }

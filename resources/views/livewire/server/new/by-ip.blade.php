@@ -3,7 +3,7 @@
         <x-limit-reached name="servers" />
     @else
         <h1>Create a new Server</h1>
-        <div class="subtitle ">Servers are the main blocks of your infrastructure.</div>
+        <div class="subtitle">Servers are the main blocks of your infrastructure.</div>
         <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
             <div class="flex gap-2">
                 <x-forms.input id="name" label="Name" required />
@@ -25,6 +25,10 @@
                     @endif
                 @endforeach
             </x-forms.select>
+            <div class="w-64">
+                <x-forms.checkbox type="checkbox" id="is_part_of_swarm"
+                    label="Is it part of a Swarm cluster?" />
+            </div>
             <x-forms.button type="submit">
                 Save New Server
             </x-forms.button>

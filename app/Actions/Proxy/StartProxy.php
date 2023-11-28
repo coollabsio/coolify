@@ -13,6 +13,9 @@ class StartProxy
     public function handle(Server $server, bool $async = true): string|Activity
     {
         try {
+            if ($server->isSwarm()) {
+                throw new \Exception("Server is part of swarm, not implemented yet.");
+            }
             $proxyType = $server->proxyType();
             $commands = collect([]);
             $proxy_path = get_proxy_path();
@@ -46,11 +49,9 @@ class StartProxy
                 $server->save();
                 return 'OK';
             }
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             ray($e);
             throw $e;
         }
-
-
     }
 }

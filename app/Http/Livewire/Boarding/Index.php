@@ -31,6 +31,7 @@ class Index extends Component
     public ?string $remoteServerHost = null;
     public ?int    $remoteServerPort = 22;
     public ?string $remoteServerUser = 'root';
+    public bool $isPartOfSwarm = false;
     public ?Server $createdServer = null;
 
     public Collection $projects;
@@ -182,7 +183,9 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'private_key_id' => $this->createdPrivateKey->id,
             'team_id' => currentTeam()->id,
         ]);
-        $this->createdServer->save();
+        $this->createdServer->settings->is_part_of_swarm = $this->isPartOfSwarm;
+        $this->createdServer->settings->save();
+        $this->createdServer->addInitialNetwork();
         $this->validateServer();
     }
     public function validateServer()

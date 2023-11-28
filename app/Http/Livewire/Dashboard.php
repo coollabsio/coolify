@@ -14,6 +14,8 @@ class Dashboard extends Component
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();
+        ray($this->servers[1]);
+        ray($this->servers[1]->standaloneDockers);
         $this->projects = Project::ownedByCurrentTeam()->get();
     }
     // public function getIptables()

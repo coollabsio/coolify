@@ -35,25 +35,10 @@ class Server extends BaseModel
             }
             $server->forceFill($payload);
         });
-
         static::created(function ($server) {
             ServerSetting::create([
                 'server_id' => $server->id,
             ]);
-            if ($server->id === 0) {
-                StandaloneDocker::create([
-                    'id' => 0,
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $server->id,
-                ]);
-            } else {
-                StandaloneDocker::create([
-                    'name' => 'coolify',
-                    'network' => 'coolify',
-                    'server_id' => $server->id,
-                ]);
-            }
         });
         static::deleting(function ($server) {
             $server->destinations()->each(function ($destination) {
@@ -101,7 +86,39 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
-
+    public function addInitialNetwork() {
+        if ($this->id === 0) {
+            if ($this->isSwarm()) {
+                SwarmDocker::create([
+                    'id' => 0,
+                    'name' => 'coolify',
+                    'network' => 'coolify-overlay',
+                    'server_id' => $this->id,
+                ]);
+            } else {
+                StandaloneDocker::create([
+                    'id' => 0,
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $this->id,
+                ]);
+            }
+        } else {
+            if ($this->isSwarm()) {
+                SwarmDocker::create([
+                    'name' => 'coolify',
+                    'network' => 'coolify-overlay',
+                    'server_id' => $this->id,
+                ]);
+            } else {
+                StandaloneDocker::create([
+                    'name' => 'coolify',
+                    'network' => 'coolify',
+                    'server_id' => $this->id,
+                ]);
+            }
+        }
+    }
     public function proxyType()
     {
         $proxyType = $this->proxy->get('type');
@@ -357,12 +374,16 @@ class Server extends BaseModel
             return false;
         }
     }
+    public function isSwarm()
+    {
+        return data_get($this, 'settings.is_part_of_swarm');
+    }
     public function validateConnection()
     {
+        $server = Server::find($this->id);
         if ($this->skipServer()) {
             return false;
         }
-
         $uptime = instant_remote_process(['uptime'], $this, false);
         if (!$uptime) {
             $this->settings()->update([
@@ -373,14 +394,14 @@ class Server extends BaseModel
             $this->settings()->update([
                 'is_reachable' => true,
             ]);
-            $this->update([
+            $server->update([
                 'unreachable_count' => 0,
             ]);
         }
 
         if (data_get($this, 'unreachable_notification_sent') === true) {
             $this->team->notify(new Revived($this));
-            $this->update(['unreachable_notification_sent' => false]);
+            $server->update(['unreachable_notification_sent' => false]);
         }
 
         return true;
@@ -398,7 +419,20 @@ class Server extends BaseModel
         }
         $this->settings->is_usable = true;
         $this->settings->save();
-        $this->validateCoolifyNetwork();
+        $this->validateCoolifyNetwork(isSwarm: false);
+        return true;
+    }
+    public function validateDockerSwarm()
+    {
+        $swarmStatus = instant_remote_process(["docker info|grep -i swarm"], $this, false);
+        $swarmStatus = str($swarmStatus)->trim()->after(':')->trim();
+        if ($swarmStatus === 'inactive') {
+            throw new \Exception('Docker Swarm is not initiated. Please join the server to a swarm before continuing.');
+            return false;
+        }
+        $this->settings->is_usable = true;
+        $this->settings->save();
+        $this->validateCoolifyNetwork(isSwarm: true);
         return true;
     }
     public function validateDockerEngineVersion()
@@ -415,9 +449,13 @@ class Server extends BaseModel
         $this->settings->save();
         return true;
     }
-    public function validateCoolifyNetwork()
+    public function validateCoolifyNetwork($isSwarm = false)
     {
-        return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
+        if ($isSwarm) {
+            return instant_remote_process(["docker network create --driver overlay coolify-overlay >/dev/null 2>&1 || true"], $this, false);
+        } else {
+            return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
+        }
     }
     public function executeRemoteCommand(Collection $commands, ?ApplicationDeploymentQueue $loggingModel = null)
     {
