@@ -102,7 +102,6 @@ function generate_default_proxy_configuration(Server $server)
                     "--entrypoints.https.address=:443",
                     "--entrypoints.http.http.encodequerysemicolons=true",
                     "--entrypoints.https.http.encodequerysemicolons=true",
-                    "--providers.docker=true",
                     "--providers.docker.exposedbydefault=false",
                     "--providers.file.directory=/traefik/dynamic/",
                     "--providers.file.watch=true",
@@ -127,6 +126,18 @@ function generate_default_proxy_configuration(Server $server)
         $config['services']['traefik']['command'][] = "--log.level=debug";
         $config['services']['traefik']['command'][] = "--accesslog.filepath=/traefik/access.log";
         $config['services']['traefik']['command'][] = "--accesslog.bufferingsize=100";
+    }
+    if ($server->isSwarm()) {
+        $config['services']['traefik']['command'][] = "--providers.docker.swarmMode=true";
+        $config['services']['traefik']['deploy'] = [
+            "placement" => [
+                "constraints" => [
+                    "node.role==manager",
+                ],
+            ],
+        ];
+    } else {
+        $config['services']['traefik']['command'][] = "--providers.docker=true";
     }
     $config = Yaml::dump($config, 4, 2);
     SaveConfiguration::run($server, $config);
