@@ -123,6 +123,9 @@ function instant_remote_process(Collection|array $command, Server $server, $thro
         }
         return excludeCertainErrors($process->errorOutput(), $exitCode);
     }
+    if ($output === 'null') {
+        $output = null;
+    }
     return $output;
 }
 function excludeCertainErrors(string $errorOutput, ?int $exitCode = null)

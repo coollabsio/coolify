@@ -156,25 +156,27 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         // Generate custom host<->ip mapping
         $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
-        $allContainers = format_docker_command_output_to_json($allContainers);
-        $ips = collect([]);
-        if (count($allContainers) > 0) {
-            $allContainers = $allContainers[0];
-            foreach ($allContainers as $container) {
-                $containerName = data_get($container, 'Name');
-                if ($containerName === 'coolify-proxy') {
-                    continue;
-                }
-                $containerIp = data_get($container, 'IPv4Address');
-                if ($containerName && $containerIp) {
-                    $containerIp = str($containerIp)->before('/');
-                    $ips->put($containerName, $containerIp->value());
+        if (!is_null($allContainers)) {
+            $allContainers = format_docker_command_output_to_json($allContainers);
+            $ips = collect([]);
+            if (count($allContainers) > 0) {
+                $allContainers = $allContainers[0];
+                foreach ($allContainers as $container) {
+                    $containerName = data_get($container, 'Name');
+                    if ($containerName === 'coolify-proxy') {
+                        continue;
+                    }
+                    $containerIp = data_get($container, 'IPv4Address');
+                    if ($containerName && $containerIp) {
+                        $containerIp = str($containerIp)->before('/');
+                        $ips->put($containerName, $containerIp->value());
+                    }
                 }
             }
+            $this->addHosts = $ips->map(function ($ip, $name) {
+                return "--add-host $name:$ip";
+            })->implode(' ');
         }
-        $this->addHosts = $ips->map(function ($ip, $name) {
-            return "--add-host $name:$ip";
-        })->implode(' ');
 
         if ($this->application->dockerfile_target_build) {
             $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
@@ -214,6 +216,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
             if ($this->application->docker_registry_image_name && $this->application->build_pack !== 'dockerimage') {
                 $this->push_to_docker_registry();
+                if ($this->server->isSwarm()) {
+                    $this->application_deployment_queue->addLogEntry("Creating / updating stack.");
+                    $this->execute_remote_command(
+                        [
+                            "docker stack deploy --with-registry-auth --prune --compose-file {$this->configuration_dir}/docker-compose.yml {$this->application->uuid}"
+                        ],
+                    );
+                }
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
             $this->application->isConfigurationChanged(true);
@@ -534,75 +544,83 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function rolling_update()
     {
-        if (count($this->application->ports_mappings_array) > 0) {
-            $this->execute_remote_command(
-                [
-                    "echo '\n----------------------------------------'",
-                ],
-                ["echo -n 'Application has ports mapped to the host system, rolling update is not supported.'"],
-            );
-            $this->stop_running_container(force: true);
-            $this->start_by_compose_file();
+        if ($this->server->isSwarm()) {
+            // Skip this.
         } else {
-            $this->execute_remote_command(
-                [
-                    "echo '\n----------------------------------------'",
-                ],
-                ["echo -n 'Rolling update started.'"],
-            );
-            $this->start_by_compose_file();
-            $this->health_check();
-            $this->stop_running_container();
-            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
+            if (count($this->application->ports_mappings_array) > 0) {
+                $this->execute_remote_command(
+                    [
+                        "echo '\n----------------------------------------'",
+                    ],
+                    ["echo -n 'Application has ports mapped to the host system, rolling update is not supported.'"],
+                );
+                $this->stop_running_container(force: true);
+                $this->start_by_compose_file();
+            } else {
+                $this->execute_remote_command(
+                    [
+                        "echo '\n----------------------------------------'",
+                    ],
+                    ["echo -n 'Rolling update started.'"],
+                );
+                $this->start_by_compose_file();
+                $this->health_check();
+                $this->stop_running_container();
+                $this->application_deployment_queue->addLogEntry("Rolling update completed.");
+            }
         }
     }
     private function health_check()
     {
-        if ($this->application->isHealthcheckDisabled()) {
-            $this->newVersionIsHealthy = true;
-            return;
-        }
-        // ray('New container name: ', $this->container_name);
-        if ($this->container_name) {
-            $counter = 1;
-            $this->execute_remote_command(
-                [
-                    "echo 'Waiting for healthcheck to pass on the new container.'"
-                ]
-            );
-            if ($this->full_healthcheck_url) {
+        if ($this->server->isSwarm()) {
+            // Implement healthcheck for swarm
+        } else {
+            if ($this->application->isHealthcheckDisabled()) {
+                $this->newVersionIsHealthy = true;
+                return;
+            }
+            // ray('New container name: ', $this->container_name);
+            if ($this->container_name) {
+                $counter = 1;
                 $this->execute_remote_command(
                     [
-                        "echo 'Healthcheck URL (inside the container): {$this->full_healthcheck_url}'"
+                        "echo 'Waiting for healthcheck to pass on the new container.'"
                     ]
                 );
-            }
-            while ($counter < $this->application->health_check_retries) {
-                $this->execute_remote_command(
-                    [
-                        "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
-                        "hidden" => true,
-                        "save" => "health_check"
-                    ],
-
-                );
-                $this->execute_remote_command(
-                    [
-                        "echo 'Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}'"
-                    ],
-                );
-                if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
-                    $this->newVersionIsHealthy = true;
-                    $this->application->update(['status' => 'running']);
+                if ($this->full_healthcheck_url) {
                     $this->execute_remote_command(
                         [
-                            "echo 'New container is healthy.'"
+                            "echo 'Healthcheck URL (inside the container): {$this->full_healthcheck_url}'"
+                        ]
+                    );
+                }
+                while ($counter < $this->application->health_check_retries) {
+                    $this->execute_remote_command(
+                        [
+                            "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
+                            "hidden" => true,
+                            "save" => "health_check"
+                        ],
+
+                    );
+                    $this->execute_remote_command(
+                        [
+                            "echo 'Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}'"
                         ],
                     );
-                    break;
+                    if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
+                        $this->newVersionIsHealthy = true;
+                        $this->application->update(['status' => 'running']);
+                        $this->execute_remote_command(
+                            [
+                                "echo 'New container is healthy.'"
+                            ],
+                        );
+                        break;
+                    }
+                    $counter++;
+                    sleep($this->application->health_check_interval);
                 }
-                $counter++;
-                sleep($this->application->health_check_interval);
             }
         }
     }
@@ -849,21 +867,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         }
         if ($this->pull_request_id !== 0) {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
-
-            // $newHostLabel = $newLabels->filter(function ($label) {
-            //     return str($label)->contains('Host');
-            // });
-            // $labels = $labels->reject(function ($label) {
-            //     return str($label)->contains('Host');
-            // });
-            // ray($labels,$newLabels);
-            // $labels = $labels->map(function ($label) {
-            //     $pattern = '/([a-zA-Z0-9]+)-(\d+)-(http|https)/';
-            //     $replacement = "$1-pr-{$this->pull_request_id}-$2-$3";
-            //     $newLabel = preg_replace($pattern, $replacement, $label);
-            //     return $newLabel;
-            // });
-            // $labels = $labels->merge($newHostLabel);
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
         $docker_compose = [
@@ -906,6 +909,20 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if ($this->server->isSwarm()) {
+            data_forget($docker_compose, 'services.' . $this->container_name . '.container_name');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.expose');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.restart');
+
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_limit');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.memswap_limit');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_swappiness');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.mem_reservation');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpus');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpuset');
+            data_forget($docker_compose, 'services.' . $this->container_name . '.cpu_shares');
+        } else {
+        }
         if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = [
                 'driver' => 'fluentd',

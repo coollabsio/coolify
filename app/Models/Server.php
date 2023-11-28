@@ -67,7 +67,7 @@ class Server extends BaseModel
     {
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
-        return Server::whereTeamId($teamId)->with('settings')->select($selectArray->all())->orderBy('name');
+        return Server::whereTeamId($teamId)->with('settings','swarmDockers','standaloneDockers')->select($selectArray->all())->orderBy('name');
     }
 
     static public function isUsable()
@@ -87,6 +87,8 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
     public function addInitialNetwork() {
+        ray($this->id);
+
         if ($this->id === 0) {
             if ($this->isSwarm()) {
                 SwarmDocker::create([
@@ -106,13 +108,13 @@ class Server extends BaseModel
         } else {
             if ($this->isSwarm()) {
                 SwarmDocker::create([
-                    'name' => 'coolify',
+                    'name' => 'coolify-overlay',
                     'network' => 'coolify-overlay',
                     'server_id' => $this->id,
                 ]);
             } else {
                 StandaloneDocker::create([
-                    'name' => 'coolify',
+                    'name' => 'coolify-overlay',
                     'network' => 'coolify',
                     'server_id' => $this->id,
                 ]);
@@ -452,7 +454,7 @@ class Server extends BaseModel
     public function validateCoolifyNetwork($isSwarm = false)
     {
         if ($isSwarm) {
-            return instant_remote_process(["docker network create --driver overlay coolify-overlay >/dev/null 2>&1 || true"], $this, false);
+            return instant_remote_process(["docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true"], $this, false);
         } else {
             return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
         }

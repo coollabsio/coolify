@@ -13,9 +13,9 @@ class SwarmDockerSeeder extends Seeder
      */
     public function run(): void
     {
-        SwarmDocker::create([
-            'name' => 'Swarm Docker 1',
-            'server_id' => 1,
-        ]);
+        // SwarmDocker::create([
+        //     'name' => 'Swarm Docker 1',
+        //     'server_id' => 1,
+        // ]);
     }
 }

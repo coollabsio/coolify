@@ -69,21 +69,39 @@
             @endif
             @if ($application->build_pack !== 'dockerimage' && $application->build_pack !== 'dockercompose')
                 <h3>Docker Registry</h3>
-                <div>Push the built image to a docker registry. More info <a class="underline"
-                        href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                @if ($application->destination->server->isSwarm())
+                <div>Docker Swarm requires the image to be available in a registry. More info <a class="underline"
+                    href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                            @else
+                            <div>Push the built image to a docker registry. More info <a class="underline"
+                                href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                @endif
                 <div class="flex flex-col gap-2 xl:flex-row">
                     @if ($application->build_pack === 'dockerimage')
-                        <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
-                        <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                        @if ($application->destination->server->isSwarm())
+                            <x-forms.input required id="application.docker_registry_image_name" label="Docker Image" />
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                        @else
+                            <x-forms.input id="application.docker_registry_image_name" label="Docker Image" />
+                            <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
+                        @endif
                     @else
-                        <x-forms.input id="application.docker_registry_image_name"
-                            helper="Empty means it won't push the image to a docker registry."
-                            placeholder="Empty means it won't push the image to a docker registry."
-                            label="Docker Image" />
-                        <x-forms.input id="application.docker_registry_image_tag"
-                            placeholder="Empty means only push commit sha tag."
-                            helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
-                            label="Docker Image Tag" />
+                        @if ($application->destination->server->isSwarm())
+                            <x-forms.input id="application.docker_registry_image_name" required label="Docker Image" />
+                            <x-forms.input id="application.docker_registry_image_tag"
+                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                label="Docker Image Tag" />
+                        @else
+                            <x-forms.input id="application.docker_registry_image_name"
+                                helper="Empty means it won't push the image to a docker registry."
+                                placeholder="Empty means it won't push the image to a docker registry."
+                                label="Docker Image" />
+                            <x-forms.input id="application.docker_registry_image_tag"
+                                placeholder="Empty means only push commit sha tag."
+                                helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."
+                                label="Docker Image Tag" />
+                        @endif
+
                     @endif
 
                 </div>
@@ -140,8 +158,8 @@
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
-                <x-forms.textarea rows="10" readonly id="application.docker_compose" label="Docker Compose Content"
-                    helper="You need to modify the docker compose file." />
+                <x-forms.textarea rows="10" readonly id="application.docker_compose"
+                    label="Docker Compose Content" helper="You need to modify the docker compose file." />
                 {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
                     label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
