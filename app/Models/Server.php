@@ -194,7 +194,8 @@ class Server extends BaseModel
     {
         return instant_remote_process(["df /| tail -1 | awk '{ print $5}' | sed 's/%//g'"], $this, false);
     }
-    public function definedResources() {
+    public function definedResources()
+    {
         $applications = $this->applications();
         $databases = $this->databases();
         $services = $this->services();
@@ -342,12 +343,16 @@ class Server extends BaseModel
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
-        $ID_LIKE = data_get($collectedData, 'ID_LIKE');
-        $VERSION_ID = data_get($collectedData, 'VERSION_ID');
-        // ray($ID, $ID_LIKE, $VERSION_ID);
-        if (collect(SUPPORTED_OS)->contains($ID_LIKE)) {
+        // $ID_LIKE = data_get($collectedData, 'ID_LIKE');
+        // $VERSION_ID = data_get($collectedData, 'VERSION_ID');
+        $supported = collect(SUPPORTED_OS)->filter(function ($supportedOs) use ($ID) {
+            if (str($supportedOs)->contains($ID)) {
+                return str($ID);
+            }
+        });
+        if ($supported->count() === 1) {
             ray('supported');
-            return str($ID_LIKE)->explode(' ')->first();
+            return $supported->first();
         } else {
             ray('not supported');
             return false;
