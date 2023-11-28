@@ -1,11 +1,7 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
-###########
-## Always run "php artisan app:sync-to-bunny-cdn --env=secrets" or "scripts/run sync-bunny" if you update this file.
-###########
-
-VERSION="1.0.3"
+VERSION="1.0.4"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -18,6 +14,28 @@ if [ $EUID != 0 ]; then
     echo "Please run as root"
     exit
 fi
+# case "$OS_TYPE" in
+# ubuntu | debian | raspbian)
+#     echo "Installing dependencies with APT..."
+#     apt update -y >/dev/null 2>&1
+#     apt install -y curl wget git jq >/dev/null 2>&1
+#     ;;
+# centos | fedora | rhel | ol | rocky)
+#     echo "Installing dependencies with DNF..."
+#     dnf update -y >/dev/null 2>&1
+#     dnf install -y curl wget git jq >/dev/null 2>&1
+#     ;;
+# sles | opensuse-leap | opensuse-tumbleweed)
+#     echo "Installing dependencies with Zypper..."
+#     zypper refresh >/dev/null 2>&1
+#     zypper install -y curl wget git jq >/dev/null 2>&1
+#     ;;
+# *)
+#     echo "This script only supports Debian, Redhat or Sles based operating systems for now."
+#     exit
+#     ;;
+# esac
+
 if [ $OS_TYPE != "ubuntu" ] && [ $OS_TYPE != "debian" ] && [ $OS_TYPE != "raspbian" ]; then
     echo "This script only supports Ubuntu and Debian for now."
     exit
@@ -41,7 +59,7 @@ echo -e "-------------"
 echo "Installing required packages..."
 
 apt update -y >/dev/null 2>&1
-apt install -y curl wget git jq jc >/dev/null 2>&1
+apt install -y curl wget git jq >/dev/null 2>&1
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker..."
@@ -53,7 +71,7 @@ if ! [ -x "$(command -v docker)" ]; then
         echo "Maybe your OS is not supported."
         echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
         exit 1
-   fi
+    fi
 fi
 echo -e "-------------"
 echo -e "Check Docker Configuration..."
@@ -92,7 +110,6 @@ else
     echo "Docker configuration updated, restart docker daemon..."
     systemctl restart docker
 fi
-
 
 echo -e "-------------"
 
