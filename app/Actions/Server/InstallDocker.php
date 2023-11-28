@@ -48,20 +48,19 @@ class InstallDocker
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
                     "command -v jq >/dev/null || apt-get update -y",
-                    "command -v jq >/dev/null || apt install -y jq",
+                    "command -v jq >/dev/null || apt install -y curl wget git jq",
 
                 ]);
             } else if ($supported_os_type->contains('rhel')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
-                    "command -v jq >/dev/null || dnf update -y",
-                    "command -v jq >/dev/null || dnf install -y jq",
+                    "command -v jq >/dev/null || dnf install -y curl wget git jq",
                 ]);
             } else if ($supported_os_type->contains('sles')) {
                 $command = $command->merge([
                     "echo 'Installing Prerequisites...'",
                     "command -v jq >/dev/null || zypper update -y",
-                    "command -v jq >/dev/null || zypper install -y jq",
+                    "command -v jq >/dev/null || zypper install -y curl wget git jq",
                 ]);
             } else {
                 throw new \Exception('Unsupported OS');

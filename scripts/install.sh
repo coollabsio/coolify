@@ -46,7 +46,6 @@ ubuntu | debian | raspbian)
     apt install -y curl wget git jq >/dev/null 2>&1
     ;;
 centos | fedora | rhel | ol | rocky)
-    dnf update -y >/dev/null 2>&1
     dnf install -y curl wget git jq >/dev/null 2>&1
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
