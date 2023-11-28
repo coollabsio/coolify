@@ -275,8 +275,11 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
     return $labels->all();
 }
 
-function isDatabaseImage(string $image)
+function isDatabaseImage(?string $image = null)
 {
+    if (is_null($image)) {
+        return false;
+    }
     $image = str($image);
     if ($image->contains(':')) {
         $image = str($image);
