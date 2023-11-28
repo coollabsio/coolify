@@ -32,15 +32,17 @@
         @empty
         @endforelse
     @else
+    <div class="flex flex-col">
         @forelse ($server->definedResources() as $resource)
             @if ($loop->first)
                 <h3 class="pt-4">Defined resources</h3>
             @endif
-            <div class="flex gap-2">
+            <a class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
                 <div class="w-64">{{ str($resource->type())->headline() }}</div>
-                <a class="text-white underline" href="{{ $resource->link() }}">{{ $resource->name }}</a>
-            </div>
+                <div >{{ $resource->name }}</div>
+            </a>
         @empty
         @endforelse
+        </div>
     @endif
 </div>
