@@ -1289,9 +1289,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->execute_remote_command(
             ["echo 'Oops something is not okay, are you okay? 😢'", 'type' => 'err'],
             ["echo '{$exception->getMessage()}'", 'type' => 'err'],
-            ["echo -n 'Deployment failed. Removing the new version of your application.'", 'type' => 'err'],
-            [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true]
         );
+        if ($this->application->build_pack !== 'dockercompose') {
+            $this->execute_remote_command(
+                ["echo -n 'Deployment failed. Removing the new version of your application.'", 'type' => 'err'],
+                [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true]
+            );
+        }
 
         $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
