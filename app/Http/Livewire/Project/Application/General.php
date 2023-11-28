@@ -199,7 +199,7 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            if ($this->initialDockerComposeLocation !== $this->application->docker_compose_location || $this->initialDockerComposePrLocation !== $this->application->docker_compose_pr_location) {
+            if ($this->application->build_pack === 'dockercompose' && ($this->initialDockerComposeLocation !== $this->application->docker_compose_location || $this->initialDockerComposePrLocation !== $this->application->docker_compose_pr_location)) {
                 $this->loadComposeFile();
             }
             $this->validate();
@@ -234,10 +234,12 @@ class General extends Component
                 $this->customLabels = str($this->customLabels)->replace(',', "\n");
             }
             $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
-            $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+            if ($this->application->build_pack === 'dockercompose') {
+                $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
+                $this->parsedServices = $this->application->parseCompose();
+            }
             $this->application->save();
             $showToaster && $this->emit('success', 'Application settings updated!');
-            $this->parsedServices = $this->application->parseCompose();
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
