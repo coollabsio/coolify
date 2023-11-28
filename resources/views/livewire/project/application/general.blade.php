@@ -119,9 +119,9 @@
                         <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
                             label="Docker Compose Location"
                             helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
-                            <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
+                        {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
                             label="Docker Compose Location For Pull Requests"
-                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" />
+                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
                     @endif
                     @if ($application->build_pack === 'dockerfile')
                         <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target"
@@ -140,9 +140,10 @@
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
-
                 <x-forms.textarea rows="10" readonly id="application.docker_compose" label="Docker Compose Content"
                     helper="You need to modify the docker compose file." />
+                {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
+                    label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
 
             @if ($application->dockerfile)

@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('applications', function (Blueprint $table) {
             $table->string('docker_compose_location')->nullable()->default('/docker-compose.yaml')->after('dockerfile_location');
-            $table->string('docker_compose_pr_location')->nullable()->default('/docker-compose-pr.yaml')->after('docker_compose_location');
+            $table->string('docker_compose_pr_location')->nullable()->default('/docker-compose.yaml')->after('docker_compose_location');
 
             $table->longText('docker_compose')->nullable()->after('docker_compose_location');
             $table->longText('docker_compose_pr')->nullable()->after('docker_compose_location');

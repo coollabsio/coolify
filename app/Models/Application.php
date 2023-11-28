@@ -153,7 +153,7 @@ class Application extends BaseModel
         return Attribute::make(
             set: function ($value) {
                 if (is_null($value) || $value === '') {
-                    return '/docker-compose-pr.yaml';
+                    return '/docker-compose.yaml';
                 } else {
                     if ($value !== '/') {
                         return Str::start(Str::replaceEnd('/', '', $value), '/');
@@ -602,7 +602,11 @@ class Application extends BaseModel
     function parseCompose(int $pull_request_id = 0)
     {
         if ($this->docker_compose_raw) {
-            return parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
+            $mainCompose = parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
+            if ($this->getMorphClass() === 'App\Models\Application' && $this->docker_compose_pr_raw) {
+                parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, is_pr: true);
+            }
+            return $mainCompose;
         } else {
             return collect([]);
         }
@@ -620,11 +624,15 @@ class Application extends BaseModel
             $workdir = rtrim($this->base_directory, '/');
             $composeFile = $this->docker_compose_location;
             $prComposeFile = $this->docker_compose_pr_location;
+            $fileList = collect([".$composeFile"]);
+            if ($composeFile !== $prComposeFile) {
+                $fileList->push(".$prComposeFile");
+            }
             $commands = collect([
                 "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
                 $cloneCommand,
                 "git sparse-checkout init --cone",
-                "git sparse-checkout set .$workdir$composeFile .$workdir$prComposeFile",
+                "git sparse-checkout set {$fileList->implode(' ')}",
                 "git read-tree -mu HEAD",
                 "cat .$workdir$composeFile",
             ]);
@@ -632,23 +640,30 @@ class Application extends BaseModel
             if (!$composeFileContent) {
                 $this->docker_compose_location = $initialDockerComposeLocation;
                 $this->save();
-                throw new \Exception("Could not load compose file from $workdir$composeFile");
+                throw new \Exception("Could not load base compose file from $workdir$composeFile");
             } else {
                 $this->docker_compose_raw = $composeFileContent;
                 $this->save();
             }
-            $commands = collect([
-                "cat .$workdir$prComposeFile",
-            ]);
-            $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
-            if (!$composePrFileContent) {
-                $this->docker_compose_pr_location = $initialDockerComposePrLocation;
+            if ($composeFile === $prComposeFile) {
+                $this->docker_compose_pr_raw = $composeFileContent;
                 $this->save();
-                throw new \Exception("Could not load compose file from $workdir$prComposeFile");
             } else {
-                $this->docker_compose_pr_raw = $composePrFileContent;
-                $this->save();
+                $commands = collect([
+                    "cd /tmp/{$uuid}",
+                    "cat .$workdir$prComposeFile",
+                ]);
+                $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
+                if (!$composePrFileContent) {
+                    $this->docker_compose_pr_location = $initialDockerComposePrLocation;
+                    $this->save();
+                    throw new \Exception("Could not load compose file from $workdir$prComposeFile");
+                } else {
+                    $this->docker_compose_pr_raw = $composePrFileContent;
+                    $this->save();
+                }
             }
+
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
             ]);

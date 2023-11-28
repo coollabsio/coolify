@@ -579,7 +579,7 @@ function getTopLevelNetworks(Service|Application $resource)
         return $topLevelNetworks->keys();
     }
 }
-function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id)
+function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id, bool $is_pr = false)
 {
     // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
@@ -1089,8 +1089,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             return collect([]);
         }
     } else if ($resource->getMorphClass() === 'App\Models\Application') {
-        if ($pull_request_id !== 0 && $resource->dockerComposePrLocation() !== $resource->dockerComposeLocation()) {
-
+        $isSameDockerComposeFile = false;
+        if ($resource->dockerComposePrLocation() === $resource->dockerComposeLocation()) {
+            $isSameDockerComposeFile = true;
+            $is_pr = false;
+        }
+        if ($is_pr) {
+            try {
+                $yaml = Yaml::parse($resource->docker_compose_pr_raw);
+            } catch (\Exception $e) {
+                throw new \Exception($e->getMessage());
+            }
         } else {
             try {
                 $yaml = Yaml::parse($resource->docker_compose_raw);
@@ -1098,7 +1107,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 throw new \Exception($e->getMessage());
             }
         }
-
+        ray($yaml);
         $server = $resource->destination->server;
         $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
         if ($pull_request_id !== 0) {
@@ -1172,7 +1181,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
             } else {
-
             }
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
@@ -1469,8 +1477,20 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             'volumes' => $topLevelVolumes->toArray(),
             'networks' => $topLevelNetworks->toArray(),
         ];
-        $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
-        $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        if ($isSameDockerComposeFile) {
+            $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
+            $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
+            $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+            $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+        } else {
+            if ($is_pr) {
+                $resource->docker_compose_pr_raw = Yaml::dump($yaml, 10, 2);
+                $resource->docker_compose_pr = Yaml::dump($finalServices, 10, 2);
+            } else {
+                $resource->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+                $resource->docker_compose = Yaml::dump($finalServices, 10, 2);
+            }
+        }
         $resource->save();
         return collect($finalServices);
     }

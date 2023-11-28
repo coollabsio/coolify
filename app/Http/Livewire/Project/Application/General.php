@@ -60,7 +60,9 @@ class General extends Component
         'application.docker_compose_location' => 'nullable',
         'application.docker_compose_pr_location' => 'nullable',
         'application.docker_compose' => 'nullable',
+        'application.docker_compose_pr' => 'nullable',
         'application.docker_compose_raw' => 'nullable',
+        'application.docker_compose_pr_raw' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
@@ -88,7 +90,9 @@ class General extends Component
         'application.docker_compose_location' => 'Docker compose location',
         'application.docker_compose_pr_location' => 'Docker compose location',
         'application.docker_compose' => 'Docker compose',
+        'application.docker_compose_pr' => 'Docker compose',
         'application.docker_compose_raw' => 'Docker compose raw',
+        'application.docker_compose_pr_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.settings.is_static' => 'Is static',
@@ -98,7 +102,6 @@ class General extends Component
     {
         try {
             $this->parsedServices = $this->application->parseCompose();
-            ray($this->parsedServices);
         } catch (\Throwable $e) {
             $this->emit('error', $e->getMessage());
         }
@@ -196,7 +199,7 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            if ($this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
+            if ($this->initialDockerComposeLocation !== $this->application->docker_compose_location || $this->initialDockerComposePrLocation !== $this->application->docker_compose_pr_location) {
                 $this->loadComposeFile();
             }
             $this->validate();
