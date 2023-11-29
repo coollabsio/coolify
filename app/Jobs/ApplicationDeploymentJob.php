@@ -468,7 +468,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);
         }
-
+        if (isset($this->docker_compose_base64)) {
+            $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
+            $composeFileName = "$this->configuration_dir/docker-compose.yml";
+            if ($this->pull_request_id !== 0) {
+                $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yml";
+            }
+            $this->execute_remote_command(
+                [
+                    "mkdir -p $this->configuration_dir"
+                ],
+                [
+                    "echo '{$this->docker_compose_base64}' | base64 -d > $composeFileName",
+                ],
+                [
+                    "echo '{$readme}' > $this->configuration_dir/README.md",
+                ]
+            );
+        }
         $this->start_by_compose_file();
         $this->application->loadComposeFile(isInit: false);
     }
@@ -1224,6 +1241,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+            );
+        } else if ($this->application->build_pack === 'dockercompose') {
+            $this->execute_remote_command(
+                ["docker compose --project-directory {$this->configuration_dir} up --build -d"],
             );
         } else {
             $this->execute_remote_command(
