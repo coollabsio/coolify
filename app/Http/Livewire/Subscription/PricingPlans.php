@@ -11,6 +11,9 @@ class PricingPlans extends Component
     public bool $isTrial = false;
     public function mount() {
         $this->isTrial = !data_get(currentTeam(),'subscription.stripe_trial_already_ended');
+        if (config('constants.limits.trial_period') == 0) {
+            $this->isTrial = false;
+        }
     }
     public function subscribeStripe($type)
     {
@@ -63,6 +66,7 @@ class PricingPlans extends Component
         ];
 
         if (!data_get($team,'subscription.stripe_trial_already_ended')) {
+            if (config('constants.limits.trial_period') > 0) {
             $payload['subscription_data'] = [
                 'trial_period_days' => config('constants.limits.trial_period'),
                 'trial_settings' => [
@@ -71,6 +75,7 @@ class PricingPlans extends Component
                     ]
                 ],
             ];
+        }
             $payload['payment_method_collection'] = 'if_required';
         }
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;

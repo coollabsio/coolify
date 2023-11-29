@@ -22,7 +22,7 @@ return [
         'official' => 'https://cdn.coollabs.io/coolify/service-templates.json',
     ],
     'limits' => [
-        'trial_period' => 7,
+        'trial_period' => 0,
         'server' => [
             'zero' => 0,
             'self-hosted' => 999999999999,

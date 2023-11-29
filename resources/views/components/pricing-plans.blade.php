@@ -21,8 +21,11 @@
                 </label>
             </fieldset>
         </div>
-        <div class="py-2 text-center"><span class="font-bold text-warning">{{ config('constants.limits.trial_period') }}
-                days trial</span> included on all plans, without credit card details.</div>
+        @if (config('constants.limits.trial_period') > 0)
+            <div class="py-2 text-center"><span
+                    class="font-bold text-warning">{{ config('constants.limits.trial_period') }}
+                    days trial</span> included on all plans, without credit card details.</div>
+        @endif
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
             <div>Save <span class="font-bold text-warning">10%</span> annually with the yearly plans.
             </div>
@@ -255,8 +258,8 @@
                 <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>
-                        <a class="font-bold text-white hover:no-underline"
-                            href="{{ config('coolify.docs') }}">Contact Us</a>
+                        <a class="font-bold text-white hover:no-underline" href="{{ config('coolify.docs') }}">Contact
+                            Us</a>
                     </x-forms.button>
                 </div>
             </div>
