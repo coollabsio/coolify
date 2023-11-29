@@ -37,14 +37,14 @@ class Init extends Command
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_helper_containers();
     }
-    private function cleanup_stucked_helper_containers() {
+    private function cleanup_stucked_helper_containers()
+    {
         $servers = Server::all();
         foreach ($servers as $server) {
             if ($server->isFunctional()) {
                 CleanupHelperContainersJob::dispatch($server);
             }
         }
-
     }
     private function alive()
     {
@@ -66,7 +66,7 @@ class Init extends Command
     // private function cleanup_ssh()
     // {
 
-         // TODO: it will cleanup id.root@host.docker.internal
+    // TODO: it will cleanup id.root@host.docker.internal
     //     try {
     //         $files = Storage::allFiles('ssh/keys');
     //         foreach ($files as $file) {
@@ -101,15 +101,15 @@ class Init extends Command
             $applications = Application::all();
             foreach ($applications as $application) {
                 if (!data_get($application, 'environment')) {
-                    ray('Application without environment', $application->name);
+                    echo 'Application without environment' . $application->name . 'deleting\n';
                     $application->delete();
                 }
                 if (!$application->destination()) {
-                    ray('Application without destination', $application->name);
+                    echo 'Application without destination' . $application->name . 'deleting\n';
                     $application->delete();
                 }
                 if (!data_get($application, 'destination.server')) {
-                    ray('Application without server', $application->name);
+                    echo 'Application without server' . $application->name . 'deleting\n';
                     $application->delete();
                 }
             }
@@ -120,15 +120,15 @@ class Init extends Command
             $postgresqls = StandalonePostgresql::all();
             foreach ($postgresqls as $postgresql) {
                 if (!data_get($postgresql, 'environment')) {
-                    ray('Postgresql without environment', $postgresql->name);
+                    echo 'Postgresql without environment' . $postgresql->name . 'deleting\n';
                     $postgresql->delete();
                 }
                 if (!$postgresql->destination()) {
-                    ray('Postgresql without destination', $postgresql->name);
+                    echo 'Postgresql without destination' . $postgresql->name . 'deleting\n';
                     $postgresql->delete();
                 }
                 if (!data_get($postgresql, 'destination.server')) {
-                    ray('Postgresql without server', $postgresql->name);
+                    echo 'Postgresql without server' . $postgresql->name . 'deleting\n';
                     $postgresql->delete();
                 }
             }
@@ -139,15 +139,15 @@ class Init extends Command
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
                 if (!data_get($redis, 'environment')) {
-                    ray('Redis without environment', $redis->name);
+                    echo 'Redis without environment' . $redis->name . 'deleting\n';
                     $redis->delete();
                 }
                 if (!$redis->destination()) {
-                    ray('Redis without destination', $redis->name);
+                    echo 'Redis without destination' . $redis->name . 'deleting\n';
                     $redis->delete();
                 }
                 if (!data_get($redis, 'destination.server')) {
-                    ray('Redis without server', $redis->name);
+                    echo 'Redis without server' . $redis->name . 'deleting\n';
                     $redis->delete();
                 }
             }
@@ -159,15 +159,15 @@ class Init extends Command
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
                 if (!data_get($mongodb, 'environment')) {
-                    ray('Mongodb without environment', $mongodb->name);
+                    echo 'Mongodb without environment' . $mongodb->name . 'deleting\n';
                     $mongodb->delete();
                 }
                 if (!$mongodb->destination()) {
-                    ray('Mongodb without destination', $mongodb->name);
+                    echo 'Mongodb without destination' . $mongodb->name . 'deleting\n';
                     $mongodb->delete();
                 }
                 if (!data_get($mongodb, 'destination.server')) {
-                    ray('Mongodb without server', $mongodb->name);
+                    echo 'Mongodb without server' . $mongodb->name . 'deleting\n';
                     $mongodb->delete();
                 }
             }
@@ -179,15 +179,15 @@ class Init extends Command
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
                 if (!data_get($mysql, 'environment')) {
-                    ray('Mysql without environment', $mysql->name);
+                    echo 'Mysql without environment' . $mysql->name . 'deleting\n';
                     $mysql->delete();
                 }
                 if (!$mysql->destination()) {
-                    ray('Mysql without destination', $mysql->name);
+                    echo 'Mysql without destination' . $mysql->name . 'deleting\n';
                     $mysql->delete();
                 }
                 if (!data_get($mysql, 'destination.server')) {
-                    ray('Mysql without server', $mysql->name);
+                    echo 'Mysql without server' . $mysql->name . 'deleting\n';
                     $mysql->delete();
                 }
             }
@@ -199,15 +199,15 @@ class Init extends Command
             $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
                 if (!data_get($mariadb, 'environment')) {
-                    ray('Mariadb without environment', $mariadb->name);
+                    echo 'Mariadb without environment' . $mariadb->name . 'deleting\n';
                     $mariadb->delete();
                 }
                 if (!$mariadb->destination()) {
-                    ray('Mariadb without destination', $mariadb->name);
+                    echo 'Mariadb without destination' . $mariadb->name . 'deleting\n';
                     $mariadb->delete();
                 }
                 if (!data_get($mariadb, 'destination.server')) {
-                    ray('Mariadb without server', $mariadb->name);
+                    echo 'Mariadb without server' . $mariadb->name . 'deleting\n';
                     $mariadb->delete();
                 }
             }
@@ -219,15 +219,15 @@ class Init extends Command
             $services = Service::all();
             foreach ($services as $service) {
                 if (!data_get($service, 'environment')) {
-                    ray('Service without environment', $service->name);
+                    echo 'Service without environment' . $service->name . 'deleting\n';
                     $service->delete();
                 }
                 if (!$service->destination()) {
-                    ray('Service without destination', $service->name);
+                    echo 'Service without destination' . $service->name . 'deleting\n';
                     $service->delete();
                 }
                 if (!data_get($service, 'server')) {
-                    ray('Service without server', $service->name);
+                    echo 'Service without server' . $service->name . 'deleting\n';
                     $service->delete();
                 }
             }
@@ -238,7 +238,7 @@ class Init extends Command
             $serviceApplications = ServiceApplication::all();
             foreach ($serviceApplications as $service) {
                 if (!data_get($service, 'service')) {
-                    ray('ServiceApplication without service', $service->name);
+                    echo 'ServiceApplication without service' . $service->name . 'deleting\n';
                     $service->delete();
                 }
             }
@@ -249,7 +249,7 @@ class Init extends Command
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
                 if (!data_get($service, 'service')) {
-                    ray('ServiceDatabase without service', $service->name);
+                    echo 'ServiceDatabase without service' . $service->name . 'deleting\n';
                     $service->delete();
                 }
             }
