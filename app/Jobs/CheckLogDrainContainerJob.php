@@ -47,7 +47,7 @@ class CheckLogDrainContainerJob implements ShouldQueue, ShouldBeEncrypted
             if (!$this->server->isServerReady()) {
                 return;
             };
-            $containers = instant_remote_process(["docker container ls -q"], $this->server);
+            $containers = instant_remote_process(["docker container ls -q"], $this->server, false);
             if (!$containers) {
                 return;
             }
