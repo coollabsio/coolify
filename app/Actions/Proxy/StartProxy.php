@@ -30,7 +30,7 @@ class StartProxy
                     "mkdir -p $proxy_path && cd $proxy_path",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
-                    // "docker stack deploy -c docker-compose.yaml coolify-proxy",
+                    "cd $proxy_path && docker stack deploy -c docker-compose.yml coolify-proxy",
                     "echo 'Proxy started successfully.'"
                 ]);
             } else {

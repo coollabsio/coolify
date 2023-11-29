@@ -76,10 +76,20 @@ class InstallDocker
                 "echo 'Restarting Docker Engine...'",
                 "systemctl enable docker >/dev/null 2>&1 || true",
                 "systemctl restart docker",
-                "echo 'Creating default Docker network (coolify)...'",
-                "docker network create --attachable coolify >/dev/null 2>&1 || true",
-                "echo 'Done!'"
             ]);
+            if ($server->isSwarm()) {
+                $command = $command->merge([
+                    "docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true",
+                ]);
+            } else {
+                $command = $command->merge([
+                    "docker network create --attachable coolify >/dev/null 2>&1 || true",
+                ]);
+                $command = $command->merge([
+                    "echo 'Done!'",
+                ]);
+            }
+
             return remote_process($command, $server);
         }
     }

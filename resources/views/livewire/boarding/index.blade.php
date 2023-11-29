@@ -208,7 +208,7 @@
                                 id="remoteServerUser" />
                         </div>
                         <div class="w-64">
-                            <x-forms.checkbox type="checkbox" id="isPartOfSwarm"
+                            <x-forms.checkbox type="checkbox" id="isSwarmManager"
                                 label="Is it a Swarm Manager?" />
                         </div>
                         <x-forms.button type="submit">Check Connection</x-forms.button>

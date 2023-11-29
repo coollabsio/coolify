@@ -26,7 +26,7 @@
                 @endforeach
             </x-forms.select>
             <div class="w-64">
-                <x-forms.checkbox type="checkbox" id="is_part_of_swarm"
+                <x-forms.checkbox type="checkbox" id="is_swarm_manager"
                     label="Is it a Swarm Manager?" />
             </div>
             <x-forms.button type="submit">

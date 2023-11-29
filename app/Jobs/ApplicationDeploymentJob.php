@@ -453,11 +453,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
         }
-        $this->execute_remote_command([
-            "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
-        ], [
-            "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
-        ]);
+        if ($this->server->isSwarm()) {
+            // TODO
+        } else {
+            $this->execute_remote_command([
+                "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+            ], [
+                "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
+            ]);
+        }
+
         $this->start_by_compose_file();
         $this->application->loadComposeFile(isInit: false);
     }

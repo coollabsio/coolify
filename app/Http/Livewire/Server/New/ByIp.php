@@ -21,7 +21,7 @@ class ByIp extends Component
     public string $ip;
     public string $user = 'root';
     public int $port = 22;
-    public bool $is_part_of_swarm = false;
+    public bool $is_swarm_manager = false;
 
     protected $rules = [
         'name' => 'required|string',
@@ -29,7 +29,7 @@ class ByIp extends Component
         'ip' => 'required',
         'user' => 'required|string',
         'port' => 'required|integer',
-        'is_part_of_swarm' => 'required|boolean',
+        'is_swarm_manager' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
@@ -37,7 +37,7 @@ class ByIp extends Component
         'ip' => 'IP Address/Domain',
         'user' => 'User',
         'port' => 'Port',
-        'is_part_of_swarm' => 'Is part of swarm',
+        'is_swarm_manager' => 'Swarm Manager',
     ];
 
     public function mount()
@@ -76,7 +76,7 @@ class ByIp extends Component
                     "status" => ProxyStatus::EXITED->value,
                 ],
             ]);
-            $server->settings->is_part_of_swarm = $this->is_part_of_swarm;
+            $server->settings->is_swarm_manager = $this->is_swarm_manager;
             $server->settings->save();
             $server->addInitialNetwork();
             return redirect()->route('server.show', $server->uuid);

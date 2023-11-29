@@ -378,7 +378,7 @@ class Server extends BaseModel
     }
     public function isSwarm()
     {
-        return data_get($this, 'settings.is_part_of_swarm');
+        return data_get($this, 'settings.is_swarm_manager') || data_get($this, 'settings.is_swarm_worker');
     }
     public function validateConnection()
     {

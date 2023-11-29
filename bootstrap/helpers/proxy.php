@@ -54,9 +54,15 @@ function connectProxyToNetworks(Server $server)
 function generate_default_proxy_configuration(Server $server)
 {
     $proxy_path = get_proxy_path();
-    $networks = collect($server->standaloneDockers)->map(function ($docker) {
-        return $docker['network'];
-    })->unique();
+    if ($server->isSwarm()) {
+        $networks = collect($server->swarmDockers)->map(function ($docker) {
+            return $docker['network'];
+        })->unique();
+    } else {
+        $networks = collect($server->standaloneDockers)->map(function ($docker) {
+            return $docker['network'];
+        })->unique();
+    }
     if ($networks->count() === 0) {
         $networks = collect(['coolify']);
     }
@@ -66,6 +72,16 @@ function generate_default_proxy_configuration(Server $server)
             "external" => true,
         ];
     });
+    $labels = [
+        "traefik.enable=true",
+        "traefik.http.routers.traefik.entrypoints=http",
+        "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
+        "traefik.http.routers.traefik.service=api@internal",
+        "traefik.http.services.traefik.loadbalancer.server.port=8080",
+        // Global Middlewares
+        "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
+        "traefik.http.middlewares.gzip.compress=true",
+    ];
     $config = [
         "version" => "3.8",
         "networks" => $array_of_networks->toArray(),
@@ -109,16 +125,7 @@ function generate_default_proxy_configuration(Server $server)
                     "--certificatesresolvers.letsencrypt.acme.storage=/traefik/acme.json",
                     "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=http",
                 ],
-                "labels" => [
-                    "traefik.enable=true",
-                    "traefik.http.routers.traefik.entrypoints=http",
-                    "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
-                    "traefik.http.routers.traefik.service=api@internal",
-                    "traefik.http.services.traefik.loadbalancer.server.port=8080",
-                    // Global Middlewares
-                    "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
-                    "traefik.http.middlewares.gzip.compress=true",
-                ],
+                "labels" => $labels,
             ],
         ],
     ];
@@ -128,8 +135,13 @@ function generate_default_proxy_configuration(Server $server)
         $config['services']['traefik']['command'][] = "--accesslog.bufferingsize=100";
     }
     if ($server->isSwarm()) {
+        data_forget($config, 'services.traefik.container_name');
+        data_forget($config, 'services.traefik.restart');
+        data_forget($config, 'services.traefik.labels');
+
         $config['services']['traefik']['command'][] = "--providers.docker.swarmMode=true";
         $config['services']['traefik']['deploy'] = [
+            "labels" => $labels,
             "placement" => [
                 "constraints" => [
                     "node.role==manager",
@@ -139,7 +151,7 @@ function generate_default_proxy_configuration(Server $server)
     } else {
         $config['services']['traefik']['command'][] = "--providers.docker=true";
     }
-    $config = Yaml::dump($config, 4, 2);
+    $config = Yaml::dump($config, 12, 2);
     SaveConfiguration::run($server, $config);
     return $config;
 }

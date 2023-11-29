@@ -24,7 +24,8 @@ class Form extends Component
         'server.port' => 'required',
         'server.settings.is_cloudflare_tunnel' => 'required|boolean',
         'server.settings.is_reachable' => 'required',
-        'server.settings.is_part_of_swarm' => 'required|boolean',
+        'server.settings.is_swarm_manager' => 'required|boolean',
+        // 'server.settings.is_swarm_worker' => 'required|boolean',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -34,8 +35,9 @@ class Form extends Component
         'server.user' => 'User',
         'server.port' => 'Port',
         'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
-        'server.settings.is_reachable' => 'is reachable',
-        'server.settings.is_part_of_swarm' => 'is part of swarm'
+        'server.settings.is_reachable' => 'Is reachable',
+        'server.settings.is_swarm_manager' => 'Swarm Manager',
+        // 'server.settings.is_swarm_worker' => 'Swarm Worker',
     ];
 
     public function mount()
