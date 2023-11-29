@@ -47,7 +47,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $containerReplicase = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
             } else {
                 // Precheck for containers
-                $containers = instant_remote_process(["docker container ls -q"], $this->server);
+                $containers = instant_remote_process(["docker container ls -q"], $this->server, false);
                 if (!$containers) {
                     return;
                 }
@@ -95,7 +95,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     $uuid = data_get($labels, 'coolify.name');
                 } else {
                     $labels = data_get($container, 'Config.Labels');
-                    $uuid = data_get($labels, 'com.docker.compose.service');
                 }
                 $containerStatus = data_get($container, 'State.Status');
                 $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
@@ -131,6 +130,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                         }
                     }
                 } else {
+                    $uuid = data_get($labels, 'com.docker.compose.service');
                     if ($uuid) {
                         $database = $databases->where('uuid', $uuid)->first();
                         if ($database) {
