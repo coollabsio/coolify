@@ -46,6 +46,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
                 $containerReplicase = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
             } else {
+                // Precheck for containers
+                $containers = instant_remote_process(["docker container ls -q"], $this->server);
+                if (!$containers) {
+                    return;
+                }
                 $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
                 $containerReplicase = null;
             }
