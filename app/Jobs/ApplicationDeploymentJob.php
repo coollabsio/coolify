@@ -1244,7 +1244,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             );
         } else if ($this->application->build_pack === 'dockercompose') {
             $this->execute_remote_command(
-                ["docker compose --project-directory {$this->configuration_dir} up --build -d"],
+                ["docker compose --project-directory {$this->configuration_dir} up --build -d", "hidden" => true],
             );
         } else {
             $this->execute_remote_command(
