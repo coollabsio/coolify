@@ -38,8 +38,7 @@
                 <x-forms.input id="server.description" label="Description" />
                 <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                     helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example:</span><br>In case you set:<span class='text-helper'>https://example.com</span> your applications will get:<br> <span class='text-helper'>https://randomId.example.com</span>" />
-                {{-- <x-forms.checkbox disabled type="checkbox" id="server.settings.is_part_of_swarm"
-                    label="Is it part of a Swarm cluster?" /> --}}
+
             </div>
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input id="server.ip" label="IP Address/Domain"
@@ -49,13 +48,17 @@
                     <x-forms.input type="number" id="server.port" label="Port" required />
                 </div>
             </div>
-            @if (!$server->isLocalhost())
-                <div class="w-64">
+            <div class="w-64">
+                @if (!$server->isLocalhost())
                     <x-forms.checkbox instantSave
                         helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                         id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
-                </div>
-            @endif
+                @endif
+                {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                    label="Is it a Swarm Manager?" /> --}}
+                    {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                    label="Is it a Swarm Worker?" /> --}}
+            </div>
         </div>
 
         @if ($server->isFunctional())

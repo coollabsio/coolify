@@ -30,6 +30,7 @@ class Init extends Command
         $this->alive();
         $cleanup = $this->option('cleanup');
         if ($cleanup) {
+            echo "Running cleanup\n";
             $this->cleanup_stucked_resources();
             $this->cleanup_ssh();
         }
@@ -101,12 +102,12 @@ class Init extends Command
                     ray('Application without environment', $application->name);
                     $application->delete();
                 }
-                if (!data_get($application, 'destination.server')) {
-                    ray('Application without server', $application->name);
-                    $application->delete();
-                }
                 if (!$application->destination()) {
                     ray('Application without destination', $application->name);
+                    $application->delete();
+                }
+                if (!data_get($application, 'destination.server')) {
+                    ray('Application without server', $application->name);
                     $application->delete();
                 }
             }
@@ -120,12 +121,12 @@ class Init extends Command
                     ray('Postgresql without environment', $postgresql->name);
                     $postgresql->delete();
                 }
-                if (!data_get($postgresql, 'destination.server')) {
-                    ray('Postgresql without server', $postgresql->name);
-                    $postgresql->delete();
-                }
                 if (!$postgresql->destination()) {
                     ray('Postgresql without destination', $postgresql->name);
+                    $postgresql->delete();
+                }
+                if (!data_get($postgresql, 'destination.server')) {
+                    ray('Postgresql without server', $postgresql->name);
                     $postgresql->delete();
                 }
             }
@@ -139,12 +140,12 @@ class Init extends Command
                     ray('Redis without environment', $redis->name);
                     $redis->delete();
                 }
-                if (!data_get($redis, 'destination.server')) {
-                    ray('Redis without server', $redis->name);
-                    $redis->delete();
-                }
                 if (!$redis->destination()) {
                     ray('Redis without destination', $redis->name);
+                    $redis->delete();
+                }
+                if (!data_get($redis, 'destination.server')) {
+                    ray('Redis without server', $redis->name);
                     $redis->delete();
                 }
             }
@@ -159,12 +160,12 @@ class Init extends Command
                     ray('Mongodb without environment', $mongodb->name);
                     $mongodb->delete();
                 }
-                if (!data_get($mongodb, 'destination.server')) {
-                    ray('Mongodb without server', $mongodb->name);
-                    $mongodb->delete();
-                }
                 if (!$mongodb->destination()) {
                     ray('Mongodb without destination', $mongodb->name);
+                    $mongodb->delete();
+                }
+                if (!data_get($mongodb, 'destination.server')) {
+                    ray('Mongodb without server', $mongodb->name);
                     $mongodb->delete();
                 }
             }
@@ -179,12 +180,12 @@ class Init extends Command
                     ray('Mysql without environment', $mysql->name);
                     $mysql->delete();
                 }
-                if (!data_get($mysql, 'destination.server')) {
-                    ray('Mysql without server', $mysql->name);
-                    $mysql->delete();
-                }
                 if (!$mysql->destination()) {
                     ray('Mysql without destination', $mysql->name);
+                    $mysql->delete();
+                }
+                if (!data_get($mysql, 'destination.server')) {
+                    ray('Mysql without server', $mysql->name);
                     $mysql->delete();
                 }
             }
@@ -199,12 +200,12 @@ class Init extends Command
                     ray('Mariadb without environment', $mariadb->name);
                     $mariadb->delete();
                 }
-                if (!data_get($mariadb, 'destination.server')) {
-                    ray('Mariadb without server', $mariadb->name);
-                    $mariadb->delete();
-                }
                 if (!$mariadb->destination()) {
                     ray('Mariadb without destination', $mariadb->name);
+                    $mariadb->delete();
+                }
+                if (!data_get($mariadb, 'destination.server')) {
+                    ray('Mariadb without server', $mariadb->name);
                     $mariadb->delete();
                 }
             }
@@ -219,12 +220,12 @@ class Init extends Command
                     ray('Service without environment', $service->name);
                     $service->delete();
                 }
-                if (!data_get($service, 'server')) {
-                    ray('Service without server', $service->name);
-                    $service->delete();
-                }
                 if (!$service->destination()) {
                     ray('Service without destination', $service->name);
+                    $service->delete();
+                }
+                if (!data_get($service, 'server')) {
+                    ray('Service without server', $service->name);
                     $service->delete();
                 }
             }

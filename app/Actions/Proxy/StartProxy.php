@@ -13,6 +13,7 @@ class StartProxy
     public function handle(Server $server, bool $async = true): string|Activity
     {
         try {
+
             $proxyType = $server->proxyType();
             $commands = collect([]);
             $proxy_path = get_proxy_path();
@@ -24,18 +25,29 @@ class StartProxy
             $docker_compose_yml_base64 = base64_encode($configuration);
             $server->proxy->last_applied_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;
             $server->save();
-            $commands = $commands->merge([
-                "mkdir -p $proxy_path && cd $proxy_path",
-                "echo 'Creating required Docker Compose file.'",
-                "echo 'Pulling docker image.'",
-                'docker compose pull',
-                "echo 'Stopping existing coolify-proxy.'",
-                "docker compose down -v --remove-orphans > /dev/null 2>&1",
-                "echo 'Starting coolify-proxy.'",
-                'docker compose up -d --remove-orphans',
-                "echo 'Proxy started successfully.'"
-            ]);
-            $commands = $commands->merge(connectProxyToNetworks($server));
+            if ($server->isSwarm()) {
+                $commands = $commands->merge([
+                    "mkdir -p $proxy_path && cd $proxy_path",
+                    "echo 'Creating required Docker Compose file.'",
+                    "echo 'Starting coolify-proxy.'",
+                    "cd $proxy_path && docker stack deploy -c docker-compose.yml coolify-proxy",
+                    "echo 'Proxy started successfully.'"
+                ]);
+            } else {
+                $commands = $commands->merge([
+                    "mkdir -p $proxy_path && cd $proxy_path",
+                    "echo 'Creating required Docker Compose file.'",
+                    "echo 'Pulling docker image.'",
+                    'docker compose pull',
+                    "echo 'Stopping existing coolify-proxy.'",
+                    "docker compose down -v --remove-orphans > /dev/null 2>&1",
+                    "echo 'Starting coolify-proxy.'",
+                    'docker compose up -d --remove-orphans',
+                    "echo 'Proxy started successfully.'"
+                ]);
+                $commands = $commands->merge(connectProxyToNetworks($server));
+            }
+
             if ($async) {
                 $activity = remote_process($commands, $server);
                 return $activity;
@@ -46,11 +58,9 @@ class StartProxy
                 $server->save();
                 return 'OK';
             }
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             ray($e);
             throw $e;
         }
-
-
     }
 }

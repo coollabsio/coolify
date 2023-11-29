@@ -42,8 +42,43 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             if (!$this->server->isServerReady()) {
                 return;
             };
-            $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server);
+            if ($this->server->isSwarm()) {
+                $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
+                $containerReplicase = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
+            } else {
+                // Precheck for containers
+                $containers = instant_remote_process(["docker container ls -q"], $this->server);
+                if (!$containers) {
+                    return;
+                }
+                $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
+                $containerReplicase = null;
+            }
+            if (is_null($containers)) {
+                return;
+            }
             $containers = format_docker_command_output_to_json($containers);
+            if ($containerReplicase) {
+                $containerReplicase = format_docker_command_output_to_json($containerReplicase);
+                foreach ($containerReplicase as $containerReplica) {
+                    $name = data_get($containerReplica, 'Name');
+                    $containers = $containers->map(function ($container) use ($name, $containerReplica) {
+                        if (data_get($container, 'Spec.Name') === $name) {
+                            $replicas = data_get($containerReplica, 'Replicas');
+                            $running = str($replicas)->explode('/')[0];
+                            $total = str($replicas)->explode('/')[1];
+                            if ($running === $total) {
+                                data_set($container, 'State.Status', 'running');
+                                data_set($container, 'State.Health.Status', 'healthy');
+                            } else {
+                                data_set($container, 'State.Status', 'starting');
+                                data_set($container, 'State.Health.Status', 'unhealthy');
+                            }
+                        }
+                        return $container;
+                    });
+                }
+            }
             $applications = $this->server->applications();
             $databases = $this->server->databases();
             $services = $this->server->services()->get();
@@ -55,10 +90,16 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $foundServices = [];
 
             foreach ($containers as $container) {
+                if ($this->server->isSwarm()) {
+                    $labels = data_get($container, 'Spec.Labels');
+                    $uuid = data_get($labels, 'coolify.name');
+                } else {
+                    $labels = data_get($container, 'Config.Labels');
+                    $uuid = data_get($labels, 'com.docker.compose.service');
+                }
                 $containerStatus = data_get($container, 'State.Status');
                 $containerHealth = data_get($container, 'State.Health.Status', 'unhealthy');
                 $containerStatus = "$containerStatus ($containerHealth)";
-                $labels = data_get($container, 'Config.Labels');
                 $labels = Arr::undot(format_docker_labels_to_json($labels));
                 $applicationId = data_get($labels, 'coolify.applicationId');
                 if ($applicationId) {
@@ -90,7 +131,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                         }
                     }
                 } else {
-                    $uuid = data_get($labels, 'com.docker.compose.service');
                     if ($uuid) {
                         $database = $databases->where('uuid', $uuid)->first();
                         if ($database) {
@@ -245,7 +285,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             // Check if proxy is running
             $this->server->proxyType();
             $foundProxyContainer = $containers->filter(function ($value, $key) {
-                return data_get($value, 'Name') === '/coolify-proxy';
+                if ($this->server->isSwarm()) {
+                    return data_get($value, 'Spec.Name') === 'coolify-proxy_traefik';
+                } else {
+                    return data_get($value, 'Name') === '/coolify-proxy';
+                }
             })->first();
             if (!$foundProxyContainer) {
                 try {

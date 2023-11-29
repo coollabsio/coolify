@@ -16,7 +16,7 @@ class Status extends Component
     protected $listeners = ['proxyStatusUpdated', 'startProxyPolling'];
     public function startProxyPolling()
     {
-        $this->polling = true;
+        $this->checkProxy();
     }
     public function proxyStatusUpdated()
     {

@@ -15,6 +15,8 @@
     <div class="flex-1"></div>
     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
         <div>Please load a Compose file.</div>
+    @elseif ($application->destination->server->isSwarm() && str($application->docker_registry_image_name)->isEmpty())
+        Swarm Deployments requires a Docker Image in a Registry.
     @else
         <x-applications.advanced :application="$application" />
         @if ($application->status !== 'exited')

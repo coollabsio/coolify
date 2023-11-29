@@ -863,7 +863,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         $key = Str::of($variableName);
                         $value = Str::of($variable);
                     }
-                    // TODO: here is the problem
                     if ($key->startsWith('SERVICE_FQDN')) {
                         if ($isNew || $savedService->fqdn === null) {
                             $name = $key->after('SERVICE_FQDN_')->beforeLast('_')->lower();
@@ -1145,6 +1144,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
             } else {
+                // TODO
             }
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));

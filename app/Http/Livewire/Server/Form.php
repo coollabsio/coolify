@@ -17,14 +17,15 @@ class Form extends Component
     protected $listeners = ['serverRefresh'];
 
     protected $rules = [
-        'server.name' => 'required|min:6',
+        'server.name' => 'required',
         'server.description' => 'nullable',
         'server.ip' => 'required',
         'server.user' => 'required',
         'server.port' => 'required',
-        'server.settings.is_cloudflare_tunnel' => 'required',
+        'server.settings.is_cloudflare_tunnel' => 'required|boolean',
         'server.settings.is_reachable' => 'required',
-        'server.settings.is_part_of_swarm' => 'required',
+        'server.settings.is_swarm_manager' => 'required|boolean',
+        // 'server.settings.is_swarm_worker' => 'required|boolean',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -34,8 +35,9 @@ class Form extends Component
         'server.user' => 'User',
         'server.port' => 'Port',
         'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
-        'server.settings.is_reachable' => 'is reachable',
-        'server.settings.is_part_of_swarm' => 'is part of swarm'
+        'server.settings.is_reachable' => 'Is reachable',
+        'server.settings.is_swarm_manager' => 'Swarm Manager',
+        // 'server.settings.is_swarm_worker' => 'Swarm Worker',
     ];
 
     public function mount()
@@ -49,9 +51,14 @@ class Form extends Component
     }
     public function instantSave()
     {
-        refresh_server_connection($this->server->privateKey);
-        $this->validateServer();
-        $this->server->settings->save();
+        try {
+            refresh_server_connection($this->server->privateKey);
+            $this->validateServer(false);
+            $this->server->settings->save();
+            $this->emit('success', 'Server updated successfully.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
     public function installDocker()
     {
@@ -99,6 +106,12 @@ class Form extends Component
             } else {
                 $install && $this->installDocker();
                 return;
+            }
+            if ($this->server->isSwarm()) {
+                $swarmInstalled = $this->server->validateDockerSwarm();
+                if ($swarmInstalled) {
+                    $install && $this->emit('success', 'Docker Swarm is initiated.');
+                }
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

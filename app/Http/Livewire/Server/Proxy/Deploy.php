@@ -58,11 +58,25 @@ class Deploy extends Component
 
     public function stop()
     {
-        instant_remote_process([
-            "docker rm -f coolify-proxy",
-        ], $this->server);
-        $this->server->proxy->status = 'exited';
-        $this->server->save();
-        $this->emit('proxyStatusUpdated');
+        try {
+            if ($this->server->isSwarm()) {
+                instant_remote_process([
+                    "docker service rm coolify-proxy_traefik",
+                ], $this->server);
+                $this->server->proxy->status = 'exited';
+                $this->server->save();
+                $this->emit('proxyStatusUpdated');
+            } else {
+                instant_remote_process([
+                    "docker rm -f coolify-proxy",
+                ], $this->server);
+                $this->server->proxy->status = 'exited';
+                $this->server->save();
+                $this->emit('proxyStatusUpdated');
+            }
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+
     }
 }
