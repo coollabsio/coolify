@@ -32,7 +32,7 @@ class Init extends Command
         if ($cleanup) {
             echo "Running cleanup\n";
             $this->cleanup_stucked_resources();
-            $this->cleanup_ssh();
+            // $this->cleanup_ssh();
         }
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_helper_containers();
@@ -63,21 +63,23 @@ class Init extends Command
             echo "Error in alive: {$e->getMessage()}\n";
         }
     }
-    private function cleanup_ssh()
-    {
-        try {
-            $files = Storage::allFiles('ssh/keys');
-            foreach ($files as $file) {
-                Storage::delete($file);
-            }
-            $files = Storage::allFiles('ssh/mux');
-            foreach ($files as $file) {
-                Storage::delete($file);
-            }
-        } catch (\Throwable $e) {
-            echo "Error in cleaning ssh: {$e->getMessage()}\n";
-        }
-    }
+    // private function cleanup_ssh()
+    // {
+
+         // TODO: it will cleanup id.root@host.docker.internal
+    //     try {
+    //         $files = Storage::allFiles('ssh/keys');
+    //         foreach ($files as $file) {
+    //             Storage::delete($file);
+    //         }
+    //         $files = Storage::allFiles('ssh/mux');
+    //         foreach ($files as $file) {
+    //             Storage::delete($file);
+    //         }
+    //     } catch (\Throwable $e) {
+    //         echo "Error in cleaning ssh: {$e->getMessage()}\n";
+    //     }
+    // }
     private function cleanup_in_progress_application_deployments()
     {
         // Cleanup any failed deployments
