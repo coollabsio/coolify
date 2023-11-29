@@ -220,8 +220,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $this->application_deployment_queue->addLogEntry("Creating / updating stack.");
                     $this->execute_remote_command(
                         [
-                            "docker stack deploy --with-registry-auth --prune --compose-file {$this->configuration_dir}/docker-compose.yml {$this->application->uuid}"
+                            executeInDocker($this->deployment_uuid, "cd {$this->workdir} && docker stack deploy --with-registry-auth -c docker-compose.yml {$this->application->uuid}")
                         ],
+                        [
+                            "echo 'Stack deployed. It may take a few minutes to fully available in your swarm.'"
+                        ]
                     );
                 }
             }
@@ -376,7 +379,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $envs->push($env->key . '=' . $env->value);
             }
         }
-        ray($envs);
         $envs_base64 = base64_encode($envs->implode("\n"));
         $this->execute_remote_command(
             [
@@ -442,17 +444,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->cleanup_git();
         $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
         $yaml = Yaml::dump($composeFile->toArray(), 10);
+        ray($composeFile);
+        ray($this->container_name);
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yaml"), "hidden" => true
+            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
         ]);
         $this->save_environment_variables();
         $this->stop_running_container(force: true);
 
+        ray($this->pull_request_id);
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
         }
+        ray($networkId);
         if ($this->server->isSwarm()) {
             // TODO
         } else {
@@ -832,26 +838,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_args = $this->env_args->implode(' ');
     }
 
-    private function modify_compose_file()
-    {
-        // ray("{$this->workdir}{$this->docker_compose_location}");
-        $this->execute_remote_command([executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->docker_compose_location}"), "hidden" => true, "save" => 'compose_file']);
-        if ($this->saved_outputs->get('compose_file')) {
-            $compose = $this->saved_outputs->get('compose_file');
-        }
-        try {
-            $yaml = Yaml::parse($compose);
-        } catch (\Exception $e) {
-            throw new \Exception($e->getMessage());
-        }
-        $services = data_get($yaml, 'services');
-        $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-        $definedNetwork = collect([$this->application->uuid]);
-
-        $services = collect($services)->map(function ($service, $serviceName) use ($topLevelNetworks, $definedNetwork) {
-            $serviceNetworks = collect(data_get($service, 'networks', []));
-        });
-    }
     private function generate_compose_file()
     {
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
@@ -952,10 +938,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ]
                 ]
             ];
-
         } else {
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
-
         }
         if ($this->server->isLogDrainEnabled() && $this->application->isLogDrainEnabled()) {
             $docker_compose['services'][$this->container_name]['logging'] = [

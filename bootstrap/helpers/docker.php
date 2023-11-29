@@ -93,7 +93,11 @@ function executeInDocker(string $containerId, string $command)
 
 function getContainerStatus(Server $server, string $container_id, bool $all_data = false, bool $throwError = false)
 {
-    $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
+    if ($server->isSwarm()) {
+        $container = instant_remote_process(["docker service ls --filter 'name={$container_id}' --format '{{json .}}' "], $server, $throwError);
+    } else {
+        $container = instant_remote_process(["docker inspect --format '{{json .}}' {$container_id}"], $server, $throwError);
+    }
     if (!$container) {
         return 'exited';
     }
@@ -101,7 +105,19 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
     if ($all_data) {
         return $container[0];
     }
-    return data_get($container[0], 'State.Status', 'exited');
+    if ($server->isSwarm()) {
+        $replicas = data_get($container[0], 'Replicas');
+        $replicas = explode('/', $replicas);
+        $active = (int)$replicas[0];
+        $total = (int)$replicas[1];
+        if ($active === $total) {
+            return 'running';
+        } else {
+            return 'starting';
+        }
+    } else {
+        return data_get($container[0], 'State.Status', 'exited');
+    }
 }
 
 function generateApplicationContainerName(Application $application, $pull_request_id = 0)

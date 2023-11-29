@@ -54,8 +54,8 @@
                         helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                         id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                 @endif
-                <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                    label="Is it a Swarm Manager?" />
+                {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                    label="Is it a Swarm Manager?" /> --}}
                     {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
                     label="Is it a Swarm Worker?" /> --}}
             </div>

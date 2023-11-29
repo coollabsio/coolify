@@ -207,10 +207,10 @@
                                 placeholder="Username to connect to your server. Default is root." label="Username"
                                 id="remoteServerUser" />
                         </div>
-                        <div class="w-64">
+                        {{-- <div class="w-64">
                             <x-forms.checkbox type="checkbox" id="isSwarmManager"
                                 label="Is it a Swarm Manager?" />
-                        </div>
+                        </div> --}}
                         <x-forms.button type="submit">Check Connection</x-forms.button>
                     </form>
                 </x-slot:actions>

@@ -603,6 +603,7 @@ class Application extends BaseModel
     {
         if ($this->docker_compose_raw) {
             $mainCompose = parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
+            ray($this->docker_compose_pr_raw);
             if ($this->getMorphClass() === 'App\Models\Application' && $this->docker_compose_pr_raw) {
                 parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, is_pr: true);
             }
@@ -614,7 +615,7 @@ class Application extends BaseModel
     function loadComposeFile($isInit = false)
     {
         $initialDockerComposeLocation = $this->docker_compose_location;
-        $initialDockerComposePrLocation = $this->docker_compose_pr_location;
+        // $initialDockerComposePrLocation = $this->docker_compose_pr_location;
         if ($this->build_pack === 'dockercompose') {
             if ($isInit && $this->docker_compose_raw) {
                 return;
@@ -623,11 +624,11 @@ class Application extends BaseModel
             ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
             $workdir = rtrim($this->base_directory, '/');
             $composeFile = $this->docker_compose_location;
-            $prComposeFile = $this->docker_compose_pr_location;
-            $fileList = collect([".$composeFile"]);
-            if ($composeFile !== $prComposeFile) {
-                $fileList->push(".$prComposeFile");
-            }
+            // $prComposeFile = $this->docker_compose_pr_location;
+            $fileList = collect([".$workdir$composeFile"]);
+            // if ($composeFile !== $prComposeFile) {
+            //     $fileList->push(".$prComposeFile");
+            // }
             $commands = collect([
                 "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
                 $cloneCommand,
@@ -645,24 +646,24 @@ class Application extends BaseModel
                 $this->docker_compose_raw = $composeFileContent;
                 $this->save();
             }
-            if ($composeFile === $prComposeFile) {
-                $this->docker_compose_pr_raw = $composeFileContent;
-                $this->save();
-            } else {
-                $commands = collect([
-                    "cd /tmp/{$uuid}",
-                    "cat .$workdir$prComposeFile",
-                ]);
-                $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
-                if (!$composePrFileContent) {
-                    $this->docker_compose_pr_location = $initialDockerComposePrLocation;
-                    $this->save();
-                    throw new \Exception("Could not load compose file from $workdir$prComposeFile");
-                } else {
-                    $this->docker_compose_pr_raw = $composePrFileContent;
-                    $this->save();
-                }
-            }
+            // if ($composeFile === $prComposeFile) {
+            //     $this->docker_compose_pr_raw = $composeFileContent;
+            //     $this->save();
+            // } else {
+            //     $commands = collect([
+            //         "cd /tmp/{$uuid}",
+            //         "cat .$workdir$prComposeFile",
+            //     ]);
+            //     $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
+            //     if (!$composePrFileContent) {
+            //         $this->docker_compose_pr_location = $initialDockerComposePrLocation;
+            //         $this->save();
+            //         throw new \Exception("Could not load compose file from $workdir$prComposeFile");
+            //     } else {
+            //         $this->docker_compose_pr_raw = $composePrFileContent;
+            //         $this->save();
+            //     }
+            // }
 
             $commands = collect([
                 "rm -rf /tmp/{$uuid}",
