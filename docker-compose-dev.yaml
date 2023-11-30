@@ -5,9 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-dev
-    command: bash -c 'pnpm install && pnpm dev'
+    command: bash -c 'pnpm install && pnpm db:push && pnpm dev'
     env_file:
-      - '.env'
+      - 'apps/api/.env'
     container_name: coolify
     ports:
       - target: 3000
