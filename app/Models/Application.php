@@ -50,11 +50,14 @@ class Application extends BaseModel
     }
     public function link()
     {
-        return route('project.application.configuration', [
-            'project_uuid' => $this->environment->project->uuid,
-            'environment_name' => $this->environment->name,
-            'application_uuid' => $this->uuid
-        ]);
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.application.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'application_uuid' => data_get($this, 'uuid')
+            ]);
+        }
+        return null;
     }
     public function settings()
     {
