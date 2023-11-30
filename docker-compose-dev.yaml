@@ -5,14 +5,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile-dev
-    command: bash -c 'pnpm install && pnpm db:push && pnpm db:seed && pnpm dev'
-    environment:
-      - COOLIFY_CONTAINER_DEV=true
-      - COOLIFY_APP_ID=random-local-id
-      - COOLIFY_SECRET_KEY=12341234123412341234123412341234
-      - COOLIFY_DATABASE_URL=file:../db/dev.db
-      - GITPOD_WORKSPACE_URL=${GITPOD_WORKSPACE_URL}
-      - CODESANDBOX_HOST=${CODESANDBOX_HOST}
+    command: bash -c 'pnpm install && pnpm dev'
+    env_file:
+      - '.env'
     container_name: coolify
     ports:
       - target: 3000
