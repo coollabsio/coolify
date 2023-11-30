@@ -52,7 +52,7 @@ export async function listAllSettings(request: FastifyRequest) {
 		let cns = [];
 		for (const certificate of certificates) {
 			const x509 = new X509Certificate(certificate.cert);
-			const hosts = x509.subjectAltName.split(',').replaceAll('DNS:', '');
+			const hosts = x509.subjectAltName.split(',').map((a) => a.replaceAll('DNS:', ''));
 
 			cns.push({
 				commonName: x509.subject
