@@ -30,7 +30,7 @@ services:
       retries: 15
 
   postgresql:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     volumes:
       - gitea-postgresql-data:/var/lib/postgresql/data
     environment:
