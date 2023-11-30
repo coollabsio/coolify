@@ -59,10 +59,36 @@ async function generateRouters({
 	isHttp2 = false,
 	httpBasicAuth = null
 }) {
-	const rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
-	const ruleWWW = `Host(\`www.${nakedDomain}\`)${
-		pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''
-	}`;
+	// Initialize arrays to hold the rules
+	const rulesArray = [];
+	const rulesWWWArray = [];
+
+	if (Array.isArray(nakedDomain)) {
+		// Handle multiple domains
+		for (const domain of nakedDomain) {
+			const basicRule = `Host(\`${domain}\`)`;
+			rulesArray.push(basicRule + (pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''));
+
+			if (isWWW) {
+				const wwwRule = `Host(\`www.${domain}\`)`;
+				rulesWWWArray.push(wwwRule + (pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''));
+			}
+		}
+	} else {
+		// Handle single domain (for backward compatibility)
+		const rule = `Host(\`${nakedDomain}\`)${pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''}`;
+		rulesArray.push(rule);
+
+		if (isWWW) {
+			const ruleWWW = `Host(\`www.${nakedDomain}\`)${
+				pathPrefix ? ` && PathPrefix(\`${pathPrefix}\`)` : ''
+			}`;
+			rulesWWWArray.push(ruleWWW);
+		}
+	}
+
+	const rule = rulesArray.join(' || ');
+	const ruleWWW = rulesWWWArray.join(' || ');
 
 	const http: any = {
 		entrypoints: ['web'],
@@ -477,37 +503,37 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						continue;
 					}
 					const domains = getDomains(fqdn);
+					const domain = getDomain(fqdn);
 
-					for (const domain of domains) {
-						const nakedDomain = domain.replace(/^www\./, '');
-						const isHttps = fqdn.startsWith('https://');
-						const isWWW = fqdn.includes('www.');
-						const pathPrefix = '/';
-						const serviceId = `${id}-${port || 'default'}`;
-						traefik.http.routers = {
-							...traefik.http.routers,
-							...(await generateRouters({
-								serviceId,
-								domain,
-								nakedDomain,
-								pathPrefix,
-								isHttps,
-								isWWW,
-								isDualCerts: dualCerts,
-								isCustomSSL,
-								isHttp2,
-								httpBasicAuth
-							}))
+					const nakedDomain = domains.map((d) => d.replace(/^www\./, ''));
+					const isHttps = fqdn.startsWith('https://');
+					const isWWW = fqdn.includes('www.');
+					const pathPrefix = '/';
+					const serviceId = `${id}-${port || 'default'}`;
+
+					traefik.http.routers = {
+						...traefik.http.routers,
+						...(await generateRouters({
+							serviceId,
+							domain,
+							nakedDomain,
+							pathPrefix,
+							isHttps,
+							isWWW,
+							isDualCerts: dualCerts,
+							isCustomSSL,
+							isHttp2,
+							httpBasicAuth
+						}))
+					};
+					traefik.http.services = {
+						...traefik.http.services,
+						...generateServices(serviceId, id, port, isHttp2, isHttps)
+					};
+					if (httpBasicAuth) {
+						traefik.http.middlewares[`${serviceId}-${pathPrefix}-basic-auth`] = {
+							...httpBasicAuth
 						};
-						traefik.http.services = {
-							...traefik.http.services,
-							...generateServices(serviceId, id, port, isHttp2, isHttps)
-						};
-						if (httpBasicAuth) {
-							traefik.http.middlewares[`${serviceId}-${pathPrefix}-basic-auth`] = {
-								...httpBasicAuth
-							};
-						}
 					}
 					if (previews) {
 						const { stdout } = await executeCommand({
