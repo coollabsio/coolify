@@ -21,10 +21,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public function __construct(public Server $server)
-    {
-        $this->handle();
-    }
     public function middleware(): array
     {
         return [(new WithoutOverlapping($this->server->id))->dontRelease()];
@@ -34,6 +30,11 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         return $this->server->id;
     }
+
+    public function __construct(public Server $server)
+    {
+    }
+
 
     public function handle()
     {
