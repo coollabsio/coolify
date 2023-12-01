@@ -19,6 +19,9 @@ class LogDrains extends Component
         'server.settings.is_logdrain_axiom_enabled' => 'required|boolean',
         'server.settings.logdrain_axiom_dataset_name' => 'required|string',
         'server.settings.logdrain_axiom_api_key' => 'required|string',
+        'server.settings.is_logdrain_custom_enabled' => 'required|boolean',
+        'server.settings.logdrain_custom_config' => 'required|string',
+        'server.settings.logdrain_custom_config_parser' => 'nullable',
     ];
     protected $validationAttributes = [
         'server.settings.is_logdrain_newrelic_enabled' => 'New Relic log drain',
@@ -29,6 +32,9 @@ class LogDrains extends Component
         'server.settings.is_logdrain_axiom_enabled' => 'Axiom log drain',
         'server.settings.logdrain_axiom_dataset_name' => 'Axiom dataset name',
         'server.settings.logdrain_axiom_api_key' => 'Axiom API key',
+        'server.settings.is_logdrain_custom_enabled' => 'Custom log drain',
+        'server.settings.logdrain_custom_config' => 'Custom log drain configuration',
+        'server.settings.logdrain_custom_config_parser' => 'Custom log drain configuration parser',
     ];
 
     public function mount()
@@ -84,6 +90,7 @@ class LogDrains extends Component
                 $this->server->settings->update([
                     'is_logdrain_highlight_enabled' => false,
                     'is_logdrain_axiom_enabled' => false,
+                    'is_logdrain_custom_enabled' => false,
                 ]);
             } else if ($type === 'highlight') {
                 $this->validate([
@@ -93,6 +100,7 @@ class LogDrains extends Component
                 $this->server->settings->update([
                     'is_logdrain_newrelic_enabled' => false,
                     'is_logdrain_axiom_enabled' => false,
+                    'is_logdrain_custom_enabled' => false,
                 ]);
             } else if ($type === 'axiom') {
                 $this->validate([
@@ -103,6 +111,18 @@ class LogDrains extends Component
                 $this->server->settings->update([
                     'is_logdrain_newrelic_enabled' => false,
                     'is_logdrain_highlight_enabled' => false,
+                    'is_logdrain_custom_enabled' => false,
+                ]);
+            } else if ($type === 'custom') {
+                $this->validate([
+                    'server.settings.is_logdrain_custom_enabled' => 'required|boolean',
+                    'server.settings.logdrain_custom_config' => 'required|string',
+                    'server.settings.logdrain_custom_config_parser' => 'nullable',
+                ]);
+                $this->server->settings->update([
+                    'is_logdrain_newrelic_enabled' => false,
+                    'is_logdrain_highlight_enabled' => false,
+                    'is_logdrain_axiom_enabled' => false,
                 ]);
             }
             $this->server->settings->save();
@@ -120,6 +140,10 @@ class LogDrains extends Component
             } else if ($type === 'axiom') {
                 $this->server->settings->update([
                     'is_logdrain_axiom_enabled' => false,
+                ]);
+            } else if ($type === 'custom') {
+                $this->server->settings->update([
+                    'is_logdrain_custom_enabled' => false,
                 ]);
             }
             handleError($e, $this);

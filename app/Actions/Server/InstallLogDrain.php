@@ -16,6 +16,8 @@ class InstallLogDrain
             $type = 'highlight';
         } else if ($server->settings->is_logdrain_axiom_enabled) {
             $type = 'axiom';
+        } else if ($server->settings->is_logdrain_custom_enabled) {
+            $type = 'custom';
         } else {
             $type = 'none';
         }
@@ -114,15 +116,23 @@ class InstallLogDrain
     json_date_format iso8601
     tls On
 ");
+            } else if ($type === 'custom') {
+                if (!$server->settings->is_logdrain_custom_enabled) {
+                    throw new \Exception('Custom log drain is not enabled.');
+                }
+                $config = base64_encode($server->settings->logdrain_custom_config);
+                $parsers = base64_encode($server->settings->logdrain_custom_config_parser);
             } else {
                 throw new \Exception('Unknown log drain type.');
             }
-            $parsers = base64_encode("
+            if ($type !== 'custom') {
+                $parsers = base64_encode("
 [PARSER]
-    Name        empty_line_skipper
-    Format      regex
-    Regex       /^(?!\s*$).+/
+Name        empty_line_skipper
+Format      regex
+Regex       /^(?!\s*$).+/
 ");
+            }
             $compose = base64_encode("
 services:
   coolify-log-drain:
@@ -179,6 +189,12 @@ Files:
                     "echo AXIOM_DATASET_NAME={$server->settings->logdrain_axiom_dataset_name} >> $config_path/.env",
                     "echo AXIOM_API_KEY={$server->settings->logdrain_axiom_api_key} >> $config_path/.env",
                 ];
+            } else if ($type === 'custom') {
+                $add_envs_command = [
+                    "touch $config_path/.env"
+                ];
+            } else {
+                throw new \Exception('Unknown log drain type.');
             }
             $restart_command = [
                 "echo 'Stopping old Fluent Bit'",

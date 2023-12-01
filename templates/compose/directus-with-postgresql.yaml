@@ -24,7 +24,7 @@ services:
       - REDIS_PORT=6379
       - WEBSOCKETS_ENABLED=true
   postgresql:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     volumes:
       - directus-postgresql-data:/var/lib/postgresql/data
     environment:

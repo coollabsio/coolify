@@ -62,6 +62,25 @@
                     </x-forms.button>
                 </div>
             </form> --}}
+            <h3>Custom FluentBit configuration</h3>
+            <div class="w-32">
+                <x-forms.checkbox instantSave='instantSave("custom")' id="server.settings.is_logdrain_custom_enabled"
+                    label="Enabled" />
+            </div>
+            <form wire:submit.prevent='submit("custom")' class="flex flex-col">
+                <div class="flex flex-col gap-4">
+                    <x-forms.textarea rows="6" required id="server.settings.logdrain_custom_config"
+                        label="Custom FluentBit Configuration" />
+                        <x-forms.textarea  id="server.settings.logdrain_custom_config_parser"
+                        label="Custom Parser Configuration" />
+                </div>
+                <div class="flex justify-end gap-4 pt-6">
+                    <x-forms.button type="submit">
+                        Save
+                    </x-forms.button>
+                </div>
+            </form>
+
         </div>
     </div>
 </div>

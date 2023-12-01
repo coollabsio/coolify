@@ -363,11 +363,14 @@ class Service extends BaseModel
     }
     public function link()
     {
-        return route('project.service.configuration', [
-            'project_uuid' => $this->environment->project->uuid,
-            'environment_name' => $this->environment->name,
-            'service_uuid' => $this->uuid
-        ]);
+        if (data_get($this, 'environment.project.uuid')) {
+            return route('project.service.configuration', [
+                'project_uuid' => data_get($this, 'environment.project.uuid'),
+                'environment_name' => data_get($this, 'environment.name'),
+                'service_uuid' => data_get($this, 'uuid')
+            ]);
+        }
+        return null;
     }
     public function documentation()
     {

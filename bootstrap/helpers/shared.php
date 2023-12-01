@@ -913,13 +913,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         continue;
                     }
                     if ($value?->startsWith('$')) {
-                        $value = Str::of(replaceVariables($value));
-                        $key = $value;
                         $foundEnv = EnvironmentVariable::where([
                             'key' => $key,
                             'service_id' => $resource->id,
                         ])->first();
+                        $value = Str::of(replaceVariables($value));
+                        $key = $value;
                         if ($value->startsWith('SERVICE_')) {
+                            $foundEnv = EnvironmentVariable::where([
+                                'key' => $key,
+                                'service_id' => $resource->id,
+                            ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                             if ($command->value() === 'FQDN' || $command->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
@@ -1271,13 +1275,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     continue;
                 }
                 if ($value?->startsWith('$')) {
-                    $value = Str::of(replaceVariables($value));
-                    $key = $value;
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'application_id' => $resource->id,
+                        'service_id' => $resource->id,
                     ])->first();
+                    $value = Str::of(replaceVariables($value));
+                    $key = $value;
+
                     if ($value->startsWith('SERVICE_')) {
+                        $foundEnv = EnvironmentVariable::where([
+                            'key' => $key,
+                            'application_id' => $resource->id,
+                        ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
                         if ($command->value() === 'FQDN' || $command->value() === 'URL') {
                             if (Str::lower($forService) === $serviceName) {
