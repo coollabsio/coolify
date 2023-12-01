@@ -701,7 +701,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [
                 "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}")
             ],
+
         );
+        if ($this->restart_only || !$this->force_rebuild) {
+            $this->execute_remote_command(
+                [
+                    "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+                ],
+            );
+        }
     }
     private function deploy_to_additional_destinations()
     {
@@ -1285,7 +1293,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
             }
         }
-        ray($dockerfile->implode("\n"));
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),
