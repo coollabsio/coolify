@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\ApplicationPreview;
@@ -84,7 +85,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $databases = $this->server->databases();
             $services = $this->server->services()->get();
             $previews = $this->server->previews();
-
             $foundApplications = [];
             $foundApplicationPreviews = [];
             $foundDatabases = [];
@@ -135,10 +135,24 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     if ($uuid) {
                         $database = $databases->where('uuid', $uuid)->first();
                         if ($database) {
+                            $isPublic = data_get($database, 'is_public');
                             $foundDatabases[] = $database->id;
                             $statusFromDb = $database->status;
                             if ($statusFromDb !== $containerStatus) {
                                 $database->update(['status' => $containerStatus]);
+                            }
+                            if ($isPublic) {
+                                $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
+                                    if ($this->server->isSwarm()) {
+                                        return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                    } else {
+                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                                    }
+                                })->first();
+                                if (!$foundTcpProxy) {
+                                    StartDatabaseProxy::run($database);
+                                    $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                }
                             }
                         } else {
                             // Notify user that this container should not be there.
