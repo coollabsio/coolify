@@ -606,7 +606,6 @@ class Application extends BaseModel
     {
         if ($this->docker_compose_raw) {
             $mainCompose = parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id);
-            ray($this->docker_compose_pr_raw);
             if ($this->getMorphClass() === 'App\Models\Application' && $this->docker_compose_pr_raw) {
                 parseDockerComposeFile(resource: $this, isNew: false, pull_request_id: $pull_request_id, is_pr: true);
             }
