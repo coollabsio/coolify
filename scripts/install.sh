@@ -59,15 +59,21 @@ sles | opensuse-leap | opensuse-tumbleweed)
 esac
 
 if ! [ -x "$(command -v docker)" ]; then
-    echo "Docker is not installed. Installing Docker..."
+    echo "Docker is not installed. Installing Docker."
     curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
     if [ -x "$(command -v docker)" ]; then
         echo "Docker installed successfully."
     else
-        echo "Docker installation failed."
-        echo "Maybe your OS is not supported."
-        echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-        exit 1
+        echo "Docker installation failed with Rancher script. Trying with official script."
+        curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+        if [ -x "$(command -v docker)" ]; then
+            echo "Docker installed successfully."
+        else
+            echo "Docker installation failed with official script."
+            echo "Maybe your OS is not supported."
+            echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
+        fi
     fi
 fi
 echo -e "-------------"

@@ -67,7 +67,7 @@ class InstallDocker
             }
             $command = $command->merge([
                 "echo 'Installing Docker Engine...'",
-                "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh",
+                "curl https://releases.rancher.com/install-docker/{$dockerVersion}.sh | sh || curl https://get.docker.com | sh -s -- --version {$dockerVersion}",
                 "echo 'Configuring Docker Engine (merging existing configuration with the required)...'",
                 "test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json \"/etc/docker/daemon.json.original-`date +\"%Y%m%d-%H%M%S\"`\" || echo '{$config}' | base64 -d > /etc/docker/daemon.json",
                 "echo '{$config}' | base64 -d > /etc/docker/daemon.json.coolify",
