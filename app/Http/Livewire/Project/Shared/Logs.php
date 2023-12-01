@@ -22,6 +22,7 @@ class Logs extends Component
     public $parameters;
     public $query;
     public $status;
+    public $serviceSubType;
 
     public function mount()
     {
@@ -64,6 +65,11 @@ class Logs extends Component
         } else if (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+            $service_name = data_get($this->parameters, 'service_name');
+            $this->serviceSubType = $this->resource->applications()->where('name', $service_name)->first();
+            if (!$this->serviceSubType) {
+                $this->serviceSubType = $this->resource->databases()->where('name', $service_name)->first();
+            }
             $this->status = $this->resource->status;
             $this->server = $this->resource->server;
             $this->container = data_get($this->parameters, 'service_name') . '-' . $this->resource->uuid;

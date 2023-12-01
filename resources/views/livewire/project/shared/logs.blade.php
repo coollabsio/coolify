@@ -7,7 +7,7 @@
                 @if ($loop->first)
                     <h2 class="pb-4">Logs</h2>
                 @endif
-                <livewire:project.shared.get-logs :server="$server" :container="$container" />
+                <livewire:project.shared.get-logs :server="$server" :resource="$resource" :container="$container" />
             @empty
                 <div>No containers are not running.</div>
             @endforelse
@@ -16,7 +16,7 @@
         <h1>Logs</h1>
         <livewire:project.database.heading :database="$resource" />
         <div class="pt-4">
-            <livewire:project.shared.get-logs :server="$server" :container="$container" />
+            <livewire:project.shared.get-logs :resource="$resource" :server="$server" :container="$container" />
         </div>
     @elseif ($type === 'service')
         <livewire:project.service.navbar :service="$resource" :parameters="$parameters" :query="$query" />
@@ -28,7 +28,7 @@
                 </a>
             </div>
             <div class="flex-1 pl-8">
-                <livewire:project.shared.get-logs :server="$server" :container="$container" />
+                <livewire:project.shared.get-logs :server="$server" :resource="$resource" :servicesubtype="$serviceSubType" :container="$container" />
             </div>
         </div>
     @endif
