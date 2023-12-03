@@ -1,0 +1,19 @@
+# documentation: https://www.meilisearch.com/docs/learn/configuration/instance_options
+# slogan: MeiliSearch is a powerful, fast, open-source, easy to use and deploy search engine.
+# tags: search,engine,fulltext,full,text,meilisearch
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    environment:
+      - SERVICE_FQDN_MEILISEARCH
+      - MEILI_NO_ANALYTICS=${MEILI_NO_ANALYTICS:-true}
+      - MEILI_ENV=${MEILI_ENV:-production}
+      - MEILI_MASTER_KEY=${SERVICE_PASSWORD_MEILISEARCH}
+    volumes:
+      - meilisearch-data:/meili_data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 2s
+      timeout: 10s
+      retries: 15
