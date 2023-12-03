@@ -109,7 +109,7 @@
 		}
 	];
 	function normalizeDockerServices(services: any[]) {
-		const tempdockerComposeServices = [];
+		const tempdockerComposeServices: any = [];
 		for (const [name, data] of Object.entries(services)) {
 			tempdockerComposeServices.push({
 				name,
@@ -118,9 +118,18 @@
 		}
 		for (const service of tempdockerComposeServices) {
 			if (!dockerComposeConfiguration[service.name]) {
-				dockerComposeConfiguration[service.name] = {};
+				dockerComposeConfiguration[service.name] = {
+					fqdnPorts: [{ fqdn: '', port: '' }]
+				};
 			}
 		}
+		// Initialize fqdnPorts for each service, if not already initialized
+		tempdockerComposeServices.forEach((service: any) => {
+			if (!service.fqdnPorts) {
+				service.fqdnPorts = dockerComposeConfiguration[service.name].fqdnPorts;
+			}
+		});
+
 		return tempdockerComposeServices;
 	}
 	if (dockerComposeFile?.services) {
@@ -256,6 +265,10 @@
 		if (loading.save) return;
 		if (toast) loading.save = true;
 		try {
+			dockerComposeServices.forEach((service) => {
+				dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
+			});
+
 			nonWWWDomain = application.fqdn && getDomain(application.fqdn).replace(/^www\./, '');
 			if (application.deploymentType) {
 				application.deploymentType = application.deploymentType.toLowerCase();
@@ -498,6 +511,16 @@
 			}
 		}
 		statues[service.name] = foundStatus || 'Stopped';
+	}
+
+	function addFqdnPort(service) {
+		service.fqdnPorts.push({ fqdn: '', port: '' });
+		dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
+	}
+
+	function removeFqdnPort(service, index) {
+		service.fqdnPorts.splice(index, 1);
+		dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
 	}
 </script>
 
@@ -1260,25 +1283,57 @@
 							<div class="text-xs">{application.id}-{service.name}</div>
 						</div>
 
-						<div class="grid grid-cols-2 items-center px-8">
-							<label for="fqdn"
+						<div class="grid grid-cols-2 px-8">
+							<label for=""
 								>{$t('application.url_fqdn')}
 								<Explainer
 									explanation={"If you specify <span class='text-settings font-bold'>https</span>, the application will be accessible only over https.<br>SSL certificate will be generated automatically.<br><br>If you specify <span class='text-settings font-bold'>www</span>, the application will be redirected (302) from non-www and vice versa.<br><br>To modify the domain, you must first stop the application.<br><br><span class='text-settings font-bold'>You must set your DNS to point to the server IP in advance.</span>"}
 								/>
 							</label>
-							<div>
+							<label for=""
+								>{$t('forms.port')}
+								<Explainer
+									explanation={'The port your application listens inside the docker container.'}
+								/></label
+							>
+						</div>
+						<!-- FQDN and Port Configuration -->
+						{#each service.fqdnPorts as f, index}
+							<div class="grid grid-cols-3 items-center space-x-4 px-8">
+								<!-- FQDN Input -->
 								<input
-									class="w-full"
 									disabled={isDisabled}
 									readonly={!$appSession.isAdmin}
-									name="fqdn"
-									id="fqdn"
-									bind:value={dockerComposeConfiguration[service.name].fqdn}
+									class="w-full"
+									bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
 									placeholder="eg: https://coollabs.io"
 								/>
+
+								<!-- Port Input -->
+								<input
+									disabled={isDisabled}
+									readonly={!$appSession.isAdmin}
+									required={!!dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
+									class="w-full"
+									type="number"
+									bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].port}
+									placeholder="Internal port"
+								/>
+
+								<div class="px-8">
+									<button
+										class="btn btn-sm btn-primary"
+										on:click|preventDefault={() => addFqdnPort(service)}>Add URL/Port</button
+									>
+									{#if service.fqdnPorts.length > 1}
+										<button on:click|preventDefault={() => removeFqdnPort(service, index)}
+											>Remove</button
+										>
+									{/if}
+								</div>
 							</div>
-						</div>
+						{/each}
+
 						<div class="grid grid-cols-2 items-center px-8">
 							<label for="destinationdns"
 								>Internal DNS on the deployed Destination
@@ -1302,23 +1357,6 @@
 								/>
 							</label>
 							<input for="stackdns" class="w-full" disabled readonly value={service.name} />
-						</div>
-						<div class="grid grid-cols-2 items-center px-8 pb-4">
-							<label for="port"
-								>{$t('forms.port')}
-								<Explainer
-									explanation={'The port your application listens inside the docker container.'}
-								/></label
-							>
-							<input
-								class="w-full"
-								disabled={isDisabled}
-								readonly={!$appSession.isAdmin}
-								name="port"
-								id="port"
-								required={!!dockerComposeConfiguration[service.name]?.fqdn}
-								bind:value={dockerComposeConfiguration[service.name].port}
-							/>
 						</div>
 					{/each}
 				</div>
