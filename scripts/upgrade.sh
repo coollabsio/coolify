@@ -1,7 +1,7 @@
 #!/bin/bash
 ## Do not modify this file. You will lost the ability to autoupdate!
 
-VERSION="1.0.3"
+VERSION="1.0.4"
 CDN="https://cdn.coollabs.io/coolify"
 
 curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
@@ -9,7 +9,29 @@ curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.p
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 
 # Merge .env and .env.production. New values will be added to .env
-sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' > /data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+
+# Check if PUSHER_APP_ID or PUSHER_APP_KEY or PUSHER_APP_SECRET is empty in /data/coolify/source/.env
+# if grep -q "PUSHER_APP_ID=$" /data/coolify/source/.env; then
+#     echo "PUSHER_APP_ID is not set in .env"
+#     sed -i "s|PUSHER_APP_ID=.*|PUSHER_APP_ID=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+# else
+#     echo "PUSHER_APP_ID is set in .env"
+# fi
+
+# if grep -q "PUSHER_APP_KEY=$" /data/coolify/source/.env; then
+#     echo "PUSHER_APP_KEY is not set in .env"
+#     sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+# else
+#     echo "PUSHER_APP_KEY is set in .env"
+# fi
+
+# if grep -q "PUSHER_APP_SECRET=$" /data/coolify/source/.env; then
+#     echo "PUSHER_APP_SECRET is not set in .env"
+#     sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
+# else
+#     echo "PUSHER_APP_SECRET is set in .env"
+# fi
 
 # Make sure coolify network exists
 docker network create --attachable coolify 2>/dev/null
