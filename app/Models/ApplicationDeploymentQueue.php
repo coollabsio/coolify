@@ -9,6 +9,11 @@ class ApplicationDeploymentQueue extends Model
 {
     protected $guarded = [];
 
+    public function setStatus(string $status) {
+        $this->update([
+            'status' => $status,
+        ]);
+    }
     public function getOutput($name)
     {
         if (!$this->logs) {
