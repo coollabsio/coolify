@@ -21,10 +21,10 @@ services:
       SSL_MODE: "off"
       AUTORUN_LARAVEL_STORAGE_LINK: "false"
       AUTORUN_LARAVEL_MIGRATION: "false"
-      PUSHER_HOST: "coolify-soketi"
-      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
-      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      # PUSHER_HOST: "coolify-soketi"
+      # PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      # PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      # PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
   postgres:

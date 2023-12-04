@@ -111,12 +111,12 @@ services:
       interval: 2s
       retries: 5
       timeout: 2s
-  soketi:
-    environment:
-      SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
-      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
-      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
-      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
+  # soketi:
+  #   environment:
+  #     SOKETI_DEBUG: "${SOKETI_DEBUG:-false}"
+  #     SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID}"
+  #     SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY}"
+  #     SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET}"
 volumes:
   coolify-db:
     name: coolify-db
