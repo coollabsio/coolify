@@ -1003,7 +1003,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($savedService->serviceType()) {
                     $fqdns = generateServiceSpecificFqdns($savedService, forTraefik: true);
                 } else {
-                    $fqdns = collect(data_get($savedService, 'fqdns'));
+                    $fqdns = collect(data_get($savedService, 'fqdns'))->filter();
                 }
                 $defaultLabels = defaultLabels($resource->id, $containerName, type: 'service', subType: $isDatabase ? 'database' : 'application', subId: $savedService->id);
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
@@ -1102,6 +1102,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $serviceNetworks = collect(data_get($service, 'networks', []));
             $serviceVariables = collect(data_get($service, 'environment', []));
             $serviceLabels = collect(data_get($service, 'labels', []));
+            $serviceBuildVariables = collect(data_get($service, 'build.args', []));
+            $serviceVariables = $serviceVariables->merge($serviceBuildVariables);
             if ($serviceLabels->count() > 0) {
                 $removedLabels = collect([]);
                 $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
@@ -1148,7 +1150,52 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     data_set($service, 'volumes', $serviceVolumes->toArray());
                 }
             } else {
-                // TODO
+                if (count($serviceVolumes) > 0) {
+                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes) {
+                        if (is_string($volume)) {
+                            $volume = str($volume);
+                            if ($volume->contains(':')) {
+                                $name = $volume->before(':');
+                                $mount = $volume->after(':');
+                                if ($name->startsWith('.') || $name->startsWith('~')) {
+                                    $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
+                                    if ($name->startsWith('.')) {
+                                        $name = $name->replaceFirst('.', $dir);
+                                    }
+                                    if ($name->startsWith('~')) {
+                                        $name = $name->replaceFirst('~', $dir);
+                                    }
+                                    $volume = str("$name:$mount");
+                                } else {
+                                    $topLevelVolumes->put($name->value(), [
+                                        'name' => $name->value(),
+                                    ]);
+                                }
+                            }
+                        } else if (is_array($volume)) {
+                            $source = data_get($volume, 'source');
+                            if ($source) {
+                                if (str($source, '.') || str($source, '~')) {
+                                    $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
+                                    if (str($source, '.')) {
+                                        $source = str('.', $dir, $source);
+                                    }
+                                    if (str($source, '~')) {
+                                        $source = str('~', $dir, $source);
+                                    }
+                                    data_set($volume, 'source', $source);
+                                } else {
+                                    data_set($volume, 'source', $source);
+                                    $topLevelVolumes->put($source, [
+                                        'name' => $source,
+                                    ]);
+                                }
+                            }
+                        }
+                        return $volume->value();
+                    });
+                    data_set($service, 'volumes', $serviceVolumes->toArray());
+                }
             }
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));

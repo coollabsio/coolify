@@ -587,12 +587,12 @@ class Application extends BaseModel
         $commands = collect([]);
         if ($dockerConfigFileExists === 'OK') {
             $commands->push([
-                "command" => "docker run -d --network $network -v /:/host --name $deploymentUuid --rm -v {$serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock $helperImage",
+                "command" => "docker run -d --network $network --name $deploymentUuid --rm -v {$serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock $helperImage",
                 "hidden" => true,
             ]);
         } else {
             $commands->push([
-                "command" => "docker run -d --network {$network} -v /:/host --name {$deploymentUuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}",
+                "command" => "docker run -d --network {$network} --name {$deploymentUuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}",
                 "hidden" => true,
             ]);
         }
