@@ -67,14 +67,16 @@
                     @endif
                 </div>
             @endif
-            @if ($application->build_pack !== 'dockerimage' && $application->build_pack !== 'dockercompose')
+            @if ($application->build_pack !== 'dockercompose')
                 <h3>Docker Registry</h3>
                 @if ($application->destination->server->isSwarm())
-                <div>Docker Swarm requires the image to be available in a registry. More info <a class="underline"
-                    href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
-                            @else
-                            <div>Push the built image to a docker registry. More info <a class="underline"
+                    <div>Docker Swarm requires the image to be available in a registry. More info <a class="underline"
+                            href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                @else
+                    @if ($application->build_pack !== 'dockerimage')
+                        <div>Push the built image to a docker registry. More info <a class="underline"
                                 href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                    @endif
                 @endif
                 <div class="flex flex-col gap-2 xl:flex-row">
                     @if ($application->build_pack === 'dockerimage')
