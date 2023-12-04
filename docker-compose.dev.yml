@@ -44,6 +44,13 @@ services:
     volumes:
       - /data/coolify/_volumes/redis/:/data
       # - coolify-redis-data-dev:/data
+  soketi:
+    ports:
+      - "${FORWARD_SOKETI_PORT:-6001}:6001"
+      - "${FORWARD_SOKETI_METRICS_SERVER_PORT:-9601}:9601"
+    environment:
+      SOKETI_DEBUG: "true"
+      SOKETI_METRICS_SERVER_PORT: "${SOKETI_METRICS_SERVER_PORT:-9601}"
   vite:
     image: node:20
     working_dir: /var/www/html

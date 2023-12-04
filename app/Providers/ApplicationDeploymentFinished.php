@@ -10,7 +10,7 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ApplicationDeploymentFinished
+class ApplicationDeploymentFinished implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -21,7 +21,7 @@ class ApplicationDeploymentFinished
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel('application-deployment-finished'),
+            new Channel('custom-channel'),
         ];
     }
 }
