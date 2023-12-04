@@ -131,6 +131,20 @@ class Service extends BaseModel
                     }
                     $fields->put('Weblate', $data);
                     break;
+                case str($image)?->contains('meilisearch'):
+                    $data = collect([]);
+                    $SERVICE_PASSWORD_MEILISEARCH = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_MEILISEARCH')->first();
+                    if ($SERVICE_PASSWORD_MEILISEARCH) {
+                        $data = $data->merge([
+                            'API Key' => [
+                                'key' => data_get($SERVICE_PASSWORD_MEILISEARCH, 'key'),
+                                'value' => data_get($SERVICE_PASSWORD_MEILISEARCH, 'value'),
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Meilisearch', $data);
+                    break;
                 case str($image)?->contains('ghost'):
                     $data = collect([]);
                     $MAIL_OPTIONS_AUTH_PASS = $this->environment_variables()->where('key', 'MAIL_OPTIONS_AUTH_PASS')->first();
@@ -193,6 +207,7 @@ class Service extends BaseModel
                     break;
             }
         }
+        ray($fields);
         $databases = $this->databases()->get();
 
         foreach ($databases as $database) {

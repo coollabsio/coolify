@@ -87,8 +87,6 @@ class Server extends BaseModel
         return $this->hasOne(ServerSetting::class);
     }
     public function addInitialNetwork() {
-        ray($this->id);
-
         if ($this->id === 0) {
             if ($this->isSwarm()) {
                 SwarmDocker::create([

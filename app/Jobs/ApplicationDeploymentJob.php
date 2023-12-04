@@ -347,6 +347,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+            $this->create_workdir();
             $this->generate_compose_file();
             $this->rolling_update();
             return;
@@ -442,10 +443,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->clone_repository();
         $this->generate_image_names();
         $this->cleanup_git();
+        $this->application->loadComposeFile(isInit: false);
         $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
         $yaml = Yaml::dump($composeFile->toArray(), 10);
-        ray($composeFile);
-        ray($this->container_name);
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
@@ -453,12 +453,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->save_environment_variables();
         $this->stop_running_container(force: true);
 
-        ray($this->pull_request_id);
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
         }
-        ray($networkId);
         if ($this->server->isSwarm()) {
             // TODO
         } else {
@@ -487,7 +485,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         }
         $this->start_by_compose_file();
-        $this->application->loadComposeFile(isInit: false);
     }
     private function deploy_dockerfile_buildpack()
     {
@@ -530,6 +527,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
+                $this->create_workdir();
                 $this->execute_remote_command([
                     "echo 'No configuration changed & image found ({$this->production_image_name}) with the same Git Commit SHA. Build step skipped.'",
                 ]);
@@ -677,7 +675,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
         );
     }
-
+    private function create_workdir()
+    {
+        $this->execute_remote_command(
+            [
+                "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
+            ],
+        );
+    }
     private function prepare_builder_image()
     {
         $helperImage = config('coolify.helper_image');
@@ -686,9 +691,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->dockerConfigFileExists = instant_remote_process(["test -f {$this->serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $this->server);
 
         if ($this->dockerConfigFileExists === 'OK') {
-            $runCommand = "docker run -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v {$this->serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         } else {
-            $runCommand = "docker run -d --network {$this->destination->network} -v /:/host --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
+            $runCommand = "docker run -d --network {$this->destination->network} --name {$this->deployment_uuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}";
         }
         $this->execute_remote_command(
             [
@@ -703,13 +708,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ],
 
         );
-        if ($this->restart_only || !$this->force_rebuild) {
-            $this->execute_remote_command(
-                [
-                    "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->workdir}")
-                ],
-            );
-        }
     }
     private function deploy_to_additional_destinations()
     {
@@ -1249,10 +1247,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
-            );
-        } else if ($this->application->build_pack === 'dockercompose') {
-            $this->execute_remote_command(
-                ["docker compose --project-directory {$this->configuration_dir} up --build -d", "hidden" => true],
             );
         } else {
             $this->execute_remote_command(
