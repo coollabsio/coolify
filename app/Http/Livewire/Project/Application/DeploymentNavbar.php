@@ -17,11 +17,7 @@ class DeploymentNavbar extends Component
     public Application $application;
     public Server $server;
     public bool $is_debug_enabled = false;
-    protected $listeners = ['deploymentFinished','echo:custom-channel,ApplicationDeploymentFinished' => 'notifyNewOrder'];
-
-    public function notifyNewOrder() {
-        ray('New order received');
-    }
+    protected $listeners = ['deploymentFinished'];
     public function mount()
     {
         $this->application = Application::find($this->application_deployment_queue->application_id);

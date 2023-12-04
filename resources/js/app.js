@@ -9,14 +9,15 @@ window.Pusher = Pusher;
 
 window.Echo = new Echo({
     broadcaster: 'pusher',
-    cluster: import.meta.env.VITE_PUSHER_HOST,
-    key: import.meta.env.VITE_PUSHER_APP_KEY,
-    wsHost: import.meta.env.VITE_PUSHER_HOST,
+    cluster: import.meta.env.VITE_PUSHER_HOST ?? '127.0.0.1',
+    key: import.meta.env.VITE_PUSHER_APP_KEY ?? 'coolify',
+    wsHost: import.meta.env.VITE_PUSHER_HOST ?? '127.0.0.1',
     wsPort: import.meta.env.VITE_PUSHER_PORT,
     wssPort: import.meta.env.VITE_PUSHER_PORT,
     forceTLS: false,
-    encrypted: false,
-    disableStats: true,
+    encrypted: true,
+    disableStats: false,
+    enableLogging: true,
     enabledTransports: ['ws', 'wss'],
 });
 
@@ -30,6 +31,4 @@ app.component("magic-bar", MagicBar);
 app.mount("#vue");
 
 
-window.Echo.channel("custom-channel").listen("ApplicationDeploymentFinished", (e) => {
-    console.log(e);
-});
+

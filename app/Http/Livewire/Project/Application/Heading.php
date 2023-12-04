@@ -11,11 +11,24 @@ use Visus\Cuid2\Cuid2;
 
 class Heading extends Component
 {
+    protected string $deploymentUuid;
     public Application $application;
     public array $parameters;
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:custom.{$teamId},ApplicationDeploymentFinished" => 'updateStatus',
+        ];
+    }
 
-    protected string $deploymentUuid;
-
+    public function updateStatus($message)
+    {
+        $applicationUuid = data_get($message, 'applicationUuid');
+        if ($this->application->uuid === $applicationUuid) {
+            $this->application->status = data_get($message, 'status');
+        }
+    }
     public function mount()
     {
         $this->parameters = get_route_parameters();

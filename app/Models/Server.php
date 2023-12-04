@@ -382,17 +382,17 @@ class Server extends BaseModel
     public function validateConnection()
     {
         $server = Server::find($this->id);
-        if ($this->skipServer()) {
+        if ($server->skipServer()) {
             return false;
         }
-        $uptime = instant_remote_process(['uptime'], $this, false);
+        $uptime = instant_remote_process(['uptime'], $server, false);
         if (!$uptime) {
-            $this->settings()->update([
+            $server->settings()->update([
                 'is_reachable' => false,
             ]);
             return false;
         } else {
-            $this->settings()->update([
+            $server->settings()->update([
                 'is_reachable' => true,
             ]);
             $server->update([
@@ -400,8 +400,8 @@ class Server extends BaseModel
             ]);
         }
 
-        if (data_get($this, 'unreachable_notification_sent') === true) {
-            $this->team->notify(new Revived($this));
+        if (data_get($server, 'unreachable_notification_sent') === true) {
+            $server->team->notify(new Revived($server));
             $server->update(['unreachable_notification_sent' => false]);
         }
 

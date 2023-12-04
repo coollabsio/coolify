@@ -10,7 +10,6 @@ class Dashboard extends Component
 {
     public $projects = [];
     public $servers = [];
-
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();

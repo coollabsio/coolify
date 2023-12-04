@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\ApplicationDeploymentFinished;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\DatabaseController;
@@ -39,6 +40,11 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
+Route::get('/fire', function () {
+    ApplicationDeploymentFinished::dispatch('kk0gg0s', 'stopped');
+
+    return 'Event has been sent!';
+});
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }

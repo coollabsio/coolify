@@ -44,6 +44,7 @@ class Form extends Component
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
+        $this->validateServer();
     }
     public function serverRefresh($install = true)
     {

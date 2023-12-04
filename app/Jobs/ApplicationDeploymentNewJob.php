@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Events\ApplicationDeploymentFinished;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -14,7 +15,6 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
-use App\Providers\ApplicationDeploymentFinished;
 use App\Traits\ExecuteRemoteCommand;
 use Exception;
 use Illuminate\Bus\Queueable;
@@ -102,7 +102,7 @@ class ApplicationDeploymentNewJob implements ShouldQueue, ShouldBeEncrypted
                 });
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
-            ApplicationDeploymentFinished::dispatch($this->application, $this->deployment);
+            ApplicationDeploymentFinished::dispatch($this->application->uuid, ApplicationDeploymentStatus::FINISHED->value);
         } catch (Throwable $exception) {
             $this->fail($exception);
         } finally {
