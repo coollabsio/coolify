@@ -1,6 +1,6 @@
 <div>
     @if ($server->isFunctional())
-        <div class="flex gap-2" wire:poll.5000ms='checkProxy'>
+        <div class="flex gap-2">
             @if (data_get($server, 'proxy.status') === 'running')
                 <x-status.running status="Proxy Running" />
             @elseif (data_get($server, 'proxy.status') === 'restarting')
