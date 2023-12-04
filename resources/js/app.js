@@ -9,11 +9,11 @@ window.Pusher = Pusher;
 
 window.Echo = new Echo({
     broadcaster: 'pusher',
-    cluster: import.meta.env.VITE_PUSHER_HOST ?? '127.0.0.1',
+    cluster: window.location.hostname,
     key: import.meta.env.VITE_PUSHER_APP_KEY ?? 'coolify',
-    wsHost: import.meta.env.VITE_PUSHER_HOST ?? '127.0.0.1',
-    wsPort: import.meta.env.VITE_PUSHER_PORT,
-    wssPort: import.meta.env.VITE_PUSHER_PORT,
+    wsHost: window.location.hostname,
+    wsPort: 6001,
+    wssPort: 6001,
     forceTLS: false,
     encrypted: true,
     disableStats: false,
