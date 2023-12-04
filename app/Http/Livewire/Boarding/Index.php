@@ -32,6 +32,7 @@ class Index extends Component
     public ?int    $remoteServerPort = 22;
     public ?string $remoteServerUser = 'root';
     public bool $isSwarmManager = false;
+    public bool $isCloudflareTunnel = false;
     public ?Server $createdServer = null;
 
     public Collection $projects;
@@ -184,6 +185,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'team_id' => currentTeam()->id,
         ]);
         $this->createdServer->settings->is_swarm_manager = $this->isSwarmManager;
+        $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->createdServer->addInitialNetwork();
         $this->validateServer();
@@ -200,6 +202,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
         } catch (\Throwable $e) {
             $this->serverReachable = false;
+            $this->createdServer->delete();
             return handleError(error: $e, livewire: $this);
         }
 

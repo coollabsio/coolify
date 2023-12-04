@@ -207,10 +207,11 @@
                                 placeholder="Username to connect to your server. Default is root." label="Username"
                                 id="remoteServerUser" />
                         </div>
-                        {{-- <div class="w-64">
-                            <x-forms.checkbox type="checkbox" id="isSwarmManager"
-                                label="Is it a Swarm Manager?" />
-                        </div> --}}
+                        <div class="w-64">
+                            <x-forms.checkbox
+                                helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                                id="isCloudflareTunnel" label="Cloudflare Tunnel" />
+                        </div>
                         <x-forms.button type="submit">Check Connection</x-forms.button>
                     </form>
                 </x-slot:actions>
