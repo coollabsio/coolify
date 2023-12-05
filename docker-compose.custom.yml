@@ -1,0 +1,8 @@
+# This is for running Coolfiy behind Cloudflare Tunnel
+# You need to expose the soketi port to the host and map it to a hostname
+# For more details go to https://coolify.io/docs/cloudflare-tunnel
+version: '3.8'
+services:
+  soketi:
+    ports:
+      - 6001:6001
