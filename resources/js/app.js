@@ -9,11 +9,11 @@ window.Pusher = Pusher;
 
 window.Echo = new Echo({
     broadcaster: 'pusher',
-    cluster: window.location.hostname,
+    cluster: import.meta.env.VITE_PUSHER_HOST || window.location.hostname,
     key: import.meta.env.VITE_PUSHER_APP_KEY,
-    wsHost: window.location.hostname,
-    wsPort: 6001,
-    wssPort: 6001,
+    wsHost: import.meta.env.VITE_PUSHER_HOST || window.location.hostname,
+    wsPort: import.meta.env.VITE_PUSHER_PORT || 6001,
+    wssPort: import.meta.env.VITE_PUSHER_PORT || 6001,
     forceTLS: false,
     encrypted: true,
     disableStats: false,
