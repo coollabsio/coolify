@@ -49,7 +49,7 @@
             window.Echo = new Echo({
                 broadcaster: 'pusher',
                 cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
-                key: 'coolify',
+                key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
                 wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
                 wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
                 wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
