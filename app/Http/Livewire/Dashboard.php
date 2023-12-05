@@ -10,17 +10,17 @@ class Dashboard extends Component
 {
     public $projects = [];
     public $servers = [];
-    // public function getListeners()
-    // {
-    //     $teamId = auth()->user()->currentTeam()->id;
-    //     return [
-    //         "echo-private:custom.{$teamId},TestEvent" => 'notifyNewOrder',
-    //     ];
-    // }
-    // public function notifyNewOrder()
-    // {
-    //     $this->emit('success', 'New order received!');
-    // }
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:custom.{$teamId},TestEvent" => 'notifyNewOrder',
+        ];
+    }
+    public function notifyNewOrder()
+    {
+        $this->emit('success', 'New order received!');
+    }
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();
