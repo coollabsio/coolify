@@ -13,14 +13,16 @@ use Illuminate\Queue\SerializesModels;
 class TestEvent implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
+    public $teamId;
     public function __construct()
     {
+        $this->teamId = auth()->user()->currentTeam()->id;
     }
 
     public function broadcastOn(): array
     {
         return [
-            new Channel('public'),
+            new PrivateChannel("custom.{$this->teamId}"),
         ];
     }
 }
