@@ -38,12 +38,12 @@ use Illuminate\Support\Str;
 use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
-
+Route::get('/fire', function () {
+    event(new \App\Events\TestEvent());
+    return 'fired';
+});
 if (isDev()) {
-    Route::get('/fire', function () {
-        event(new \App\Events\TestEvent());
-        return 'fired';
-    });
+
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
 Route::post('/forgot-password', function (Request $request) {

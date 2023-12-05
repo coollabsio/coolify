@@ -15,7 +15,7 @@ return [
     |
     */
 
-    'default' => env('BROADCAST_DRIVER', 'null'),
+    'default' => env('BROADCAST_DRIVER', 'pusher'),
 
     /*
     |--------------------------------------------------------------------------
@@ -36,7 +36,7 @@ return [
             'secret' => env('PUSHER_APP_SECRET', 'coolify'),
             'app_id' => env('PUSHER_APP_ID', 'coolify'),
             'options' => [
-                'host' => 'coolify-soketi',
+                'host' => env('PUSHER_HOST', 'coolify-soketi'),
                 'port' => env('PUSHER_PORT', 6001),
                 'scheme' => env('PUSHER_SCHEME', 'http'),
                 'encrypted' => true,

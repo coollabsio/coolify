@@ -21,10 +21,11 @@ services:
       SSL_MODE: "off"
       AUTORUN_LARAVEL_STORAGE_LINK: "false"
       AUTORUN_LARAVEL_MIGRATION: "false"
-      # PUSHER_HOST: "coolify-soketi"
-      # PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
-      # PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-      # PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+      PUSHER_HOST: "${PUSHER_HOST}"
+      PUSHER_PORT: "${PUSHER_PORT:-6001}"
+      PUSHER_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      PUSHER_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      PUSHER_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
     volumes:
       - .:/var/www/html/:cached
   postgres:
@@ -48,16 +49,16 @@ services:
     volumes:
       - /data/coolify/_volumes/redis/:/data
       # - coolify-redis-data-dev:/data
-  # soketi:
-  #   env_file:
-  #     - .env
-  #   ports:
-  #     - "${FORWARD_SOKETI_PORT:-6001}:6001"
-  #   environment:
-  #     SOKETI_DEBUG: "false"
-  #     SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
-  #     SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
-  #     SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
+  soketi:
+    env_file:
+      - .env
+    ports:
+      - "${FORWARD_SOKETI_PORT:-6001}:6001"
+    environment:
+      SOKETI_DEBUG: "false"
+      SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
+      SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
+      SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
   vite:
     image: node:20
     working_dir: /var/www/html

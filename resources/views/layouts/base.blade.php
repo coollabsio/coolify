@@ -24,6 +24,12 @@
     @if (config('app.name') == 'Coolify Cloud')
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
     @endif
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/1.15.3/echo.iife.min.js"
+        integrity="sha512-aPAh2oRUr3ALz2MwVWkd6lmdgBQC0wSr0R++zclNjXZreT/JrwDPZQwA/p6R3wOCTcXKIHgA9pQGEQBWQmdLaA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pusher/8.3.0/pusher.min.js"
+        integrity="sha512-tXL5mrkSoP49uQf2jO0LbvzMyFgki//znmq0wYXGq94gVF6TU0QlrSbwGuPpKTeN1mIjReeqKZ4/NJPjHN1d2Q=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 @section('body')
 
@@ -37,7 +43,22 @@
         </dialog>
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
+
         <script>
+            window.Pusher = Pusher;
+            window.Echo = new Echo({
+                broadcaster: 'pusher',
+                cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
+                key: 'coolify',
+                wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
+                wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
+                wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
+                forceTLS: false,
+                encrypted: true,
+                disableStats: false,
+                enableLogging: true,
+                enabledTransports: ['ws', 'wss'],
+            });
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
 

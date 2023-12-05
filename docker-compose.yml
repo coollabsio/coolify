@@ -24,12 +24,12 @@ services:
         restart: always
         networks:
             - coolify
-    # soketi:
-    #     image: 'quay.io/soketi/soketi:latest-16-alpine'
-    #     container_name: coolify-soketi
-    #     restart: always
-    #     networks:
-    #         - coolify
+    soketi:
+        image: 'quay.io/soketi/soketi:latest-16-alpine'
+        container_name: coolify-soketi
+        restart: always
+        networks:
+            - coolify
 networks:
     coolify:
         name: coolify
