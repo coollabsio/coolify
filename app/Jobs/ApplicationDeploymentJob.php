@@ -1249,9 +1249,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         } else {
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
-            );
+            if ($this->docker_compose_location) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+                );
+            }
         }
         $this->application_deployment_queue->addLogEntry("New container started.");
     }
