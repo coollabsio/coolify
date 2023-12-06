@@ -1,6 +1,5 @@
 <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus" wire:poll.10000ms="checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
-    <livewire:project.service.compose-modal :service="$service" />
     <div class="flex h-full pt-6" >
         <div class="flex flex-col items-start gap-4 min-w-fit">
             <a target="_blank" href="{{ $service->documentation() }}">Documentation <x-external-link /></a>

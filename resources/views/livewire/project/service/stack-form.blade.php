@@ -5,7 +5,9 @@
             <div>Configuration</div>
         </div>
         <x-forms.button type="submit">Save</x-forms.button>
-        <x-forms.button class="w-64" onclick="composeModal.showModal()">Edit Compose
+        <x-forms.button class="w-64"
+            onclick="Livewire.emit('openModal', 'project.service.compose-modal',{{ json_encode(['serviceId' => $service->id]) }})">Edit
+            Compose
             File</x-forms.button>
     </div>
     <div class="flex gap-2">

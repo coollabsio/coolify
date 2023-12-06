@@ -1,8 +1,9 @@
 import Alpine from "alpinejs";
+import focus from '@alpinejs/focus'
 import { createApp } from "vue";
 import MagicBar from "./components/MagicBar.vue";
 import Toaster from "../../vendor/masmerise/livewire-toaster/resources/js";
-
+Alpine.plugin(focus)
 Alpine.plugin(Toaster);
 
 window.Alpine = Alpine;

@@ -37,6 +37,7 @@
 
     <body>
         @livewireScripts
+        @livewire('livewire-ui-modal')
         <dialog id="help" class="modal">
             <livewire:help />
             <form method="dialog" class="modal-backdrop">

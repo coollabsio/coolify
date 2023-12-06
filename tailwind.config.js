@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     content: [
+        './vendor/wire-elements/modal/resources/views/*.blade.php',
+        './storage/framework/views/*.php',
         "./resources/**/*.blade.php",
         "./app/**/*.php",
         "./resources/**/*.js",
