@@ -4,9 +4,9 @@
 VERSION="1.0.4"
 CDN="https://cdn.coollabs.io/coolify"
 
-#curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
-#curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
-#curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
+curl -fsSL $CDN/docker-compose.yml -o /data/coolify/source/docker-compose.yml
+curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.prod.yml
+curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 
 # Merge .env and .env.production. New values will be added to .env
 sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
