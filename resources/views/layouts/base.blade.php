@@ -25,8 +25,8 @@
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
     @endif
     @auth
-        <script src="{{ asset('js/echo.js') }}"></script>
-        <script src="{{ asset('js/pusher.js') }}"></script>
+        <script src="/js/echo.js"></script>
+        <script src="/js/pusher.js"></script>
     @endauth
 </head>
 @section('body')
