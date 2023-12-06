@@ -58,7 +58,7 @@
                 wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
                 forceTLS: false,
                 encrypted: true,
-                disableStats: false,
+                enableStats: false,
                 enableLogging: true,
                 enabledTransports: ['ws', 'wss'],
             });
