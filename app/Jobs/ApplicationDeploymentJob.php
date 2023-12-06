@@ -1094,6 +1094,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $health_check_port = $this->application->health_check_port;
         }
+        if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
+            $health_check_port = 80;
+        }
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
