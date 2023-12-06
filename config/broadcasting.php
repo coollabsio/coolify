@@ -37,7 +37,7 @@ return [
             'app_id' => env('PUSHER_APP_ID', 'coolify'),
             'options' => [
                 'host' => env('PUSHER_BACKEND_HOST', 'coolify-soketi'),
-                'port' => env('PUSHER_PORT', 6001),
+                'port' => env('PUSHER_BACKEND_PORT', 6001),
                 'scheme' => env('PUSHER_SCHEME', 'http'),
                 'encrypted' => true,
                 'useTLS' => env('PUSHER_SCHEME', 'https') === 'https',
