@@ -1,4 +1,4 @@
-<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus" wire:poll.10000ms="checkStatus">
+<div x-data="{ raw: true, activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus" wire:poll.10000ms="checkStatus" wire:ignore.self>
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <livewire:project.service.compose-modal :raw="$service->docker_compose_raw" :actual="$service->docker_compose" />
     <div class="flex h-full pt-6">

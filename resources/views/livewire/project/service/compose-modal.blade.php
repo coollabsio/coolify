@@ -1,4 +1,4 @@
-<dialog id="composeModal" class="modal" x-data="{ raw: true }" wire:ignore.self>
+<dialog id="composeModal" class="modal" x-data="{ raw: true }">
     <form method="dialog" class="flex flex-col gap-2 rounded max-w-7xl modal-box" wire:submit.prevent='submit'>
         <div class="flex items-end gap-2">
         <h1>Docker Compose</h1>
