@@ -1,4 +1,4 @@
-<form x-data="{ raw: true }" class="flex flex-col gap-2 custom-modal" wire:submit.prevent='submit'>
+<form x-data="{ raw: true }" class=" custom-modal" wire:submit.prevent='submit'>
     <div class="flex items-end gap-2">
         <h1>Docker Compose</h1>
         <div x-cloak x-show="raw">
@@ -21,7 +21,12 @@
         <x-forms.textarea rows="20" readonly id="service.docker_compose">
         </x-forms.textarea>
     </div>
-    <x-forms.button type="submit">
-        Save
-    </x-forms.button>
+    <div class="flex justify-end w-full gap-2">
+        <x-forms.button class="w-64" type="submit">
+            Save
+        </x-forms.button>
+        <x-forms.button wire:click='closeModal'>
+            Close
+        </x-forms.button>
+    </div>
 </form>
