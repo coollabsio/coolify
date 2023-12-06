@@ -39,13 +39,19 @@ use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
 use Laravel\Fortify\Fortify;
 
-Route::get('/fire', function () {
-    event(new \App\Events\TestEvent());
-    return 'fired';
-});
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
+
+Route::get('/api/v1/test/realtime', function () {
+    if (auth()->user()?->currentTeam()->id !== 0) {
+        return redirect('/');
+    }
+    event(new \App\Events\TestEvent());
+    return 'Look at your other tab.';
+})->middleware('auth');
+
+
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         $arrayOfRequest = $request->only(Fortify::email());

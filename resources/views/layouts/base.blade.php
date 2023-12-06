@@ -45,6 +45,7 @@
         <x-version class="fixed left-2 bottom-1" />
 
         <script>
+            @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({
                 broadcaster: 'pusher',
@@ -59,6 +60,7 @@
                 enableLogging: true,
                 enabledTransports: ['ws', 'wss'],
             });
+            @endauth
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
 
