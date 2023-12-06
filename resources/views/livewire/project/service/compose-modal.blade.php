@@ -1,4 +1,4 @@
-<form x-data="{ raw: true }" class="flex flex-col gap-2 rounded max-w-7xl modal-box" wire:submit.prevent='submit'>
+<form x-data="{ raw: true }" class="flex flex-col gap-2 custom-modal" wire:submit.prevent='submit'>
     <div class="flex items-end gap-2">
         <h1>Docker Compose</h1>
         <div x-cloak x-show="raw">

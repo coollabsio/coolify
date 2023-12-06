@@ -27,7 +27,7 @@
                     x-transition:leave-end="opacity-0"
                     class="fixed inset-0 transition-all transform"
             >
-                <div class="absolute inset-0 opacity-50 bg-coolgray-200"></div>
+                <div class="absolute inset-0 bg-black opacity-70"></div>
             </div>
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
@@ -40,7 +40,6 @@
                     x-transition:leave="ease-in duration-200"
                     x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
                     x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                    x-bind:class="modalWidth"
                     class="fixed top-0 w-full overflow-hidden text-left align-bottom transition-all transform rounded-lg sm:my-8 sm:align-middle sm:w-full"
                     id="modal-container"
                     x-trap.noscroll.inert="show && showActiveComponent"

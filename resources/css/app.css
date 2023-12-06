@@ -17,6 +17,9 @@ button[isError] {
 .main {
     @apply pt-4 pl-24 pr-10 mx-auto;
 }
+.custom-modal {
+    @apply px-8 py-4 border bg-base-100 border-coolgray-200;
+}
 .label-text,
 label {
     @apply text-neutral-400;
