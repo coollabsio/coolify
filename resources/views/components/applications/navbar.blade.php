@@ -3,17 +3,17 @@
         href="{{ route('project.application.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
-        href="{{ route('project.application.deployments', $parameters) }}">
-        <button>Deployments</button>
+    <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+        href="{{ route('project.application.command', $parameters) }}">
+        <button>Execute Command</button>
     </a>
     <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
-        href="{{ route('project.application.command', $parameters) }}">
-        <button>Run command</button>
+    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
+        href="{{ route('project.application.deployments', $parameters) }}">
+        <button>Deployments</button>
     </a>
     <x-applications.links :application="$application" />
     <div class="flex-1"></div>

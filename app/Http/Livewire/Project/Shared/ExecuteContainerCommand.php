@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application;
+namespace App\Http\Livewire\Project\Shared;
 
 use App\Models\Application;
 use App\Models\Server;
@@ -12,7 +12,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Livewire\Component;
 
-class Command extends Component
+class ExecuteContainerCommand extends Component
 {
     public string $command;
     public string $container;

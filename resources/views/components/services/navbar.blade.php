@@ -38,7 +38,8 @@
         </button>
     @endif
     @if (serviceStatus($service) === 'exited')
-        <button wire:click='stop(true)' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
+        <button wire:click='stop(true)'
+            class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 " viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
                 <path fill="red" d="M26 20h-6v-2h6zm4 8h-6v-2h6zm-2-4h-6v-2h6z" />
                 <path fill="red"
