@@ -1,6 +1,10 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
+set -e # Exit immediately if a command exits with a non-zero status
+set -u # Treat unset variables as an error and exit
+set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
+
 VERSION="1.1.0"
 DOCKER_VERSION="24.0"
 
