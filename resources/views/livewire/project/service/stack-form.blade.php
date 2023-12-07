@@ -6,7 +6,7 @@
         </div>
         <x-forms.button type="submit">Save</x-forms.button>
         <x-forms.button class="w-64"
-            onclick="Livewire.dispatch('openModal', {component: {component: 'modals.edit-compose', arguments: arguments: {{ json_encode(['serviceId' => $service->id]) }} } })">Edit
+            onclick="Livewire.dispatch('openModal', {component: 'modal.edit-compose', arguments:  {{ json_encode(['serviceId' => $service->id]) }}  })">Edit
             Compose
             File</x-forms.button>
     </div>

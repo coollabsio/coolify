@@ -967,6 +967,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                             }
                         } else {
+                            $foundEnv = EnvironmentVariable::where([
+                                'key' => $key,
+                                'service_id' => $resource->id,
+                            ])->first();
                             if ($value->contains(':-')) {
                                 $key = $value->before(':');
                                 $defaultValue = $value->after(':-');

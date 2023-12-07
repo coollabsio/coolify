@@ -47,7 +47,7 @@ class Select extends Component
     }
     public function render()
     {
-        if ($this->search) $this->loadServices();
+        $this->loadServices();
         return view('livewire.project.new.select');
     }
 
