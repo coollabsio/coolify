@@ -90,11 +90,14 @@ class Command extends Component
     {
         $this->validate();
         try {
+            // Wrap command to prevent escaped execution in the host.
+            $cmd = 'sh -c "' . str_replace('"', '\"', $this->command)  . '"';
+
             if (!empty($this->dir)) {
-                $exec = "docker exec -w {$this->dir} {$this->container} {$this->command}";
+                $exec = "docker exec -w {$this->dir} {$this->container} {$cmd}";
             }
             else {
-                $exec = "docker exec {$this->container} {$this->command}";
+                $exec = "docker exec {$this->container} {$cmd}";
             }
             $activity = remote_process([$exec], $this->server, ignore_errors: true);
             $this->emit('newMonitorActivity', $activity->id);
