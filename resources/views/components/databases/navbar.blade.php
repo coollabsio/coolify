@@ -7,6 +7,10 @@
         href="{{ route('project.database.logs', $parameters) }}">
         <button>Logs</button>
     </a>
+    <a class="{{ request()->routeIs('project.database.command') ? 'text-white' : '' }}"
+        href="{{ route('project.database.command', $parameters) }}">
+        <button>Run command</button>
+    </a>
     @if (
         $database->getMorphClass() === 'App\Models\StandalonePostgresql' ||
             $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||

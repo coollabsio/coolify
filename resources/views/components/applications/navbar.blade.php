@@ -11,6 +11,10 @@
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
+    <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+        href="{{ route('project.application.command', $parameters) }}">
+        <button>Run command</button>
+    </a>
     <x-applications.links :application="$application" />
     <div class="flex-1"></div>
     @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))
