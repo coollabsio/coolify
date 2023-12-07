@@ -26,7 +26,7 @@ class Configuration extends Component
             return redirect()->route('dashboard');
         }
         $this->application = $application;
-        $mainServer = $application->destination->server;
+        $mainServer = $this->application->destination->server;
         $servers = Server::ownedByCurrentTeam()->get();
         $this->servers = $servers->filter(function ($server) use ($mainServer) {
             return $server->id != $mainServer->id;

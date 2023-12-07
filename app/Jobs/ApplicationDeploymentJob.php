@@ -1094,6 +1094,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $health_check_port = $this->application->health_check_port;
         }
+        if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
+            $health_check_port = 80;
+        }
         if ($this->application->health_check_path) {
             $this->full_healthcheck_url = "{$this->application->health_check_method}: {$this->application->health_check_scheme}://{$this->application->health_check_host}:{$health_check_port}{$this->application->health_check_path}";
             $generated_healthchecks_commands = [
@@ -1249,9 +1252,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         } else {
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
-            );
+            if ($this->docker_compose_location) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+                );
+            }
         }
         $this->application_deployment_queue->addLogEntry("New container started.");
     }

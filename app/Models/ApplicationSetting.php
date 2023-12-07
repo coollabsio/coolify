@@ -16,29 +16,16 @@ class ApplicationSetting extends Model
         'is_git_submodules_enabled' => 'boolean',
         'is_git_lfs_enabled' => 'boolean',
     ];
-    protected $fillable = [
-        'application_id',
-        'is_static',
-        'is_auto_deploy_enabled',
-        'is_force_https_enabled',
-        'is_debug_enabled',
-        'is_preview_deployments_enabled',
-        'is_git_submodules_enabled',
-        'is_git_lfs_enabled',
-    ];
+    protected $guarded = [];
 
     public function isStatic(): Attribute
     {
         return Attribute::make(
             set: function ($value) {
-                if (is_null($this->application->ports_exposes)) {
-                    if ($value) {
-                        $this->application->ports_exposes = '80';
-                    } else {
-                        $this->application->ports_exposes = '3000';
-                    }
-                    $this->application->save();
+                if ($value) {
+                    $this->application->ports_exposes = 80;
                 }
+                $this->application->save();
                 return $value;
             }
         );

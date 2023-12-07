@@ -1124,7 +1124,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $pull_request_id, $topLevelVolumes) {
                         if (is_string($volume)) {
                             $volume = str($volume);
-                            if ($volume->contains(':')) {
+                            if ($volume->contains(':') && !$volume->startsWith('/')) {
                                 $name = $volume->before(':');
                                 $mount = $volume->after(':');
                                 $newName = $resource->uuid . "-{$name}-pr-$pull_request_id";
@@ -1138,13 +1138,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             if ($source) {
                                 $newSource = $resource->uuid . "-{$source}-pr-$pull_request_id";
                                 data_set($volume, 'source', $newSource);
-                                $topLevelVolumes->put($newSource, [
-                                    'name' => $newSource,
-                                ]);
+                                if (!str($source)->startsWith('/')) {
+                                    $topLevelVolumes->put($newSource, [
+                                        'name' => $newSource,
+                                    ]);
+                                }
                             }
                         }
-
-
                         return $volume->value();
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
@@ -1154,7 +1154,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes) {
                         if (is_string($volume)) {
                             $volume = str($volume);
-                            if ($volume->contains(':')) {
+                            if ($volume->contains(':') && !$volume->startsWith('/')) {
                                 $name = $volume->before(':');
                                 $mount = $volume->after(':');
                                 if ($name->startsWith('.') || $name->startsWith('~')) {
@@ -1175,7 +1175,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                         } else if (is_array($volume)) {
                             $source = data_get($volume, 'source');
                             if ($source) {
-                                if (str($source, '.') || str($source, '~')) {
+                                if ((str($source)->startsWith('.') || str($source)->startsWith('~')) && !str($source)->startsWith('/')) {
                                     $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
                                     if (str($source, '.')) {
                                         $source = str('.', $dir, $source);

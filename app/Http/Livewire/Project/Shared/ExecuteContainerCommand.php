@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Livewire\Project\Application;
+namespace App\Http\Livewire\Project\Shared;
 
 use App\Models\Application;
 use App\Models\Server;
@@ -12,7 +12,7 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Livewire\Component;
 
-class Command extends Component
+class ExecuteContainerCommand extends Component
 {
     public string $command;
     public string $container;
@@ -83,7 +83,7 @@ class Command extends Component
 
             $this->server = $this->resource->server;
         }
-        if ($this->containers->count() > 1) {
+        if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
         }
     }
@@ -92,13 +92,10 @@ class Command extends Component
     {
         $this->validate();
         try {
-            // Wrap command to prevent escaped execution in the host.
-            $cmd = 'sh -c "' . str_replace('"', '\"', $this->command)  . '"';
-
             if (!empty($this->workDir)) {
-                $exec = "docker exec -w {$this->workDir} {$this->container} {$cmd}";
+                $exec = "docker exec -w {$this->workDir} {$this->container} {$this->command}";
             } else {
-                $exec = "docker exec {$this->container} {$cmd}";
+                $exec = "docker exec {$this->container} {$this->command}";
             }
             $activity = remote_process([$exec], $this->server, ignore_errors: true);
             $this->emit('newMonitorActivity', $activity->id);

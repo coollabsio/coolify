@@ -11,6 +11,13 @@
 |
 */
 
-// Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
-//     return (int) $user->id === (int) $id;
-// });
+use App\Models\Application;
+use App\Models\User;
+use Illuminate\Support\Facades\Broadcast;
+
+Broadcast::channel('custom.{teamId}', function (User $user, int $teamId) {
+    if ($user->teams->pluck('id')->contains($teamId)) {
+        return true;
+    }
+    return false;
+});

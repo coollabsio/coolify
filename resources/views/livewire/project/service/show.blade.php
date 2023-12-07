@@ -26,10 +26,6 @@
                     <button>Logs</button>
                 </a>
             @endif
-            <a class="{{ request()->routeIs('project.service.command') ? 'text-white' : '' }}"
-                href="{{ route('project.service.command', $parameters) }}">
-                <button>Run command</button>
-            </a>
         </div>
         <div class="w-full pl-8">
             @isset($serviceApplication)

@@ -24,11 +24,20 @@
     @if (config('app.name') == 'Coolify Cloud')
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
     @endif
+    @auth
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/laravel-echo/1.15.3/echo.iife.min.js"
+            integrity="sha512-aPAh2oRUr3ALz2MwVWkd6lmdgBQC0wSr0R++zclNjXZreT/JrwDPZQwA/p6R3wOCTcXKIHgA9pQGEQBWQmdLaA=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/pusher/8.3.0/pusher.min.js"
+            integrity="sha512-tXL5mrkSoP49uQf2jO0LbvzMyFgki//znmq0wYXGq94gVF6TU0QlrSbwGuPpKTeN1mIjReeqKZ4/NJPjHN1d2Q=="
+            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    @endauth
 </head>
 @section('body')
 
     <body>
         @livewireScripts
+        @livewire('livewire-ui-modal')
         <dialog id="help" class="modal">
             <livewire:help />
             <form method="dialog" class="modal-backdrop">
@@ -37,7 +46,47 @@
         </dialog>
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
+
         <script>
+            @auth
+            window.Pusher = Pusher;
+            window.Echo = new Echo({
+                broadcaster: 'pusher',
+                cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
+                key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
+                wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
+                wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
+                wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
+                forceTLS: false,
+                encrypted: true,
+                enableStats: false,
+                enableLogging: true,
+                enabledTransports: ['ws', 'wss'],
+            });
+
+            if ("{{ auth()->user()->id }}" == 0) {
+                let checkPusherInterval = null;
+                let checkNumber = 0;
+                let errorMessage = "Coolify could not connect to the new realtime service introduced in beta.154.<br>Please check the related <a href='https://coolify.io/docs/cloudflare-tunnels' target='_blank'>documentation</a> or get help on <a href='https://coollabs.io/discord' target='_blank'>Discord</a>.";
+                checkPusherInterval = setInterval(() => {
+                    if (window.Echo) {
+                        if (window.Echo.connector.pusher.connection.state !== 'connected') {
+                            checkNumber++;
+                            if (checkNumber > 5) {
+                                clearInterval(checkPusherInterval);
+                                Livewire.emit('error', errorMessage);
+                            }
+                        } else {
+                           console.log('Coolify is now connected to the new realtime service introduced in beta.154.');
+                            clearInterval(checkPusherInterval);
+                        }
+                    } else {
+                        clearInterval(checkPusherInterval);
+                        Livewire.emit('error', errorMessage);
+                    }
+                }, 2000);
+            }
+            @endauth
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
 

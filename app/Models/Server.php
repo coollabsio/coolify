@@ -67,7 +67,7 @@ class Server extends BaseModel
     {
         $teamId = currentTeam()->id;
         $selectArray = collect($select)->concat(['id']);
-        return Server::whereTeamId($teamId)->with('settings','swarmDockers','standaloneDockers')->select($selectArray->all())->orderBy('name');
+        return Server::whereTeamId($teamId)->with('settings', 'swarmDockers', 'standaloneDockers')->select($selectArray->all())->orderBy('name');
     }
 
     static public function isUsable()
@@ -86,7 +86,8 @@ class Server extends BaseModel
     {
         return $this->hasOne(ServerSetting::class);
     }
-    public function addInitialNetwork() {
+    public function addInitialNetwork()
+    {
         if ($this->id === 0) {
             if ($this->isSwarm()) {
                 SwarmDocker::create([
@@ -381,17 +382,17 @@ class Server extends BaseModel
     public function validateConnection()
     {
         $server = Server::find($this->id);
-        if ($this->skipServer()) {
+        if ($server->skipServer()) {
             return false;
         }
-        $uptime = instant_remote_process(['uptime'], $this, false);
+        $uptime = instant_remote_process(['uptime'], $server, false);
         if (!$uptime) {
-            $this->settings()->update([
+            $server->settings()->update([
                 'is_reachable' => false,
             ]);
             return false;
         } else {
-            $this->settings()->update([
+            $server->settings()->update([
                 'is_reachable' => true,
             ]);
             $server->update([
@@ -399,8 +400,8 @@ class Server extends BaseModel
             ]);
         }
 
-        if (data_get($this, 'unreachable_notification_sent') === true) {
-            $this->team->notify(new Revived($this));
+        if (data_get($server, 'unreachable_notification_sent') === true) {
+            $server->team->notify(new Revived($server));
             $server->update(['unreachable_notification_sent' => false]);
         }
 
@@ -535,5 +536,75 @@ class Server extends BaseModel
                 loggingModel: $this->deploymentQueueEntry
             );
         });
+    }
+    public function getHostIPMappings($network)
+    {
+        $addHosts = null;
+        $allContainers = instant_remote_process(["docker network inspect {$network} -f '{{json .Containers}}' "], $this);
+        if (!is_null($allContainers)) {
+            $allContainers = format_docker_command_output_to_json($allContainers);
+            $ips = collect([]);
+            if (count($allContainers) > 0) {
+                $allContainers = $allContainers[0];
+                foreach ($allContainers as $container) {
+                    $containerName = data_get($container, 'Name');
+                    if ($containerName === 'coolify-proxy') {
+                        continue;
+                    }
+                    $containerIp = data_get($container, 'IPv4Address');
+                    if ($containerName && $containerIp) {
+                        $containerIp = str($containerIp)->before('/');
+                        $ips->put($containerName, $containerIp->value());
+                    }
+                }
+            }
+            $addHosts = $ips->map(function ($ip, $name) {
+                return "--add-host $name:$ip";
+            })->implode(' ');
+        }
+        return $addHosts;
+    }
+    public function checkIfDockerImageExists(string $imageName, ApplicationDeploymentQueue $deployment)
+    {
+        $this->executeRemoteCommand(
+            commands: collect([
+                [
+                    "name" => "local_image_found",
+                    "command" => "docker images -q {$imageName} 2>/dev/null",
+                    "hidden" => true,
+                ]
+            ]),
+            loggingModel: $deployment
+        );
+        if (str($deployment->getOutput('local_image_found'))->isEmpty()) {
+            $this->executeRemoteCommand(
+                commands: collect([
+                    [
+                        "command" => "docker pull {$imageName} 2>/dev/null",
+                        "ignoreErrors" => true,
+                        "hidden" => true
+                    ],
+                    [
+                        "name" => "local_image_found",
+                        "command" => "docker images -q {$imageName} 2>/dev/null",
+                        "hidden" => true,
+                    ]
+                ]),
+                loggingModel: $deployment
+            );
+        }
+    }
+    public function createWorkDirForDeployment(string $workdir, ApplicationDeploymentQueue $deployment)
+    {
+        $this->executeRemoteCommand(
+            commands: collect([
+                [
+                    "command" => executeInDocker($deployment->deployment_uuid, "mkdir -p {$workdir}"),
+                    "ignoreErrors" => true,
+                    "hidden" => true
+                ],
+            ]),
+            loggingModel: $deployment
+        );
     }
 }
