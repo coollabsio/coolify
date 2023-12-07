@@ -12,6 +12,7 @@ use App\Http\Livewire\Project\Service\Show as ServiceShow;
 use App\Http\Livewire\Dev\Compose as Compose;
 use App\Http\Livewire\Dashboard;
 use App\Http\Livewire\Project\CloneProject;
+use App\Http\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Http\Livewire\Project\Shared\Logs;
 use App\Http\Livewire\Security\ApiTokens;
 use App\Http\Livewire\Server\All;
@@ -42,6 +43,16 @@ use Laravel\Fortify\Fortify;
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
+
+Route::get('/api/v1/test/realtime', function () {
+    if (auth()->user()?->currentTeam()->id !== 0) {
+        return redirect('/');
+    }
+    event(new \App\Events\TestEvent());
+    return 'Look at your other tab.';
+})->middleware('auth');
+
+
 Route::post('/forgot-password', function (Request $request) {
     if (is_transactional_emails_active()) {
         $arrayOfRequest = $request->only(Fortify::email());
@@ -111,18 +122,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
     )->name('project.application.deployment');
 
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/logs', Logs::class)->name('project.application.logs');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/command', ExecuteContainerCommand::class)->name('project.application.command');
 
     // Databases
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups', [DatabaseController::class, 'backups'])->name('project.database.backups.all');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/backups/{backup_uuid}', [DatabaseController::class, 'executions'])->name('project.database.backups.executions');
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/logs', Logs::class)->name('project.database.logs');
+    Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}/command', ExecuteContainerCommand::class)->name('project.database.command');
 
 
     // Services
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}/logs', Logs::class)->name('project.service.logs');
+    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/command', ExecuteContainerCommand::class)->name('project.service.command');
 });
 
 Route::middleware(['auth'])->group(function () {

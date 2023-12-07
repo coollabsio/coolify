@@ -2,7 +2,7 @@
 @section('body')
     @parent
     <x-navbar />
-    <div class="fixed z-50 top-[4.5rem] left-4" id="vue">
+    <div class="fixed z-30 top-[4.5rem] left-4" id="vue">
         <magic-bar></magic-bar>
     </div>
     <livewire:sponsorship />

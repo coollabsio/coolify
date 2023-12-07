@@ -29,8 +29,6 @@ class General extends Component
     public ?string $initialDockerComposeLocation = null;
     public ?string $initialDockerComposePrLocation = null;
 
-    public bool $is_static;
-
     public $parsedServices = [];
     public $parsedServiceDomains = [];
 
@@ -124,6 +122,10 @@ class General extends Component
     {
         $this->application->settings->save();
         $this->emit('success', 'Settings saved.');
+        $this->application->refresh();
+        if ($this->ports_exposes !== $this->application->ports_exposes) {
+            $this->resetDefaultLabels(false);
+        }
     }
     public function loadComposeFile($isInit = false)
     {
@@ -156,7 +158,7 @@ class General extends Component
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
-            $this->application->settings->is_static = $this->is_static = false;
+            $this->application->settings->is_static = false;
             $this->application->settings->save();
         }
         if ($this->application->build_pack === 'dockercompose') {

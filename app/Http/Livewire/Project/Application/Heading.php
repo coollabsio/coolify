@@ -39,6 +39,26 @@ class Heading extends Component
         $this->deploy(force_rebuild: true);
     }
 
+    public function deployNew()
+    {
+        if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
+            $this->emit('error', 'Please load a Compose file first.');
+            return;
+        }
+        $this->setDeploymentUuid();
+        queue_application_deployment(
+            application_id: $this->application->id,
+            deployment_uuid: $this->deploymentUuid,
+            force_rebuild: false,
+            is_new_deployment: true,
+        );
+        return redirect()->route('project.application.deployment', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $this->deploymentUuid,
+            'environment_name' => $this->parameters['environment_name'],
+        ]);
+    }
     public function deploy(bool $force_rebuild = false)
     {
         if ($this->application->build_pack === 'dockercompose' && is_null($this->application->docker_compose_raw)) {
@@ -71,6 +91,22 @@ class Heading extends Component
         $this->application->status = 'exited';
         $this->application->save();
         $this->application->refresh();
+    }
+    public function restartNew()
+    {
+        $this->setDeploymentUuid();
+        queue_application_deployment(
+            application_id: $this->application->id,
+            deployment_uuid: $this->deploymentUuid,
+            restart_only: true,
+            is_new_deployment: true,
+        );
+        return redirect()->route('project.application.deployment', [
+            'project_uuid' => $this->parameters['project_uuid'],
+            'application_uuid' => $this->parameters['application_uuid'],
+            'deployment_uuid' => $this->deploymentUuid,
+            'environment_name' => $this->parameters['environment_name'],
+        ]);
     }
     public function restart()
     {

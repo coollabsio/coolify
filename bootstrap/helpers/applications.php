@@ -2,6 +2,7 @@
 
 use App\Jobs\ApplicationDeployDockerImageJob;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Jobs\ApplicationDeploymentNewJob;
 use App\Jobs\ApplicationDeploySimpleDockerfileJob;
 use App\Jobs\ApplicationRestartJob;
 use App\Jobs\MultipleApplicationDeploymentJob;
@@ -11,7 +12,7 @@ use App\Models\ApplicationPreview;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
-function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null)
+function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
 {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,
@@ -36,19 +37,32 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     if ($running_deployments->count() > 0) {
         return;
     }
-    dispatch(new ApplicationDeploymentJob(
-        application_deployment_queue_id: $deployment->id,
-    ))->onConnection('long-running')->onQueue('long-running');
-
+    if ($is_new_deployment) {
+        dispatch(new ApplicationDeploymentNewJob(
+            deployment: $deployment,
+            application: Application::find($application_id)
+        ))->onConnection('long-running')->onQueue('long-running');
+    } else {
+        dispatch(new ApplicationDeploymentJob(
+            application_deployment_queue_id: $deployment->id,
+        ))->onConnection('long-running')->onQueue('long-running');
+    }
 }
 
-function queue_next_deployment(Application $application)
+function queue_next_deployment(Application $application, bool $isNew = false)
 {
     $next_found = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->first();
     if ($next_found) {
-        dispatch(new ApplicationDeploymentJob(
-            application_deployment_queue_id: $next_found->id,
-        ))->onConnection('long-running')->onQueue('long-running');
+        if ($isNew) {
+            dispatch(new ApplicationDeploymentNewJob(
+                deployment: $next_found,
+                application: $application
+            ))->onConnection('long-running')->onQueue('long-running');
+        } else {
+            dispatch(new ApplicationDeploymentJob(
+                application_deployment_queue_id: $next_found->id,
+            ))->onConnection('long-running')->onQueue('long-running');
+        }
     }
 }
 // Deployment things

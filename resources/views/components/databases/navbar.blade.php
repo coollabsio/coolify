@@ -3,6 +3,10 @@
         href="{{ route('project.database.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
+    <a class="{{ request()->routeIs('project.database.command') ? 'text-white' : '' }}"
+        href="{{ route('project.database.command', $parameters) }}">
+        <button>Execute Command</button>
+    </a>
     <a class="{{ request()->routeIs('project.database.logs') ? 'text-white' : '' }}"
         href="{{ route('project.database.logs', $parameters) }}">
         <button>Logs</button>
