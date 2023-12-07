@@ -70,10 +70,10 @@ CMD ["nginx", "-g", "daemon off;"]
             'fqdn' => $fqdn
         ]);
 
-        redirect()->route('project.application.configuration', [
+        return $this->redirectRoute('project.application.configuration', [
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,
             'project_uuid' => $project->uuid,
-        ]);
+        ], navigate: true);
     }
 }

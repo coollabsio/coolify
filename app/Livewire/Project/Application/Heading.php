@@ -52,12 +52,12 @@ class Heading extends Component
             force_rebuild: false,
             is_new_deployment: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return $this->redirectRoute('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
-        ]);
+        ], navigate: true);
     }
     public function deploy(bool $force_rebuild = false)
     {
@@ -101,12 +101,12 @@ class Heading extends Component
             restart_only: true,
             is_new_deployment: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return $this->redirectRoute('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
-        ]);
+        ], navigate: true);
     }
     public function restart()
     {
@@ -116,11 +116,11 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return $this->redirectRoute('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
             'environment_name' => $this->parameters['environment_name'],
-        ]);
+        ], navigate: true);
     }
 }

@@ -15,15 +15,15 @@ class Configuration extends Component
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
-            return redirect()->route('dashboard');
+            return $this->redirectRoute('dashboard', navigate: true);
         }
         $environment = $project->load(['environments'])->environments->where('name', request()->route('environment_name'))->first()->load(['applications']);
         if (!$environment) {
-            return redirect()->route('dashboard');
+            return $this->redirectRoute('dashboard', navigate: true);
         }
         $application = $environment->applications->where('uuid', request()->route('application_uuid'))->first();
         if (!$application) {
-            return redirect()->route('dashboard');
+            return $this->redirectRoute('dashboard', navigate: true);
         }
         $this->application = $application;
         $mainServer = $this->application->destination->server;

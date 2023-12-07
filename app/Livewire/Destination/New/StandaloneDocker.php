@@ -70,7 +70,7 @@ class StandaloneDocker extends Component
                 ]);
             }
             $this->createNetworkAndAttachToProxy();
-            return redirect()->route('destination.show', $docker->uuid);
+            return $this->redirectRoute('destination.show', $docker->uuid, navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

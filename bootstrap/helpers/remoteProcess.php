@@ -61,6 +61,7 @@ function remote_process(
 // }
 function savePrivateKeyToFs(Server $server)
 {
+    ray(data_get($server, 'privateKey.private_key'));
     if (data_get($server, 'privateKey.private_key') === null) {
         throw new \Exception("Server {$server->name} does not have a private key");
     }

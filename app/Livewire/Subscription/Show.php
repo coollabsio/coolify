@@ -11,7 +11,7 @@ class Show extends Component
     public bool $alreadySubscribed = false;
     public function mount() {
         if (!isCloud()) {
-            return redirect('/');
+            return $this->redirect('/', navigate: true);
         }
         $this->settings = InstanceSettings::get();
         $this->alreadySubscribed = currentTeam()->subscription()->exists();

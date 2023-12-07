@@ -24,7 +24,7 @@ class Index extends Component
     public function mount()
     {
         if (config('coolify.waitlist') == false) {
-            return redirect()->route('register');
+            return $this->redirectRoute('register', navigate: true);
         }
         $this->waitingInLine = Waitlist::whereVerified(true)->count();
         $this->users = User::count();

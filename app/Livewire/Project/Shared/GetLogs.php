@@ -19,7 +19,7 @@ class GetLogs extends Component
 {
     public string $outputs = '';
     public string $errors = '';
-    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource;
+    public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|null $resource = null;
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
     public Server $server;
     public ?string $container = null;
@@ -29,13 +29,15 @@ class GetLogs extends Component
 
     public function mount()
     {
-        if ($this->resource->getMorphClass() === 'App\Models\Application') {
-            $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
-        } else {
-            if ($this->servicesubtype) {
-                $this->showTimeStamps = $this->servicesubtype->is_include_timestamps;
+        if (!is_null($this->resource)) {
+            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+                $this->showTimeStamps = $this->resource->settings->is_include_timestamps;
             } else {
-                $this->showTimeStamps = $this->resource->is_include_timestamps;
+                if ($this->servicesubtype) {
+                    $this->showTimeStamps = $this->servicesubtype->is_include_timestamps;
+                } else {
+                    $this->showTimeStamps = $this->resource->is_include_timestamps;
+                }
             }
         }
     }
@@ -45,16 +47,18 @@ class GetLogs extends Component
     }
     public function instantSave()
     {
-        if ($this->resource->getMorphClass() === 'App\Models\Application') {
-            $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
-            $this->resource->settings->save();
-        } else {
-            if ($this->servicesubtype) {
-                $this->servicesubtype->is_include_timestamps = $this->showTimeStamps;
-                $this->servicesubtype->save();
+        if (!is_null($this->resource)) {
+            if ($this->resource->getMorphClass() === 'App\Models\Application') {
+                $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
+                $this->resource->settings->save();
             } else {
-                $this->resource->is_include_timestamps = $this->showTimeStamps;
-                $this->resource->save();
+                if ($this->servicesubtype) {
+                    $this->servicesubtype->is_include_timestamps = $this->showTimeStamps;
+                    $this->servicesubtype->save();
+                } else {
+                    $this->resource->is_include_timestamps = $this->showTimeStamps;
+                    $this->resource->save();
+                }
             }
         }
     }

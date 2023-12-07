@@ -17,7 +17,7 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
-                return redirect()->route('server.all');
+                return $this->redirectRoute('server.all', navigate: true);
             }
             $this->privateKeys = PrivateKey::ownedByCurrentTeam()->get()->where('is_git_related', false);
         } catch (\Throwable $e) {

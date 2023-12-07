@@ -13,9 +13,9 @@ class Logs extends Component
     {
         $this->parameters = get_route_parameters();
         try {
-            $this->server = Server::ownedByCurrentTeam(['name', 'proxy'])->whereUuid(request()->server_uuid)->first();
+            $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
-                return redirect()->route('server.all');
+                return $this->redirectRoute('server.all', navigate: true);
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

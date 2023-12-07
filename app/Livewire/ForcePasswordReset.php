@@ -35,7 +35,7 @@ class ForcePasswordReset extends Component
             if ($firstLogin) {
                 send_internal_notification('First login for ' . auth()->user()->email);
             }
-            return redirect()->route('dashboard');
+            return $this->redirectRoute('dashboard', navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

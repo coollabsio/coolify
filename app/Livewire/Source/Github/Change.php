@@ -41,7 +41,7 @@ class Change extends Component
         $github_app_uuid = request()->github_app_uuid;
         $this->github_app = GithubApp::where('uuid', $github_app_uuid)->first();
         if (!$this->github_app) {
-            return redirect()->route('source.all');
+            return $this->redirectRoute('source.all', navigate: true);
         }
         $settings = InstanceSettings::get();
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
@@ -67,7 +67,7 @@ class Change extends Component
                 $type = data_get($parameters, 'type');
                 $destination = data_get($parameters, 'destination');
                 session()->forget('from');
-                return redirect()->route($back, [
+                return $this->redirectRoute($back, [
                     'environment_name' => $environment_name,
                     'project_uuid' => $project_uuid,
                     'type' => $type,
@@ -105,7 +105,7 @@ class Change extends Component
     {
         try {
             $this->github_app->delete();
-            redirect()->route('source.all');
+            return $this->redirectRoute('source.all', navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

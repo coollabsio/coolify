@@ -22,10 +22,10 @@ class Danger extends Component
     {
         try {
             DeleteResourceJob::dispatchSync($this->resource);
-            return redirect()->route('project.resources', [
+            return $this->redirectRoute('project.resources', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'environment_name' => $this->parameters['environment_name']
-            ]);
+            ], navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

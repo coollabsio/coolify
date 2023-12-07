@@ -35,7 +35,7 @@ class Change extends Component
             if ($this->private_key->isEmpty()) {
                 $this->private_key->delete();
                 currentTeam()->privateKeys = PrivateKey::where('team_id', currentTeam()->id)->get();
-                return redirect()->route('security.private-key.index');
+                return $this->redirectRoute('security.private-key.index', navigate: true);
             }
             $this->dispatch('error', 'This private key is in use and cannot be deleted. Please delete all servers, applications, and GitHub/GitLab apps that use this private key before deleting it.');
         } catch (\Throwable $e) {

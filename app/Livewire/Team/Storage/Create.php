@@ -65,7 +65,7 @@ class Create extends Component
             $this->storage->team_id = currentTeam()->id;
             $this->storage->testConnection();
             $this->storage->save();
-            return redirect()->route('team.storages.show', $this->storage->uuid);
+            return $this->redirectRoute('team.storages.show', $this->storage->uuid, navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

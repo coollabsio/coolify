@@ -41,9 +41,9 @@ class LogDrains extends Component
     {
         $this->parameters = get_route_parameters();
         try {
-            $server = Server::ownedByCurrentTeam(['name', 'description', 'ip', 'port', 'user', 'proxy'])->whereUuid(request()->server_uuid)->first();
+            $server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($server)) {
-                return redirect()->route('server.all');
+                return $this->redirectRoute('server.all', navigate: true);
             }
             $this->server = $server;
         } catch (\Throwable $e) {

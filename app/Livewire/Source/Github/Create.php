@@ -48,7 +48,7 @@ class Create extends Component
             if (session('from')) {
                 session(['from' => session('from') + ['source_id' => $github_app->id]]);
             }
-            redirect()->route('source.github.show', ['github_app_uuid' => $github_app->uuid]);
+            return $this->redirectRoute('source.github.show', ['github_app_uuid' => $github_app->uuid], navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

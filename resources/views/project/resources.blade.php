@@ -41,7 +41,7 @@
         </nav>
     </div>
     @if ($environment->isEmpty())
-        <a href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
+        <a wire:navigate href="{{ route('project.resources.new', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
             class="items-center justify-center box">+ Add New Resource</a>
     @endif
     <div class="grid gap-2 lg:grid-cols-2">

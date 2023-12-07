@@ -79,7 +79,7 @@ class ByIp extends Component
             $server->settings->is_swarm_manager = $this->is_swarm_manager;
             $server->settings->save();
             $server->addInitialNetwork();
-            return redirect()->route('server.show', $server->uuid);
+            return $this->redirectRoute('server.show', $server->uuid, navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

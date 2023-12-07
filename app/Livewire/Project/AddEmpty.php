@@ -27,7 +27,7 @@ class AddEmpty extends Component
                 'description' => $this->description,
                 'team_id' => currentTeam()->id,
             ]);
-            return redirect()->route('project.show', $project->uuid);
+            return $this->redirectRoute('project.show', $project->uuid, navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

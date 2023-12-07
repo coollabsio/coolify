@@ -22,7 +22,7 @@
         <livewire:project.service.navbar :service="$resource" :parameters="$parameters" :query="$query" />
         <div class="flex gap-4 pt-6">
             <div>
-                <a class="{{ request()->routeIs('project.service.show') ? 'text-white' : '' }}"
+                <a wire:navigate class="{{ request()->routeIs('project.service.show') ? 'text-white' : '' }}"
                     href="{{ route('project.service.show', $parameters) }}">
                     <button><- Back</button>
                 </a>
