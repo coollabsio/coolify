@@ -83,7 +83,7 @@ class ExecuteContainerCommand extends Component
 
             $this->server = $this->resource->server;
         }
-        if ($this->containers->count() > 1) {
+        if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
         }
     }
