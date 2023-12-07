@@ -1,4 +1,4 @@
-<form x-data="{ raw: true }" class="custom-modal" wire:submit.prevent='submit'>
+<form x-data="{ raw: true }" class="custom-modal" wire:submit='submit'>
     <div class="flex items-end gap-2">
         <h1>Docker Compose</h1>
         <div x-cloak x-show="raw">

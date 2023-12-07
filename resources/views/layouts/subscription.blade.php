@@ -2,9 +2,11 @@
 @section('body')
     @parent
     @if (isSubscriptionOnGracePeriod())
-        <div class="fixed top-[4.5rem] left-4 z-50" id="vue">
-            <magic-bar></magic-bar>
-        </div>
+        @persist('magic-bar')
+            <div class="fixed top-[4.5rem] left-4 z-50" id="vue">
+                <magic-bar></magic-bar>
+            </div>
+        @endpersist
         <x-navbar />
     @else
         <x-navbar-subscription />

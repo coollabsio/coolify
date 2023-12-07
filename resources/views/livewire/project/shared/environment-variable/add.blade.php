@@ -1,5 +1,5 @@
 <dialog id="newVariable" class="modal">
-    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
         <h3 class="text-lg font-bold">Add Environment Variable</h3>
         <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
         <x-forms.input placeholder="production" id="value" label="Value" required />

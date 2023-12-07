@@ -23,7 +23,7 @@
             <div>
                 <form action="/login" method="POST" class="flex flex-col gap-2">
                     @csrf
-                @env('local')
+                    @env('local')
                     <x-forms.input value="test@example.com" type="email" name="email" required
                         label="{{ __('input.email') }}" autofocus />
 

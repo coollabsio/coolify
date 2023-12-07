@@ -1,17 +1,17 @@
 <div class="navbar-main">
-    <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
         href="{{ route('project.application.command', $parameters) }}">
         <button>Execute Command</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
         href="{{ route('project.application.deployments', $parameters) }}">
         <button>Deployments</button>
     </a>

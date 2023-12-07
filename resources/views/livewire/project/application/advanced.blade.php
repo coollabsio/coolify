@@ -23,7 +23,7 @@
                 <x-forms.checkbox instantSave id="application.settings.is_git_lfs_enabled" label="Git LFS"
                     helper="Allow Git LFS during build process." />
             @endif
-            <form wire:submit.prevent="submit">
+            <form wire:submit="submit">
                 @if ($application->build_pack !== 'dockercompose')
                     <div class="flex gap-2">
                         <x-forms.checkbox

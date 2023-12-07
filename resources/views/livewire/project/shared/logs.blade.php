@@ -1,4 +1,4 @@
-<x-layout>
+<div>
     @if ($type === 'application')
         <h1>Logs</h1>
         <livewire:project.application.heading :application="$resource" />
@@ -28,8 +28,9 @@
                 </a>
             </div>
             <div class="flex-1 pl-8">
-                <livewire:project.shared.get-logs :server="$server" :resource="$resource" :servicesubtype="$serviceSubType" :container="$container" />
+                <livewire:project.shared.get-logs :server="$server" :resource="$resource" :servicesubtype="$serviceSubType"
+                    :container="$container" />
             </div>
         </div>
     @endif
-</x-layout>
+</div>

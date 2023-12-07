@@ -1,5 +1,5 @@
 <dialog id="newStorage" class="modal">
-    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
         <h3 class="text-lg font-bold">Add Storage Volume</h3>
         <x-forms.input placeholder="pv-name" id="name" label="Name" required />
         <x-forms.input placeholder="/root" id="host_path" label="Source Path" />

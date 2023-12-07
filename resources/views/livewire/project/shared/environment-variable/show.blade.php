@@ -5,7 +5,8 @@
                     class="font-bold text-warning">({{ $env->key }})</span>?</p>
         </x-slot:modalBody>
     </x-modal>
-    <form wire:submit.prevent='submit' class="flex flex-col gap-2 p-4 m-2 border lg:items-center border-coolgray-300 lg:m-0 lg:p-0 lg:border-0 lg:flex-row">
+    <form wire:submit='submit'
+        class="flex flex-col gap-2 p-4 m-2 border lg:items-center border-coolgray-300 lg:m-0 lg:p-0 lg:border-0 lg:flex-row">
         @if ($isLocked)
             <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">

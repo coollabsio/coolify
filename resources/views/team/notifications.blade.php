@@ -9,14 +9,13 @@
                 @click.prevent="activeTab = 'telegram'; window.location.hash = 'telegram'" href="#">Telegram</a>
             <a :class="activeTab === 'discord' && 'text-white'"
                 @click.prevent="activeTab = 'discord'; window.location.hash = 'discord'" href="#">Discord</a>
-
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'email'" class="h-full">
                 <livewire:notifications.email-settings />
             </div>
             <div x-cloak x-show="activeTab === 'telegram'" class="h-full">
-                <livewire:notifications.telegram-settings  />
+                <livewire:notifications.telegram-settings />
             </div>
             <div x-cloak x-show="activeTab === 'discord'">
                 <livewire:notifications.discord-settings />

@@ -4,7 +4,7 @@
             <p>This private key will be deleted. It is not reversible. <br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    <form class="flex flex-col gap-2" wire:submit.prevent='changePrivateKey'>
+    <form class="flex flex-col gap-2" wire:submit='changePrivateKey'>
         <div class="flex items-end gap-2">
             <h2>Private Key</h2>
             <x-forms.button type="submit">

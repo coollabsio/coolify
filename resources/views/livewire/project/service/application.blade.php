@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='submit'>
+    <form wire:submit='submit'>
         <div class="flex items-center gap-2 pb-4">
             @if ($application->human_name)
                 <h2>{{ Str::headline($application->human_name) }}</h2>

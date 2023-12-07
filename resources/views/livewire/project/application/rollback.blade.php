@@ -3,7 +3,8 @@
         <h2>Rollback</h2>
         <x-forms.button wire:click='loadImages(true)'>Reload Available Images</x-forms.button>
     </div>
-    <div class="pb-4 ">You can easily rollback to a previously built <span class="text-warning">(local)</span> images quickly.</div>
+    <div class="pb-4 ">You can easily rollback to a previously built <span class="text-warning">(local)</span> images
+        quickly.</div>
     <div wire:target='loadImages'>
         <div class="flex flex-wrap">
             @forelse ($images as $image)
@@ -25,7 +26,8 @@
                                     Rollback
                                 </x-forms.button>
                             @else
-                                <x-forms.button class="bg-coolgray-100" wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
+                                <x-forms.button class="bg-coolgray-100"
+                                    wire:click="rollbackImage('{{ data_get($image, 'tag') }}')">
                                     Rollback
                                 </x-forms.button>
                             @endif

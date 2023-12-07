@@ -1,4 +1,4 @@
-<form wire:submit.prevent='clone'>
+<form wire:submit='clone'>
     <div class="flex flex-col">
         <div class="flex gap-2">
             <h1>Clone</h1>

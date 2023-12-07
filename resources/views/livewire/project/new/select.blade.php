@@ -90,7 +90,8 @@
                             New PostgreSQL
                         </div>
                         <div class="description">
-                            PostgreSQL is an open-source, object-relational database management system known for its robustness, advanced features, and strong standards compliance.
+                            PostgreSQL is an open-source, object-relational database management system known for its
+                            robustness, advanced features, and strong standards compliance.
                         </div>
                     </div>
                 </div>
@@ -100,7 +101,8 @@
                             New Redis
                         </div>
                         <div class="description">
-                            Redis is an open-source, in-memory data structure store used as a database, cache, and message broker, known for its high performance, flexibility, and rich data structures.
+                            Redis is an open-source, in-memory data structure store used as a database, cache, and
+                            message broker, known for its high performance, flexibility, and rich data structures.
                         </div>
                     </div>
                 </div>
@@ -110,7 +112,9 @@
                             New MongoDB
                         </div>
                         <div class="description">
-                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with optional schemas, known for its flexibility, scalability, and wide range of application use cases.
+                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with
+                            optional schemas, known for its flexibility, scalability, and wide range of application use
+                            cases.
                         </div>
                     </div>
                 </div>
@@ -120,7 +124,8 @@
                             New MySQL
                         </div>
                         <div class="description">
-                            MySQL is an open-source relational database management system known for its speed, reliability, and flexibility in managing and accessing data.
+                            MySQL is an open-source relational database management system known for its speed,
+                            reliability, and flexibility in managing and accessing data.
                         </div>
                     </div>
                 </div>
@@ -130,7 +135,8 @@
                             New Mariadb
                         </div>
                         <div class="description">
-                            MariaDB is an open-source relational database management system that serves as a drop-in replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
+                            MariaDB is an open-source relational database management system that serves as a drop-in
+                            replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
                         </div>
                     </div>
                 </div>
@@ -181,7 +187,7 @@
                                 </div>
                             </button>
                         @endif
-                        @empty
+                    @empty
                         <div>No service found. Please try to reload the list!</div>
                     @endforelse
                 @endif
@@ -248,7 +254,7 @@
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')
-            <form wire:submit.prevent='addExistingPostgresql' class="flex items-end gap-2">
+            <form wire:submit='addExistingPostgresql' class="flex items-end gap-2">
                 <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
                     id="existingPostgresqlUrl" />
                 <x-forms.button type="submit">Add Database</x-forms.button>

@@ -5,7 +5,7 @@
             </p>
         </x-slot:modalBody>
     </x-modal>
-    <form class="flex flex-col gap-2 pb-6" wire:submit.prevent='submit'>
+    <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
         <div class="flex items-start gap-2">
             <div class="pb-4">
                 <h2>Storage Details</h2>

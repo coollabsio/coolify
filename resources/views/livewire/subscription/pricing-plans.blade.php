@@ -1,19 +1,19 @@
 <x-pricing-plans>
     @if (config('subscription.provider') === 'stripe')
         <x-slot:basic>
-            <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-monthly')">
+            <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-basic" class="w-full h-10 buyme"
+                wire:click="subscribeStripe('basic-monthly')">
                 {{ $isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
 
-            <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('basic-yearly')">
+            <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-basic" class="w-full h-10 buyme"
+                wire:click="subscribeStripe('basic-yearly')">
                 {{ $isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
         </x-slot:basic>
         <x-slot:pro>
-            <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro"
-                class="w-full h-10 buyme" wire:click="subscribeStripe('pro-monthly')">
+            <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-pro" class="w-full h-10 buyme"
+                wire:click="subscribeStripe('pro-monthly')">
                 {{ $isTrial ? 'Start Trial' : 'Subscribe' }}
             </x-forms.button>
 
@@ -23,12 +23,14 @@
         </x-slot:pro>
         <x-slot:ultimate>
             <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate"
-                class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.docs') }}" target="_blank">
+                class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.docs') }}"
+                    target="_blank">
                     Contact Us</a>
             </x-forms.button>
 
             <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate"
-                class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.docs') }}" target="_blank">
+                class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.docs') }}"
+                    target="_blank">
                     Contact Us</a>
             </x-forms.button>
         </x-slot:ultimate>
