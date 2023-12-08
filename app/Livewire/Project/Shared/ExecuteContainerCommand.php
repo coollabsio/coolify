@@ -10,6 +10,7 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Sleep;
 use Livewire\Component;
 
 class ExecuteContainerCommand extends Component
@@ -23,7 +24,16 @@ class ExecuteContainerCommand extends Component
     public string $workDir = '';
     public Server $server;
     public $servers = [];
-
+    public function getListeners()
+    {
+        return [
+            "serviceStatusChanged",
+        ];
+    }
+    public function serviceStatusChanged()
+    {
+        $this->getContainers();
+    }
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -33,8 +43,12 @@ class ExecuteContainerCommand extends Component
 
     public function mount()
     {
-        $this->containers = collect();
         $this->parameters = get_route_parameters();
+        $this->getContainers();
+    }
+    public function getContainers()
+    {
+        $this->containers = collect();
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
             $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
@@ -92,10 +106,12 @@ class ExecuteContainerCommand extends Component
     {
         $this->validate();
         try {
+            // Wrap command to prevent escaped execution in the host.
+            $cmd = 'sh -c "' . str_replace('"', '\"', $this->command)  . '"';
             if (!empty($this->workDir)) {
-                $exec = "docker exec -w {$this->workDir} {$this->container} {$this->command}";
+                $exec = "docker exec -w {$this->workDir} {$this->container} {$cmd}";
             } else {
-                $exec = "docker exec {$this->container} {$this->command}";
+                $exec = "docker exec {$this->container} {$cmd}";
             }
             $activity = remote_process([$exec], $this->server, ignore_errors: true);
             $this->dispatch('newMonitorActivity', $activity->id);

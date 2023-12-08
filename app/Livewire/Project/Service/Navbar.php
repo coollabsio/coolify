@@ -29,9 +29,8 @@ class Navbar extends Component
     }
     public function getListeners()
     {
-        $userId = auth()->user()->id;
         return [
-            "echo-private:custom.{$userId},ServiceStatusChanged" => 'serviceStatusChanged',
+            "serviceStatusChanged"
         ];
     }
     public function serviceStatusChanged()

@@ -38,6 +38,7 @@ class Index extends Component
     {
         dispatch_sync(new ContainerStatusJob($this->service->server));
         $this->refreshStacks();
+        $this->dispatch('serviceStatusChanged');
     }
     public function refreshStacks()
     {

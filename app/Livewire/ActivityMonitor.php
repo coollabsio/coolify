@@ -8,7 +8,7 @@ use Spatie\Activitylog\Models\Activity;
 
 class ActivityMonitor extends Component
 {
-    public string|null $header = null;
+    public ?string $header = null;
     public $activityId;
     public $isPollingActive = false;
 
@@ -26,31 +26,30 @@ class ActivityMonitor extends Component
 
     public function hydrateActivity()
     {
-        $this->activity = Activity::query()
-            ->find($this->activityId);
+        $this->activity = Activity::find($this->activityId);
     }
 
     public function polling()
     {
         $this->hydrateActivity();
-        $this->setStatus(ProcessStatus::IN_PROGRESS);
+        // $this->setStatus(ProcessStatus::IN_PROGRESS);
         $exit_code = data_get($this->activity, 'properties.exitCode');
         if ($exit_code !== null) {
             if ($exit_code === 0) {
-                $this->setStatus(ProcessStatus::FINISHED);
+                // $this->setStatus(ProcessStatus::FINISHED);
             } else {
-                $this->setStatus(ProcessStatus::ERROR);
+                // $this->setStatus(ProcessStatus::ERROR);
             }
             $this->isPollingActive = false;
             $this->dispatch('activityFinished');
         }
     }
 
-    protected function setStatus($status)
-    {
-        $this->activity->properties = $this->activity->properties->merge([
-            'status' => $status,
-        ]);
-        $this->activity->save();
-    }
+    // protected function setStatus($status)
+    // {
+    //     $this->activity->properties = $this->activity->properties->merge([
+    //         'status' => $status,
+    //     ]);
+    //     $this->activity->save();
+    // }
 }

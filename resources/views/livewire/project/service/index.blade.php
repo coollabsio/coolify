@@ -115,7 +115,7 @@
                 <livewire:project.shared.webhooks :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'execute-command'">
-                <livewire:project.shared.execute-container-command :resource="$service" />
+                <livewire:project.shared.execute-container-command :resource="$service"  />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <div x-cloak x-show="activeTab === 'environment-variables'">
