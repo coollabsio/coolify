@@ -1,5 +1,6 @@
 <?php
 
+use App\Events\TestEvent;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\DatabaseController;
@@ -48,7 +49,7 @@ Route::get('/api/v1/test/realtime', function () {
     if (auth()->user()?->currentTeam()->id !== 0) {
         return redirect('/');
     }
-    event(new \App\Events\TestEvent('asd'));
+    TestEvent::dispatch('asd');
     return 'Look at your other tab.';
 })->middleware('auth');
 

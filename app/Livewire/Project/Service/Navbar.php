@@ -65,6 +65,6 @@ class Navbar extends Component
         } else {
             $this->dispatch('success', 'Service stopped successfully.');
         }
-        event(new ServiceStatusChanged());
+        ServiceStatusChanged::dispatch();
     }
 }
