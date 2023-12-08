@@ -106,12 +106,10 @@ class ExecuteContainerCommand extends Component
     {
         $this->validate();
         try {
-            // Wrap command to prevent escaped execution in the host.
-            $cmd = 'sh -c "' . str_replace('"', '\"', $this->command)  . '"';
             if (!empty($this->workDir)) {
-                $exec = "docker exec -w {$this->workDir} {$this->container} {$cmd}";
+                $exec = "docker exec -w {$this->workDir} {$this->container} {$this->command}";
             } else {
-                $exec = "docker exec {$this->container} {$cmd}";
+                $exec = "docker exec {$this->container} {$this->command}";
             }
             $activity = remote_process([$exec], $this->server, ignore_errors: true);
             $this->dispatch('newMonitorActivity', $activity->id);
