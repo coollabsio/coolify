@@ -13,7 +13,8 @@
         @if (data_get($server, 'privateKey.uuid'))
             <div>
                 Currently attached Private Key:
-                <a href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
+                <a
+                    href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($server, 'privateKey.uuid')]) }}">
                     <button class="text-white btn-link">{{ data_get($server, 'privateKey.name') }}</button>
                 </a>
             </div>

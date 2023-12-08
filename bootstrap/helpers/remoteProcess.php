@@ -24,6 +24,7 @@ function remote_process(
     ?string $type_uuid = null,
     ?Model  $model = null,
     bool    $ignore_errors = false,
+    $callEventOnFinish = null
 ): Activity {
     if (is_null($type)) {
         $type = ActivityTypes::INLINE->value;
@@ -47,18 +48,12 @@ function remote_process(
             type: $type,
             type_uuid: $type_uuid,
             model: $model,
-            ignore_errors: $ignore_errors
+            ignore_errors: $ignore_errors,
+            call_event_on_finish: $callEventOnFinish,
         ),
     ])();
 }
 
-// function removePrivateKeyFromSshAgent(Server $server)
-// {
-//     if (data_get($server, 'privateKey.private_key') === null) {
-//         throw new \Exception("Server {$server->name} does not have a private key");
-//     }
-//     // processWithEnv()->run("echo '{$server->privateKey->private_key}' | ssh-add -d -");
-// }
 function savePrivateKeyToFs(Server $server)
 {
     if (data_get($server, 'privateKey.private_key') === null) {

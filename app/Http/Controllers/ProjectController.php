@@ -116,7 +116,6 @@ class ProjectController extends Controller
                     });
                 }
                 $service->parse(isNew: true);
-
                 return redirect()->route('project.service.configuration', [
                     'service_uuid' => $service->uuid,
                     'environment_name' => $environment->name,

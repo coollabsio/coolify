@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent="submit" class="flex flex-col gap-2">
+    <form wire:submit="submit" class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">

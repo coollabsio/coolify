@@ -1,6 +1,6 @@
 <div x-init="$wire.getLogs">
     <div class="flex gap-2">
-        <h4>Container: {{$container}}</h4>
+        <h4>Container: {{ $container }}</h4>
         @if ($streamLogs)
             <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
         @endif
@@ -9,7 +9,7 @@
         <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
         <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
     </div>
-    <form wire:submit.prevent='getLogs(true)' class="flex items-end gap-2">
+    <form wire:submit='getLogs(true)' class="flex items-end gap-2">
         <x-forms.input label="Only Show Number of Lines" placeholder="1000" required id="numberOfLines"></x-forms.input>
         <x-forms.button type="submit">Refresh</x-forms.button>
     </form>

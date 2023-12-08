@@ -88,7 +88,7 @@
                         wire:click="setPrivateKey('create')">No (create one for me)
                     </x-forms.button>
                     @if (count($privateKeys) > 0)
-                        <form wire:submit.prevent='selectExistingPrivateKey' class="flex flex-col w-full gap-4 pr-10">
+                        <form wire:submit='selectExistingPrivateKey' class="flex flex-col w-full gap-4 pr-10">
                             <x-forms.select label="Existing SSH Keys" id='selectedExistingPrivateKey'>
                                 @foreach ($privateKeys as $privateKey)
                                     <option wire:key="{{ $loop->index }}" value="{{ $privateKey->id }}">
@@ -120,7 +120,7 @@
                     <x-forms.button class="justify-center box" wire:click="createNewServer">No (create one for me)
                     </x-forms.button>
                     <div>
-                        <form wire:submit.prevent='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
+                        <form wire:submit='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
                             <x-forms.select label="Existing servers" class="w-96" id='selectedExistingServer'>
                                 @foreach ($servers as $server)
                                     <option wire:key="{{ $loop->index }}" value="{{ $server->id }}">
@@ -159,7 +159,7 @@
                     Please let me know your key details.
                 </x-slot:question>
                 <x-slot:actions>
-                    <form wire:submit.prevent='savePrivateKey' class="flex flex-col w-full gap-4 pr-10">
+                    <form wire:submit='savePrivateKey' class="flex flex-col w-full gap-4 pr-10">
                         <x-forms.input required placeholder="Choose a name for your Private Key. Could be anything."
                             label="Name" id="privateKeyName" />
                         <x-forms.input placeholder="Description, so others will know more about this."
@@ -192,7 +192,7 @@
                     Please let me know your server details.
                 </x-slot:question>
                 <x-slot:actions>
-                    <form wire:submit.prevent='saveServer' class="flex flex-col w-full gap-4 pr-10">
+                    <form wire:submit='saveServer' class="flex flex-col w-full gap-4 pr-10">
                         <div class="flex gap-2">
                             <x-forms.input required placeholder="Choose a name for your Server. Could be anything."
                                 label="Name" id="remoteServerName" />
@@ -291,8 +291,7 @@
                         one!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
-                            <form wire:submit.prevent='selectExistingProject'
-                                class="flex flex-col w-full gap-4 lg:w-96">
+                            <form wire:submit='selectExistingProject' class="flex flex-col w-full gap-4 lg:w-96">
                                 <x-forms.select label="Existing projects" class="w-96"
                                     id='selectedExistingProject'>
                                     @foreach ($projects as $project)

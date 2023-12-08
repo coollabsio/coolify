@@ -66,7 +66,8 @@
                             </a>
                         @endif
                         |
-                        <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">Open PR on Git
+                        <a target="_blank" href="{{ data_get($preview, 'pull_request_html_url') }}">Open
+                            PR on Git
                             <x-external-link />
                         </a>
                     </div>

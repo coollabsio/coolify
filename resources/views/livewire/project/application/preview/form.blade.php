@@ -1,4 +1,4 @@
-<form wire:submit.prevent='submit'>
+<form wire:submit='submit'>
     <div class="flex items-center gap-2">
         <h2>Preview Deployments</h2>
         <x-forms.button type="submit">Save</x-forms.button>

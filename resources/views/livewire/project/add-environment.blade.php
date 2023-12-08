@@ -1,5 +1,5 @@
 <dialog id="newEnvironment" class="modal">
-    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
         <x-forms.input placeholder="production" id="name" label="Name" required />
         <x-forms.button onclick="newEnvironment.close()" type="submit">
             Save

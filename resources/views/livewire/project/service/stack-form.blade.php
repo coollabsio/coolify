@@ -1,4 +1,4 @@
-<form wire:submit.prevent='submit' class="flex flex-col gap-4 pb-2">
+<form wire:submit='submit' class="flex flex-col gap-4 pb-2">
     <div class="flex gap-2">
         <div>
             <h2>Service Stack</h2>
@@ -6,7 +6,7 @@
         </div>
         <x-forms.button type="submit">Save</x-forms.button>
         <x-forms.button class="w-64"
-            onclick="Livewire.emit('openModal', 'modals.edit-compose',{{ json_encode(['serviceId' => $service->id]) }})">Edit
+            onclick="Livewire.dispatch('openModal', {component: 'modal.edit-compose', arguments:  {{ json_encode(['serviceId' => $service->id]) }}  })">Edit
             Compose
             File</x-forms.button>
     </div>

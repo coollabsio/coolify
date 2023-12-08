@@ -1,5 +1,5 @@
 <dialog id="createScheduledBackup" class="modal">
-    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+    <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
         <h2>New Backup</h2>
         <x-forms.input placeholder="0 0 * * * or daily" id="frequency" label="Frequency" required />
         <h3>S3 Storage</h3>

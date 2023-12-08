@@ -4,7 +4,7 @@
     @else
         <h1>Create a new Server</h1>
         <div class="subtitle">Servers are the main blocks of your infrastructure.</div>
-        <form class="flex flex-col gap-2" wire:submit.prevent='submit'>
+        <form class="flex flex-col gap-2" wire:submit='submit'>
             <div class="flex gap-2">
                 <x-forms.input id="name" label="Name" required />
                 <x-forms.input id="description" label="Description" />

@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='submit' class="flex flex-col">
+    <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>Configuration</h2>
             <x-forms.button type="submit">
@@ -24,12 +24,13 @@
         <x-forms.checkbox instantSave id="is_auto_update_enabled" label="Auto Update Coolify" />
         <x-forms.checkbox instantSave id="is_registration_enabled" label="Registration Allowed" />
         <x-forms.checkbox instantSave id="do_not_track" label="Do Not Track" />
-        @if($next_channel)
-        <x-forms.checkbox instantSave helper="Do not recommended, only if you like to live on the edge."
-            id="next_channel" label="Enable pre-release (early) updates" />
-            @else
-            <x-forms.checkbox disabled instantSave helper="Currently disabled. Do not recommended, only if you like to live on the edge."
-            id="next_channel" label="Enable pre-release (early) updates" />
-            @endif
+        @if ($next_channel)
+            <x-forms.checkbox instantSave helper="Do not recommended, only if you like to live on the edge."
+                id="next_channel" label="Enable pre-release (early) updates" />
+        @else
+            <x-forms.checkbox disabled instantSave
+                helper="Currently disabled. Do not recommended, only if you like to live on the edge." id="next_channel"
+                label="Enable pre-release (early) updates" />
+        @endif
     </div>
 </div>

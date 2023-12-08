@@ -1,7 +1,6 @@
 <x-layout>
     <x-security.navbar />
-    <a class="text-center hover:no-underline group"
-        href="{{ route('security.private-key.index')}}">
+    <a class="text-center hover:no-underline group" href="{{ route('security.private-key.index') }}">
         <div class="group-hover:text-white">
             <div>Private Keys</div>
         </div>

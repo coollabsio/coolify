@@ -1,4 +1,4 @@
-<form wire:submit.prevent="submit">
+<form wire:submit="submit">
     <div class="flex gap-2 pb-2">
         <h2>Scheduled Backup</h2>
         <x-forms.button type="submit">

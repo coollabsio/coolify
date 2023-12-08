@@ -1,0 +1,70 @@
+<?php
+
+namespace App\Livewire\Project\Service;
+
+use App\Actions\Service\StartService;
+use App\Actions\Service\StopService;
+use App\Events\ServiceStatusChanged;
+use App\Jobs\ContainerStatusJob;
+use App\Models\Service;
+use Livewire\Component;
+use Spatie\Activitylog\Models\Activity;
+
+class Navbar extends Component
+{
+    public Service $service;
+    public array $parameters;
+    public array $query;
+    public $isDeploymentProgress = false;
+
+    public function checkDeployments()
+    {
+        $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
+        $status = data_get($activity, 'properties.status');
+        if ($status === 'queued' || $status === 'in_progress') {
+            $this->isDeploymentProgress = true;
+        } else {
+            $this->isDeploymentProgress = false;
+        }
+    }
+    public function getListeners()
+    {
+        return [
+            "serviceStatusChanged"
+        ];
+    }
+    public function serviceStatusChanged()
+    {
+        $this->service->refresh();
+    }
+    public function render()
+    {
+        return view('livewire.project.service.navbar');
+    }
+    public function checkStatus()
+    {
+        $this->service->refresh();
+    }
+    public function deploy()
+    {
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+            return;
+        }
+        $this->service->parse();
+        $activity = StartService::run($this->service);
+        $this->dispatch('newMonitorActivity', $activity->id);
+    }
+    public function stop(bool $forceCleanup = false)
+    {
+        StopService::run($this->service);
+        $this->service->refresh();
+        if ($forceCleanup) {
+            $this->dispatch('success', 'Force cleanup service successfully.');
+        } else {
+            $this->dispatch('success', 'Service stopped successfully.');
+        }
+        ServiceStatusChanged::dispatch();
+    }
+}

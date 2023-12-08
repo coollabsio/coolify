@@ -11,7 +11,7 @@
     @endif
     <select {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) wire:dirty.class.remove='text-white'
         wire:dirty.class="text-black bg-warning" wire:loading.attr="disabled" name={{ $id }}
-        @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model.defer={{ $id }} @endif>
+        @if ($attributes->whereStartsWith('wire:model')->first()) {{ $attributes->whereStartsWith('wire:model')->first() }} @else wire:model={{ $id }} @endif>
         {{ $slot }}
     </select>
     @error($id)

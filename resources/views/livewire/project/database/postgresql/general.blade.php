@@ -1,6 +1,6 @@
 <div>
     <dialog id="newInitScript" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='save_new_init_script'>
+        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='save_new_init_script'>
             <h3 class="text-lg font-bold">Add Init Script</h3>
             <x-forms.input placeholder="create_test_db.sql" id="new_filename" label="Filename" required />
             <x-forms.textarea placeholder="CREATE DATABASE test;" id="new_content" label="Content" required />
@@ -13,7 +13,7 @@
         </form>
     </dialog>
 
-    <form wire:submit.prevent="submit" class="flex flex-col gap-2">
+    <form wire:submit="submit" class="flex flex-col gap-2">
         <div class="flex items-center gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">
@@ -76,8 +76,8 @@
     </form>
     <h3 class="pt-4">Advanced</h3>
     <div class="flex flex-col">
-        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings." instantSave="instantSaveAdvanced"
-            id="database.is_log_drain_enabled" label="Drain Logs" />
+        <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+            instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
     </div>
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">

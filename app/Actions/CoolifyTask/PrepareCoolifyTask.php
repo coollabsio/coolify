@@ -39,7 +39,7 @@ class PrepareCoolifyTask
 
     public function __invoke(): Activity
     {
-        $job = new CoolifyTask($this->activity, ignore_errors: $this->remoteProcessArgs->ignore_errors);
+        $job = new CoolifyTask($this->activity, ignore_errors: $this->remoteProcessArgs->ignore_errors, call_event_on_finish: $this->remoteProcessArgs->call_event_on_finish);
         dispatch($job);
         $this->activity->refresh();
         return $this->activity;

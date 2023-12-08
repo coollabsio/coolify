@@ -13,7 +13,7 @@
         <div>
             <h3>Additional Servers</h3>
             @foreach ($servers as $server)
-                <form wire:submit.prevent='submit' class="p-2 border border-coolgray-400">
+                <form wire:submit='submit' class="p-2 border border-coolgray-400">
                     <h4>{{ $server->name }}</h4>
                     <div class="text-sm text-coolgray-600">{{ $server->description }}</div>
                     <x-forms.checkbox id="additionalServers.{{ $loop->index }}.enabled" label="Enabled">

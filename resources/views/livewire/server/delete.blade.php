@@ -23,10 +23,10 @@
         <div class="flex flex-col">
             @forelse ($server->definedResources() as $resource)
                 @if ($loop->first)
-                    <h3 class="pt-4">Defined resources</h3>
+                    <h3 class="pt-4">Resources</h3>
                 @endif
                 @if ($resource->link())
-                    <a class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
+                    <a wire:navigate class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
                         <div class="w-64">{{ str($resource->type())->headline() }}</div>
                         <div>{{ $resource->name }}</div>
                     </a>
@@ -43,10 +43,10 @@
         <div class="flex flex-col">
             @forelse ($server->definedResources() as $resource)
                 @if ($loop->first)
-                    <h3 class="pt-4">Defined resources</h3>
+                    <h3 class="pt-4">Resources</h3>
                 @endif
                 @if ($resource->link())
-                    <a class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
+                    <a wire:navigate class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
                         <div class="w-64">{{ str($resource->type())->headline() }}</div>
                         <div>{{ $resource->name }}</div>
                     </a>

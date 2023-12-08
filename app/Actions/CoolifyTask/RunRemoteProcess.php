@@ -17,9 +17,9 @@ class RunRemoteProcess
 
     public bool $hide_from_output;
 
-    public bool $is_finished;
-
     public bool $ignore_errors;
+
+    public $call_event_on_finish = null;
 
     protected $time_start;
 
@@ -34,7 +34,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hide_from_output = false, bool $is_finished = false, bool $ignore_errors = false)
+    public function __construct(Activity $activity, bool $hide_from_output = false, bool $ignore_errors = false, $call_event_on_finish = null)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::INLINE->value) {
@@ -43,8 +43,8 @@ class RunRemoteProcess
 
         $this->activity = $activity;
         $this->hide_from_output = $hide_from_output;
-        $this->is_finished = $is_finished;
         $this->ignore_errors = $ignore_errors;
+        $this->call_event_on_finish = $call_event_on_finish;
     }
 
     public static function decodeOutput(?Activity $activity = null): string
@@ -79,12 +79,18 @@ class RunRemoteProcess
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
-            if (($processResult->exitCode() == 0 && $this->is_finished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
+            if ($processResult->exitCode() == 0) {
                 $status = ProcessStatus::FINISHED;
             }
             if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
                 $status = ProcessStatus::ERROR;
             }
+            // if (($processResult->exitCode() == 0 && $this->is_finished) || $this->activity->properties->get('status') === ProcessStatus::FINISHED->value) {
+            //     $status = ProcessStatus::FINISHED;
+            // }
+            // if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
+            //     $status = ProcessStatus::ERROR;
+            // }
         }
 
         $this->activity->properties = $this->activity->properties->merge([
@@ -97,7 +103,15 @@ class RunRemoteProcess
         if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
             throw new \RuntimeException($processResult->errorOutput(), $processResult->exitCode());
         }
-
+        if ($this->call_event_on_finish) {
+            try {
+                event(resolve("App\\Events\\$this->call_event_on_finish", [
+                    'userId' => $this->activity->causer_id,
+                ]));
+            } catch (\Throwable $e) {
+                ray($e);
+            }
+        }
         return $processResult;
     }
 

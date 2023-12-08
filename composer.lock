@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "c1fc9357fddf5e7b23bb5d500c54fe29",
+    "content-hash": "44337ff4ff1d9c435d9776fec01ebe9c",
     "packages": [
         {
             "name": "aws/aws-crt-php",
@@ -3132,33 +3132,34 @@
         },
         {
             "name": "livewire/livewire",
-            "version": "v2.12.6",
+            "version": "v3.2.6",
             "source": {
                 "type": "git",
                 "url": "https://github.com/livewire/livewire.git",
-                "reference": "7d3a57b3193299cf1a0639a3935c696f4da2cf92"
+                "reference": "ecded08cdc4b36bbb4b26bcc7f7a171ea2e4368c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/livewire/livewire/zipball/7d3a57b3193299cf1a0639a3935c696f4da2cf92",
-                "reference": "7d3a57b3193299cf1a0639a3935c696f4da2cf92",
+                "url": "https://api.github.com/repos/livewire/livewire/zipball/ecded08cdc4b36bbb4b26bcc7f7a171ea2e4368c",
+                "reference": "ecded08cdc4b36bbb4b26bcc7f7a171ea2e4368c",
                 "shasum": ""
             },
             "require": {
-                "illuminate/database": "^7.0|^8.0|^9.0|^10.0",
-                "illuminate/support": "^7.0|^8.0|^9.0|^10.0",
-                "illuminate/validation": "^7.0|^8.0|^9.0|^10.0",
+                "illuminate/database": "^10.0",
+                "illuminate/support": "^10.0",
+                "illuminate/validation": "^10.0",
                 "league/mime-type-detection": "^1.9",
-                "php": "^7.2.5|^8.0",
-                "symfony/http-kernel": "^5.0|^6.0"
+                "php": "^8.1",
+                "symfony/http-kernel": "^6.2"
             },
             "require-dev": {
                 "calebporzio/sushi": "^2.1",
-                "laravel/framework": "^7.0|^8.0|^9.0|^10.0",
+                "laravel/framework": "^10.0",
+                "laravel/prompts": "^0.1.6",
                 "mockery/mockery": "^1.3.1",
-                "orchestra/testbench": "^5.0|^6.0|^7.0|^8.0",
-                "orchestra/testbench-dusk": "^5.2|^6.0|^7.0|^8.0",
-                "phpunit/phpunit": "^8.4|^9.0",
+                "orchestra/testbench": "^8.0",
+                "orchestra/testbench-dusk": "^8.0",
+                "phpunit/phpunit": "^9.0",
                 "psy/psysh": "@stable"
             },
             "type": "library",
@@ -3193,7 +3194,7 @@
             "description": "A front-end framework for Laravel.",
             "support": {
                 "issues": "https://github.com/livewire/livewire/issues",
-                "source": "https://github.com/livewire/livewire/tree/v2.12.6"
+                "source": "https://github.com/livewire/livewire/tree/v3.2.6"
             },
             "funding": [
                 {
@@ -3201,7 +3202,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2023-08-11T04:02:34+00:00"
+            "time": "2023-12-04T21:20:19+00:00"
         },
         {
             "name": "lorisleiva/laravel-actions",
@@ -3352,25 +3353,28 @@
         },
         {
             "name": "masmerise/livewire-toaster",
-            "version": "1.3.0",
+            "version": "2.0.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/masmerise/livewire-toaster.git",
-                "reference": "da21267abd9684c590a131a40173fb3c42eab722"
+                "reference": "89aa127df5d17b915b0818761bdf83e8915036c2"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/masmerise/livewire-toaster/zipball/da21267abd9684c590a131a40173fb3c42eab722",
-                "reference": "da21267abd9684c590a131a40173fb3c42eab722",
+                "url": "https://api.github.com/repos/masmerise/livewire-toaster/zipball/89aa127df5d17b915b0818761bdf83e8915036c2",
+                "reference": "89aa127df5d17b915b0818761bdf83e8915036c2",
                 "shasum": ""
             },
             "require": {
                 "laravel/framework": "^10.0",
-                "livewire/livewire": "^2.0",
+                "livewire/livewire": "^3.0",
                 "php": "~8.2"
             },
+            "conflict": {
+                "stevebauman/unfinalize": "*"
+            },
             "require-dev": {
-                "dive-be/php-crowbar": "^1.1",
+                "dive-be/php-crowbar": "^1.0",
                 "laravel/pint": "^1.0",
                 "nunomaduro/larastan": "^2.0",
                 "orchestra/testbench": "^8.0",
@@ -3414,9 +3418,9 @@
             ],
             "support": {
                 "issues": "https://github.com/masmerise/livewire-toaster/issues",
-                "source": "https://github.com/masmerise/livewire-toaster/tree/1.3.0"
+                "source": "https://github.com/masmerise/livewire-toaster/tree/2.0.3"
             },
-            "time": "2023-08-05T18:22:07+00:00"
+            "time": "2023-09-28T12:07:49+00:00"
         },
         {
             "name": "monolog/monolog",
@@ -10224,25 +10228,25 @@
         },
         {
             "name": "wire-elements/modal",
-            "version": "1.0.8",
+            "version": "2.0.8",
             "source": {
                 "type": "git",
                 "url": "https://github.com/wire-elements/modal.git",
-                "reference": "1019f423485afb6df0d1531d978e93d4ad0975fb"
+                "reference": "d6dac3a6ef6527a734504d8a84de49ec0a72282b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/wire-elements/modal/zipball/1019f423485afb6df0d1531d978e93d4ad0975fb",
-                "reference": "1019f423485afb6df0d1531d978e93d4ad0975fb",
+                "url": "https://api.github.com/repos/wire-elements/modal/zipball/d6dac3a6ef6527a734504d8a84de49ec0a72282b",
+                "reference": "d6dac3a6ef6527a734504d8a84de49ec0a72282b",
                 "shasum": ""
             },
             "require": {
-                "livewire/livewire": "^2.0",
-                "php": "^7.4|^8.0",
+                "livewire/livewire": "^3.0",
+                "php": "^8.1",
                 "spatie/laravel-package-tools": "^1.9"
             },
             "require-dev": {
-                "orchestra/testbench": "^6.15",
+                "orchestra/testbench": "^8.5",
                 "phpunit/phpunit": "^9.5"
             },
             "type": "library",
@@ -10276,9 +10280,9 @@
             ],
             "support": {
                 "issues": "https://github.com/wire-elements/modal/issues",
-                "source": "https://github.com/wire-elements/modal/tree/1.0.8"
+                "source": "https://github.com/wire-elements/modal/tree/2.0.8"
             },
-            "time": "2023-04-07T12:35:15+00:00"
+            "time": "2023-11-12T14:57:13+00:00"
         },
         {
             "name": "yosymfony/parser-utils",

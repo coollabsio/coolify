@@ -23,17 +23,16 @@
                 <h3 class="pb-4">Found Destinations</h3>
             @endif
             <div class="flex flex-wrap gap-2 ">
-            @foreach ($networks as $network)
-            <div >
-                <a
-
-                    href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
-                    <x-forms.button >+<x-highlighted text="{{ data_get($network, 'Name') }}" />
-                    </x-forms.button>
-                </a>
+                @foreach ($networks as $network)
+                    <div>
+                        <a
+                            href="{{ route('destination.new', ['server_id' => $server->id, 'network_name' => data_get($network, 'Name')]) }}">
+                            <x-forms.button>+<x-highlighted text="{{ data_get($network, 'Name') }}" />
+                            </x-forms.button>
+                        </a>
+                    </div>
+                @endforeach
             </div>
-            @endforeach
-        </div>
         </div>
     @else
         <div>Server is not validated. Validate first.</div>

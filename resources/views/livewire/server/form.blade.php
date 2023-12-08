@@ -5,7 +5,7 @@
                 running on.<br>Please think again.</p>
         </x-slot:modalBody>
     </x-modal>
-    <form wire:submit.prevent='submit' class="flex flex-col">
+    <form wire:submit='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
             @if ($server->id === 0)
@@ -13,7 +13,6 @@
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
             @endif
-
         </div>
         @if (!$server->isFunctional())
             You can't use this server until it is validated.
@@ -56,7 +55,7 @@
                 @endif
                 {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
                     label="Is it a Swarm Manager?" /> --}}
-                    {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                {{-- <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
                     label="Is it a Swarm Worker?" /> --}}
             </div>
         </div>

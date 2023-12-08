@@ -1,4 +1,4 @@
-<form class="flex flex-col gap-2 pb-6" wire:submit.prevent='submit'>
+<form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
     <div class="flex items-end gap-2">
         <h2>General</h2>
         <x-forms.button type="submit">
