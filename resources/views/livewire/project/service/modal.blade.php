@@ -1,5 +1,5 @@
 <div>
-    <x-modal submitWireAction="checkStatus" modalId="startService">
+    <x-modal noSubmit modalId="startService">
         <x-slot:modalBody>
             <livewire:activity-monitor header="Service Startup Logs" />
         </x-slot:modalBody>

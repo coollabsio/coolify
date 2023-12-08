@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
-use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 
 class Service extends BaseModel
@@ -207,7 +206,6 @@ class Service extends BaseModel
                     break;
             }
         }
-        ray($fields);
         $databases = $this->databases()->get();
 
         foreach ($databases as $database) {

@@ -3,7 +3,6 @@
 namespace App\Livewire\Modal;
 
 use App\Models\Service;
-use Livewire\Component;
 use LivewireUI\Modal\ModalComponent;
 
 class EditCompose extends ModalComponent

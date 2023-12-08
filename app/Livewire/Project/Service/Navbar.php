@@ -4,25 +4,53 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
+use Spatie\Activitylog\Models\Activity;
 
 class Navbar extends Component
 {
     public Service $service;
     public array $parameters;
     public array $query;
-    protected $listeners = ["checkStatus"];
+    public $isDeploymentProgress = false;
 
+    public function checkDeployments() {
+        $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
+        $status = data_get($activity, 'properties.status');
+        if ($status === 'queued' || $status === 'in_progress') {
+            $this->isDeploymentProgress = true;
+        } else {
+            $this->isDeploymentProgress = false;
+        }
+    }
+    public function getListeners()
+    {
+        $userId = auth()->user()->id;
+        return [
+            "echo-private:custom.{$userId},ServiceStatusChanged" => 'serviceStatusChanged',
+        ];
+    }
+    public function serviceStatusChanged()
+    {
+        $this->service->refresh();
+    }
     public function render()
     {
         return view('livewire.project.service.navbar');
     }
-    public function checkStatus() {
+    public function checkStatus()
+    {
         $this->service->refresh();
     }
     public function deploy()
     {
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+            return;
+        }
         $this->service->parse();
         $activity = StartService::run($this->service);
         $this->dispatch('newMonitorActivity', $activity->id);

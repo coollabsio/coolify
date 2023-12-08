@@ -48,7 +48,7 @@ Route::get('/api/v1/test/realtime', function () {
     if (auth()->user()?->currentTeam()->id !== 0) {
         return redirect('/');
     }
-    event(new \App\Events\TestEvent());
+    event(new \App\Events\TestEvent('asd'));
     return 'Look at your other tab.';
 })->middleware('auth');
 

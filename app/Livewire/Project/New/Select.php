@@ -133,13 +133,13 @@ class Select extends Component
     public function setDestination(string $destination_uuid)
     {
         $this->destination_uuid = $destination_uuid;
-        return $this->redirectRoute('project.resources.new', [
+        return redirect()->route('project.resources.new', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_name' => $this->parameters['environment_name'],
             'type' => $this->type,
             'destination' => $this->destination_uuid,
             'server_id' => $this->server_id,
-        ], navigate: true);
+        ]);
     }
 
     public function loadServers()

@@ -13,7 +13,15 @@ class Index extends Component
     public $databases;
     public array $parameters;
     public array $query;
-    protected $listeners = ["refreshStacks", "checkStatus"];
+    public function getListeners()
+    {
+        $userId = auth()->user()->id;
+        return [
+            "echo-private:custom.{$userId},ServiceStatusChanged" => 'checkStatus',
+            "refreshStacks",
+            "checkStatus",
+        ];
+    }
     public function render()
     {
         return view('livewire.project.service.index');
@@ -28,7 +36,7 @@ class Index extends Component
     }
     public function checkStatus()
     {
-        dispatch(new ContainerStatusJob($this->service->server));
+        dispatch_sync(new ContainerStatusJob($this->service->server));
         $this->refreshStacks();
     }
     public function refreshStacks()
