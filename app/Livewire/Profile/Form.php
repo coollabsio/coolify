@@ -2,21 +2,16 @@
 
 namespace App\Livewire\Profile;
 
-use App\Models\User;
+use Livewire\Attributes\Validate;
 use Livewire\Component;
 
 class Form extends Component
 {
     public int $userId;
-    public string $name;
     public string $email;
 
-    protected $rules = [
-        'name' => 'required',
-    ];
-    protected $validationAttributes = [
-        'name' => 'name',
-    ];
+    #[Validate('required')]
+    public string $name;
 
     public function mount()
     {
@@ -30,9 +25,11 @@ class Form extends Component
     {
         try {
             $this->validate();
-            User::where('id', $this->userId)->update([
+            auth()->user()->update([
                 'name' => $this->name,
             ]);
+
+            $this->dispatch('success', 'Profile updated successfully.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
