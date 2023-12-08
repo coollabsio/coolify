@@ -2,7 +2,7 @@
     <ol class="flex items-center">
         <li class="inline-flex items-center">
             <a wire:nagivate class="text-xs truncate lg:text-sm"
-                href="{{ route('project.show', ['project_uuid' => data_get($resource, 'environment.project.uuid')]) }}">
+                href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
                 {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
         </li>
         <li>
