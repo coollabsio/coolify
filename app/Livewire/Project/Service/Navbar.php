@@ -16,7 +16,8 @@ class Navbar extends Component
     public array $query;
     public $isDeploymentProgress = false;
 
-    public function checkDeployments() {
+    public function checkDeployments()
+    {
         $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
         $status = data_get($activity, 'properties.status');
         if ($status === 'queued' || $status === 'in_progress') {
@@ -27,14 +28,9 @@ class Navbar extends Component
     }
     public function getListeners()
     {
-        $userId = auth()->user()->id;
         return [
-            "echo-private:custom.{$userId},ServiceStatusChanged" => 'serviceStatusChanged',
+            "updateStatus" => 'checkStatus',
         ];
-    }
-    public function serviceStatusChanged()
-    {
-        $this->service->refresh();
     }
     public function render()
     {
