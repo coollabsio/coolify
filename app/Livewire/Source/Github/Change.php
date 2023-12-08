@@ -88,7 +88,20 @@ class Change extends Component
     {
         try {
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
-            $this->validate();
+            $this->validate([
+                'github_app.name' => 'required|string',
+                'github_app.organization' => 'nullable|string',
+                'github_app.api_url' => 'required|string',
+                'github_app.html_url' => 'required|string',
+                'github_app.custom_user' => 'required|string',
+                'github_app.custom_port' => 'required|int',
+                'github_app.app_id' => 'required|int',
+                'github_app.installation_id' => 'required|int',
+                'github_app.client_id' => 'required|string',
+                'github_app.client_secret' => 'required|string',
+                'github_app.webhook_secret' => 'required|string',
+                'github_app.is_system_wide' => 'required|bool',
+            ]);
             $this->github_app->save();
             $this->dispatch('success', 'Github App updated successfully.');
         } catch (\Throwable $e) {
@@ -98,7 +111,6 @@ class Change extends Component
 
     public function instantSave()
     {
-        $this->submit();
     }
 
     public function delete()
