@@ -27,7 +27,7 @@ class RunRemoteProcess
 
     protected $last_write_at = 0;
 
-    protected $throttle_interval_ms = 500;
+    protected $throttle_interval_ms = 200;
 
     protected int $counter = 1;
 
@@ -74,8 +74,14 @@ class RunRemoteProcess
         $this->time_start = hrtime(true);
 
         $status = ProcessStatus::IN_PROGRESS;
-        $processResult = Process::forever()->run($this->getCommand(), $this->handleOutput(...));
+        $timeout = config('constants.ssh.command_timeout');
+        $process = Process::timeout($timeout)->start($this->getCommand(), $this->handleOutput(...));
+        $this->activity->properties = $this->activity->properties->merge([
+            'process_id' => $process->id(),
+        ]);
 
+        $processResult = $process->wait();
+        // $processResult = Process::timeout($timeout)->run($this->getCommand(), $this->handleOutput(...));
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
@@ -131,7 +137,6 @@ class RunRemoteProcess
         }
         $this->current_time = $this->elapsedTime();
         $this->activity->description = $this->encodeOutput($type, $output);
-
         if ($this->isAfterLastThrottle()) {
             // Let's write to database.
             DB::transaction(function () {
