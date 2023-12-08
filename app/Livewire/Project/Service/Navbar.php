@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Service;
 
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
+use App\Events\ServiceStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
@@ -16,7 +17,8 @@ class Navbar extends Component
     public array $query;
     public $isDeploymentProgress = false;
 
-    public function checkDeployments() {
+    public function checkDeployments()
+    {
         $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
         $status = data_get($activity, 'properties.status');
         if ($status === 'queued' || $status === 'in_progress') {
@@ -64,6 +66,6 @@ class Navbar extends Component
         } else {
             $this->dispatch('success', 'Service stopped successfully.');
         }
-        $this->dispatch('checkStatus');
+        event(new ServiceStatusChanged(userId: auth()->user()->id));
     }
 }

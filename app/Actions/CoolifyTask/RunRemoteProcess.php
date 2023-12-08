@@ -17,8 +17,6 @@ class RunRemoteProcess
 
     public bool $hide_from_output;
 
-    public bool $is_finished;
-
     public bool $ignore_errors;
 
     public $call_event_on_finish = null;
@@ -36,7 +34,7 @@ class RunRemoteProcess
     /**
      * Create a new job instance.
      */
-    public function __construct(Activity $activity, bool $hide_from_output = false, bool $is_finished = false, bool $ignore_errors = false, $call_event_on_finish = null)
+    public function __construct(Activity $activity, bool $hide_from_output = false, bool $ignore_errors = false, $call_event_on_finish = null)
     {
 
         if ($activity->getExtraProperty('type') !== ActivityTypes::INLINE->value) {
@@ -45,7 +43,6 @@ class RunRemoteProcess
 
         $this->activity = $activity;
         $this->hide_from_output = $hide_from_output;
-        $this->is_finished = $is_finished;
         $this->ignore_errors = $ignore_errors;
         $this->call_event_on_finish = $call_event_on_finish;
     }
@@ -82,7 +79,7 @@ class RunRemoteProcess
         if ($this->activity->properties->get('status') === ProcessStatus::ERROR->value) {
             $status = ProcessStatus::ERROR;
         } else {
-            if ($processResult->exitCode() == 0 && $this->is_finished) {
+            if ($processResult->exitCode() == 0) {
                 $status = ProcessStatus::FINISHED;
             }
             if ($processResult->exitCode() != 0 && !$this->ignore_errors) {
@@ -110,7 +107,6 @@ class RunRemoteProcess
             try {
                 event(resolve("App\\Events\\$this->call_event_on_finish", [
                     'userId' => $this->activity->causer_id,
-                    'typeUuid' => $this->activity->getExtraProperty('type_uuid'),
                 ]));
             } catch (\Throwable $e) {
                 ray($e);

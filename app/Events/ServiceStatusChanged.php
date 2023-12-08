@@ -16,6 +16,12 @@ class ServiceStatusChanged implements ShouldBroadcast
     public $userId;
     public function __construct($userId = null)
     {
+        if (is_null($userId)) {
+            $userId = auth()->user()->id ?? null;
+        }
+        if (is_null($userId)) {
+            throw new \Exception("User id is null");
+        }
         $this->userId = $userId;
     }
 
