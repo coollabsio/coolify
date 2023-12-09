@@ -1,6 +1,6 @@
 ARG PNPM_VERSION=7.17.1
 
-FROM node:18-slim as build
+FROM node:21-slim as build
 WORKDIR /app
 RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
 
@@ -9,7 +9,7 @@ RUN pnpm install -p
 COPY . .
 
 # Production build
-FROM node:18-slim
+FROM node:21-slim
 ARG DOCKER_VERSION=20.10.18
 ARG TARGETPLATFORM
 ENV NODE_ENV production

@@ -515,12 +515,15 @@
 
 	function addFqdnPort(service) {
 		service.fqdnPorts.push({ fqdn: '', port: '' });
-		dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
+		if (service.name && dockerComposeConfiguration && dockerComposeConfiguration[service.name])
+			dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
 	}
 
 	function removeFqdnPort(service, index) {
 		service.fqdnPorts.splice(index, 1);
-		dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
+
+		if (service.name && dockerComposeConfiguration && dockerComposeConfiguration[service.name])
+			dockerComposeConfiguration[service.name].fqdnPorts = service.fqdnPorts;
 	}
 </script>
 
