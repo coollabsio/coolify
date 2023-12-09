@@ -439,7 +439,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						runningContainers[destinationDockerId].filter((container) => container.startsWith(id))
 							.length === 0
 					) {
-						continue;
+						// continue;
 					}
 					let httpBasicAuth = null;
 					if (basicAuthUser && basicAuthPw && isBasicAuthEnabled) {
@@ -453,15 +453,16 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						const services = Object.entries(JSON.parse(dockerComposeConfiguration));
 						if (services.length > 0) {
 							for (const service of services) {
-								const [key, value] = service;
-								if (key && value) {
-									if (!value.fqdn || !value.port) {
+								const [key, config] = service;
+								if (key && config) {
+									if (!config.fqdn || !config.port) {
 										continue;
 									}
-									const { fqdn, port } = value;
+									const { fqdn, port } = config;
 									const containerId = `${id}-${key}`;
+									const domains = getDomains(fqdn);
 									const domain = getDomain(fqdn);
-									const nakedDomain = domain.replace(/^www\./, '');
+									const nakedDomain = domains.map((d) => d.replace(/^www\./, ''));
 									const isHttps = fqdn.startsWith('https://');
 									const isWWW = fqdn.includes('www.');
 									const pathPrefix = '/';
