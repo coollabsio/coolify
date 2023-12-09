@@ -1,8 +1,8 @@
-FROM node:21-slim
+FROM node:18-slim
 ENV NODE_ENV development
 ARG TARGETPLATFORM
-ARG PNPM_VERSION=8.12.0
-ARG NPM_VERSION=10.2.5
+ARG PNPM_VERSION=7.11.0
+ARG NPM_VERSION=8.19.1
 # https://download.docker.com/linux/static/stable/
 ARG DOCKER_VERSION=20.10.18
 # https://github.com/docker/compose/releases

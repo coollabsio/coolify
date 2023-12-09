@@ -1,6 +1,6 @@
-ARG PNPM_VERSION=8.12.0
+ARG PNPM_VERSION=7.11.0
 
-FROM node:21-slim as build
+FROM node:18-slim as build
 WORKDIR /app
 
 RUN apt update && apt -y install curl
@@ -11,7 +11,7 @@ RUN pnpm install
 RUN pnpm build
 
 # Production build
-FROM node:21-slim
+FROM node:18-slim
 WORKDIR /app
 ENV NODE_ENV production
 ARG TARGETPLATFORM
