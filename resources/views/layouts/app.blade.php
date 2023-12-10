@@ -13,21 +13,6 @@
     </main>
     <script data-navigate-once>
         @auth
-        window.Pusher = Pusher;
-        window.Echo = new Echo({
-            broadcaster: 'pusher',
-            cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
-            key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
-            wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
-            wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
-            wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
-            forceTLS: false,
-            encrypted: true,
-            enableStats: false,
-            enableLogging: true,
-            enabledTransports: ['ws', 'wss'],
-        });
-
         if ("{{ auth()->user()->id }}" == 0) {
             let checkPusherInterval = null;
             let checkNumber = 0;
