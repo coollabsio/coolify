@@ -498,6 +498,8 @@ function removeAnsiColors($text)
 
 function getTopLevelNetworks(Service|Application $resource)
 {
+    $environment = $resource->environment;
+    $projectNetwork = $environment->project->uuid . '-' . $environment->name;
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
             try {
@@ -507,7 +509,7 @@ function getTopLevelNetworks(Service|Application $resource)
             }
             $services = data_get($yaml, 'services');
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
-            $definedNetwork = collect([$resource->uuid]);
+            $definedNetwork = collect([$resource->uuid, $projectNetwork]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
 
@@ -548,7 +550,7 @@ function getTopLevelNetworks(Service|Application $resource)
         $server = $resource->destination->server;
         $topLevelNetworks = collect(data_get($yaml, 'networks', []));
         $services = data_get($yaml, 'services');
-        $definedNetwork = collect([$resource->uuid]);
+        $definedNetwork = collect([$resource->uuid, $projectNetwork]);
         $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
             $serviceNetworks = collect(data_get($service, 'networks', []));
 
@@ -581,6 +583,8 @@ function getTopLevelNetworks(Service|Application $resource)
 }
 function parseDockerComposeFile(Service|Application $resource, bool $isNew = false, int $pull_request_id = 0, bool $is_pr = false)
 {
+    $environment = $resource->environment;
+    $projectNetwork = $environment->project->uuid . '-' . $environment->name;
     // ray()->clearAll();
     if ($resource->getMorphClass() === 'App\Models\Service') {
         if ($resource->docker_compose_raw) {
@@ -603,7 +607,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $resource->save();
                 }
             }
-            $definedNetwork = collect([$resource->uuid]);
+            $definedNetwork = collect([$resource->uuid, $projectNetwork]);
 
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource) {
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
@@ -1092,7 +1096,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $resource->save();
             }
         }
-        $definedNetwork = collect([$resource->uuid]);
+        $definedNetwork = collect([$resource->uuid, $projectNetwork]);
         if ($pull_request_id !== 0) {
             $definedNetwork = collect(["{$resource->uuid}-$pull_request_id"]);
         }

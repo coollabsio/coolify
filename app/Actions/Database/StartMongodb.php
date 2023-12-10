@@ -29,6 +29,9 @@ class StartMongodb
             "mkdir -p $this->configuration_dir",
         ];
 
+        $environment = $this->database->environment;
+        $projectNetwork = $environment->project->uuid . '-' . $environment->name;
+
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
@@ -44,7 +47,7 @@ class StartMongodb
                     'environment' => $environment_variables,
                     'restart' => RESTART_MODE,
                     'networks' => [
-                        $this->database->destination->network,
+                        $projectNetwork,
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
@@ -69,9 +72,9 @@ class StartMongodb
                 ]
             ],
             'networks' => [
-                $this->database->destination->network => [
+                $projectNetwork => [
                     'external' => true,
-                    'name' => $this->database->destination->network,
+                    'name' => $projectNetwork,
                     'attachable' => true,
                 ]
             ]

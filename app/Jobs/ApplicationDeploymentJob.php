@@ -454,6 +454,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->stop_running_container(force: true);
 
         $networkId = $this->application->uuid;
+
+        // Create a network for connectivity to resources in the same environment.
+        $environment = $this->application->environment;
+        $projectNetworkId = $environment->project->uuid . '-' . $environment->name;
+
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
         }
@@ -462,6 +467,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->execute_remote_command([
                 "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+            ], [
+                "docker network create --attachable '{$projectNetworkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ], [
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);

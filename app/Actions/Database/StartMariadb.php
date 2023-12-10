@@ -27,6 +27,9 @@ class StartMariadb
             "mkdir -p $this->configuration_dir",
         ];
 
+        $environment = $this->database->environment;
+        $projectNetwork = $environment->project->uuid . '-' . $environment->name;
+
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables();
@@ -40,7 +43,7 @@ class StartMariadb
                     'environment' => $environment_variables,
                     'restart' => RESTART_MODE,
                     'networks' => [
-                        $this->database->destination->network,
+                        $projectNetwork,
                     ],
                     'labels' => [
                         'coolify.managed' => 'true',
@@ -62,9 +65,9 @@ class StartMariadb
                 ]
             ],
             'networks' => [
-                $this->database->destination->network => [
+                $projectNetwork => [
                     'external' => true,
-                    'name' => $this->database->destination->network,
+                    'name' => $projectNetwork,
                     'attachable' => true,
                 ]
             ]
@@ -102,6 +105,7 @@ class StartMariadb
         $readme = generate_readme_file($this->database->name, now());
         $this->commands[] = "echo '{$readme}' > $this->configuration_dir/README.md";
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
+        $this->commands[] = "docker network create --attachable '{$projectNetwork}' >/dev/null || true";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo '{$database->name} started.'";
