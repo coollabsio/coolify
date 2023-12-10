@@ -76,6 +76,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private string $docker_compose_location = '/docker-compose.yml';
     private ?string $addHosts = null;
     private ?string $buildTarget = null;
+    private ?string $projectNetworkId = null;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
 
@@ -102,6 +103,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->commit = $this->application_deployment_queue->commit;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
+
+        // Create a network for connectivity to resources in the same environment.
+        $environment = $this->application->environment;
+        $this->projectNetworkId = $environment->project->uuid . '-' . $environment->name;
 
         $this->git_type = data_get($this->application_deployment_queue, 'git_type');
 
@@ -399,6 +404,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->prepare_builder_image();
         $this->execute_remote_command(
             [
+                "docker network create --attachable '{$this->projectNetworkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+            ],
+            [
+                "docker network connect {$this->projectNetworkId} coolify-proxy >/dev/null || true", "hidden" => true, "ignore_errors" => true
+            ],
+            [
                 executeInDocker($this->deployment_uuid, "echo '$dockerfile_base64' | base64 -d > $this->workdir$this->dockerfile_location")
             ],
         );
@@ -418,6 +429,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->execute_remote_command(
             [
                 "echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag}.'"
+            ],
+            [
+                "docker network create --attachable '{$this->projectNetworkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+            ],
+            [
+                "docker network connect {$this->projectNetworkId} coolify-proxy >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ],
         );
         $this->generate_image_names();
@@ -455,10 +472,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         $networkId = $this->application->uuid;
 
-        // Create a network for connectivity to resources in the same environment.
-        $environment = $this->application->environment;
-        $projectNetworkId = $environment->project->uuid . '-' . $environment->name;
-
         if ($this->pull_request_id !== 0) {
             $networkId = "{$this->application->uuid}-{$this->pull_request_id}";
         }
@@ -468,7 +481,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->execute_remote_command([
                 "docker network create --attachable '{$networkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ], [
-                "docker network create --attachable '{$projectNetworkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
+                "docker network create --attachable '{$this->projectNetworkId}' >/dev/null || true", "hidden" => true, "ignore_errors" => true
             ], [
                 "docker network connect {$networkId} coolify-proxy || true", "hidden" => true, "ignore_errors" => true
             ]);
@@ -900,7 +913,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'environment' => $environment_variables,
                     'expose' => $ports,
                     'networks' => [
-                        $this->destination->network,
+                        $this->projectNetworkId,
                     ],
                     'healthcheck' => [
                         'test' => [
@@ -922,9 +935,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ],
             'networks' => [
-                $this->destination->network => [
+                $this->projectNetworkId => [
                     'external' => true,
-                    'name' => $this->destination->network,
+                    'name' => $this->projectNetworkId,
                     'attachable' => true
                 ]
             ]
