@@ -1548,17 +1548,18 @@ function generateEnvValue(string $command)
     return $generatedValue;
 }
 
-function getRealtime() {
+function getRealtime()
+{
     $envDefined = env('PUSHER_PORT');
-    if ($envDefined != '6001') {
-        return $envDefined;
-    }
-    $url = Url::fromString(Request::getSchemeAndHttpHost());
-    Log::info(Request::getSchemeAndHttpHost());
-    $port = $url->getPort();
-    if ($port) {
-        return '6001';
+    if (is_null($envDefined)) {
+        $url = Url::fromString(Request::getSchemeAndHttpHost());
+        $port = $url->getPort();
+        if ($port) {
+            return '6001';
+        } else {
+            return null;
+        }
     } else {
-        return null;
+        return $envDefined;
     }
 }
