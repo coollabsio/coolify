@@ -1551,7 +1551,7 @@ function generateEnvValue(string $command)
 function getRealtime()
 {
     $envDefined = env('PUSHER_PORT');
-    if (is_null($envDefined)) {
+    if (empty($envDefined)) {
         $url = Url::fromString(Request::getSchemeAndHttpHost());
         $port = $url->getPort();
         if ($port) {
