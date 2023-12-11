@@ -9,13 +9,16 @@ use Visus\Cuid2\Cuid2;
 class Danger extends Component
 {
     public $resource;
-    public array $parameters;
+    public $projectUuid;
+    public $environmentName;
     public ?string $modalId = null;
 
     public function mount()
     {
         $this->modalId = new Cuid2(7);
-        $this->parameters = get_route_parameters();
+        $parameters = get_route_parameters();
+        $this->projectUuid = $parameters['project_uuid'];
+        $this->environmentName = $parameters['environment_name'];
     }
 
     public function delete()
@@ -23,8 +26,8 @@ class Danger extends Component
         try {
             DeleteResourceJob::dispatchSync($this->resource);
             return $this->redirectRoute('project.resources', [
-                'project_uuid' => $this->parameters['project_uuid'],
-                'environment_name' => $this->parameters['environment_name']
+                'project_uuid' => $this->projectUuid,
+                'environment_name' => $this->environmentName
             ], navigate: true);
         } catch (\Throwable $e) {
             return handleError($e, $this);
