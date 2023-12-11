@@ -21,7 +21,7 @@
     </form>
     <h2 class="pt-6">Advanced</h2>
     <div class="flex flex-col py-6 text-right w-80">
-        @if(isset(env('AUTOUPDATE')))
+        @if(config('autoupdate'))
             <x-forms.checkbox instantSave helper="AUTOUPDATE is set in .env file, you need to modify it there." disabled
                 id="is_auto_update_enabled" label="Auto Update Coolify" />
         @else
