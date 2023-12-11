@@ -44,7 +44,6 @@
         </dialog>
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
-
         <script data-navigate-once>
             @auth
             window.Pusher = Pusher;
@@ -53,8 +52,8 @@
                 cluster: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
                 key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
                 wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
-                wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
-                wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
+                wsPort: "{{ getRealtime() }}",
+                wssPort: "{{ getRealtime() }}",
                 forceTLS: false,
                 encrypted: true,
                 enableStats: false,

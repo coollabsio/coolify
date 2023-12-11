@@ -1,12 +1,17 @@
 #!/bin/bash
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
+set -e # Exit immediately if a command exits with a non-zero status
+## $1 could be empty, so we need to disable this check
+#set -u # Treat unset variables as an error and exit
+set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
+
 VERSION="1.1.0"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
-OS_TYPE=$(cat /etc/os-release | grep -w "ID" | cut -d "=" -f 2 | tr -d '"')
-OS_VERSION=$(cat /etc/os-release | grep -w "VERSION_ID" | cut -d "=" -f 2 | tr -d '"')
+OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 DATE=$(date +"%Y%m%d-%H%M%S")
 
@@ -26,6 +31,8 @@ esac
 # Ovewrite LATEST_VERSION if user pass a version number
 if [ "$1" != "" ]; then
     LATEST_VERSION=$1
+    LATEST_VERSION="${LATEST_VERSION,,}"
+    LATEST_VERSION="${LATEST_VERSION#v}"
 fi
 
 echo -e "-------------"
@@ -79,8 +86,8 @@ fi
 echo -e "-------------"
 echo -e "Check Docker Configuration..."
 mkdir -p /etc/docker
-
-test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-$DATE || cat >/etc/docker/daemon.json <<EOL
+# shellcheck disable=SC2015
+test -s /etc/docker/daemon.json && cp /etc/docker/daemon.json /etc/docker/daemon.json.original-"$DATE" || cat >/etc/docker/daemon.json <<EOL
 {
   "log-driver": "json-file",
   "log-opts": {
@@ -98,11 +105,15 @@ cat >/etc/docker/daemon.json.coolify <<EOL
   }
 }
 EOL
-cat <<<$(jq . /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json.coolify
-cat <<<$(jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify) >/etc/docker/daemon.json
+TEMP_FILE=$(mktemp)
+if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify >"$TEMP_FILE"; then
+    echo "Error merging JSON files"
+    exit 1
+fi
+mv "$TEMP_FILE" /etc/docker/daemon.json
 
-if [ -s /etc/docker/daemon.json.original-$DATE ]; then
-    DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-$DATE))
+if [ -s /etc/docker/daemon.json.original-"$DATE" ]; then
+    DIFF=$(diff <(jq --sort-keys . /etc/docker/daemon.json) <(jq --sort-keys . /etc/docker/daemon.json.original-"$DATE"))
     if [ "$DIFF" != "" ]; then
         echo "Docker configuration updated, restart docker daemon..."
         systemctl restart docker
@@ -145,6 +156,14 @@ fi
 # Merge .env and .env.production. New values will be added to .env
 sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
 
+if [ "$AUTOUPDATE" = "false" ]; then
+    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
+        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    else
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+    fi
+fi
+
 # Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
     ssh-keygen -t ed25519 -a 100 -f /data/coolify/ssh/keys/id.root@host.docker.internal -q -N "" -C root@coolify
@@ -163,11 +182,11 @@ if [ ! -f ~/.ssh/authorized_keys ]; then
     addSshKey
 fi
 
-if [ -z "$(grep -w "root@coolify" ~/.ssh/authorized_keys)" ]; then
+if ! grep -qw "root@coolify" ~/.ssh/authorized_keys; then
     addSshKey
 fi
 
-bash /data/coolify/source/upgrade.sh ${LATEST_VERSION:-latest}
+bash /data/coolify/source/upgrade.sh "${LATEST_VERSION:-latest}"
 
 echo -e "\nCongratulations! Your Coolify instance is ready to use.\n"
 echo "Please visit http://$(curl -4s https://ifconfig.io):8000 to get started."

@@ -16,7 +16,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Sanctum::usePersonalAccessTokenModel(PersonalAccessToken::class);
-
         Http::macro('github', function (string $api_url, string|null $github_access_token = null) {
             if ($github_access_token) {
                 return Http::withHeaders([

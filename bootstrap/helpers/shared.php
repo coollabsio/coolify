@@ -29,7 +29,9 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
@@ -1544,4 +1546,20 @@ function generateEnvValue(string $command)
             break;
     }
     return $generatedValue;
+}
+
+function getRealtime()
+{
+    $envDefined = env('PUSHER_PORT');
+    if (empty($envDefined)) {
+        $url = Url::fromString(Request::getSchemeAndHttpHost());
+        $port = $url->getPort();
+        if ($port) {
+            return '6001';
+        } else {
+            return null;
+        }
+    } else {
+        return $envDefined;
+    }
 }

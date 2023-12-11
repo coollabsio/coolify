@@ -6,6 +6,8 @@ use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Request;
 use Spatie\Url\Url;
 
 class InstanceSettings extends Model implements SendsEmail
