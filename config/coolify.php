@@ -2,7 +2,6 @@
 
 return [
     'docs' => 'https://coolify.io/docs/contact',
-    'autoupdate' => env('AUTOUPDATE', null),
     'self_hosted' => env('SELF_HOSTED', true),
     'waitlist' => env('WAITLIST', false),
     'license_url' => 'https://licenses.coollabs.io',
