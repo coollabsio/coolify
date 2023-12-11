@@ -32,24 +32,6 @@ class InstanceSettings extends Model implements SendsEmail
             }
         );
     }
-    public static function realtimePort()
-    {
-        $envDefined = env('PUSHER_PORT');
-        if ($envDefined != '6001') {
-            return $envDefined;
-        }
-        $url = Url::fromString(Request::getSchemeAndHttpHost());
-        Log::info(Request::getSchemeAndHttpHost());
-        Log::info($url);
-        $scheme = $url->getScheme();
-        ray($url);
-        $port = $url->getPort();
-        if ($port) {
-            return '6001';
-        } else {
-            return null;
-        }
-    }
     public static function get()
     {
         return InstanceSettings::findOrFail(0);
