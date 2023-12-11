@@ -41,9 +41,11 @@ class Navbar extends Component
     {
         return view('livewire.project.service.navbar');
     }
-    public function checkStatus()
+    public function check_status($showNotification = false)
     {
+        dispatch_sync(new ContainerStatusJob($this->service->destination->server));
         $this->service->refresh();
+        if ($showNotification) $this->dispatch('success', 'Service status updated.');
     }
     public function deploy()
     {

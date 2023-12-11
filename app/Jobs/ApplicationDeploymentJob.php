@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -266,6 +267,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true,
                 ]
             );
+            ApplicationStatusChanged::dispatch(data_get($this->application,'environment.project.team.id'));
         }
     }
     private function push_to_docker_registry()
@@ -1246,6 +1248,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     }
 
     private function build_by_compose_file() {
+        $this->application_deployment_queue->addLogEntry("Pulling & building required images.");
         if ($this->application->build_pack === 'dockerimage') {
             $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(

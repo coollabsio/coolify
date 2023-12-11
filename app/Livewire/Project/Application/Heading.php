@@ -3,6 +3,7 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
+use App\Events\ApplicationStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\Application;
@@ -15,13 +16,19 @@ class Heading extends Component
     public array $parameters;
 
     protected string $deploymentUuid;
-
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'check_status',
+        ];
+    }
     public function mount()
     {
         $this->parameters = get_route_parameters();
     }
 
-    public function check_status()
+    public function check_status($showNotification = false)
     {
         if ($this->application->destination->server->isFunctional()) {
             dispatch(new ContainerStatusJob($this->application->destination->server));
@@ -32,6 +39,7 @@ class Heading extends Component
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));
         }
+        if ($showNotification) $this->dispatch('success', 'Application status updated.');
     }
 
     public function force_deploy_without_cache()

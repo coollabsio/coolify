@@ -34,10 +34,11 @@ class Heading extends Component
         $this->check_status();
     }
 
-    public function check_status()
+    public function check_status($showNotification = false)
     {
         dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
+        if ($showNotification) $this->dispatch('success', 'Database status updated.');
     }
 
     public function mount()
