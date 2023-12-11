@@ -229,9 +229,7 @@ function setup_dynamic_configuration()
             $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
                 0 => 'redirect-to-https@docker',
             ];
-            $traefik_dynamic_conf['http']['routers']['coolify-realtime-ws']['middlewares'] = [
-                0 => 'redirect-to-https@docker',
-            ];
+
             $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
                 'entryPoints' => [
                     0 => 'https',
