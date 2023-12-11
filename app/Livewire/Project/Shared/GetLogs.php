@@ -70,7 +70,7 @@ class GetLogs extends Component
     }
     public function getLogs($refresh = false)
     {
-        if (!$refresh && $this->resource->getMorphClass() === 'App\Models\Service') return;
+        if (!$refresh && $this->resource?->getMorphClass() === 'App\Models\Service') return;
         if ($this->container) {
             if ($this->showTimeStamps) {
                 $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");

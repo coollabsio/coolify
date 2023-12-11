@@ -79,11 +79,11 @@ class Controller extends BaseController
         if (isInstanceAdmin()) {
             $settings = InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
-            if ($database->status !== 'running') {
-                $database->status = 'running';
-                $database->save();
-            }
             if ($database) {
+                if ($database->status !== 'running') {
+                    $database->status = 'running';
+                    $database->save();
+                }
                 $s3s = S3Storage::whereTeamId(0)->get();
             }
             return view('settings.configuration', [
