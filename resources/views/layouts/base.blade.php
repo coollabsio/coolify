@@ -54,7 +54,6 @@
                 wsHost: "{{ env('PUSHER_HOST') }}" || window.location.hostname,
                 wsPort: "{{ App\Models\InstanceSettings::realtimePort() }}",
                 wssPort: "{{ App\Models\InstanceSettings::realtimePort() }}",
-                wsPath: '/realtime',
                 forceTLS: false,
                 encrypted: true,
                 enableStats: false,

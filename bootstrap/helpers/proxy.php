@@ -184,13 +184,13 @@ function setup_dynamic_configuration()
                         'service' => 'coolify',
                         'rule' => "Host(`{$host}`)",
                     ],
-                    'coolify-ws' =>
+                    'coolify-realtime-ws' =>
                     [
                         'entryPoints' => [
                             0 => 'http',
                         ],
                         'service' => 'coolify-realtime',
-                        'rule' => "Host(`{$host}`) && PathPrefix(`/realtime/`)",
+                        'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
                     ],
                 ],
                 'services' =>
@@ -229,7 +229,7 @@ function setup_dynamic_configuration()
             $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
                 0 => 'redirect-to-https@docker',
             ];
-            $traefik_dynamic_conf['http']['routers']['coolify-ws']['middlewares'] = [
+            $traefik_dynamic_conf['http']['routers']['coolify-realtime-ws']['middlewares'] = [
                 0 => 'redirect-to-https@docker',
             ];
             $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
@@ -242,12 +242,12 @@ function setup_dynamic_configuration()
                     'certresolver' => 'letsencrypt',
                 ],
             ];
-            $traefik_dynamic_conf['http']['routers']['coolify-wss'] = [
+            $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss'] = [
                 'entryPoints' => [
                     0 => 'https',
                 ],
                 'service' => 'coolify-realtime',
-                'rule' => "Host(`{$host}`) && PathPrefix(`/realtime/`)",
+                'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
                 'tls' => [
                     'certresolver' => 'letsencrypt',
                 ],

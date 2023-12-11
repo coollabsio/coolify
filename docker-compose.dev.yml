@@ -57,7 +57,6 @@ services:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
     environment:
       SOKETI_DEBUG: "true"
-      SOKETI_PATH_PREFIX: "${PUSHER_PATH_PREFIX:-/realtime}"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
