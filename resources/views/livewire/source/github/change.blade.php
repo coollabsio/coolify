@@ -96,7 +96,7 @@
             <div class="py-10">
                 @if (!isCloud() || isDev())
                     <div class="flex items-end gap-2">
-                        <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
+                        <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
                             helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
                             @if ($ipv4)
                                 <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>
