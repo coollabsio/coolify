@@ -30,6 +30,6 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
-        Config::set('realtime.port', \App\Models\InstanceSettings::realtimePort());
+        Config::set('coolify.realtime_port', \App\Models\InstanceSettings::realtimePort());
     }
 }

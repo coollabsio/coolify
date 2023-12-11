@@ -2,6 +2,7 @@
 
 return [
     'docs' => 'https://coolify.io/docs/contact',
+    'realtime_port' => "6001",
     'self_hosted' => env('SELF_HOSTED', true),
     'waitlist' => env('WAITLIST', false),
     'license_url' => 'https://licenses.coollabs.io',
