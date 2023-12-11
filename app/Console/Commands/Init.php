@@ -38,10 +38,12 @@ class Init extends Command
         setup_dynamic_configuration();
 
         $settings = InstanceSettings::get();
-        if (env('AUTOUPDATE') == true) {
-            $settings->update(['is_auto_update_enabled' => true]);
-        } else {
-            $settings->update(['is_auto_update_enabled' => false]);
+        if (!is_null(env('AUTOUPDATE', null))) {
+            if (env('AUTOUPDATE') == true) {
+                $settings->update(['is_auto_update_enabled' => true]);
+            } else {
+                $settings->update(['is_auto_update_enabled' => false]);
+            }
         }
     }
     private function cleanup_stucked_helper_containers()
