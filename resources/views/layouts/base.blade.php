@@ -42,6 +42,7 @@
                 <button>close</button>
             </form>
         </dialog>
+        {{$realtimePort}}
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
         <script data-navigate-once>

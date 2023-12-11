@@ -31,7 +31,8 @@ class InstanceSettings extends Model implements SendsEmail
             }
         );
     }
-    public static function realtimePort() {
+    public static function realtimePort()
+    {
         $envDefined = env('PUSHER_PORT');
         if ($envDefined != '6001') {
             return $envDefined;
@@ -40,11 +41,8 @@ class InstanceSettings extends Model implements SendsEmail
         $port = $url->getPort();
         if ($port) {
             return 6001;
-        }
-        if ($url->getScheme() === 'https') {
-            return 443;
         } else {
-            return 6001;
+            return null;
         }
     }
     public static function get()
