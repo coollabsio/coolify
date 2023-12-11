@@ -640,7 +640,9 @@ Route::post('/payments/stripe/events', function () {
                 // Unhandled event type
         }
     } catch (Exception $e) {
-        send_internal_notification("Subscription webhook ($type) failed: " . $e->getMessage());
+        if ($type !== 'payment_intent.payment_failed') {
+            send_internal_notification("Subscription webhook ($type) failed: " . $e->getMessage());
+        }
         $webhook->update([
             'status' => 'failed',
             'failure_reason' => $e->getMessage(),
