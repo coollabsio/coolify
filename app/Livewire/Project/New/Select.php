@@ -109,9 +109,6 @@ class Select extends Component
         if (count($this->servers) === 1) {
             $server = $this->servers->first();
             $this->setServer($server);
-            if (count($server->destinations()) === 1) {
-                $this->setDestination($server->destinations()->first()->uuid);
-            }
         }
         if (!is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server)->first();
