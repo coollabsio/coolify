@@ -80,7 +80,9 @@ class ExecuteContainerCommand extends Component
             $this->resource = $resource;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
-            $this->containers->push($this->container);
+            if (data_get($this,'resource.status') == 'running') {
+                $this->containers->push($this->container);
+            }
         } else if (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();

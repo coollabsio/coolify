@@ -7,6 +7,8 @@
     @elseif ($type === 'database')
         <h1>Execute Command</h1>
         <livewire:project.database.heading :database="$resource" />
+        <h2 class="pt-4">Command Details</h2>
+        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
         <h2>Execute Command</h2>
     @endif
