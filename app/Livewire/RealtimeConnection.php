@@ -8,6 +8,7 @@ class RealtimeConnection extends Component
 {
     public $checkConnection = false;
     public $showNotification = false;
+    public $isNotificationEnabled = true;
     public function render()
     {
         return view('livewire.realtime-connection');
@@ -18,8 +19,7 @@ class RealtimeConnection extends Component
         $this->showNotification = false;
     }
     public function mount() {
-        $isRoot = auth()->user()->id === 0;
-        $showNotification = data_get(auth()->user(), 'is_notification_realtime_enabled');
-        $this->checkConnection = $isRoot && $showNotification;
+        $this->isNotificationEnabled = auth()->user()->is_notification_realtime_enabled;
+        $this->checkConnection = auth()->user()->id === 0;
     }
 }
