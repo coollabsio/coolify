@@ -106,9 +106,9 @@ cat >/etc/docker/daemon.json.coolify <<EOL
 }
 EOL
 TEMP_FILE=$(mktemp)
-if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify > "$TEMP_FILE"; then
- echo "Error merging JSON files"
- exit 1
+if ! jq -s '.[0] * .[1]' /etc/docker/daemon.json /etc/docker/daemon.json.coolify >"$TEMP_FILE"; then
+    echo "Error merging JSON files"
+    exit 1
 fi
 mv "$TEMP_FILE" /etc/docker/daemon.json
 
@@ -156,9 +156,12 @@ fi
 # Merge .env and .env.production. New values will be added to .env
 sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
 
-# Check if AUTOUPDATE value is true in env, not in env file and it is not set in .env
 if [ "$AUTOUPDATE" = "false" ]; then
-    sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+    if ! grep -q "AUTOUPDATE=" /data/coolify/source/.env; then
+        echo "AUTOUPDATE=false" >>/data/coolify/source/.env
+    else
+        sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+    fi
 fi
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
