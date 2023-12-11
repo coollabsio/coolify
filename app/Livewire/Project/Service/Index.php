@@ -17,7 +17,7 @@ class Index extends Component
     {
         $userId = auth()->user()->id;
         return [
-            "echo-private:custom.{$userId},ServiceStatusChanged" => 'checkStatus',
+            "echo-private:user.{$userId},ServiceStatusChanged" => 'checkStatus',
             "refreshStacks",
             "checkStatus",
         ];

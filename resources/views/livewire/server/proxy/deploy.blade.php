@@ -45,11 +45,11 @@
     @endif
     <script>
         function checkProxy() {
-            Livewire.emit('checkProxy')
+            window.Livewire.dispatch('checkProxy')
         }
         Livewire.on('proxyChecked', () => {
             startProxy.showModal();
-            Livewire.emit('startProxy');
+            window.Livewire.dispatch('startProxy');
         })
     </script>
 </div>

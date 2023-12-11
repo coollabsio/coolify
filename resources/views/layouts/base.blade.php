@@ -121,7 +121,7 @@
             }
 
             function copyToClipboard(text) {
-                navigator?.clipboard?.writeText(text) && window.Livewire.emit('success', 'Copied to clipboard.');
+                navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
             }
             document.addEventListener('livewire:init', () => {
                 window.Livewire.on('reloadWindow', (timeout) => {

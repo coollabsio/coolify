@@ -28,7 +28,7 @@ class DatabaseStatusChanged implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel("custom.{$this->userId}"),
+            new PrivateChannel("user.{$this->userId}"),
         ];
     }
 }

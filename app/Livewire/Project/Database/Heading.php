@@ -21,7 +21,7 @@ class Heading extends Component
     {
         $userId = auth()->user()->id;
         return [
-            "echo-private:custom.{$userId},DatabaseStatusChanged" => 'activityFinished',
+            "echo-private:user.{$userId},DatabaseStatusChanged" => 'activityFinished',
         ];
     }
 

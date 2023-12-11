@@ -10,25 +10,25 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class ServiceStatusChanged implements ShouldBroadcast
+class BackupCreated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
-    public $userId;
-    public function __construct($userId = null)
+    public $teamId;
+    public function __construct($teamId = null)
     {
-        if (is_null($userId)) {
-            $userId = auth()->user()->id ?? null;
+        if (is_null($teamId)) {
+            $teamId = auth()->user()->currentTeam()->id ?? null;
         }
-        if (is_null($userId)) {
-            throw new \Exception("User id is null");
+        if (is_null($teamId)) {
+            throw new \Exception("Team id is null");
         }
-        $this->userId = $userId;
+        $this->teamId = $teamId;
     }
 
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel("user.{$this->userId}"),
+            new PrivateChannel("team.{$this->teamId}"),
         ];
     }
 }

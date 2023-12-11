@@ -22,9 +22,9 @@
                 if (window.Echo) {
                     if (window.Echo.connector.pusher.connection.state !== 'connected') {
                         checkNumber++;
-                        if (checkNumber > 5) {
+                        if (checkNumber > 2) {
                             clearInterval(checkPusherInterval);
-                            Livewire.emit('error', errorMessage);
+                            window.Livewire.dispatch('error', errorMessage);
                         }
                     } else {
                         console.log('Coolify is now connected to the new realtime service introduced in beta.154.');
@@ -32,7 +32,7 @@
                     }
                 } else {
                     clearInterval(checkPusherInterval);
-                    Livewire.emit('error', errorMessage);
+                    window.Livewire.dispatch('error', errorMessage);
                 }
             }, 2000);
         }

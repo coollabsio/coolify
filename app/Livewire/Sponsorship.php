@@ -8,12 +8,12 @@ class Sponsorship extends Component
 {
     public function getListeners()
     {
-        $userId = auth()->user()->id;
+        $teamId = auth()->user()->currentTeam()->id;
         return [
-            "echo-private:custom.{$userId},TestEvent" => 'testEvent',
+            "echo-private:team.{$teamId},TestEvent" => 'testEvent',
         ];
     }
-    public function testEvent($asd)
+    public function testEvent()
     {
         $this->dispatch('success', 'Realtime events configured!');
     }

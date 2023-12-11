@@ -10,7 +10,15 @@ class BackupExecutions extends Component
     public $backup;
     public $executions;
     public $setDeletableBackup;
-    protected $listeners = ['refreshBackupExecutions', 'deleteBackup'];
+    public function getListeners()
+    {
+        $userId = auth()->user()->id;
+        return [
+            "echo-private:team.{$userId},BackupCreated" => 'refreshBackupExecutions',
+            "refreshBackupExecutions",
+            "deleteBackup"
+        ];
+    }
 
     public function deleteBackup($exeuctionId)
     {
