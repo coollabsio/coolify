@@ -43,6 +43,7 @@ services:
       - PUSHER_APP_ID
       - PUSHER_APP_KEY
       - PUSHER_APP_SECRET
+      - AUTOUPDATE
       - SELF_HOSTED
       - WAITLIST
       - SUBSCRIPTION_PROVIDER

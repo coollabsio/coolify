@@ -124,10 +124,9 @@ class ProductionSeeder extends Seeder
         }
         $settings = InstanceSettings::get();
 
-        if (env('AUTOUPDATE') === 'true') {
+        if (env('AUTOUPDATE')) {
             $settings->update(['is_auto_update_enabled' => true]);
-        }
-        if (env('AUTOUPDATE') === 'false') {
+        } else {
             $settings->update(['is_auto_update_enabled' => false]);
         }
         try {
