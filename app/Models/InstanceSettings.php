@@ -42,7 +42,7 @@ class InstanceSettings extends Model implements SendsEmail
         ray($url);
         $port = $url->getPort();
         if ($port) {
-            return 6001;
+            return '6001';
         } else {
             return null;
         }

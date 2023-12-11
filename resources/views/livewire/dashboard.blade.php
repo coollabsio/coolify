@@ -3,7 +3,7 @@
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
     <h1>Dashboard</h1>
-    Realtime Port: {{ $realtimePort ?? 'Not set' }}
+    Realtime Port: {{ config('realtime.port') ?? 'Not set' }}
 
     <div class="subtitle">Your self-hosted environment</div>
     @if (request()->query->get('success'))

@@ -30,6 +30,6 @@ class AppServiceProvider extends ServiceProvider
                 ])->baseUrl($api_url);
             }
         });
-        view()->share('realtimePort', \App\Models\InstanceSettings::realtimePort() );
+        Config::set('realtime.port', \App\Models\InstanceSettings::realtimePort());
     }
 }
