@@ -37,6 +37,10 @@ class InstanceSettings extends Model implements SendsEmail
             return $envDefined;
         }
         $url = Url::fromString(Request::getSchemeAndHttpHost());
+        $port = $url->getPort();
+        if ($port) {
+            return 6001;
+        }
         if ($url->getScheme() === 'https') {
             return 443;
         } else {
