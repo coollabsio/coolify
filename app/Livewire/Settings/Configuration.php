@@ -93,6 +93,14 @@ class Configuration extends Component
                             'service' => 'coolify',
                             'rule' => "Host(`{$host}`)",
                         ],
+                        'coolify-realtime-ws' =>
+                        [
+                            'entryPoints' => [
+                                0 => 'http',
+                            ],
+                            'service' => 'coolify-realtime',
+                            'rule' => "Host(`{$host}`) && PathPrefix(`/realtime/`)",
+                        ],
                     ],
                     'services' =>
                     [
@@ -109,6 +117,19 @@ class Configuration extends Component
                                 ],
                             ],
                         ],
+                        'coolify-realtime' =>
+                        [
+                            'loadBalancer' =>
+                            [
+                                'servers' =>
+                                [
+                                    0 =>
+                                    [
+                                        'url' => 'http://coolify-realtime:6001',
+                                    ],
+                                ],
+                            ],
+                        ],
                     ],
                 ],
             ];
@@ -117,12 +138,25 @@ class Configuration extends Component
                 $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
                     0 => 'redirect-to-https@docker',
                 ];
+                $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss']['middlewares'] = [
+                    0 => 'redirect-to-https@docker',
+                ];
                 $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
                     'entryPoints' => [
                         0 => 'https',
                     ],
                     'service' => 'coolify',
                     'rule' => "Host(`{$host}`)",
+                    'tls' => [
+                        'certresolver' => 'letsencrypt',
+                    ],
+                ];
+                $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss'] = [
+                    'entryPoints' => [
+                        0 => 'https',
+                    ],
+                    'service' => 'coolify-realtime',
+                    'rule' => "Host(`{$host}`) && PathPrefix(`/realtime/`)",
                     'tls' => [
                         'certresolver' => 'letsencrypt',
                     ],

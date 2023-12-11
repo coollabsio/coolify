@@ -6,6 +6,7 @@ use App\Notifications\Channels\SendsEmail;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Request;
 use Spatie\Url\Url;
 
 class InstanceSettings extends Model implements SendsEmail
@@ -29,6 +30,18 @@ class InstanceSettings extends Model implements SendsEmail
                 }
             }
         );
+    }
+    public static function realtimePort() {
+        $envDefined = env('PUSHER_PORT');
+        if ($envDefined != '6001') {
+            return $envDefined;
+        }
+        $url = Url::fromString(Request::getSchemeAndHttpHost());
+        if ($url->getScheme() === 'https') {
+            return 443;
+        } else {
+            return 6001;
+        }
     }
     public static function get()
     {

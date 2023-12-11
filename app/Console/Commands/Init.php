@@ -36,6 +36,7 @@ class Init extends Command
         }
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_helper_containers();
+        setup_dynamic_configuration();
     }
     private function cleanup_stucked_helper_containers()
     {
