@@ -8,6 +8,7 @@ use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Database\StopDatabase;
+use App\Events\DatabaseStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use Livewire\Component;
 
@@ -16,7 +17,13 @@ class Heading extends Component
     public $database;
     public array $parameters;
 
-    protected $listeners = ['activityFinished'];
+    public function getListeners()
+    {
+        $userId = auth()->user()->id;
+        return [
+            "echo-private:custom.{$userId},DatabaseStatusChanged" => 'activityFinished',
+        ];
+    }
 
     public function activityFinished()
     {

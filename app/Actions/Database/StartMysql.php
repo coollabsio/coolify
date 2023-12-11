@@ -105,7 +105,7 @@ class StartMysql
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
         $this->commands[] = "echo '{$database->name} started.'";
-        return remote_process($this->commands, $database->destination->server);
+        return remote_process($this->commands, $database->destination->server,callEventOnFinish: 'DatabaseStatusChanged');
     }
 
     private function generate_local_persistent_volumes()
