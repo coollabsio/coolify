@@ -49,11 +49,15 @@
             window.Pusher = Pusher;
             window.Echo = new Echo({
                 broadcaster: 'pusher',
-                cluster: "{{ env('PUSHER_HOST') }}" || "{{ App\Models\InstanceSettings::get()->public_ipv4 }}" || window
-                    .location.hostname,
+                cluster: "{{ env('PUSHER_HOST') }}" ||
+                    "{{ App\Models\InstanceSettings::get()->public_ipv4 }}" ||
+                    "{{ App\Models\InstanceSettings::get()->public_ipv6 }}" ||
+                    window.location.hostname,
                 key: "{{ env('PUSHER_APP_KEY') }}" || 'coolify',
-                wsHost: "{{ env('PUSHER_HOST') }}" || "{{ App\Models\InstanceSettings::get()->public_ipv4 }}" || window
-                    .location.hostname,
+                wsHost: "{{ env('PUSHER_HOST') }}" ||
+                    "{{ App\Models\InstanceSettings::get()->public_ipv4 }}" ||
+                    "{{ App\Models\InstanceSettings::get()->public_ipv6 }}" ||
+                    window.location.hostname,
                 wsPort: "{{ env('PUSHER_PORT') }}" || 6001,
                 wssPort: "{{ env('PUSHER_PORT') }}" || 6001,
                 forceTLS: false,
