@@ -2,7 +2,8 @@
 ## Do not modify this file. You will lose the ability to install and auto-update!
 
 set -e # Exit immediately if a command exits with a non-zero status
-set -u # Treat unset variables as an error and exit
+## $1 could be empty, so we need to disable this check
+#set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
 VERSION="1.1.0"
@@ -154,6 +155,11 @@ fi
 
 # Merge .env and .env.production. New values will be added to .env
 sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env
+
+# Check if AUTOUPDATE value is true in env, not in env file and it is not set in .env
+if [ "$AUTOUPDATE" = "false" ]; then
+    sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=false|g" /data/coolify/source/.env
+fi
 
 # Generate an ssh key (ed25519) at /data/coolify/ssh/keys/id.root@host.docker.internal
 if [ ! -f /data/coolify/ssh/keys/id.root@host.docker.internal ]; then
