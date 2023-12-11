@@ -136,7 +136,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Services
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
-    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}/logs', Logs::class)->name('project.service.logs');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/command', ExecuteContainerCommand::class)->name('project.service.command');
 });
 

@@ -51,19 +51,26 @@ class GetLogs extends Component
             if ($this->resource->getMorphClass() === 'App\Models\Application') {
                 $this->resource->settings->is_include_timestamps = $this->showTimeStamps;
                 $this->resource->settings->save();
-            } else {
-                if ($this->servicesubtype) {
-                    $this->servicesubtype->is_include_timestamps = $this->showTimeStamps;
-                    $this->servicesubtype->save();
+            }
+            if ($this->resource->getMorphClass() === 'App\Models\Service') {
+                $serviceName = str($this->container)->beforeLast('-')->value();
+                $subType = $this->resource->applications()->where('name', $serviceName)->first();
+                if ($subType) {
+                    $subType->is_include_timestamps = $this->showTimeStamps;
+                    $subType->save();
                 } else {
-                    $this->resource->is_include_timestamps = $this->showTimeStamps;
-                    $this->resource->save();
+                    $subType = $this->resource->databases()->where('name', $serviceName)->first();
+                    if ($subType) {
+                        $subType->is_include_timestamps = $this->showTimeStamps;
+                        $subType->save();
+                    }
                 }
             }
         }
     }
     public function getLogs($refresh = false)
     {
+        if (!$refresh && $this->resource->getMorphClass() === 'App\Models\Service') return;
         if ($this->container) {
             if ($this->showTimeStamps) {
                 $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");

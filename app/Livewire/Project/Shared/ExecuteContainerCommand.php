@@ -80,7 +80,7 @@ class ExecuteContainerCommand extends Component
             $this->resource = $resource;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
-            if (data_get($this,'resource.status') == 'running') {
+            if (str(data_get($this,'resource.status'))->startsWith('running')) {
                 $this->containers->push($this->container);
             }
         } else if (data_get($this->parameters, 'service_uuid')) {

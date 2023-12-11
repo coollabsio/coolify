@@ -20,12 +20,6 @@
                 <a :class="activeTab === 'backups' && 'text-white'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
-            @if (data_get($parameters, 'service_name'))
-                <a wire:navigate class="{{ request()->routeIs('project.service.logs') ? 'text-white' : '' }}"
-                    href="{{ route('project.service.logs', $parameters) }}">
-                    <button>Logs</button>
-                </a>
-            @endif
         </div>
         <div class="w-full pl-8">
             @isset($serviceApplication)
