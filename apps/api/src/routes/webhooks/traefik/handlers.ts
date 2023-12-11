@@ -439,7 +439,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 						runningContainers[destinationDockerId].filter((container) => container.startsWith(id))
 							.length === 0
 					) {
-						// continue;
+						continue;
 					}
 					let httpBasicAuth = null;
 					if (basicAuthUser && basicAuthPw && isBasicAuthEnabled) {
