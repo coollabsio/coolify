@@ -122,14 +122,9 @@ class ProductionSeeder extends Seeder
                 ]);
             }
         }
-        $settings = InstanceSettings::get();
 
-        if (env('AUTOUPDATE')) {
-            $settings->update(['is_auto_update_enabled' => true]);
-        } else {
-            $settings->update(['is_auto_update_enabled' => false]);
-        }
         try {
+            $settings = InstanceSettings::get();
             if (is_null($settings->public_ipv4)) {
                 $ipv4 = Process::run('curl -4s https://ifconfig.io')->output();
                 if ($ipv4) {

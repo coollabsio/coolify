@@ -130,13 +130,6 @@ curl -fsSL $CDN/docker-compose.prod.yml -o /data/coolify/source/docker-compose.p
 curl -fsSL $CDN/.env.production -o /data/coolify/source/.env.production
 curl -fsSL $CDN/upgrade.sh -o /data/coolify/source/upgrade.sh
 
-# Check if AUTOUPDATE env variable is set, if set use it, if not set to true
-if [ -z "$AUTOUPDATE" ]; then
-    AUTOUPDATE=true
-else
-    AUTOUPDATE=false
-fi
-
 # Copy .env.example if .env does not exist
 if [ ! -f /data/coolify/source/.env ]; then
     cp /data/coolify/source/.env.production /data/coolify/source/.env
@@ -148,8 +141,6 @@ if [ ! -f /data/coolify/source/.env ]; then
     sed -i "s|PUSHER_APP_KEY=.*|PUSHER_APP_KEY=$(openssl rand -hex 32)|g" /data/coolify/source/.env
     sed -i "s|PUSHER_APP_SECRET=.*|PUSHER_APP_SECRET=$(openssl rand -hex 32)|g" /data/coolify/source/.env
 fi
-
-sed -i "s|AUTOUPDATE=.*|AUTOUPDATE=$AUTOUPDATE|g" /data/coolify/source/.env
 
 # Merge .env and .env.production. New values will be added to .env
 sort -u -t '=' -k 1,1 /data/coolify/source/.env /data/coolify/source/.env.production | sed '/^$/d' >/data/coolify/source/.env.temp && mv /data/coolify/source/.env.temp /data/coolify/source/.env

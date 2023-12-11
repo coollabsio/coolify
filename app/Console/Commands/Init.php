@@ -18,7 +18,6 @@ use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Storage;
 
 class Init extends Command
 {
@@ -37,6 +36,13 @@ class Init extends Command
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_helper_containers();
         setup_dynamic_configuration();
+
+        $settings = InstanceSettings::get();
+        if (env('AUTOUPDATE') == true) {
+            $settings->update(['is_auto_update_enabled' => true]);
+        } else {
+            $settings->update(['is_auto_update_enabled' => false]);
+        }
     }
     private function cleanup_stucked_helper_containers()
     {
