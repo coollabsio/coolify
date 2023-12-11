@@ -22,7 +22,7 @@
                         <x-forms.input type="password" label="Password" readonly id="database.postgres_password" />
                     </div>
                 </div>
-                <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database,'status')" />
+                <livewire:project.database.backup-edit :backup="$backup" :s3s="$s3s" :status="data_get($database, 'status')" />
             @else
                 To configure automatic backup for your Coolify instance, you first need to add as a database resource
                 into Coolify.

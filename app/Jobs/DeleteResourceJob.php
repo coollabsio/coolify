@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
-use App\Actions\Service\StopService;
+use App\Actions\Service\DeleteService;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneMariadb;
@@ -54,11 +54,13 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                 case 'standalone-mariadb':
                     StopDatabase::run($this->resource);
                     break;
-                case 'service':
-                    StopService::run($this->resource);
-                    break;
             }
-            $this->resource->delete();
+            if ($this->resource->type() === 'service') {
+                $this->resource->delete();
+                DeleteService::dispatch($this->resource);
+            } else {
+                $this->resource->delete();
+            }
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;

@@ -6,6 +6,6 @@
         [{{ $fqdn }}]({{ $fqdn }}).
     @endif
 
-[View Deployment Logs]({{ $deployment_url }})
+    [View Deployment Logs]({{ $deployment_url }})
 
 </x-emails.layout>

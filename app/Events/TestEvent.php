@@ -22,7 +22,7 @@ class TestEvent implements ShouldBroadcast
     public function broadcastOn(): array
     {
         return [
-            new PrivateChannel("custom.{$this->teamId}"),
+            new PrivateChannel("team.{$this->teamId}"),
         ];
     }
 }

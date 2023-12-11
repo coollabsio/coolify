@@ -12,7 +12,7 @@
     <textarea placeholder="{{ $placeholder }}" {{ $attributes->merge(['class' => $defaultClass]) }}
         @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
-        wire:model.defer={{ $value ?? $id }}
+        wire:model={{ $value ?? $id }}
         wire:dirty.class="input-warning" @endif
         @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}" name="{{ $name }}"
         name={{ $id }}></textarea>

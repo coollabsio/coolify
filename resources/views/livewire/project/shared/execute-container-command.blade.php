@@ -2,14 +2,18 @@
     @if ($type === 'application')
         <h1>Execute Command</h1>
         <livewire:project.application.heading :application="$resource" />
+        <h2 class="pt-4">Command Details</h2>
+        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'database')
         <h1>Execute Command</h1>
         <livewire:project.database.heading :database="$resource" />
+        <h2 class="pt-4">Command Details</h2>
+        <div class="pb-2">Run any one-shot command inside a container.</div>
     @elseif ($type === 'service')
         <h2>Execute Command</h2>
     @endif
     @if (count($containers) > 0)
-        <form class="flex flex-col gap-2 pt-4" wire:submit.prevent='runCommand'>
+        <form class="flex flex-col gap-2 pt-4" wire:submit='runCommand'>
             <div class="flex gap-2">
                 <x-forms.input placeholder="ls -l" autofocus id="command" label="Command" required />
                 <x-forms.input id="workDir" label="Working directory" />

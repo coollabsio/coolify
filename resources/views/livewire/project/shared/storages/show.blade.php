@@ -7,7 +7,7 @@
         </x-slot:modalBody>
     </x-modal>
 
-    <form wire:submit.prevent='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
+    <form wire:submit='submit' class="flex flex-col gap-2 xl:items-end xl:flex-row">
         @if ($isReadOnly)
             @if ($isFirst)
                 <x-forms.input id="storage.name" label="Volume Name" required readonly />

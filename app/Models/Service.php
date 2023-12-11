@@ -2,45 +2,17 @@
 
 namespace App\Models;
 
+use App\Actions\Service\DeleteService;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Symfony\Component\Yaml\Yaml;
 use Illuminate\Support\Str;
 
 class Service extends BaseModel
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
     protected $guarded = [];
-
-    protected static function booted()
-    {
-        static::deleting(function ($service) {
-            $storagesToDelete = collect([]);
-            foreach ($service->applications()->get() as $application) {
-                $storages = $application->persistentStorages()->get();
-                foreach ($storages as $storage) {
-                    $storagesToDelete->push($storage);
-                }
-            }
-            foreach ($service->databases()->get() as $database) {
-                $storages = $database->persistentStorages()->get();
-                foreach ($storages as $storage) {
-                    $storagesToDelete->push($storage);
-                }
-            }
-            $service->environment_variables()->delete();
-            $service->applications()->delete();
-            $service->databases()->delete();
-
-            $server = data_get($service, 'server');
-            if ($server && $storagesToDelete->count() > 0) {
-                $storagesToDelete->each(function ($storage) use ($server) {
-                    instant_remote_process(["docker volume rm -f $storage->name"], $server, false);
-                });
-            }
-        });
-    }
     public function type()
     {
         return 'service';
@@ -207,7 +179,6 @@ class Service extends BaseModel
                     break;
             }
         }
-        ray($fields);
         $databases = $this->databases()->get();
 
         foreach ($databases as $database) {

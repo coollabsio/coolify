@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='createGitHubApp' class="flex flex-col">
+    <form wire:submit='createGitHubApp' class="flex flex-col">
         <h2>GitHub App</h2>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />

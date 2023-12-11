@@ -40,7 +40,7 @@
                 <li class="step step-secondary">Select a Private Key</li>
                 <li class="step step-secondary">Select a Repository, Branch & Save</li>
             </ul>
-            <form class="flex flex-col gap-2 pb-6" wire:submit.prevent='submit'>
+            <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
                 <div class="flex gap-2">
                     <x-forms.input id="repository_url" required label="Repository URL"
                         helper="{!! __('repository.url') !!}" />

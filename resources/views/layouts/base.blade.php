@@ -20,7 +20,6 @@
             display: none !important;
         }
     </style>
-    @livewireStyles
     @if (config('app.name') == 'Coolify Cloud')
         <script defer data-domain="app.coolify.io" src="https://analytics.coollabs.io/js/plausible.js"></script>
     @endif
@@ -36,8 +35,7 @@
 @section('body')
 
     <body>
-        @livewireScripts
-        @livewire('livewire-ui-modal')
+        @livewire('wire-elements-modal')
         <dialog id="help" class="modal">
             <livewire:help />
             <form method="dialog" class="modal-backdrop">
@@ -47,7 +45,7 @@
         <x-toaster-hub />
         <x-version class="fixed left-2 bottom-1" />
 
-        <script>
+        <script data-navigate-once>
             @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({
@@ -63,29 +61,6 @@
                 enableLogging: true,
                 enabledTransports: ['ws', 'wss'],
             });
-
-            if ("{{ auth()->user()->id }}" == 0) {
-                let checkPusherInterval = null;
-                let checkNumber = 0;
-                let errorMessage = "Coolify could not connect to the new realtime service introduced in beta.154.<br>Please check the related <a href='https://coolify.io/docs/cloudflare-tunnels' target='_blank'>documentation</a> or get help on <a href='https://coollabs.io/discord' target='_blank'>Discord</a>.";
-                checkPusherInterval = setInterval(() => {
-                    if (window.Echo) {
-                        if (window.Echo.connector.pusher.connection.state !== 'connected') {
-                            checkNumber++;
-                            if (checkNumber > 5) {
-                                clearInterval(checkPusherInterval);
-                                Livewire.emit('error', errorMessage);
-                            }
-                        } else {
-                           console.log('Coolify is now connected to the new realtime service introduced in beta.154.');
-                            clearInterval(checkPusherInterval);
-                        }
-                    } else {
-                        clearInterval(checkPusherInterval);
-                        Livewire.emit('error', errorMessage);
-                    }
-                }, 2000);
-            }
             @endauth
             let checkHealthInterval = null;
             let checkIfIamDeadInterval = null;
@@ -146,34 +121,35 @@
             }
 
             function copyToClipboard(text) {
-                navigator?.clipboard?.writeText(text) && Livewire.emit('success', 'Copied to clipboard.');
+                navigator?.clipboard?.writeText(text) && window.Livewire.dispatch('success', 'Copied to clipboard.');
             }
-
-            Livewire.on('reloadWindow', (timeout) => {
-                if (timeout) {
-                    setTimeout(() => {
+            document.addEventListener('livewire:init', () => {
+                window.Livewire.on('reloadWindow', (timeout) => {
+                    if (timeout) {
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, timeout);
+                        return;
+                    } else {
                         window.location.reload();
-                    }, timeout);
-                    return;
-                } else {
-                    window.location.reload();
-                }
-            })
-            Livewire.on('info', (message) => {
-                if (message) Toaster.info(message)
-            })
-            Livewire.on('error', (message) => {
-                if (message) Toaster.error(message)
-            })
-            Livewire.on('warning', (message) => {
-                if (message) Toaster.warning(message)
-            })
-            Livewire.on('success', (message) => {
-                if (message) Toaster.success(message)
-            })
-            Livewire.on('installDocker', () => {
-                installDocker.showModal();
-            })
+                    }
+                })
+                window.Livewire.on('info', (message) => {
+                    if (message) Toaster.info(message)
+                })
+                window.Livewire.on('error', (message) => {
+                    if (message) Toaster.error(message)
+                })
+                window.Livewire.on('warning', (message) => {
+                    if (message) Toaster.warning(message)
+                })
+                window.Livewire.on('success', (message) => {
+                    if (message) Toaster.success(message)
+                })
+                window.Livewire.on('installDocker', () => {
+                    installDocker.showModal();
+                })
+            });
         </script>
     </body>
 @show

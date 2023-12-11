@@ -5,12 +5,12 @@
         </x-slot:modalBody>
     </x-modal>
     @if (data_get($github_app, 'app_id'))
-        <form wire:submit.prevent='submit'>
+        <form wire:submit='submit'>
             <div class="flex items-center gap-2">
                 <h1>GitHub App</h1>
                 <div class="flex gap-2">
                     @if (data_get($github_app, 'installation_id'))
-                    <x-forms.button type="submit">Save</x-forms.button>
+                        <x-forms.button type="submit">Save</x-forms.button>
                         <a href="{{ get_installation_path($github_app) }}">
                             <x-forms.button>
                                 Update Repositories
@@ -91,12 +91,12 @@
             <span>You must complete this step before you can use this source!</span>
         </div>
         <div class="flex flex-col">
-            <h2 >Register a GitHub App</h2>
-            <div >You need to register a GitHub App before using this source.</div>
+            <h2>Register a GitHub App</h2>
+            <div>You need to register a GitHub App before using this source.</div>
             <div class="py-10">
                 @if (!isCloud() || isDev())
                     <div class="flex items-end gap-2">
-                        <x-forms.select wire:model='webhook_endpoint' label="Webhook Endpoint"
+                        <x-forms.select wire:model.live='webhook_endpoint' label="Webhook Endpoint"
                             helper="All Git webhooks will be sent to this endpoint. <br><br>If you would like to use domain instead of IP address, set your Coolify instance's FQDN in the Settings menu.">
                             @if ($ipv4)
                                 <option value="{{ $ipv4 }}">Use {{ $ipv4 }}</option>

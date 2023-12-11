@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='submit' class="flex flex-col">
+    <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">
@@ -27,7 +27,7 @@
             @if (!$application->dockerfile && $application->build_pack !== 'dockerimage')
                 <div class="flex flex-col gap-2">
                     <div class="flex gap-2">
-                        <x-forms.select wire:model="application.build_pack" label="Build Pack" required>
+                        <x-forms.select wire:model.live="application.build_pack" label="Build Pack" required>
                             <option value="nixpacks">Nixpacks</option>
                             <option value="static">Static</option>
                             <option value="dockerfile">Dockerfile</option>

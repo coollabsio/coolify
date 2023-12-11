@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit.prevent='submit' class="flex flex-col gap-2 ">
+    <form wire:submit='submit' class="flex flex-col gap-2 ">
         <div class="flex items-end gap-2">
             <h1>Project: {{ data_get($project, 'name') }}</h1>
             <x-forms.button type="submit">Save</x-forms.button>

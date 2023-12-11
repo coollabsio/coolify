@@ -1,9 +1,9 @@
 <x-collapsible>
     <x-slot:title>
-        <div>{{$workdir}}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
+        <div>{{ $workdir }}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
     </x-slot:title>
     <x-slot:action>
-        <form wire:submit.prevent='submit' class="flex flex-col gap-2">
+        <form wire:submit='submit' class="flex flex-col gap-2">
             <div class="w-64">
                 <x-forms.checkbox instantSave label="Is directory?" id="fileStorage.is_directory"></x-forms.checkbox>
             </div>

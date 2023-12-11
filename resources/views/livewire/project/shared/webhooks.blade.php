@@ -13,7 +13,7 @@
         <div>
             <h3>Manual Git Webhooks</h3>
             @if ($githubManualWebhook && $gitlabManualWebhook)
-                <form wire:submit.prevent='saveSecret' class="flex flex-col gap-2">
+                <form wire:submit='saveSecret' class="flex flex-col gap-2">
                     <div class="flex items-end gap-2">
                         <x-forms.input helper="Content Type in GitHub configuration could be json or form-urlencoded."
                             readonly label="GitHub" id="githubManualWebhook"></x-forms.input>

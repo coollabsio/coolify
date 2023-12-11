@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Actions\Database\StopDatabase;
+use App\Events\BackupCreated;
 use App\Models\S3Storage;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -74,6 +75,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     public function handle(): void
     {
         try {
+            BackupCreated::dispatch($this->team->id);
             // Check if team is exists
             if (is_null($this->team)) {
                 $this->backup->update(['status' => 'failed']);
@@ -307,6 +309,8 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
             throw $e;
+        } finally {
+            BackupCreated::dispatch($this->team->id);
         }
     }
     private function backup_standalone_mongodb(string $databaseWithCollections): void

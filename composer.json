@@ -22,9 +22,9 @@
         "lcobucci/jwt": "^5.0.0",
         "league/flysystem-aws-s3-v3": "^3.0",
         "league/flysystem-sftp-v3": "^3.0",
-        "livewire/livewire": "^v2.12.3",
+        "livewire/livewire": "^3.0",
         "lorisleiva/laravel-actions": "^2.7",
-        "masmerise/livewire-toaster": "^1.2",
+        "masmerise/livewire-toaster": "^2.0",
         "nubs/random-name-generator": "^2.2",
         "phpseclib/phpseclib": "~3.0",
         "poliander/cron": "^3.0",
@@ -39,7 +39,7 @@
         "stripe/stripe-php": "^12.0",
         "symfony/yaml": "^6.2",
         "visus/cuid2": "^2.0.0",
-        "wire-elements/modal": "^1.0",
+        "wire-elements/modal": "^2.0",
         "yosymfony/toml": "^1.0"
     },
     "require-dev": {

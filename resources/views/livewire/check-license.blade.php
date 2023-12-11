@@ -1,4 +1,4 @@
-<form wire:submit.prevent='submit' class="flex flex-col gap-2">
+<form wire:submit='submit' class="flex flex-col gap-2">
     <div>
         @if ($settings->is_resale_license_active)
             <div class="text-success">License is active</div>

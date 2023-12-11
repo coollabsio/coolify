@@ -1,31 +1,32 @@
 <?php
 
+use App\Events\TestEvent;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\DatabaseController;
 use App\Http\Controllers\MagicController;
 use App\Http\Controllers\ProjectController;
-use App\Http\Livewire\Project\Application\Configuration as ApplicationConfiguration;
-use App\Http\Livewire\Boarding\Index as BoardingIndex;
-use App\Http\Livewire\Project\Service\Index as ServiceIndex;
-use App\Http\Livewire\Project\Service\Show as ServiceShow;
-use App\Http\Livewire\Dev\Compose as Compose;
-use App\Http\Livewire\Dashboard;
-use App\Http\Livewire\Project\CloneProject;
-use App\Http\Livewire\Project\Shared\ExecuteContainerCommand;
-use App\Http\Livewire\Project\Shared\Logs;
-use App\Http\Livewire\Security\ApiTokens;
-use App\Http\Livewire\Server\All;
-use App\Http\Livewire\Server\Create;
-use App\Http\Livewire\Server\Destination\Show as DestinationShow;
-use App\Http\Livewire\Server\LogDrains;
-use App\Http\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
-use App\Http\Livewire\Server\Proxy\Show as ProxyShow;
-use App\Http\Livewire\Server\Proxy\Logs as ProxyLogs;
-use App\Http\Livewire\Server\Show;
-use App\Http\Livewire\Source\Github\Change as GitHubChange;
-use App\Http\Livewire\Subscription\Show as SubscriptionShow;
-use App\Http\Livewire\Waitlist\Index as WaitlistIndex;
+use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
+use App\Livewire\Boarding\Index as BoardingIndex;
+use App\Livewire\Project\Service\Index as ServiceIndex;
+use App\Livewire\Project\Service\Show as ServiceShow;
+use App\Livewire\Dev\Compose as Compose;
+use App\Livewire\Dashboard;
+use App\Livewire\Project\CloneProject;
+use App\Livewire\Project\Shared\ExecuteContainerCommand;
+use App\Livewire\Project\Shared\Logs;
+use App\Livewire\Security\ApiTokens;
+use App\Livewire\Server\All;
+use App\Livewire\Server\Create;
+use App\Livewire\Server\Destination\Show as DestinationShow;
+use App\Livewire\Server\LogDrains;
+use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Livewire\Server\Proxy\Show as ProxyShow;
+use App\Livewire\Server\Proxy\Logs as ProxyLogs;
+use App\Livewire\Server\Show;
+use App\Livewire\Source\Github\Change as GitHubChange;
+use App\Livewire\Subscription\Show as SubscriptionShow;
+use App\Livewire\Waitlist\Index as WaitlistIndex;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -48,7 +49,7 @@ Route::get('/api/v1/test/realtime', function () {
     if (auth()->user()?->currentTeam()->id !== 0) {
         return redirect('/');
     }
-    event(new \App\Events\TestEvent());
+    TestEvent::dispatch('asd');
     return 'Look at your other tab.';
 })->middleware('auth');
 
@@ -135,7 +136,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Services
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
-    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}/logs', Logs::class)->name('project.service.logs');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/command', ExecuteContainerCommand::class)->name('project.service.command');
 });
 

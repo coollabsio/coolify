@@ -13,8 +13,7 @@
                     'border-coollabs' =>
                         data_get($backup, 'id') === data_get($selectedBackup, 'id'),
                     'flex flex-col box border-l-2 border-transparent',
-                ])
-                    wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
+                ]) wire:click="setSelectedBackup('{{ data_get($backup, 'id') }}')">
                     <div>Frequency: {{ $backup->frequency }}</div>
                     <div>Last backup: {{ data_get($backup->latest_log, 'status', 'No backup yet') }}</div>
                     <div>Number of backups to keep (locally): {{ $backup->number_of_backups_locally }}</div>

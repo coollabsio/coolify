@@ -90,7 +90,8 @@
                             New PostgreSQL
                         </div>
                         <div class="description">
-                            PostgreSQL is an open-source, object-relational database management system known for its robustness, advanced features, and strong standards compliance.
+                            PostgreSQL is an open-source, object-relational database management system known for its
+                            robustness, advanced features, and strong standards compliance.
                         </div>
                     </div>
                 </div>
@@ -100,7 +101,8 @@
                             New Redis
                         </div>
                         <div class="description">
-                            Redis is an open-source, in-memory data structure store used as a database, cache, and message broker, known for its high performance, flexibility, and rich data structures.
+                            Redis is an open-source, in-memory data structure store used as a database, cache, and
+                            message broker, known for its high performance, flexibility, and rich data structures.
                         </div>
                     </div>
                 </div>
@@ -110,7 +112,9 @@
                             New MongoDB
                         </div>
                         <div class="description">
-                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with optional schemas, known for its flexibility, scalability, and wide range of application use cases.
+                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with
+                            optional schemas, known for its flexibility, scalability, and wide range of application use
+                            cases.
                         </div>
                     </div>
                 </div>
@@ -120,7 +124,8 @@
                             New MySQL
                         </div>
                         <div class="description">
-                            MySQL is an open-source relational database management system known for its speed, reliability, and flexibility in managing and accessing data.
+                            MySQL is an open-source relational database management system known for its speed,
+                            reliability, and flexibility in managing and accessing data.
                         </div>
                     </div>
                 </div>
@@ -130,7 +135,8 @@
                             New Mariadb
                         </div>
                         <div class="description">
-                            MariaDB is an open-source relational database management system that serves as a drop-in replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
+                            MariaDB is an open-source relational database management system that serves as a drop-in
+                            replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
                         </div>
                     </div>
                 </div>
@@ -150,7 +156,7 @@
                 <x-forms.button wire:click='loadServices'>Reload Services List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
-                    wire:model.debounce.200ms="search" placeholder="Search..."></input>
+                    wire:model.live.debounce.200ms="search" placeholder="Search...">
             </div>
             <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
                 @if ($loadingServices)
@@ -181,7 +187,7 @@
                                 </div>
                             </button>
                         @endif
-                        @empty
+                    @empty
                         <div>No service found. Please try to reload the list!</div>
                     @endforelse
                 @endif
@@ -224,7 +230,16 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
+            <a wire:navigate href="{{ route('destination.new', ['server_id' => $server_id]) }}"
+                class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
+                <div class="flex flex-col mx-6 ">
+                    <div class="font-bold text-white">
+                        + Add New
+                    </div>
+                </div>
+            </a>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
+
                 @foreach ($standaloneDockers as $standaloneDocker)
                     <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
                         <div class="flex flex-col mx-6">
@@ -248,7 +263,7 @@
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')
-            <form wire:submit.prevent='addExistingPostgresql' class="flex items-end gap-2">
+            <form wire:submit='addExistingPostgresql' class="flex items-end gap-2">
                 <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
                     id="existingPostgresqlUrl" />
                 <x-forms.button type="submit">Add Database</x-forms.button>

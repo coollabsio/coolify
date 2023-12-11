@@ -19,17 +19,19 @@
                 </svg>
             </h2>
         </div>
-        <form class="flex items-end gap-2" wire:submit.prevent='submit'>
+        <form class="flex items-end gap-2" wire:submit='submit'>
             <x-forms.input id="email" type="email" label="Email" placeholder="youareawesome@protonmail.com" />
             <x-forms.button type="submit">Join Waitlist</x-forms.button>
         </form>
         <div>People waiting in the line: <span class="font-bold text-warning">{{ $waitingInLine }}</div>
         <div>Already using Coolify Cloud: <span class="font-bold text-warning">{{ $users }}</div>
         <div class="pt-8">
-            This is a paid & hosted version of Coolify.<br> See the pricing <a href="https://coolify.io/pricing" class="text-warning">here</a>.
+            This is a paid & hosted version of Coolify.<br> See the pricing <a href="https://coolify.io/pricing"
+                class="text-warning">here</a>.
         </div>
         <div class="pt-4">
-           If you are looking for the self-hosted version go <a href="https://coolify.io" class="text-warning">here</a>.
+            If you are looking for the self-hosted version go <a href="https://coolify.io"
+                class="text-warning">here</a>.
         </div>
     </div>
 </div>

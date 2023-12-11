@@ -1,13 +1,13 @@
 <div class="navbar-main">
-    <a class="{{ request()->routeIs('project.database.configuration') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.database.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.database.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
-    <a class="{{ request()->routeIs('project.database.command') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.database.command') ? 'text-white' : '' }}"
         href="{{ route('project.database.command', $parameters) }}">
         <button>Execute Command</button>
     </a>
-    <a class="{{ request()->routeIs('project.database.logs') ? 'text-white' : '' }}"
+    <a wire:navigate class="{{ request()->routeIs('project.database.logs') ? 'text-white' : '' }}"
         href="{{ route('project.database.logs', $parameters) }}">
         <button>Logs</button>
     </a>
@@ -16,7 +16,7 @@
             $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
             $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
             $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-        <a class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
+        <a wire:navigate class="{{ request()->routeIs('project.database.backups.all') ? 'text-white' : '' }}"
             href="{{ route('project.database.backups.all', $parameters) }}">
             <button>Backups</button>
         </a>

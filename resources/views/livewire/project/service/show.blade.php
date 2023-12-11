@@ -2,7 +2,7 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+            <a wire:navigate class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'service_name' => null]) }}">
                 <button><- Back</button>
             </a>
@@ -19,12 +19,6 @@
                     $serviceDatabase?->databaseType() === 'standalone-mariadb')
                 <a :class="activeTab === 'backups' && 'text-white'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
-            @endif
-            @if (data_get($parameters, 'service_name'))
-                <a class="{{ request()->routeIs('project.service.logs') ? 'text-white' : '' }}"
-                    href="{{ route('project.service.logs', $parameters) }}">
-                    <button>Logs</button>
-                </a>
             @endif
         </div>
         <div class="w-full pl-8">

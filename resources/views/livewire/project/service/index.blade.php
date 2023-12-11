@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus" wire:poll.10000ms="checkStatus">
+<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">
@@ -11,6 +11,10 @@
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
                 href="#">Execute Command</a>
+            <a :class="activeTab === 'logs' && 'text-white'"
+                @click.prevent="activeTab = 'logs';
+                window.location.hash = 'logs'"
+                href="#">Logs</a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages';
                 window.location.hash = 'storages'"
@@ -42,9 +46,8 @@
                                 $application->status)->contains(['starting']),
                             'flex gap-2 box group',
                         ])>
-                            <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                            <a wire:navigate class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                 href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
-
                                 @if ($application->human_name)
                                     {{ Str::headline($application->human_name) }}
                                 @else
@@ -61,9 +64,6 @@
                                 @endif
                                 <div class="text-xs">{{ $application->status }}</div>
                             </a>
-                            <a class="flex items-center gap-2 p-1 mx-4 font-bold rounded group-hover:text-white hover:no-underline"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $application->name]) }}"><span
-                                    class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                     @foreach ($databases as $database)
@@ -76,7 +76,7 @@
                                 $database->status)->contains(['restarting']),
                             'flex gap-2 box group',
                         ])>
-                            <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                            <a wire:navigate class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                 href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
                                 @if ($database->human_name)
                                     {{ Str::headline($database->human_name) }}
@@ -91,13 +91,9 @@
                                 @endif
                                 <div class="text-xs">{{ $database->status }}</div>
                             </a>
-                            <a class="flex items-center gap-2 p-1 mx-4 font-bold rounded hover:no-underline group-hover:text-white"
-                                href="{{ route('project.service.logs', [...$parameters, 'service_name' => $database->name]) }}"><span
-                                    class="hover:text-warning">Logs</span></a>
                         </div>
                     @endforeach
                 </div>
-
             </div>
             <div x-cloak x-show="activeTab === 'storages'">
                 <div class="flex items-center gap-2">
@@ -115,6 +111,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'webhooks'">
                 <livewire:project.shared.webhooks :resource="$service" />
+            </div>
+            <div x-cloak x-show="activeTab === 'logs'">
+                <livewire:project.shared.logs :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'execute-command'">
                 <livewire:project.shared.execute-container-command :resource="$service" />

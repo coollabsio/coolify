@@ -4,8 +4,7 @@
     @if (isCloud())
         <div class="pb-8">
             <h2>Subscription</h2>
-            @if (data_get(currentTeam(),
-                    'subscription'))
+            @if (data_get(currentTeam(), 'subscription'))
                 <livewire:subscription.actions />
             @else
                 <x-forms.button class="mt-4"><a class="text-white hover:no-underline"

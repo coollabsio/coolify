@@ -41,7 +41,7 @@
                 @if ($repositories->count() > 0)
                     <div class="flex items-end gap-2">
                         <x-forms.select class="w-full" label="Repository URL" helper="{!! __('repository.url') !!}"
-                            wire:model.defer="selected_repository_id">
+                            wire:model="selected_repository_id">
                             @foreach ($repositories as $repo)
                                 @if ($loop->first)
                                     <option selected value="{{ data_get($repo, 'id') }}">
@@ -67,7 +67,7 @@
                 @endif
                 @if ($branches->count() > 0)
                     <div class="flex flex-col gap-2 pb-6">
-                        <form class="flex flex-col" wire:submit.prevent='submit'>
+                        <form class="flex flex-col" wire:submit='submit'>
                             <div class="flex flex-col gap-2 pb-6">
                                 <div class="flex gap-2">
                                     <x-forms.select id="selected_branch_name" label="Branch">

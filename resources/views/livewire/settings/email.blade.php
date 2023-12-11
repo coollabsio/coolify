@@ -1,6 +1,6 @@
 <div>
     <dialog id="sendTestEmail" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
             <x-forms.input placeholder="test@example.com" id="emails" label="Recepients" required />
             <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
                 Send Email
@@ -14,7 +14,7 @@
         <h2>Transactional Email</h2>
     </div>
     <div class="pb-4 ">Email settings for password resets, invitations, shared with Pro+ subscribers etc.</div>
-    <form wire:submit.prevent='submitFromFields' class="pb-4">
+    <form wire:submit='submitFromFields' class="pb-4">
         <div class="flex flex-col items-end w-full gap-2 xl:flex-row">
             <x-forms.input required id="settings.smtp_from_name" helper="Name used in emails." label="From Name" />
             <x-forms.input required id="settings.smtp_from_address" helper="Email address used in emails."
@@ -38,7 +38,7 @@
             <div class="w-32">
                 <x-forms.checkbox instantSave id="settings.smtp_enabled" label="Enabled" />
             </div>
-            <form wire:submit.prevent='submit' class="flex flex-col">
+            <form wire:submit='submit' class="flex flex-col">
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input required id="settings.smtp_host" placeholder="smtp.mailgun.org" label="Host" />
@@ -65,7 +65,7 @@
             <div class="w-32">
                 <x-forms.checkbox instantSave='instantSaveResend' id="settings.resend_enabled" label="Enabled" />
             </div>
-            <form wire:submit.prevent='submitResend' class="flex flex-col">
+            <form wire:submit='submitResend' class="flex flex-col">
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
                         <x-forms.input type="password" id="settings.resend_api_key" placeholder="API key" required

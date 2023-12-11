@@ -2,6 +2,7 @@
 
 namespace App\Actions\Database;
 
+use App\Events\DatabaseStatusChanged;
 use App\Models\StandaloneMariadb;
 use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;

@@ -28,6 +28,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
         ]);
         PrivateKey::create([
+            "id" => 1,
             "team_id" => 0,
             "name" => "development-github-app",
             "description" => "This is the key for using the development GitHub app",
@@ -61,6 +62,7 @@ a1C8EDKapCw5hAhizEFOUQKOygL8Ipn+tmEUkORYdZ8Q8cWFCv9nIw==
             "is_git_related" => true
         ]);
         PrivateKey::create([
+            "id" => 2,
             "team_id" => 0,
             "name" => "development-gitlab-app",
             "description" => "This is the key for using the development Gitlab app",

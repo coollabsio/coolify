@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyTypes;
+use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
@@ -266,6 +267,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true,
                 ]
             );
+            ApplicationStatusChanged::dispatch(data_get($this->application,'environment.project.team.id'));
         }
     }
     private function push_to_docker_registry()
@@ -451,6 +453,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
         ]);
         $this->save_environment_variables();
+        // Build new container to limit downtime.
+        $this->build_by_compose_file();
         $this->stop_running_container(force: true);
 
         $networkId = $this->application->uuid;
@@ -1241,6 +1245,28 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
             );
         }
+    }
+
+    private function build_by_compose_file() {
+        $this->application_deployment_queue->addLogEntry("Pulling & building required images.");
+        if ($this->application->build_pack === 'dockerimage') {
+            $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} build"), "hidden" => true],
+            );
+        } else {
+            if ($this->docker_compose_location) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} build"), "hidden" => true],
+                );
+            }
+        }
+        $this->application_deployment_queue->addLogEntry("New images built.");
     }
 
     private function start_by_compose_file()

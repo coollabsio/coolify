@@ -1,6 +1,6 @@
 <div>
     <dialog id="sendTestEmail" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit.prevent='submit'>
+        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
             <x-forms.input placeholder="test@example.com" id="emails" label="Recepients" required />
             <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
                 Send Email
@@ -10,7 +10,7 @@
             <button>close</button>
         </form>
     </dialog>
-    <form wire:submit.prevent='submit' class="flex flex-col">
+    <form wire:submit='submit' class="flex flex-col">
         <div class="flex items-center gap-2">
             <h2>Email</h2>
             <x-forms.button type="submit">
@@ -51,7 +51,7 @@
         </div>
     @endif
     @if (!$team->use_instance_email_settings)
-        <form class="flex flex-col items-end gap-2 pb-4 xl:flex-row" wire:submit.prevent='submitFromFields'>
+        <form class="flex flex-col items-end gap-2 pb-4 xl:flex-row" wire:submit='submitFromFields'>
             <x-forms.input required id="team.smtp_from_name" helper="Name used in emails." label="From Name" />
             <x-forms.input required id="team.smtp_from_address" helper="Email address used in emails."
                 label="From Address" />
@@ -65,7 +65,7 @@
                 <div class="w-32">
                     <x-forms.checkbox instantSave id="team.smtp_enabled" label="Enabled" />
                 </div>
-                <form wire:submit.prevent='submit' class="flex flex-col">
+                <form wire:submit='submit' class="flex flex-col">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input required id="team.smtp_host" placeholder="smtp.mailgun.org" label="Host" />
@@ -92,7 +92,7 @@
                 <div class="w-32">
                     <x-forms.checkbox instantSave='instantSaveResend' id="team.resend_enabled" label="Enabled" />
                 </div>
-                <form wire:submit.prevent='submitResend' class="flex flex-col">
+                <form wire:submit='submitResend' class="flex flex-col">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col w-full gap-2 xl:flex-row">
                             <x-forms.input required type="password" id="team.resend_api_key" placeholder="API key"

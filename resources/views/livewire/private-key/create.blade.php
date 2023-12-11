@@ -1,6 +1,6 @@
 <div>
     <x-forms.button class="mb-4" wire:click="generateNewKey">Generate new SSH key for me</x-forms.button>
-    <form class="flex flex-col gap-2" wire:submit.prevent='createPrivateKey'>
+    <form class="flex flex-col gap-2" wire:submit='createPrivateKey'>
         <div class="flex gap-2">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="description" label="Description" />

@@ -102,7 +102,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
 {
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->emit('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
@@ -117,7 +117,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
 
     if (isset($livewire)) {
-        return $livewire->emit('error', $message);
+        return $livewire->dispatch('error', $message);
     }
     throw new Exception($message);
 }
@@ -967,6 +967,10 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 }
                             }
                         } else {
+                            $foundEnv = EnvironmentVariable::where([
+                                'key' => $key,
+                                'service_id' => $resource->id,
+                            ])->first();
                             if ($value->contains(':-')) {
                                 $key = $value->before(':');
                                 $defaultValue = $value->after(':-');
