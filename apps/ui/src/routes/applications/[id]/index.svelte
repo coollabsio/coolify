@@ -121,6 +121,10 @@
 				dockerComposeConfiguration[service.name] = {
 					fqdnPorts: [{ fqdn: '', port: '' }]
 				};
+			} else {
+				if (!dockerComposeConfiguration[service.name].fqdnPorts) {
+					dockerComposeConfiguration[service.name].fqdnPorts = [{ fqdn: '', port: '' }];
+				}
 			}
 		}
 		// Initialize fqdnPorts for each service, if not already initialized
@@ -1301,42 +1305,44 @@
 							>
 						</div>
 						<!-- FQDN and Port Configuration -->
-						{#each service.fqdnPorts as f, index}
-							<div class="grid grid-cols-3 items-center space-x-4 px-8">
-								<!-- FQDN Input -->
-								<input
-									disabled={isDisabled}
-									readonly={!$appSession.isAdmin}
-									class="w-full"
-									bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
-									placeholder="eg: https://coollabs.io"
-								/>
+						<!-- check if service has fqdnports before iterating -->
+						{#if service.fqdnPorts}
+							{#each service.fqdnPorts as f, index}
+								<div class="grid grid-cols-3 items-center space-x-4 px-8">
+									<!-- FQDN Input -->
+									<input
+										disabled={isDisabled}
+										readonly={!$appSession.isAdmin}
+										class="w-full"
+										bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
+										placeholder="eg: https://coollabs.io"
+									/>
 
-								<!-- Port Input -->
-								<input
-									disabled={isDisabled}
-									readonly={!$appSession.isAdmin}
-									required={!!dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
-									class="w-full"
-									type="number"
-									bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].port}
-									placeholder="Internal port"
-								/>
+									<!-- Port Input -->
+									<input
+										disabled={isDisabled}
+										readonly={!$appSession.isAdmin}
+										required={!!dockerComposeConfiguration[service.name].fqdnPorts[index].fqdn}
+										class="w-full"
+										type="number"
+										bind:value={dockerComposeConfiguration[service.name].fqdnPorts[index].port}
+										placeholder="Internal port"
+									/>
 
-								<div class="px-8">
-									<button
-										class="btn btn-sm btn-primary"
-										on:click|preventDefault={() => addFqdnPort(service)}>Add URL/Port</button
-									>
-									{#if service.fqdnPorts.length > 1}
-										<button on:click|preventDefault={() => removeFqdnPort(service, index)}
-											>Remove</button
+									<div class="px-8">
+										<button
+											class="btn btn-sm btn-primary"
+											on:click|preventDefault={() => addFqdnPort(service)}>Add URL/Port</button
 										>
-									{/if}
+										{#if service.fqdnPorts.length > 1}
+											<button on:click|preventDefault={() => removeFqdnPort(service, index)}
+												>Remove</button
+											>
+										{/if}
+									</div>
 								</div>
-							</div>
-						{/each}
-
+							{/each}
+						{/if}
 						<div class="grid grid-cols-2 items-center px-8">
 							<label for="destinationdns"
 								>Internal DNS on the deployed Destination
