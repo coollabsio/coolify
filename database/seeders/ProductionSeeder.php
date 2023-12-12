@@ -145,6 +145,5 @@ class ProductionSeeder extends Seeder
         } catch (\Throwable $e) {
             echo "Error: {$e->getMessage()}\n";
         }
-        Artisan::call('app:init');
     }
 }
