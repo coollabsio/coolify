@@ -120,8 +120,8 @@ class General extends Component
                 $this->application->save();
             }
             $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
-            // Fix for non-ascii characters
-            if (preg_match('~[^\x20-\x7E\t\r\n]~', $this->customLabels) > 0) {
+            // // Fix for non-ascii characters
+            if (mb_detect_encoding($this->customLabels, 'ASCII', true) === false) {
                 ray('custom_labels contains non-ascii characters');
                 $this->resetDefaultLabels(false);
             }

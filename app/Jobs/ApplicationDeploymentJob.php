@@ -883,6 +883,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->application->save();
             }
 
+            if (mb_detect_encoding(base64_decode($this->application->custom_labels), 'ASCII', true) === false) {
+                ray('custom_labels contains non-ascii characters');
+                $this->application->custom_labels = base64_encode(str(implode(",", generateLabelsApplication($this->application, $this->preview)))->replace(',', "\n"));
+                $this->application->save();
+            }
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
             $labels = $labels->filter(function ($value, $key) {
                 return !Str::startsWith($value, 'coolify.');
