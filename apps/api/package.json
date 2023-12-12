@@ -35,7 +35,6 @@
 		"csvtojson": "2.0.10",
 		"cuid": "2.1.8",
 		"dayjs": "1.11.7",
-		"dockerode": "3.3.4",
 		"dotenv-extended": "2.9.0",
 		"execa": "6.1.0",
 		"fastify": "4.11.0",
