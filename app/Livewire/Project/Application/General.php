@@ -95,7 +95,6 @@ class General extends Component
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.settings.is_static' => 'Is static',
     ];
-
     public function mount()
     {
         try {
@@ -110,11 +109,17 @@ class General extends Component
             $this->application->isConfigurationChanged(true);
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
-        if (is_null(data_get($this->application, 'custom_labels'))) {
-            $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+
+        if (base64_encode(base64_decode(data_get($this->application, 'custom_labels'), true)) === data_get($this->application, 'custom_labels')) {
+            ray('custom_labels is base64 encoded');
         } else {
-            $this->customLabels = str($this->application->custom_labels)->replace(',', "\n");
+            ray('custom_labels is not base64 encoded');
+            $this->application->custom_labels = str($this->application->custom_labels)->replace(',', "\n");
+            $this->application->custom_labels = base64_encode(data_get($this->application, 'custom_labels'));
+            $this->application->save();
         }
+
+        $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
@@ -233,14 +238,12 @@ class General extends Component
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
-            if (gettype($this->customLabels) === 'string') {
-                $this->customLabels = str($this->customLabels)->replace(',', "\n");
-            }
-            $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
                 $this->parsedServices = $this->application->parseCompose();
             }
+
+            $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $showToaster && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
