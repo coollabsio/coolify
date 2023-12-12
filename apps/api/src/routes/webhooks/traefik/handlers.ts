@@ -500,7 +500,7 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 										};
 										traefik.http.services = {
 											...traefik.http.services,
-											...generateServices({ serviceId, containerId, port: domainPort, isHttps })
+											...generateServices({ serviceId, containerId: id, port: domainPort, isHttps })
 										};
 										if (httpBasicAuth) {
 											traefik.http.middlewares[`${serviceId}-${pathPrefix}-basic-auth`] = {
