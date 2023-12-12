@@ -35,7 +35,12 @@ class Init extends Command
         }
         $this->cleanup_in_progress_application_deployments();
         $this->cleanup_stucked_helper_containers();
-        setup_dynamic_configuration();
+
+        try {
+            setup_dynamic_configuration();
+        } catch (\Throwable $e) {
+            echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
+        }
 
         $settings = InstanceSettings::get();
         if (!is_null(env('AUTOUPDATE', null))) {
