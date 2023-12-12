@@ -120,6 +120,11 @@ class General extends Component
                 $this->application->save();
             }
             $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
+            // Fix for non-ascii characters
+            if (preg_match('~[^\x20-\x7E\t\r\n]~', $this->customLabels) > 0) {
+                ray('custom_labels contains non-ascii characters');
+                $this->resetDefaultLabels(false);
+            }
         }
 
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
@@ -244,9 +249,7 @@ class General extends Component
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
                 $this->parsedServices = $this->application->parseCompose();
             }
-            if ($this->customLabels) {
-                $this->application->custom_labels = base64_encode($this->customLabels);
-            }
+            $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $showToaster && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {
