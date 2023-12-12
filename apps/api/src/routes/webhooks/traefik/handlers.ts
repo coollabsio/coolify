@@ -455,17 +455,16 @@ export async function proxyConfiguration(request: FastifyRequest<OnlyId>, remote
 							for (const service of services) {
 								const [key, config] = service;
 								if (key && config) {
-									const hasFqdnPorts = config.fqdnPorts && config.fqdnPorts.length;
-									const hasFqdnOrPort = config.fqdn || config.port;
+									const { fqdnPorts, fqdn, port } = config;
+
+									const hasFqdnOrPort = fqdn || port;
+									const hasFqdnPorts =
+										fqdnPorts && fqdnPorts.length && fqdnPorts.filter((f) => !!f.fqdn).length;
 									if (!hasFqdnPorts && !hasFqdnOrPort) continue;
 
-									const { fqdn, port } = config;
-									const { fqdnPorts } = config;
-
-									const domainsString =
-										fqdnPorts.length && fqdnPorts.filter((f) => !!f.fqdn).length
-											? fqdnPorts.map((f) => f.fqdn).join(',')
-											: fqdn;
+									const domainsString = hasFqdnPorts
+										? fqdnPorts.map((f) => f.fqdn).join(',')
+										: fqdn;
 
 									if (!domainsString) continue;
 
