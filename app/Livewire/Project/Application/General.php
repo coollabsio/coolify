@@ -110,16 +110,23 @@ class General extends Component
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
 
-        if (base64_encode(base64_decode(data_get($this->application, 'custom_labels'), true)) === data_get($this->application, 'custom_labels')) {
-            ray('custom_labels is base64 encoded');
-        } else {
-            ray('custom_labels is not base64 encoded');
-            $this->application->custom_labels = str($this->application->custom_labels)->replace(',', "\n");
-            $this->application->custom_labels = base64_encode(data_get($this->application, 'custom_labels'));
-            $this->application->save();
+        if (data_get($this->application, 'custom_labels')) {
+            if (base64_encode(base64_decode(data_get($this->application, 'custom_labels'), true)) === data_get($this->application, 'custom_labels')) {
+                ray('custom_labels is base64 encoded');
+            } else {
+                ray('custom_labels is not base64 encoded');
+                $this->application->custom_labels = str($this->application->custom_labels)->replace(',', "\n");
+                $this->application->custom_labels = base64_encode(data_get($this->application, 'custom_labels'));
+                $this->application->save();
+            }
+            $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
+            // // Fix for non-ascii characters
+            if (mb_detect_encoding($this->customLabels, 'ASCII', true) === false) {
+                ray('custom_labels contains non-ascii characters');
+                $this->resetDefaultLabels(false);
+            }
         }
 
-        $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
@@ -242,7 +249,6 @@ class General extends Component
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
                 $this->parsedServices = $this->application->parseCompose();
             }
-
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $showToaster && $this->dispatch('success', 'Application settings updated!');
