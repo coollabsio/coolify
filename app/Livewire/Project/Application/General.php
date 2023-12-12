@@ -238,15 +238,12 @@ class General extends Component
             if ($this->application->publish_directory && $this->application->publish_directory !== '/') {
                 $this->application->publish_directory = rtrim($this->application->publish_directory, '/');
             }
-            $this->application->custom_labels = base64_encode($this->customLabels);
-            // if (gettype($this->customLabels) === 'string') {
-            //     $this->customLabels = str($this->customLabels)->replace(',', "\n");
-            // }
-            // $this->application->custom_labels = $this->customLabels->explode("\n")->implode(',');
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
                 $this->parsedServices = $this->application->parseCompose();
             }
+
+            $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
             $showToaster && $this->dispatch('success', 'Application settings updated!');
         } catch (\Throwable $e) {

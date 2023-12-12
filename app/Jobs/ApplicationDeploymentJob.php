@@ -874,12 +874,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = $this->generate_environment_variables($ports);
 
         if (data_get($this->application, 'custom_labels')) {
-            ray(base64_decode($this->application->custom_labels));
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
             $labels = $labels->filter(function ($value, $key) {
                 return !Str::startsWith($value, 'coolify.');
             });
-            $this->application->custom_labels = base64_encode($labels);
+            $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
