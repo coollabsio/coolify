@@ -19,6 +19,8 @@ RUN apt-get clean autoclean && apt-get autoremove --yes && rm -rf /var/lib/{apt,
 RUN npm --no-update-notifier --no-fund --global install pnpm@${PNPM_VERSION}
 RUN npm install -g npm@${PNPM_VERSION}
 
+# install npm-run-all globally
+RUN npm install -g npm-run-all
 RUN mkdir -p ~/.docker/cli-plugins/
 
 RUN curl -SL https://cdn.coollabs.io/bin/$TARGETPLATFORM/docker-$DOCKER_VERSION -o /usr/bin/docker
