@@ -40,8 +40,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
-        $rand = rand(1, 15);
-        Sleep::for($rand)->seconds();
         try {
             if (!$this->server->isServerReady()) {
                 return;
