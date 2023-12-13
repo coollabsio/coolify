@@ -115,15 +115,15 @@ class Init extends Command
             $applications = Application::all();
             foreach ($applications as $application) {
                 if (!data_get($application, 'environment')) {
-                    echo 'Application without environment' . $application->name . 'deleting\n';
+                    echo 'Application without environment: ' . $application->name . ' deleting\n';
                     $application->delete();
                 }
                 if (!$application->destination()) {
-                    echo 'Application without destination' . $application->name . 'deleting\n';
+                    echo 'Application without destination: ' . $application->name . ' deleting\n';
                     $application->delete();
                 }
                 if (!data_get($application, 'destination.server')) {
-                    echo 'Application without server' . $application->name . 'deleting\n';
+                    echo 'Application without server: ' . $application->name . ' deleting\n';
                     $application->delete();
                 }
             }
@@ -134,15 +134,15 @@ class Init extends Command
             $postgresqls = StandalonePostgresql::all();
             foreach ($postgresqls as $postgresql) {
                 if (!data_get($postgresql, 'environment')) {
-                    echo 'Postgresql without environment' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without environment: ' . $postgresql->name . ' deleting\n';
                     $postgresql->delete();
                 }
                 if (!$postgresql->destination()) {
-                    echo 'Postgresql without destination' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without destination: ' . $postgresql->name . ' deleting\n';
                     $postgresql->delete();
                 }
                 if (!data_get($postgresql, 'destination.server')) {
-                    echo 'Postgresql without server' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without server: ' . $postgresql->name . ' deleting\n';
                     $postgresql->delete();
                 }
             }
@@ -153,15 +153,15 @@ class Init extends Command
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
                 if (!data_get($redis, 'environment')) {
-                    echo 'Redis without environment' . $redis->name . 'deleting\n';
+                    echo 'Redis without environment: ' . $redis->name . ' deleting\n';
                     $redis->delete();
                 }
                 if (!$redis->destination()) {
-                    echo 'Redis without destination' . $redis->name . 'deleting\n';
+                    echo 'Redis without destination: ' . $redis->name . ' deleting\n';
                     $redis->delete();
                 }
                 if (!data_get($redis, 'destination.server')) {
-                    echo 'Redis without server' . $redis->name . 'deleting\n';
+                    echo 'Redis without server: ' . $redis->name . ' deleting\n';
                     $redis->delete();
                 }
             }
@@ -173,15 +173,15 @@ class Init extends Command
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
                 if (!data_get($mongodb, 'environment')) {
-                    echo 'Mongodb without environment' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without environment: ' . $mongodb->name . ' deleting\n';
                     $mongodb->delete();
                 }
                 if (!$mongodb->destination()) {
-                    echo 'Mongodb without destination' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without destination: ' . $mongodb->name . ' deleting\n';
                     $mongodb->delete();
                 }
                 if (!data_get($mongodb, 'destination.server')) {
-                    echo 'Mongodb without server' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without server:  ' . $mongodb->name . ' deleting\n';
                     $mongodb->delete();
                 }
             }
@@ -193,15 +193,15 @@ class Init extends Command
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
                 if (!data_get($mysql, 'environment')) {
-                    echo 'Mysql without environment' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without environment: ' . $mysql->name . ' deleting\n';
                     $mysql->delete();
                 }
                 if (!$mysql->destination()) {
-                    echo 'Mysql without destination' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without destination: ' . $mysql->name . ' deleting\n';
                     $mysql->delete();
                 }
                 if (!data_get($mysql, 'destination.server')) {
-                    echo 'Mysql without server' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without server: ' . $mysql->name . ' deleting\n';
                     $mysql->delete();
                 }
             }
@@ -213,15 +213,15 @@ class Init extends Command
             $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
                 if (!data_get($mariadb, 'environment')) {
-                    echo 'Mariadb without environment' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without environment: ' . $mariadb->name . ' deleting\n';
                     $mariadb->delete();
                 }
                 if (!$mariadb->destination()) {
-                    echo 'Mariadb without destination' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without destination: ' . $mariadb->name . ' deleting\n';
                     $mariadb->delete();
                 }
                 if (!data_get($mariadb, 'destination.server')) {
-                    echo 'Mariadb without server' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without server: ' . $mariadb->name . ' deleting\n';
                     $mariadb->delete();
                 }
             }
@@ -233,15 +233,15 @@ class Init extends Command
             $services = Service::all();
             foreach ($services as $service) {
                 if (!data_get($service, 'environment')) {
-                    echo 'Service without environment' . $service->name . 'deleting\n';
+                    echo 'Service without environment: ' . $service->name . ' deleting\n';
                     $service->delete();
                 }
                 if (!$service->destination()) {
-                    echo 'Service without destination' . $service->name . 'deleting\n';
+                    echo 'Service without destination: ' . $service->name . ' deleting\n';
                     $service->delete();
                 }
                 if (!data_get($service, 'server')) {
-                    echo 'Service without server' . $service->name . 'deleting\n';
+                    echo 'Service without server: ' . $service->name . ' deleting\n';
                     $service->delete();
                 }
             }
@@ -252,7 +252,7 @@ class Init extends Command
             $serviceApplications = ServiceApplication::all();
             foreach ($serviceApplications as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceApplication without service' . $service->name . 'deleting\n';
+                    echo 'ServiceApplication without service: ' . $service->name . ' deleting\n';
                     $service->delete();
                 }
             }
@@ -263,7 +263,7 @@ class Init extends Command
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service' . $service->name . 'deleting\n';
+                    echo 'ServiceDatabase without service: ' . $service->name . ' deleting\n';
                     $service->delete();
                 }
             }
