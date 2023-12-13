@@ -39,7 +39,7 @@ class Controller extends BaseController
                 } else {
                     $team = $user->teams()->first();
                 }
-                if (is_null(data_get($user, 'email_verified_at'))){
+                if (is_null(data_get($user, 'email_verified_at'))) {
                     $user->email_verified_at = now();
                     $user->save();
                 }
@@ -137,16 +137,28 @@ class Controller extends BaseController
     public function acceptInvitation()
     {
         try {
-            $invitation = TeamInvitation::whereUuid(request()->route('uuid'))->firstOrFail();
+            $resetPassword = request()->query('reset-password');
+            $invitationUuid = request()->route('uuid');
+            $invitation = TeamInvitation::whereUuid($invitationUuid)->firstOrFail();
             $user = User::whereEmail($invitation->email)->firstOrFail();
-            if (auth()->user()->id !== $user->id) {
-                abort(401);
-            }
             $invitationValid = $invitation->isValid();
             if ($invitationValid) {
+                if ($resetPassword) {
+                    $user->update([
+                        'password' => Hash::make($invitationUuid),
+                        'force_password_reset' => true
+                    ]);
+                }
+                if ($user->teams()->where('team_id', $invitation->team->id)->exists()) {
+                    $invitation->delete();
+                    return redirect()->route('team.index');
+                }
                 $user->teams()->attach($invitation->team->id, ['role' => $invitation->role]);
-                refreshSession($invitation->team);
                 $invitation->delete();
+                if (auth()->user()?->id !== $user->id) {
+                    return redirect()->route('login');
+                }
+                refreshSession($invitation->team);
                 return redirect()->route('team.index');
             } else {
                 abort(401);

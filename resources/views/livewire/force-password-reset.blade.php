@@ -1,12 +1,12 @@
 <div class="min-h-screen hero">
     <div class="w-96 min-w-fit">
-        <div class="flex flex-col items-center pb-8">
+        <div class="flex flex-col items-center">
             <a href="{{ route('dashboard') }}">
                 <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
             </a>
         </div>
         <div class="flex items-center justify-center pb-4 text-center">
-            <h2>Set your initial password</h2>
+            Set your initial password
         </div>
         <form class="flex flex-col gap-2" wire:submit='submit'>
             <x-forms.input id="email" type="email" placeholder="Email" readonly label="Email" />
