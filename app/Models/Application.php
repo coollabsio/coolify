@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -340,7 +341,7 @@ class Application extends BaseModel
     }
     public function isDeploymentInprogress()
     {
-        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'in_progress')->count();
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::IN_PROGRESS)->where('status', ApplicationDeploymentStatus::QUEUED)->count();
         if ($deployments > 0) {
             return true;
         }
