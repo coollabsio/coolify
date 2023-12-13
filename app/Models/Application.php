@@ -1024,4 +1024,24 @@ class Application extends BaseModel
             ];
         }
     }
+    function parseContainerLabels(?ApplicationPreview $preview = null)
+    {
+        $customLabels = data_get($this, 'custom_labels');
+        if (!$customLabels) {
+            return;
+        }
+        if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
+            ray('custom_labels is not base64 encoded');
+            $this->custom_labels = str($customLabels)->replace(',', "\n");
+            $this->custom_labels = base64_encode($customLabels);
+        }
+        $customLabels = base64_decode($this->custom_labels);
+        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+            ray('custom_labels contains non-ascii characters');
+            $customLabels = str(implode(",", generateLabelsApplication($this, $preview)))->replace(',', "\n");
+        }
+        $this->custom_labels = base64_encode($customLabels);
+        $this->save();
+        return $customLabels;
+    }
 }

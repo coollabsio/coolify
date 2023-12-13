@@ -109,24 +109,7 @@ class General extends Component
             $this->application->isConfigurationChanged(true);
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
-
-        if (data_get($this->application, 'custom_labels')) {
-            if (base64_encode(base64_decode(data_get($this->application, 'custom_labels'), true)) === data_get($this->application, 'custom_labels')) {
-                ray('custom_labels is base64 encoded');
-            } else {
-                ray('custom_labels is not base64 encoded');
-                $this->application->custom_labels = str($this->application->custom_labels)->replace(',', "\n");
-                $this->application->custom_labels = base64_encode(data_get($this->application, 'custom_labels'));
-                $this->application->save();
-            }
-            $this->customLabels = base64_decode(data_get($this->application, 'custom_labels'));
-            // // Fix for non-ascii characters
-            if (mb_detect_encoding($this->customLabels, 'ASCII', true) === false) {
-                ray('custom_labels contains non-ascii characters');
-                $this->resetDefaultLabels(false);
-            }
-        }
-
+        $this->customLabels =  $this->application->parseContainerLabels();
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
