@@ -59,7 +59,7 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                 $this->resource->delete();
                 DeleteService::dispatch($this->resource);
             } else {
-                $this->resource->delete();
+                $this->resource->forceDelete();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
