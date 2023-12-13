@@ -240,3 +240,10 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('destination.show');
 });
+
+Route::any('/{any}', function () {
+    if (auth()->user()) {
+        return redirect('/');
+    }
+    return redirect('/login');
+})->where('any', '.*');

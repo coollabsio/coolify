@@ -69,7 +69,7 @@
 @if ($servers->count() === 1)
     <div class="grid grid-cols-1 gap-2">
     @else
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
 @endif
 @foreach ($servers as $server)
     <a wire:navigate href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
