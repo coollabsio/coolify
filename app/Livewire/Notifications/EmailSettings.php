@@ -70,7 +70,7 @@ class EmailSettings extends Component
     }
     public function sendTestNotification()
     {
-        $this->team->notify(new Test($this->emails));
+        $this->team?->notify(new Test($this->emails));
         $this->dispatch('success', 'Test Email sent successfully.');
     }
     public function instantSaveInstance()

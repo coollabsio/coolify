@@ -98,7 +98,7 @@ class User extends Authenticatable implements SendsEmail
     }
     public function sendPasswordResetNotification($token): void
     {
-        $this->notify(new TransactionalEmailsResetPassword($token));
+        $this?->notify(new TransactionalEmailsResetPassword($token));
     }
 
     public function isAdmin()

@@ -164,7 +164,7 @@ class Server extends BaseModel
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
-                    $this->team->notify(new Unreachable($this));
+                    $this->team?->notify(new Unreachable($this));
                     $this->update(['unreachable_notification_sent' => true]);
                 }
                 $this->settings()->update([
@@ -401,7 +401,7 @@ class Server extends BaseModel
         }
 
         if (data_get($server, 'unreachable_notification_sent') === true) {
-            $server->team->notify(new Revived($server));
+            $server->team?->notify(new Revived($server));
             $server->update(['unreachable_notification_sent' => false]);
         }
 

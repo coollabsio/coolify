@@ -286,7 +286,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                     if ($this->backup->save_s3) {
                         $this->upload_to_s3();
                     }
-                    $this->team->notify(new BackupSuccess($this->backup, $this->database));
+                    $this->team?->notify(new BackupSuccess($this->backup, $this->database));
                     $this->backup_log->update([
                         'status' => 'success',
                         'message' => $this->backup_output,
@@ -302,7 +302,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
                         ]);
                     }
                     send_internal_notification('DatabaseBackupJob failed with: ' . $e->getMessage());
-                    $this->team->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
+                    $this->team?->notify(new BackupFailed($this->backup, $this->database, $this->backup_output));
                     throw $e;
                 }
             }

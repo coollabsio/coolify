@@ -63,19 +63,19 @@ class CheckLogDrainContainerJob implements ShouldQueue, ShouldBeEncrypted
                 Sleep::for(10)->seconds();
                 if ($this->healthcheck()) {
                     if ($this->server->log_drain_notification_sent) {
-                        $this->server->team->notify(new ContainerRestarted('Coolify Log Drainer', $this->server));
+                        $this->server->team?->notify(new ContainerRestarted('Coolify Log Drainer', $this->server));
                         $this->server->update(['log_drain_notification_sent' => false]);
                     }
                     return;
                 }
                 if (!$this->server->log_drain_notification_sent) {
                     ray('Log drain container still unhealthy. Sending notification...');
-                    $this->server->team->notify(new ContainerStopped('Coolify Log Drainer', $this->server, null));
+                    $this->server->team?->notify(new ContainerStopped('Coolify Log Drainer', $this->server, null));
                     $this->server->update(['log_drain_notification_sent' => true]);
                 }
             } else {
                 if ($this->server->log_drain_notification_sent) {
-                    $this->server->team->notify(new ContainerRestarted('Coolify Log Drainer', $this->server));
+                    $this->server->team?->notify(new ContainerRestarted('Coolify Log Drainer', $this->server));
                     $this->server->update(['log_drain_notification_sent' => false]);
                 }
             }
