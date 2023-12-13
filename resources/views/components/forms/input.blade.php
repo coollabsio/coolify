@@ -22,7 +22,7 @@
                     </svg>
                 </div>
             @endif
-            <input {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }} @required($required)
+            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }} @required($required)
                 wire:model={{ $id }} wire:dirty.class.remove='text-white' wire:dirty.class="input-warning"
                 wire:loading.attr="disabled" type="{{ $type }}" @readonly($readonly) @disabled($disabled)
                 id="{{ $id }}" name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
@@ -30,10 +30,11 @@
 
         </div>
     @else
-        <input {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
-            wire:model={{ $id }} wire:dirty.class.remove='text-white' wire:dirty.class="input-warning"
-            wire:loading.attr="disabled" type="{{ $type }}" @disabled($disabled)
-            id="{{ $id }}" name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}">
+        <input @if($value) value="{{ $value }}" @endif {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+            @readonly($readonly) wire:model={{ $id }} wire:dirty.class.remove='text-white'
+            wire:dirty.class="input-warning" wire:loading.attr="disabled" type="{{ $type }}"
+            @disabled($disabled) id="{{ $id }}" name="{{ $name }}"
+            placeholder="{{ $attributes->get('placeholder') }}">
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />

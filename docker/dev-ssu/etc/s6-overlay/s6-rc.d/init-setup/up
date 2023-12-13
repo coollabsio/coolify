@@ -1,0 +1,4 @@
+#!/command/execlineb -P
+foreground { composer -d /var/www/html/ install }
+foreground { php /var/www/html/artisan key:generate }
+foreground { php /var/www/html/artisan migrate --step }

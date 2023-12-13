@@ -20,12 +20,12 @@ function help {
     compgen -A function | cat -n
 }
 
-function setup:dev {
-    docker exec coolify bash -c "composer install"
-    docker exec coolify bash -c "php artisan key:generate"
-    docker exec coolify bash -c "php artisan migrate:fresh --seed"
+function dev:init {
+    docker exec coolify bash -c "php artisan migrate --seed"
+    echo "Need to update privileges on a few files. I need your password for that."
     sudo chmod -R o+rwx .
 }
+
 function sync:v3 {
     if [ -z "$1" ]; then
         echo -e "Please provide a version.\n\nExample: run sync:v3 3.12.32"
@@ -57,9 +57,12 @@ function schedule:run {
 function db {
     bash spin exec -u webuser coolify php artisan db
 }
+function db:seed {
+    bash spin exec -u webuser coolify php artisan migrate --seed
+}
 
 function db:migrate {
-    bash spin exec -u webuser coolify php artisan migrate
+    bash spin exec -u webuser coolify php artisan migrate --step
 }
 
 function db:reset {

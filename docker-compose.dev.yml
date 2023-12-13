@@ -56,7 +56,7 @@ services:
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
     environment:
-      SOKETI_DEBUG: "true"
+      SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
@@ -115,3 +115,9 @@ volumes:
   coolify-pg-data-dev:
   coolify-redis-data-dev:
   coolify-minio-data-dev:
+
+networks:
+    coolify:
+        name: coolify
+        driver: bridge  
+        external: false
