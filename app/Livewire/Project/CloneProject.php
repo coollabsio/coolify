@@ -19,12 +19,14 @@ class CloneProject extends Component
     public $servers;
     public ?Environment $environment = null;
     public ?int $selectedServer = null;
+    public ?int $selectedDestination = null;
     public ?Server $server = null;
     public $resources = [];
     public string $newProjectName = '';
 
     protected $messages = [
         'selectedServer' => 'Please select a server.',
+        'selectedDestination' => 'Please select a server & destination.',
         'newProjectName' => 'Please enter a name for the new project.',
     ];
     public function mount($project_uuid)
@@ -34,7 +36,7 @@ class CloneProject extends Component
         $this->environment = $this->project->environments->where('name', $this->environment_name)->first();
         $this->project_id = $this->project->id;
         $this->servers = currentTeam()->servers;
-        $this->newProjectName = $this->project->name . ' (clone)';
+        $this->newProjectName = str($this->project->name . '-clone-' . (string)new Cuid2(7))->slug();
     }
 
     public function render()
@@ -42,9 +44,10 @@ class CloneProject extends Component
         return view('livewire.project.clone-project');
     }
 
-    public function selectServer($server_id)
+    public function selectServer($server_id, $destination_id)
     {
         $this->selectedServer = $server_id;
+        $this->selectedDestination = $destination_id;
         $this->server = $this->servers->where('id', $server_id)->first();
     }
 
@@ -52,7 +55,7 @@ class CloneProject extends Component
     {
         try {
             $this->validate([
-                'selectedServer' => 'required',
+                'selectedDestination' => 'required',
                 'newProjectName' => 'required',
             ]);
             $foundProject = Project::where('name', $this->newProjectName)->first();
@@ -81,7 +84,8 @@ class CloneProject extends Component
                     'fqdn' => generateFqdn($this->server, $uuid),
                     'status' => 'exited',
                     'environment_id' => $newEnvironment->id,
-                    'destination_id' => $this->selectedServer,
+                    // This is not correct, but we need to set it to something
+                    'destination_id' => $this->selectedDestination,
                 ]);
                 $newApplication->save();
                 $environmentVaribles = $application->environment_variables()->get();
@@ -107,7 +111,7 @@ class CloneProject extends Component
                     'status' => 'exited',
                     'started_at' => null,
                     'environment_id' => $newEnvironment->id,
-                    'destination_id' => $this->selectedServer,
+                    'destination_id' => $this->selectedDestination,
                 ]);
                 $newDatabase->save();
                 $environmentVaribles = $database->environment_variables()->get();
@@ -133,7 +137,7 @@ class CloneProject extends Component
                 $newService = $service->replicate()->fill([
                     'uuid' => $uuid,
                     'environment_id' => $newEnvironment->id,
-                    'destination_id' => $this->selectedServer,
+                    'destination_id' => $this->selectedDestination,
                 ]);
                 $newService->save();
                 foreach ($newService->applications() as $application) {
