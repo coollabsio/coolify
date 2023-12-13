@@ -22,11 +22,6 @@ You can ask for guidance anytime on our
 - Run `spin up` - You can notice that errors will be thrown. Don't worry.
   - If you see weird permission errors, especially on Mac, run `sudo spin up` instead. 
 
-If you are running Coolify for the first time:
-- Run `./scripts/run dev:init` - This will delete any existing database layouts, migrate database to the new layout, and seed your database.
-
-> If you see the login page with a 404 error, you forgot to run `./scripts/run dev:init`.
-
 ### 4) Start development
 You can login your Coolify instance at `localhost:8000` with `test@example.com` and `password`.
 

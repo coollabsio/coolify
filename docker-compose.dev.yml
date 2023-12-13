@@ -70,6 +70,8 @@ services:
     volumes:
       - .:/var/www/html:cached
     command: sh -c "npm install && npm run dev"
+    networks:
+      - coolify
   testing-host:
     <<: *testing-host-base
     container_name: coolify-testing-host
@@ -77,15 +79,8 @@ services:
       - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/coolify/:/data/coolify
-      # - coolify-data-dev:/data/coolify
-      # remote-host:
-      #   <<: *testing-host-base
-      #   container_name: coolify-remote-host
-      #   volumes:
-      #     - /:/host
-      #     - /var/run/docker.sock:/var/run/docker.sock
-      #     - /data/coolify/:/data/coolify
-      #     # - coolify-data-dev:/data/coolify
+    networks:
+      - coolify
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: coolify-mail
@@ -116,8 +111,8 @@ volumes:
   coolify-redis-data-dev:
   coolify-minio-data-dev:
 
+
 networks:
-    coolify:
-        name: coolify
-        driver: bridge  
-        external: false
+  coolify:
+    name: coolify
+    external: false
