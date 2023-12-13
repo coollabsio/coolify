@@ -18,8 +18,12 @@
                             <td>{{ $invite->email }}</td>
                             <td>{{ $invite->via }}</td>
                             <td>{{ $invite->role }}</td>
-                            <td x-on:click="copyToClipboard('{{ $invite->link }}')">
-                                <x-forms.button>Copy Invitation Link</x-forms.button>
+                            <td class="flex gap-2" x-data="checkProtocol">
+                                <template x-if="isHttps">
+                                    <x-forms.button x-on:click="copyToClipboard('{{ $invite->link }}')">Copy Invitation
+                                        Link</x-forms.button>
+                                </template>
+                                <x-forms.input id="null" type="password" value="{{ $invite->link }}" />
                             </td>
                             <td>
                                 <x-forms.button wire:click.prevent='deleteInvitation({{ $invite->id }})'>Revoke
@@ -31,6 +35,15 @@
                 </tbody>
             </table>
         </div>
-
     @endif
 </div>
+
+@script
+    <script>
+        Alpine.data('checkProtocol', () => {
+            return {
+                isHttps: window.location.protocol === 'https:'
+            }
+        })
+    </script>
+@endscript
