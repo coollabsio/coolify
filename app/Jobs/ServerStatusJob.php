@@ -54,7 +54,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 } else {
                     $this->server->high_disk_usage_notification_sent = true;
                     $this->server->save();
-                    $this->server->team->notify(new HighDiskUsage($this->server, $this->disk_usage, $this->server->settings->cleanup_after_percentage));
+                    $this->server->team?->notify(new HighDiskUsage($this->server, $this->disk_usage, $this->server->settings->cleanup_after_percentage));
                 }
             } else {
                 DockerCleanupJob::dispatchSync($this->server);

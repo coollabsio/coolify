@@ -128,11 +128,6 @@ function allowedPathsForUnsubscribedAccounts()
         'logout',
         'waitlist',
         'force-password-reset',
-        // 'livewire/message/force-password-reset',
-        // 'livewire/message/check-license',
-        // 'livewire/message/switch-team',
-        // 'livewire/message/subscription.pricing-plans',
-        // 'livewire/message/help',
         'livewire/update'
     ];
 }
@@ -141,8 +136,6 @@ function allowedPathsForBoardingAccounts()
     return [
         ...allowedPathsForUnsubscribedAccounts(),
         'boarding',
-        // 'livewire/message/boarding.index',
-        // 'livewire/message/activity-monitor',
         'livewire/update'
     ];
 }
@@ -151,9 +144,6 @@ function allowedPathsForInvalidAccounts() {
         'logout',
         'verify',
         'force-password-reset',
-        // 'livewire/message/force-password-reset',
-        // 'livewire/message/verify-email',
-        // 'livewire/message/help',
         'livewire/update'
     ];
 }

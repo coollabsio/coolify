@@ -24,20 +24,20 @@
                 <form action="/login" method="POST" class="flex flex-col gap-2">
                     @csrf
                     @env('local')
-                    <x-forms.input value="test@example.com" type="email" name="email" required
-                        label="{{ __('input.email') }}" autofocus />
+                        <x-forms.input value="test@example.com" type="email" name="email" required
+                            label="{{ __('input.email') }}" autofocus />
 
-                    <x-forms.input value="password" type="password" name="password" required
-                        label="{{ __('input.password') }}" />
-                    <a href="/forgot-password" class="text-xs">
-                        {{ __('auth.forgot_password') }}?
-                    </a>
-                @else
-                    <x-forms.input type="email" name="email" required label="{{ __('input.email') }}" autofocus />
-                    <x-forms.input type="password" name="password" required label="{{ __('input.password') }}" />
-                    <a href="/forgot-password" class="text-xs">
-                        {{ __('auth.forgot_password') }}?
-                    </a>
+                        <x-forms.input value="password" type="password" name="password" required
+                            label="{{ __('input.password') }}" />
+                        <a href="/forgot-password" class="text-xs">
+                            {{ __('auth.forgot_password') }}?
+                        </a>
+                    @else
+                        <x-forms.input type="email" name="email" required label="{{ __('input.email') }}" autofocus />
+                        <x-forms.input type="password" name="password" required label="{{ __('input.password') }}" />
+                        <a href="/forgot-password" class="text-xs">
+                            {{ __('auth.forgot_password') }}?
+                        </a>
                     @endenv
                     <x-forms.button type="submit">{{ __('auth.login') }}</x-forms.button>
                     @if (!$is_registration_enabled)

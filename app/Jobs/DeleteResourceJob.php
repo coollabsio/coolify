@@ -32,9 +32,10 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
         try {
             $server = $this->resource->destination->server;
             if (!$server->isFunctional()) {
-                $this->resource->delete();
+                $this->resource->forceDelete();
                 return 'Server is not functional';
             }
+            $this->resource->delete();
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource);
@@ -56,10 +57,9 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                     break;
             }
             if ($this->resource->type() === 'service') {
-                $this->resource->delete();
                 DeleteService::dispatch($this->resource);
             } else {
-                $this->resource->delete();
+                $this->resource->forceDelete();
             }
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());

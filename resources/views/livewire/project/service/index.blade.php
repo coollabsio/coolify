@@ -44,26 +44,44 @@
                                 $application->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $application->status)->contains(['starting']),
-                            'flex gap-2 box group',
+                            'flex gap-2 box-without-bg bg-coolgray-100 hover:text-neutral-300 group',
                         ])>
-                            <a wire:navigate class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
-                                href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
-                                @if ($application->human_name)
-                                    {{ Str::headline($application->human_name) }}
-                                @else
-                                    {{ Str::headline($application->name) }}
-                                @endif
-                                @if ($application->configuration_required)
-                                    <span class="text-xs text-error">(configuration required)</span>
-                                @endif
-                                @if ($application->description)
-                                    <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
-                                @endif
-                                @if ($application->fqdn)
-                                    <span class="text-xs">{{ Str::limit($application->fqdn, 60) }}</span>
-                                @endif
-                                <div class="text-xs">{{ $application->status }}</div>
-                            </a>
+                            <div class="flex flex-row w-full">
+                                <div class="flex flex-col flex-1">
+                                    <div class="pb-2">
+                                        @if ($application->human_name)
+                                            {{ Str::headline($application->human_name) }}
+                                        @else
+                                            {{ Str::headline($application->name) }}
+                                        @endif
+                                        <span class="text-xs">({{ $application->image }})</span>
+                                    </div>
+                                    @if ($application->configuration_required)
+                                        <span class="text-xs text-error">(configuration required)</span>
+                                    @endif
+                                    @if ($application->description)
+                                        <span class="text-xs">{{ Str::limit($application->description, 60) }}</span>
+                                    @endif
+                                    @if ($application->fqdn)
+                                        <span class="text-xs">{{ Str::limit($application->fqdn, 60) }}</span>
+                                    @endif
+                                    <div class="text-xs">{{ $application->status }}</div>
+                                </div>
+                                <div class="flex items-center px-4">
+                                    <a wire:navigate
+                                        class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                        href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
+                                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path
+                                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+                                            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     @endforeach
                     @foreach ($databases as $database)
@@ -74,23 +92,43 @@
                                 $database->status)->contains(['running']),
                             'border-l border-dashed border-warning' => Str::of(
                                 $database->status)->contains(['restarting']),
-                            'flex gap-2 box group',
+                            'flex gap-2 box-without-bg bg-coolgray-100 hover:text-neutral-300 group',
                         ])>
-                            <a wire:navigate class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
-                                href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
-                                @if ($database->human_name)
-                                    {{ Str::headline($database->human_name) }}
-                                @else
-                                    {{ Str::headline($database->name) }}
-                                @endif
-                                @if ($database->configuration_required)
-                                    <span class="text-xs text-error">(configuration required)</span>
-                                @endif
-                                @if ($database->description)
-                                    <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
-                                @endif
-                                <div class="text-xs">{{ $database->status }}</div>
-                            </a>
+
+
+                            <div class="flex flex-row w-full">
+                                <div class="flex flex-col flex-1">
+                                    <div class="pb-2">
+                                        @if ($database->human_name)
+                                            {{ Str::headline($database->human_name) }}
+                                        @else
+                                            {{ Str::headline($database->name) }}
+                                        @endif
+                                        <span class="text-xs">({{ $database->image }})</span>
+                                    </div>
+                                    @if ($database->configuration_required)
+                                        <span class="text-xs text-error">(configuration required)</span>
+                                    @endif
+                                    @if ($database->description)
+                                        <span class="text-xs">{{ Str::limit($database->description, 60) }}</span>
+                                    @endif
+                                    <div class="text-xs">{{ $database->status }}</div>
+                                </div>
+                                <div class="flex items-center px-4">
+                                    <a wire:navigate
+                                        class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                        href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
+                                            viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                            <path
+                                                d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+                                            <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     @endforeach
                 </div>

@@ -1,13 +1,13 @@
 <x-layout-simple>
     <div class="min-h-screen hero">
         <div>
-            <div class="flex flex-col items-center pb-8">
+            <div class="flex flex-col items-center ">
                 <a href="{{ route('dashboard') }}">
                     <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
                 </a>
             </div>
             <div class="flex items-center justify-center pb-4 text-center">
-                <h2>{{ __('auth.reset_password') }}</h2>
+                {{ __('auth.reset_password') }}
             </div>
             <div>
                 <form action="/reset-password" method="POST" class="flex flex-col gap-2">

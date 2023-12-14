@@ -874,20 +874,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = $this->generate_environment_variables($ports);
 
         if (data_get($this->application, 'custom_labels')) {
-            if (base64_encode(base64_decode(data_get($this->application, 'custom_labels'), true)) === data_get($this->application, 'custom_labels')) {
-                ray('custom_labels is base64 encoded');
-            } else {
-                ray('custom_labels is not base64 encoded');
-                $this->application->custom_labels = str($this->application->custom_labels)->replace(',', "\n");
-                $this->application->custom_labels = base64_encode(data_get($this->application, 'custom_labels'));
-                $this->application->save();
-            }
-
-            if (mb_detect_encoding(base64_decode($this->application->custom_labels), 'ASCII', true) === false) {
-                ray('custom_labels contains non-ascii characters');
-                $this->application->custom_labels = base64_encode(str(implode(",", generateLabelsApplication($this->application, $this->preview)))->replace(',', "\n"));
-                $this->application->save();
-            }
+            $this->application->parseContainerLabels();
             $labels = collect(preg_split("/\r\n|\n|\r/", base64_decode($this->application->custom_labels)));
             $labels = $labels->filter(function ($value, $key) {
                 return !Str::startsWith($value, 'coolify.');
@@ -1354,10 +1341,10 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         }
         queue_next_deployment($this->application);
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            $this->application->environment->project->team->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
         if ($status === ApplicationDeploymentStatus::FAILED->value) {
-            $this->application->environment->project->team->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
+            $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 

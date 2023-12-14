@@ -106,7 +106,7 @@ class Email extends Component
 
     public function sendTestNotification()
     {
-        $this->settings->notify(new Test($this->emails));
+        $this->settings?->notify(new Test($this->emails));
         $this->dispatch('success', 'Test email sent.');
     }
 }

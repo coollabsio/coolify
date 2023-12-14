@@ -56,7 +56,7 @@ services:
     ports:
       - "${FORWARD_SOKETI_PORT:-6001}:6001"
     environment:
-      SOKETI_DEBUG: "true"
+      SOKETI_DEBUG: "false"
       SOKETI_DEFAULT_APP_ID: "${PUSHER_APP_ID:-coolify}"
       SOKETI_DEFAULT_APP_KEY: "${PUSHER_APP_KEY:-coolify}"
       SOKETI_DEFAULT_APP_SECRET: "${PUSHER_APP_SECRET:-coolify}"
@@ -70,6 +70,8 @@ services:
     volumes:
       - .:/var/www/html:cached
     command: sh -c "npm install && npm run dev"
+    networks:
+      - coolify
   testing-host:
     <<: *testing-host-base
     container_name: coolify-testing-host
@@ -77,15 +79,8 @@ services:
       - /:/host
       - /var/run/docker.sock:/var/run/docker.sock
       - /data/coolify/:/data/coolify
-      # - coolify-data-dev:/data/coolify
-      # remote-host:
-      #   <<: *testing-host-base
-      #   container_name: coolify-remote-host
-      #   volumes:
-      #     - /:/host
-      #     - /var/run/docker.sock:/var/run/docker.sock
-      #     - /data/coolify/:/data/coolify
-      #     # - coolify-data-dev:/data/coolify
+    networks:
+      - coolify
   mailpit:
     image: "axllent/mailpit:latest"
     container_name: coolify-mail
@@ -115,3 +110,9 @@ volumes:
   coolify-pg-data-dev:
   coolify-redis-data-dev:
   coolify-minio-data-dev:
+
+
+networks:
+  coolify:
+    name: coolify
+    external: false

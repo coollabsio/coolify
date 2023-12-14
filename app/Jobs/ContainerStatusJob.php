@@ -17,6 +17,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Sleep;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -37,10 +38,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         $this->handle();
     }
 
-
     public function handle()
     {
-        // ray("checking container statuses for {$this->server->id}");
         try {
             if (!$this->server->isServerReady()) {
                 return;

@@ -99,7 +99,7 @@ class Init extends Command
         // Cleanup any failed deployments
 
         try {
-            $halted_deployments = ApplicationDeploymentQueue::where('status', '==', 'in_progress')->get();
+            $halted_deployments = ApplicationDeploymentQueue::where('status', '==', ApplicationDeploymentStatus::IN_PROGRESS)->where('status', '==', ApplicationDeploymentStatus::QUEUED)->get();
             foreach ($halted_deployments as $deployment) {
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
@@ -115,16 +115,19 @@ class Init extends Command
             $applications = Application::all();
             foreach ($applications as $application) {
                 if (!data_get($application, 'environment')) {
-                    echo 'Application without environment' . $application->name . 'deleting\n';
+                    echo 'Application without environment: ' . $application->name . ' soft deleting\n';
                     $application->delete();
+                    continue;
                 }
                 if (!$application->destination()) {
-                    echo 'Application without destination' . $application->name . 'deleting\n';
+                    echo 'Application without destination: ' . $application->name . ' soft deleting\n';
                     $application->delete();
+                    continue;
                 }
                 if (!data_get($application, 'destination.server')) {
-                    echo 'Application without server' . $application->name . 'deleting\n';
+                    echo 'Application without server: ' . $application->name . ' soft deleting\n';
                     $application->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -134,16 +137,19 @@ class Init extends Command
             $postgresqls = StandalonePostgresql::all();
             foreach ($postgresqls as $postgresql) {
                 if (!data_get($postgresql, 'environment')) {
-                    echo 'Postgresql without environment' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without environment: ' . $postgresql->name . ' soft deleting\n';
                     $postgresql->delete();
+                    continue;
                 }
                 if (!$postgresql->destination()) {
-                    echo 'Postgresql without destination' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without destination: ' . $postgresql->name . ' soft deleting\n';
                     $postgresql->delete();
+                    continue;
                 }
                 if (!data_get($postgresql, 'destination.server')) {
-                    echo 'Postgresql without server' . $postgresql->name . 'deleting\n';
+                    echo 'Postgresql without server: ' . $postgresql->name . ' soft deleting\n';
                     $postgresql->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -153,16 +159,19 @@ class Init extends Command
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
                 if (!data_get($redis, 'environment')) {
-                    echo 'Redis without environment' . $redis->name . 'deleting\n';
+                    echo 'Redis without environment: ' . $redis->name . ' soft deleting\n';
                     $redis->delete();
+                    continue;
                 }
                 if (!$redis->destination()) {
-                    echo 'Redis without destination' . $redis->name . 'deleting\n';
+                    echo 'Redis without destination: ' . $redis->name . ' soft deleting\n';
                     $redis->delete();
+                    continue;
                 }
                 if (!data_get($redis, 'destination.server')) {
-                    echo 'Redis without server' . $redis->name . 'deleting\n';
+                    echo 'Redis without server: ' . $redis->name . ' soft deleting\n';
                     $redis->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -173,16 +182,19 @@ class Init extends Command
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
                 if (!data_get($mongodb, 'environment')) {
-                    echo 'Mongodb without environment' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without environment: ' . $mongodb->name . ' soft deleting\n';
                     $mongodb->delete();
+                    continue;
                 }
                 if (!$mongodb->destination()) {
-                    echo 'Mongodb without destination' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without destination: ' . $mongodb->name . ' soft deleting\n';
                     $mongodb->delete();
+                    continue;
                 }
                 if (!data_get($mongodb, 'destination.server')) {
-                    echo 'Mongodb without server' . $mongodb->name . 'deleting\n';
+                    echo 'Mongodb without server:  ' . $mongodb->name . ' soft deleting\n';
                     $mongodb->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -193,16 +205,19 @@ class Init extends Command
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
                 if (!data_get($mysql, 'environment')) {
-                    echo 'Mysql without environment' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without environment: ' . $mysql->name . ' soft deleting\n';
                     $mysql->delete();
+                    continue;
                 }
                 if (!$mysql->destination()) {
-                    echo 'Mysql without destination' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without destination: ' . $mysql->name . ' soft deleting\n';
                     $mysql->delete();
+                    continue;
                 }
                 if (!data_get($mysql, 'destination.server')) {
-                    echo 'Mysql without server' . $mysql->name . 'deleting\n';
+                    echo 'Mysql without server: ' . $mysql->name . ' soft deleting\n';
                     $mysql->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -213,16 +228,19 @@ class Init extends Command
             $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
                 if (!data_get($mariadb, 'environment')) {
-                    echo 'Mariadb without environment' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without environment: ' . $mariadb->name . ' soft deleting\n';
                     $mariadb->delete();
+                    continue;
                 }
                 if (!$mariadb->destination()) {
-                    echo 'Mariadb without destination' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without destination: ' . $mariadb->name . ' soft deleting\n';
                     $mariadb->delete();
+                    continue;
                 }
                 if (!data_get($mariadb, 'destination.server')) {
-                    echo 'Mariadb without server' . $mariadb->name . 'deleting\n';
+                    echo 'Mariadb without server: ' . $mariadb->name . ' soft deleting\n';
                     $mariadb->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -233,16 +251,19 @@ class Init extends Command
             $services = Service::all();
             foreach ($services as $service) {
                 if (!data_get($service, 'environment')) {
-                    echo 'Service without environment' . $service->name . 'deleting\n';
+                    echo 'Service without environment: ' . $service->name . ' soft deleting\n';
                     $service->delete();
+                    continue;
                 }
                 if (!$service->destination()) {
-                    echo 'Service without destination' . $service->name . 'deleting\n';
+                    echo 'Service without destination: ' . $service->name . ' soft deleting\n';
                     $service->delete();
+                    continue;
                 }
                 if (!data_get($service, 'server')) {
-                    echo 'Service without server' . $service->name . 'deleting\n';
+                    echo 'Service without server: ' . $service->name . ' soft deleting\n';
                     $service->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -252,8 +273,9 @@ class Init extends Command
             $serviceApplications = ServiceApplication::all();
             foreach ($serviceApplications as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceApplication without service' . $service->name . 'deleting\n';
+                    echo 'ServiceApplication without service: ' . $service->name . ' soft deleting\n';
                     $service->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {
@@ -263,8 +285,9 @@ class Init extends Command
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service' . $service->name . 'deleting\n';
+                    echo 'ServiceDatabase without service: ' . $service->name . ' soft deleting\n';
                     $service->delete();
+                    continue;
                 }
             }
         } catch (\Throwable $e) {

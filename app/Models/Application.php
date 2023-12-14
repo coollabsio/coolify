@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
@@ -13,6 +15,7 @@ use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
 {
+    use SoftDeletes;
     protected $guarded = [];
 
     protected static function booted()
@@ -338,7 +341,7 @@ class Application extends BaseModel
     }
     public function isDeploymentInprogress()
     {
-        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', 'in_progress')->count();
+        $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->where('status', ApplicationDeploymentStatus::IN_PROGRESS)->where('status', ApplicationDeploymentStatus::QUEUED)->count();
         if ($deployments > 0) {
             return true;
         }
@@ -1023,5 +1026,25 @@ class Application extends BaseModel
                 'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
             ];
         }
+    }
+    function parseContainerLabels(?ApplicationPreview $preview = null)
+    {
+        $customLabels = data_get($this, 'custom_labels');
+        if (!$customLabels) {
+            return;
+        }
+        if (base64_encode(base64_decode($customLabels, true)) !== $customLabels) {
+            ray('custom_labels is not base64 encoded');
+            $this->custom_labels = str($customLabels)->replace(',', "\n");
+            $this->custom_labels = base64_encode($customLabels);
+        }
+        $customLabels = base64_decode($this->custom_labels);
+        if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
+            ray('custom_labels contains non-ascii characters');
+            $customLabels = str(implode(",", generateLabelsApplication($this, $preview)))->replace(',', "\n");
+        }
+        $this->custom_labels = base64_encode($customLabels);
+        $this->save();
+        return $customLabels;
     }
 }

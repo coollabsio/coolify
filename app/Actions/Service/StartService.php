@@ -11,6 +11,7 @@ class StartService
     use AsAction;
     public function handle(Service $service)
     {
+        ray('Starting service: ' . $service->name);
         $network = $service->destination->network;
         $service->saveComposeConfigs();
         $commands[] = "cd " . $service->workdir();
