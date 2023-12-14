@@ -5,25 +5,32 @@
 html {
     @apply text-neutral-400;
 }
+
 body {
     @apply text-sm antialiased scrollbar;
 }
+
 button[isError] {
     @apply bg-red-600 hover:bg-red-700;
 }
+
 .scrollbar {
     @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
 }
+
 .main {
     @apply pt-4 pl-24 pr-10 mx-auto;
 }
+
 .custom-modal {
     @apply flex flex-col gap-2 px-8 py-4 border bg-base-100 border-coolgray-200;
 }
+
 .label-text,
 label {
     @apply text-neutral-400;
 }
+
 .navbar-main {
     @apply flex items-end gap-6 py-2 border-b-2 border-solid border-coolgray-200;
 }
@@ -31,89 +38,117 @@ label {
 .loading {
     @apply w-4 text-warning;
 }
+
 h1 {
     @apply text-3xl font-bold text-white;
 }
+
 h2 {
     @apply text-2xl font-bold text-white;
 }
+
 h3 {
     @apply text-xl font-bold text-white;
 }
+
 h4 {
     @apply text-base font-bold text-white;
 }
+
 a {
     @apply text-neutral-400 hover:text-white link link-hover hover:bg-transparent;
 }
+
 .kbd-custom {
     @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
 }
+
 .icon {
     @apply w-6 h-6;
 }
+
 .icon:hover {
     @apply text-white;
 }
+
 .box {
     @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] bg-coolgray-100 hover:bg-coollabs-100 hover:text-white hover:no-underline min-w-[24rem];
 }
+
 .box-without-bg {
-    @apply flex p-2 transition-colors h-16 min-h-full hover:text-white hover:no-underline min-h-[4rem];
+    @apply flex p-2 transition-colors min-h-full hover:text-white hover:no-underline min-h-[4rem];
 }
+
 .description {
     @apply pt-2 text-xs font-bold text-neutral-500 group-hover:text-white;
 }
+
 .lds-heart {
     animation: lds-heart 1.2s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
 }
+
 @keyframes lds-heart {
     0% {
         transform: scale(1);
     }
+
     5% {
         transform: scale(1.2);
     }
+
     39% {
         transform: scale(0.85);
     }
+
     45% {
         transform: scale(1);
     }
+
     60% {
         transform: scale(0.95);
     }
+
     100% {
         transform: scale(0.9);
     }
 }
+
 .bg-coollabs-gradient {
     @apply text-transparent text-white bg-gradient-to-r from-purple-500 via-pink-500 to-red-500;
 }
+
 .text-helper {
     @apply inline-block font-bold text-warning;
 }
+
 table {
     @apply min-w-full divide-y divide-coolgray-200;
 }
+
 thead {
     @apply uppercase;
 }
+
 tbody {
     @apply divide-y divide-coolgray-200;
 }
+
 tr {
     @apply text-neutral-400;
 }
+
 tr th {
     @apply px-3 py-3.5 text-left text-white;
 }
+
 tr th:first-child {
     @apply py-3.5 pl-4 pr-3 sm:pl-6;
 }
+
 tr td {
     @apply px-3 py-4 whitespace-nowrap;
 }
+
 tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
@@ -121,12 +156,15 @@ tr td:first-child {
 .buyme {
     @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-sm bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
 }
+
 .subtitle {
     @apply pt-2 pb-10;
 }
+
 .fullscreen {
-    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-100 overflow-y-auto scrollbar pb-4 ;
+    @apply fixed top-0 left-0 w-full h-full z-[9999] bg-coolgray-100 overflow-y-auto scrollbar pb-4;
 }
+
 input.input-sm {
     @apply pr-10;
 }
