@@ -8,7 +8,7 @@ use Livewire\Component;
 class BackupExecutions extends Component
 {
     public $backup;
-    public $executions;
+    public $executions = [];
     public $setDeletableBackup;
     public function getListeners()
     {
@@ -65,6 +65,6 @@ class BackupExecutions extends Component
     }
     public function refreshBackupExecutions(): void
     {
-        $this->executions = $this->backup->executions;
+        $this->executions = data_get($this->backup, 'executions', []);
     }
 }
