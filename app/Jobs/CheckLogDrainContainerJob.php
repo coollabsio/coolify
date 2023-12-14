@@ -44,7 +44,7 @@ class CheckLogDrainContainerJob implements ShouldQueue, ShouldBeEncrypted
     {
         // ray("checking log drain statuses for {$this->server->id}");
         try {
-            if (!$this->server->isServerReady()) {
+            if (!$this->server->isFunctional()) {
                 return;
             };
             $containers = instant_remote_process(["docker container ls -q"], $this->server, false);

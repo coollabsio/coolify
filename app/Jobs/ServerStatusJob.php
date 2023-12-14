@@ -34,7 +34,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     {
         ray("checking server status for {$this->server->id}");
         try {
-            if ($this->server->isServerReady()) {
+            if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
             }
         } catch (\Throwable $e) {
