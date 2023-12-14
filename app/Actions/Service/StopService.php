@@ -10,6 +10,7 @@ class StopService
     use AsAction;
     public function handle(Service $service)
     {
+        ray('Stopping service: ' . $service->name);
         $applications = $service->applications()->get();
         foreach ($applications as $application) {
             instant_remote_process(["docker rm -f {$application->name}-{$service->uuid}"], $service->server);

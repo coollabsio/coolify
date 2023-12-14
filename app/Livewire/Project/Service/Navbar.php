@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Actions\Shared\PullImage;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Events\ServiceStatusChanged;
@@ -68,5 +69,19 @@ class Navbar extends Component
             $this->dispatch('success', 'Service stopped successfully.');
         }
         ServiceStatusChanged::dispatch();
+    }
+    public function restart()
+    {
+        $this->checkDeployments();
+        if ($this->isDeploymentProgress) {
+            $this->dispatch('error', 'There is a deployment in progress.');
+            return;
+        }
+        PullImage::run($this->service);
+        $this->dispatch('image-pulled');
+        StopService::run($this->service);
+        $this->service->parse();
+        $activity = StartService::run($this->service);
+        $this->dispatch('newMonitorActivity', $activity->id);
     }
 }
