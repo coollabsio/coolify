@@ -153,13 +153,13 @@ class Server extends BaseModel
     public function isServerReady()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
-        $serverUptimeCheckNumberMax = 3;
+        $serverUptimeCheckNumberMax = 12;
 
         $currentTime = now()->timestamp;
-        $runtime = 30;
+        $runtime = 65;
 
         $isReady = false;
-        // Run for 30 seconds max and check every 5 seconds for 3 times
+        // Run for 65 seconds max and check every 5 seconds for 12 times
         while ($currentTime + $runtime > now()->timestamp) {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
