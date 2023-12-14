@@ -1544,6 +1544,9 @@ function generateEnvValue(string $command)
         case 'USER':
             $generatedValue = Str::random(16);
             break;
+        default:
+            $generatedValue = Str::random(16);
+            break;
     }
     return $generatedValue;
 }
