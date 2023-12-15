@@ -204,7 +204,12 @@ Route::post('/source/gitlab/events/manual', function () {
                         $container_name = generateApplicationContainerName($application, $pull_request_id);
                         // ray('Stopping container: ' . $container_name);
                         instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
-                        return response('Preview Deployment closed.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview Deployment closed',
+                        ]);
+                        return response($return_payloads);
                     }
                     $return_payloads->push([
                         'application' => $application->name,
