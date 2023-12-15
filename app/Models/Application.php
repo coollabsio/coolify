@@ -966,72 +966,79 @@ class Application extends BaseModel
     function loadComposeFile($isInit = false)
     {
         $initialDockerComposeLocation = $this->docker_compose_location;
-        $initialDockerComposeRaw = $this->docker_compose_raw;
-        // $initialDockerComposePrLocation = $this->docker_compose_pr_location;
-        if ($this->build_pack === 'dockercompose') {
-            if ($isInit && $this->docker_compose_raw) {
-                return;
-            }
-            $uuid = new Cuid2();
-            ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
-            $workdir = rtrim($this->base_directory, '/');
-            $composeFile = $this->docker_compose_location;
-            // $prComposeFile = $this->docker_compose_pr_location;
-            $fileList = collect([".$workdir$composeFile"]);
-            // if ($composeFile !== $prComposeFile) {
-            //     $fileList->push(".$prComposeFile");
-            // }
-            $commands = collect([
-                "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
-                $cloneCommand,
-                "git sparse-checkout init --cone",
-                "git sparse-checkout set {$fileList->implode(' ')}",
-                "git read-tree -mu HEAD",
-                "cat .$workdir$composeFile",
-            ]);
-            $composeFileContent = instant_remote_process($commands, $this->destination->server, false);
-            if (!$composeFileContent) {
-                $this->docker_compose_location = $initialDockerComposeLocation;
-                $this->save();
-                throw new \Exception("Could not load base compose file from $workdir$composeFile");
-            } else {
-                $this->docker_compose_raw = $composeFileContent;
-                $this->save();
-            }
-            // if ($composeFile === $prComposeFile) {
-            //     $this->docker_compose_pr_raw = $composeFileContent;
-            //     $this->save();
-            // } else {
-            //     $commands = collect([
-            //         "cd /tmp/{$uuid}",
-            //         "cat .$workdir$prComposeFile",
-            //     ]);
-            //     $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
-            //     if (!$composePrFileContent) {
-            //         $this->docker_compose_pr_location = $initialDockerComposePrLocation;
-            //         $this->save();
-            //         throw new \Exception("Could not load compose file from $workdir$prComposeFile");
-            //     } else {
-            //         $this->docker_compose_pr_raw = $composePrFileContent;
-            //         $this->save();
-            //     }
-            // }
-
-            $commands = collect([
-                "rm -rf /tmp/{$uuid}",
-            ]);
-            instant_remote_process($commands, $this->destination->server, false);
-            $parsedServices = $this->parseCompose();
-            if (md5($this->docker_compose_raw) !== md5($initialDockerComposeRaw)) {
-                $this->docker_compose_domains = null;
-                $this->save();
-            }
-            return [
-                'parsedServices' => $parsedServices,
-                'initialDockerComposeLocation' => $this->docker_compose_location,
-                'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
-            ];
+        if ($isInit && $this->docker_compose_raw) {
+            return;
         }
+        $uuid = new Cuid2();
+        ['commands' => $cloneCommand] = $this->generateGitImportCommands(deployment_uuid: $uuid, only_checkout: true, exec_in_docker: false, custom_base_dir: '.');
+        $workdir = rtrim($this->base_directory, '/');
+        $composeFile = $this->docker_compose_location;
+        // $prComposeFile = $this->docker_compose_pr_location;
+        $fileList = collect([".$workdir$composeFile"]);
+        // if ($composeFile !== $prComposeFile) {
+        //     $fileList->push(".$prComposeFile");
+        // }
+        $commands = collect([
+            "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
+            $cloneCommand,
+            "git sparse-checkout init --cone",
+            "git sparse-checkout set {$fileList->implode(' ')}",
+            "git read-tree -mu HEAD",
+            "cat .$workdir$composeFile",
+        ]);
+        $composeFileContent = instant_remote_process($commands, $this->destination->server, false);
+        if (!$composeFileContent) {
+            $this->docker_compose_location = $initialDockerComposeLocation;
+            $this->save();
+            throw new \Exception("Could not load base compose file from $workdir$composeFile");
+        } else {
+            $this->docker_compose_raw = $composeFileContent;
+            $this->save();
+        }
+        // if ($composeFile === $prComposeFile) {
+        //     $this->docker_compose_pr_raw = $composeFileContent;
+        //     $this->save();
+        // } else {
+        //     $commands = collect([
+        //         "cd /tmp/{$uuid}",
+        //         "cat .$workdir$prComposeFile",
+        //     ]);
+        //     $composePrFileContent = instant_remote_process($commands, $this->destination->server, false);
+        //     if (!$composePrFileContent) {
+        //         $this->docker_compose_pr_location = $initialDockerComposePrLocation;
+        //         $this->save();
+        //         throw new \Exception("Could not load compose file from $workdir$prComposeFile");
+        //     } else {
+        //         $this->docker_compose_pr_raw = $composePrFileContent;
+        //         $this->save();
+        //     }
+        // }
+
+        $commands = collect([
+            "rm -rf /tmp/{$uuid}",
+        ]);
+        instant_remote_process($commands, $this->destination->server, false);
+        $parsedServices = $this->parseCompose();
+        if ($this->docker_compose_domains) {
+            $json = collect(json_decode($this->docker_compose_domains));
+            $names = collect(data_get($parsedServices, 'services'))->keys()->toArray();
+            $jsonNames = $json->keys()->toArray();
+            $diff = array_diff($jsonNames, $names);
+            $json = $json->filter(function ($value, $key) use ($diff) {
+                return !in_array($key, $diff);
+            });
+            if ($json) {
+                $this->docker_compose_domains = json_encode($json);
+            } else {
+                $this->docker_compose_domains = null;
+            }
+            $this->save();
+        }
+        return [
+            'parsedServices' => $parsedServices,
+            'initialDockerComposeLocation' => $this->docker_compose_location,
+            'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
+        ];
     }
     function parseContainerLabels(?ApplicationPreview $preview = null)
     {

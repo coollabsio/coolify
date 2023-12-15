@@ -146,7 +146,6 @@ class General extends Component
             $this->parsedServiceDomains[$serviceName]['domain'] = $domain;
             $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
             $this->application->save();
-            $this->dispatch('success', 'Domain generated.');
         }
         return $domain;
     }
