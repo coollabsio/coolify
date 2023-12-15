@@ -65,6 +65,7 @@ Route::get('/source/github/install', function () {
 });
 Route::post('/source/gitlab/events/manual', function () {
     try {
+        $return_payloads = collect([]);
         $payload = request()->collect();
         $headers = request()->headers->all();
         $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
@@ -76,7 +77,11 @@ Route::post('/source/gitlab/events/manual', function () {
                 $branch = Str::after($branch, 'refs/heads/');
             }
             if (!$branch) {
-                return response('Nothing to do. No branch found in the request.');
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. No branch found in the request.',
+                ]);
+                return response($return_payloads);
             }
             ray('Manual Webhook GitLab Push Event with branch: ' . $branch);
         }
@@ -88,7 +93,11 @@ Route::post('/source/gitlab/events/manual', function () {
             $pull_request_id = data_get($payload, 'object_attributes.iid');
             $pull_request_html_url = data_get($payload, 'object_attributes.url');
             if (!$branch) {
-                return response('Nothing to do. No branch found in the request.');
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. No branch found in the request.',
+                ]);
+                return response($return_payloads);
             }
             ray('Webhook GitHub Pull Request Event with branch: ' . $branch . ' and base branch: ' . $base_branch . ' and pull request id: ' . $pull_request_id);
         }
@@ -96,23 +105,41 @@ Route::post('/source/gitlab/events/manual', function () {
         if ($x_gitlab_event === 'push') {
             $applications = $applications->where('git_branch', $branch)->get();
             if ($applications->isEmpty()) {
-                return response("Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.");
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
+                ]);
+                return response($return_payloads);
             }
         }
         if ($x_gitlab_event === 'merge_request') {
             $applications = $applications->where('git_branch', $base_branch)->get();
             if ($applications->isEmpty()) {
-                return response("Nothing to do. No applications found with branch '$base_branch'.");
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => "Nothing to do. No applications found with branch '$base_branch'.",
+                ]);
+                return response($return_payloads);
             }
         }
         foreach ($applications as $application) {
             $webhook_secret = data_get($application, 'manual_webhook_secret_gitlab');
             if ($webhook_secret !== $x_gitlab_token) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Invalid token.',
+                ]);
                 ray('Invalid signature');
                 continue;
             }
             $isFunctional = $application->destination->server->isFunctional();
             if (!$isFunctional) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Server is not functional',
+                ]);
                 ray('Server is not functional: ' . $application->destination->server->name);
                 continue;
             }
@@ -127,6 +154,11 @@ Route::post('/source/gitlab/events/manual', function () {
                         is_webhook: true
                     );
                 } else {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Deployments disabled',
+                    ]);
                     ray('Deployments disabled for ' . $application->name);
                 }
             }
@@ -152,10 +184,18 @@ Route::post('/source/gitlab/events/manual', function () {
                             git_type: 'gitlab'
                         );
                         ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
-                        return response('Preview Deployment queued.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview Deployment queued',
+                        ]);
                     } else {
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'failed',
+                            'message' => 'Preview deployments disabled',
+                        ]);
                         ray('Preview deployments disabled for ' . $application->name);
-                        return response('Nothing to do. Preview Deployments disabled.');
                     }
                 } else if ($action === 'closed') {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -166,12 +206,21 @@ Route::post('/source/gitlab/events/manual', function () {
                         instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
                         return response('Preview Deployment closed.');
                     }
-                    return response('Nothing to do. No Preview Deployment found');
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'No Preview Deployment found',
+                    ]);
                 } else {
-                    return response('No action found. Contact us for debugging.', 500);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'No action found. Contact us for debugging.',
+                    ]);
                 }
             }
         }
+        return response($return_payloads);
     } catch (Exception $e) {
         ray($e->getMessage());
         return handleError($e);
