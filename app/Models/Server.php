@@ -153,14 +153,15 @@ class Server extends BaseModel
     public function isServerReady()
     {
         $serverUptimeCheckNumber = $this->unreachable_count;
-        $serverUptimeCheckNumberMax = 12;
+        $serverUptimeCheckNumberMax = 8;
 
         $currentTime = now()->timestamp;
-        $runtime = 65;
+        $runtime = 50;
 
         $isReady = false;
-        // Run for 65 seconds max and check every 5 seconds for 12 times
+        // Run for 50 seconds max and check every 5 seconds for 8 times
         while ($currentTime + $runtime > now()->timestamp) {
+            ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
@@ -200,7 +201,7 @@ class Server extends BaseModel
                     'unreachable_count' => $serverUptimeCheckNumber,
                 ]);
                 Sleep::for(5)->seconds();
-                return;
+                continue;
             }
             $isReady = true;
             break;
