@@ -230,14 +230,7 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
-            <a wire:navigate href="{{ route('destination.new', ['server_id' => $server_id]) }}"
-                class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
-                <div class="flex flex-col mx-6 ">
-                    <div class="font-bold text-white">
-                        + Add New
-                    </div>
-                </div>
-            </a>
+
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
 
                 @foreach ($standaloneDockers as $standaloneDocker)
@@ -260,6 +253,14 @@
                         </div>
                     </div>
                 @endforeach
+                <a wire:navigate href="{{ route('destination.new', ['server_id' => $server_id]) }}"
+                    class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
+                    <div class="flex flex-col mx-6 ">
+                        <div class="font-bold text-white">
+                            + Add New
+                        </div>
+                    </div>
+                </a>
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')
