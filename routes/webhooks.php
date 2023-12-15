@@ -67,7 +67,6 @@ Route::post('/source/gitlab/events/manual', function () {
     try {
         $payload = request()->collect();
         $headers = request()->headers->all();
-        ray($payload, $headers);
         $x_gitlab_token = data_get($headers, 'x-gitlab-token.0');
         $x_gitlab_event = data_get($payload, 'object_kind');
         if ($x_gitlab_event === 'push') {
@@ -83,7 +82,6 @@ Route::post('/source/gitlab/events/manual', function () {
         }
         if ($x_gitlab_event === 'merge_request') {
             $action = data_get($payload, 'object_attributes.action');
-            ray($action);
             $branch = data_get($payload, 'object_attributes.source_branch');
             $base_branch = data_get($payload, 'object_attributes.target_branch');
             $full_name = data_get($payload, 'project.path_with_namespace');
@@ -159,8 +157,7 @@ Route::post('/source/gitlab/events/manual', function () {
                         ray('Preview deployments disabled for ' . $application->name);
                         return response('Nothing to do. Preview Deployments disabled.');
                     }
-                }
-                if ($action === 'closed') {
+                } else if ($action === 'closed') {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
@@ -170,6 +167,8 @@ Route::post('/source/gitlab/events/manual', function () {
                         return response('Preview Deployment closed.');
                     }
                     return response('Nothing to do. No Preview Deployment found');
+                } else {
+                    return response('No action found. Contact us for debugging.', 500);
                 }
             }
         }
