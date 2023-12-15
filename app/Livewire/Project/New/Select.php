@@ -6,13 +6,12 @@ use App\Models\Project;
 use App\Models\Server;
 use Countable;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
 use Livewire\Component;
 
 class Select extends Component
 {
     public $current_step = 'type';
-    public ?int $server = null;
+    public ?Server $server = null;
     public string $type;
     public string $server_id;
     public string $destination_uuid;
@@ -31,7 +30,7 @@ class Select extends Component
 
     public ?string $search = null;
     protected $queryString = [
-        'server',
+        'server_id',
         'search'
     ];
 
@@ -111,7 +110,7 @@ class Select extends Component
             $this->setServer($server);
         }
         if (!is_null($this->server)) {
-            $foundServer = $this->servers->where('id', $this->server)->first();
+            $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
                 return $this->setServer($foundServer);
             }
@@ -122,6 +121,7 @@ class Select extends Component
     public function setServer(Server $server)
     {
         $this->server_id = $server->id;
+        $this->server = $server;
         $this->standaloneDockers = $server->standaloneDockers;
         $this->swarmDockers = $server->swarmDockers;
         $this->current_step = 'destinations';

@@ -232,27 +232,29 @@
             </ul>
 
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
-
-                @foreach ($standaloneDockers as $standaloneDocker)
-                    <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
-                        <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:text-white">
-                                Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
-                            </div>
-                            <div class="text-xs group-hover:text-white">
-                                network: {{ $standaloneDocker->network }}</div>
-                        </div>
-                    </div>
-                @endforeach
-                @foreach ($swarmDockers as $swarmDocker)
-                    <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
-                        <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:text-white">
-                                Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                @if ($server->isSwarm())
+                    @foreach ($swarmDockers as $swarmDocker)
+                        <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
+                            <div class="flex flex-col mx-6">
+                                <div class="font-bold group-hover:text-white">
+                                    Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endforeach
+                    @endforeach
+                @else
+                    @foreach ($standaloneDockers as $standaloneDocker)
+                        <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
+                            <div class="flex flex-col mx-6">
+                                <div class="font-bold group-hover:text-white">
+                                    Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
+                                </div>
+                                <div class="text-xs group-hover:text-white">
+                                    network: {{ $standaloneDocker->network }}</div>
+                            </div>
+                        </div>
+                    @endforeach
+                @endif
                 <a wire:navigate href="{{ route('destination.new', ['server_id' => $server_id]) }}"
                     class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
                     <div class="flex flex-col mx-6 ">

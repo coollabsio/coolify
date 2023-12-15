@@ -4,29 +4,32 @@ namespace App\Livewire\Destination\New;
 
 use App\Models\Server;
 use App\Models\StandaloneDocker as ModelsStandaloneDocker;
+use App\Models\SwarmDocker;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Str;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
-class StandaloneDocker extends Component
+class Docker extends Component
 {
     public string $name;
     public string $network;
 
     public Collection $servers;
     public Server $server;
-    public int|null $server_id = null;
+    public ?int $server_id = null;
+    public bool $is_swarm = false;
 
     protected $rules = [
         'name' => 'required|string',
         'network' => 'required|string',
-        'server_id' => 'required|integer'
+        'server_id' => 'required|integer',
+        'is_swarm' => 'boolean'
     ];
     protected $validationAttributes = [
         'name' => 'name',
         'network' => 'network',
-        'server_id' => 'server'
+        'server_id' => 'server',
+        'is_swarm' => 'swarm'
     ];
 
     public function mount()
@@ -43,13 +46,13 @@ class StandaloneDocker extends Component
         } else {
             $this->network = new Cuid2(7);
         }
-        $this->name = Str::kebab("{$this->servers->first()->name}-{$this->network}");
+        $this->name = str("{$this->servers->first()->name}-{$this->network}")->kebab();
     }
 
     public function generate_name()
     {
         $this->server = Server::find($this->server_id);
-        $this->name = Str::kebab("{$this->server->name}-{$this->network}");
+        $this->name = str("{$this->server->name}-{$this->network}")->kebab();
     }
 
     public function submit()
@@ -57,17 +60,30 @@ class StandaloneDocker extends Component
         $this->validate();
         try {
             $this->server = Server::find($this->server_id);
-            $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
-            if ($found) {
-                $this->createNetworkAndAttachToProxy();
-                $this->dispatch('error', 'Network already added to this server.');
-                return;
+            if ($this->is_swarm) {
+                $found = $this->server->swarmDockers()->where('network', $this->network)->first();
+                if ($found) {
+                    $this->dispatch('error', 'Network already added to this server.');
+                    return;
+                } else {
+                    $docker = SwarmDocker::create([
+                        'name' => $this->name,
+                        'network' => $this->network,
+                        'server_id' => $this->server_id,
+                    ]);
+                }
             } else {
-                $docker = ModelsStandaloneDocker::create([
-                    'name' => $this->name,
-                    'network' => $this->network,
-                    'server_id' => $this->server_id,
-                ]);
+                $found = $this->server->standaloneDockers()->where('network', $this->network)->first();
+                if ($found) {
+                    $this->dispatch('error', 'Network already added to this server.');
+                    return;
+                } else {
+                    $docker = ModelsStandaloneDocker::create([
+                        'name' => $this->name,
+                        'network' => $this->network,
+                        'server_id' => $this->server_id,
+                    ]);
+                }
             }
             $this->createNetworkAndAttachToProxy();
             return $this->redirectRoute('destination.show', $docker->uuid, navigate: true);

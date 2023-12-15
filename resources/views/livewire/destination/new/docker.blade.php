@@ -12,6 +12,7 @@
                 <option value="{{ $server->id }}">{{ $server->name }}</option>
             @endforeach
         </x-forms.select>
+        <x-forms.checkbox type="checkbox" id="is_swarm" label="Is it a Swarm network?" />
         <x-forms.button type="submit">
             Save Destination
         </x-forms.button>
