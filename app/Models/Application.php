@@ -966,6 +966,7 @@ class Application extends BaseModel
     function loadComposeFile($isInit = false)
     {
         $initialDockerComposeLocation = $this->docker_compose_location;
+        $initialDockerComposeRaw = $this->docker_compose_raw;
         // $initialDockerComposePrLocation = $this->docker_compose_pr_location;
         if ($this->build_pack === 'dockercompose') {
             if ($isInit && $this->docker_compose_raw) {
@@ -1020,8 +1021,13 @@ class Application extends BaseModel
                 "rm -rf /tmp/{$uuid}",
             ]);
             instant_remote_process($commands, $this->destination->server, false);
+            $parsedServices = $this->parseCompose();
+            if (md5($this->docker_compose_raw) !== md5($initialDockerComposeRaw)) {
+                $this->docker_compose_domains = null;
+                $this->save();
+            }
             return [
-                'parsedServices' => $this->parseCompose(),
+                'parsedServices' => $parsedServices,
                 'initialDockerComposeLocation' => $this->docker_compose_location,
                 'initialDockerComposePrLocation' => $this->docker_compose_pr_location,
             ];
