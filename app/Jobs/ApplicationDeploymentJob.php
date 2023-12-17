@@ -75,6 +75,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private $docker_compose_base64;
     private string $dockerfile_location = '/Dockerfile';
     private string $docker_compose_location = '/docker-compose.yml';
+    private ?string $docker_compose_custom_start_command = null;
+    private ?string $docker_compose_custom_build_command = null;
     private ?string $addHosts = null;
     private ?string $buildTarget = null;
     private Collection $saved_outputs;
@@ -432,6 +434,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if (data_get($this->application, 'docker_compose_location')) {
             $this->docker_compose_location = $this->application->docker_compose_location;
         }
+        if (data_get($this->application, 'docker_compose_custom_start_command')) {
+            $this->docker_compose_custom_start_command = $this->application->docker_compose_custom_start_command;
+        }
+        if (data_get($this->application, 'docker_compose_custom_build_command')) {
+            $this->docker_compose_custom_build_command = $this->application->docker_compose_custom_build_command;
+        }
         if ($this->pull_request_id === 0) {
             $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->application->name}.");
         } else {
@@ -454,7 +462,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         ]);
         $this->save_environment_variables();
         // Build new container to limit downtime.
-        $this->build_by_compose_file();
+        $this->application_deployment_queue->addLogEntry("Pulling & building required images.");
+
+        if ($this->docker_compose_custom_build_command) {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_build_command}"), "hidden" => true],
+            );
+        } else {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+            );
+        }
+
         $this->stop_running_container(force: true);
 
         $networkId = $this->application->uuid;
@@ -488,7 +507,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             );
         }
-        $this->start_by_compose_file();
+        // Start compose file
+        if ($this->docker_compose_custom_start_command) {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
+            );
+        } else {
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
+            );
+        }
+        $this->application_deployment_queue->addLogEntry("New container started.");
     }
     private function deploy_dockerfile_buildpack()
     {
@@ -1258,15 +1287,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} build"), "hidden" => true],
             );
         } else {
-            if ($this->docker_compose_location) {
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
-                );
-            } else {
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} build"), "hidden" => true],
-                );
-            }
+            $this->execute_remote_command(
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+            );
         }
         $this->application_deployment_queue->addLogEntry("New images built.");
     }

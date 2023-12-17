@@ -64,6 +64,8 @@ class General extends Component
         'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
+        'application.docker_compose_custom_start_command' => 'nullable',
+        'application.docker_compose_custom_build_command' => 'nullable',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -94,6 +96,8 @@ class General extends Component
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
         'application.settings.is_static' => 'Is static',
+        'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
+        'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
     ];
     public function mount()
     {
@@ -195,7 +199,8 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            if ($this->application->build_pack === 'dockercompose' && ($this->initialDockerComposeLocation !== $this->application->docker_compose_location || $this->initialDockerComposePrLocation !== $this->application->docker_compose_pr_location)) {
+            ray($this->initialDockerComposeLocation, $this->application->docker_compose_location);
+            if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
                 $this->loadComposeFile();
             }
             $this->validate();
