@@ -596,7 +596,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function rolling_update()
     {
         if ($this->server->isSwarm()) {
-            $this->push_to_docker_registry();
+            if ($this->build_pack !== 'dockerimage') {
+                $this->push_to_docker_registry();
+            }
             $this->application_deployment_queue->addLogEntry("Rolling update started.");
             $this->execute_remote_command(
                 [
