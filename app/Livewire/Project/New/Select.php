@@ -15,12 +15,15 @@ class Select extends Component
     public string $type;
     public string $server_id;
     public string $destination_uuid;
+    public Countable|array|Server $allServers = [];
     public Countable|array|Server $servers = [];
     public Collection|array $standaloneDockers = [];
     public Collection|array $swarmDockers = [];
     public array $parameters;
     public Collection|array $services = [];
     public Collection|array $allServices = [];
+    public bool $isDatabase = false;
+    public bool $includeSwarm = true;
 
     public bool $loadingServices = true;
     public bool $loading = false;
@@ -96,19 +99,43 @@ class Select extends Component
             $this->loadingServices = false;
         }
     }
+    public function instantSave()
+    {
+        if ($this->includeSwarm) {
+            $this->servers = $this->allServers;
+        } else {
+            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+        }
+    }
     public function setType(string $type)
     {
-        $this->type = $type;
         if ($this->loading) return;
         $this->loading = true;
+        $this->type = $type;
+        switch ($type) {
+            case 'postgresql':
+            case 'mysql':
+            case 'mariadb':
+            case 'redis':
+            case 'mongodb':
+                $this->isDatabase = true;
+                $this->includeSwarm = false;
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+                break;
+        }
+        if (str($type)->startsWith('one-click-service')) {
+            $this->isDatabase = true;
+            $this->includeSwarm = false;
+            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+        }
         if ($type === "existing-postgresql") {
             $this->current_step = $type;
             return;
         }
-        if (count($this->servers) === 1) {
-            $server = $this->servers->first();
-            $this->setServer($server);
-        }
+        // if (count($this->servers) === 1) {
+        //     $server = $this->servers->first();
+        //     $this->setServer($server);
+        // }
         if (!is_null($this->server)) {
             $foundServer = $this->servers->where('id', $this->server->id)->first();
             if ($foundServer) {
@@ -142,5 +169,6 @@ class Select extends Component
     public function loadServers()
     {
         $this->servers = Server::isUsable()->get();
+        $this->allServers = $this->servers;
     }
 }

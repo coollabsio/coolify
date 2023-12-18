@@ -22,6 +22,8 @@ class ByIp extends Component
     public string $user = 'root';
     public int $port = 22;
     public bool $is_swarm_manager = false;
+    public bool $is_swarm_worker = false;
+
 
     protected $rules = [
         'name' => 'required|string',
@@ -30,6 +32,7 @@ class ByIp extends Component
         'user' => 'required|string',
         'port' => 'required|integer',
         'is_swarm_manager' => 'required|boolean',
+        'is_swarm_worker' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
@@ -38,6 +41,7 @@ class ByIp extends Component
         'user' => 'User',
         'port' => 'Port',
         'is_swarm_manager' => 'Swarm Manager',
+        'is_swarm_worker' => 'Swarm Worker',
     ];
 
     public function mount()
@@ -77,6 +81,7 @@ class ByIp extends Component
                 ],
             ]);
             $server->settings->is_swarm_manager = $this->is_swarm_manager;
+            $server->settings->is_swarm_worker = $this->is_swarm_worker;
             $server->settings->save();
             $server->addInitialNetwork();
             return $this->redirectRoute('server.show', $server->uuid, navigate: true);

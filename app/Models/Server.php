@@ -72,7 +72,7 @@ class Server extends BaseModel
 
     static public function isUsable()
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true);
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false);
     }
 
     static public function destinationsByServer(string $server_id)
@@ -379,6 +379,14 @@ class Server extends BaseModel
     public function isSwarm()
     {
         return data_get($this, 'settings.is_swarm_manager') || data_get($this, 'settings.is_swarm_worker');
+    }
+    public function isSwarmManager()
+    {
+        return data_get($this, 'settings.is_swarm_manager');
+    }
+    public function isSwarmWorker()
+    {
+        return data_get($this, 'settings.is_swarm_worker');
     }
     public function validateConnection()
     {

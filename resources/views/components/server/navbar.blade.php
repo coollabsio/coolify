@@ -2,7 +2,7 @@
     <livewire:server.proxy.modal :server="$server" />
     <div class="flex items-center gap-2">
         <h1>Server</h1>
-        @if ($server->proxyType() !== 'NONE')
+        @if ($server->proxyType() !== 'NONE' && $server->isFunctional() && !$server->isSwarmWorker())
             <livewire:server.proxy.status :server="$server" />
         @endif
     </div>
@@ -20,25 +20,30 @@
             ]) }}">
             <button>Private Key</button>
         </a>
-        <a wire:navigate class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
-            href="{{ route('server.proxy', [
-                'server_uuid' => data_get($parameters, 'server_uuid'),
-            ]) }}">
-            <button>Proxy</button>
-        </a>
-        <a wire:navigate class="{{ request()->routeIs('server.destinations') ? 'text-white' : '' }}"
-            href="{{ route('server.destinations', [
-                'server_uuid' => data_get($parameters, 'server_uuid'),
-            ]) }}">
-            <button>Destinations</button>
-        </a>
-        <a wire:navigate class="{{ request()->routeIs('server.log-drains') ? 'text-white' : '' }}"
-            href="{{ route('server.log-drains', [
-                'server_uuid' => data_get($parameters, 'server_uuid'),
-            ]) }}">
-            <button>Log Drains</button>
-        </a>
+        @if (!$server->isSwarmWorker())
+            <a wire:navigate class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
+                href="{{ route('server.proxy', [
+                    'server_uuid' => data_get($parameters, 'server_uuid'),
+                ]) }}">
+                <button>Proxy</button>
+            </a>
+            <a wire:navigate class="{{ request()->routeIs('server.destinations') ? 'text-white' : '' }}"
+                href="{{ route('server.destinations', [
+                    'server_uuid' => data_get($parameters, 'server_uuid'),
+                ]) }}">
+                <button>Destinations</button>
+            </a>
+            <a wire:navigate class="{{ request()->routeIs('server.log-drains') ? 'text-white' : '' }}"
+                href="{{ route('server.log-drains', [
+                    'server_uuid' => data_get($parameters, 'server_uuid'),
+                ]) }}">
+                <button>Log Drains</button>
+            </a>
+        @endif
+
         <div class="flex-1"></div>
-        <livewire:server.proxy.deploy :server="$server" />
+        @if ($server->proxyType() !== 'NONE' && $server->isFunctional() && !$server->isSwarmWorker())
+            <livewire:server.proxy.deploy :server="$server" />
+        @endif
     </nav>
 </div>

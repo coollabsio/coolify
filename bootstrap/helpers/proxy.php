@@ -80,14 +80,18 @@ function generate_default_proxy_configuration(Server $server)
         $networks = collect($server->swarmDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify-overlay']);
+        }
     } else {
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
     }
-    if ($networks->count() === 0) {
-        $networks = collect(['coolify']);
-    }
+
     $array_of_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks) {
         $array_of_networks[$network] = [

@@ -113,7 +113,7 @@ class General extends Component
             $this->application->isConfigurationChanged(true);
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
-        $this->customLabels =  $this->application->parseContainerLabels();
+        $this->customLabels = $this->application->parseContainerLabels();
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }

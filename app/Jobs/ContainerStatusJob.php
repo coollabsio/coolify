@@ -46,7 +46,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             };
             if ($this->server->isSwarm()) {
                 $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
-                $containerReplicase = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
+                $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
             } else {
                 // Precheck for containers
                 $containers = instant_remote_process(["docker container ls -q"], $this->server, false);
@@ -54,15 +54,15 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     return;
                 }
                 $containers = instant_remote_process(["docker container inspect $(docker container ls -q) --format '{{json .}}'"], $this->server, false);
-                $containerReplicase = null;
+                $containerReplicates = null;
             }
             if (is_null($containers)) {
                 return;
             }
             $containers = format_docker_command_output_to_json($containers);
-            if ($containerReplicase) {
-                $containerReplicase = format_docker_command_output_to_json($containerReplicase);
-                foreach ($containerReplicase as $containerReplica) {
+            if ($containerReplicates) {
+                $containerReplicates = format_docker_command_output_to_json($containerReplicates);
+                foreach ($containerReplicates as $containerReplica) {
                     $name = data_get($containerReplica, 'Name');
                     $containers = $containers->map(function ($container) use ($name, $containerReplica) {
                         if (data_get($container, 'Spec.Name') === $name) {

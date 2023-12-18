@@ -72,10 +72,14 @@ class Previews extends Component
     public function stop(int $pull_request_id)
     {
         try {
-            $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id, $pull_request_id);
-            foreach ($containers as $container) {
-                $name = str_replace('/', '', $container['Names']);
-                instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
+            if ($this->application->destination->server->isSwarm()) {
+                instant_remote_process(["docker stack rm {$this->application->uuid}-{$pull_request_id}"], $this->application->destination->server);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($this->application->destination->server, $this->application->id, $pull_request_id);
+                foreach ($containers as $container) {
+                    $name = str_replace('/', '', $container['Names']);
+                    instant_remote_process(["docker rm -f $name"], $this->application->destination->server, throwError: false);
+                }
             }
             ApplicationPreview::where('application_id', $this->application->id)->where('pull_request_id', $pull_request_id)->first()->delete();
             $this->application->refresh();

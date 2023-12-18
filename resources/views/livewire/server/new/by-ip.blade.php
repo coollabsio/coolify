@@ -26,8 +26,19 @@
                 @endforeach
             </x-forms.select>
             <div class="w-64">
-                <x-forms.checkbox type="checkbox" id="is_swarm_manager"
-                    label="Is it a Swarm Manager?" />
+                @if ($is_swarm_worker)
+                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
+                        label="Is it a Swarm Manager?" />
+                @else
+                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_manager"
+                        label="Is it a Swarm Manager?" />
+                @endif
+                @if ($is_swarm_manager)
+                    <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
+                        label="Is it a Swarm Worker?" />
+                @else
+                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_worker" label="Is it a Swarm Worker?" />
+                @endif
             </div>
             <x-forms.button type="submit">
                 Save New Server

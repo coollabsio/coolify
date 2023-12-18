@@ -217,19 +217,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->server->isProxyShouldRun()) {
                 dispatch(new ContainerStatusJob($this->server));
             }
-            if ($this->application->docker_registry_image_name && $this->application->build_pack !== 'dockerimage') {
+            if ($this->application->docker_registry_image_name && $this->application->build_pack !== 'dockerimage' && !$this->application->destination->server->isSwarm()) {
                 $this->push_to_docker_registry();
-                if ($this->server->isSwarm()) {
-                    $this->application_deployment_queue->addLogEntry("Creating / updating stack.");
-                    $this->execute_remote_command(
-                        [
-                            executeInDocker($this->deployment_uuid, "cd {$this->workdir} && docker stack deploy --with-registry-auth -c docker-compose.yml {$this->application->uuid}")
-                        ],
-                        [
-                            "echo 'Stack deployed. It may take a few minutes to fully available in your swarm.'"
-                        ]
-                    );
-                }
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
             $this->application->isConfigurationChanged(true);
@@ -301,6 +290,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 "echo -n 'Image pushed to docker registry.'"
             ]);
         } catch (Exception $e) {
+            if ($this->application->destination->server->isSwarm()) {
+                throw $e;
+            }
             $this->execute_remote_command(
                 ["echo -n 'Failed to push image to docker registry. Please check debug logs for more information.'"],
             );
@@ -604,7 +596,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function rolling_update()
     {
         if ($this->server->isSwarm()) {
-            // Skip this.
+            $this->push_to_docker_registry();
+            $this->application_deployment_queue->addLogEntry("Rolling update started.");
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}")
+                ],
+            );
+            $this->application_deployment_queue->addLogEntry("Rolling update completed.");
         } else {
             if (count($this->application->ports_mappings_array) > 0) {
                 $this->execute_remote_command(
@@ -703,10 +702,20 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
         $this->stop_running_container();
-        $this->execute_remote_command(
-            ["echo -n 'Starting preview deployment.'"],
-            [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
-        );
+        if ($this->application->destination->server->isSwarm()) {
+            ray("{$this->workdir}{$this->docker_compose_location}");
+            $this->push_to_docker_registry();
+            $this->execute_remote_command(
+                [
+                    executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}-{$this->pull_request_id}")
+                ],
+            );
+        } else {
+            $this->execute_remote_command(
+                ["echo -n 'Starting preview deployment.'"],
+                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
+            );
+        }
     }
     private function create_workdir()
     {
@@ -970,13 +979,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             data_forget($docker_compose, 'services.' . $this->container_name . '.cpu_shares');
 
             $docker_compose['services'][$this->container_name]['deploy'] = [
-                'placement' => [
-                    'constraints' => [
-                        'node.role == worker'
-                    ]
-                ],
                 'mode' => 'replicated',
-                'replicas' => 1,
+                'replicas' => data_get($this->application, 'swarm_replicas', 1),
                 'update_config' => [
                     'order' => 'start-first'
                 ],
@@ -995,6 +999,16 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ]
                 ]
             ];
+            if (data_get($this->application, 'settings.is_swarm_only_worker_nodes')) {
+                $docker_compose['services'][$this->container_name]['deploy']['placement'] = [
+                    'constraints' => [
+                        'node.role == worker'
+                    ]
+                ];
+            }
+            if ($this->pull_request_id !== 0) {
+                $docker_compose['services'][$this->container_name]['deploy']['replicas'] = 1;
+            }
         } else {
             $docker_compose['services'][$this->container_name]['labels'] = $labels;
         }

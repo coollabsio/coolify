@@ -5,6 +5,11 @@
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
+            @if ($application->destination->server->isSwarm())
+                <a :class="activeTab === 'swarm' && 'text-white'"
+                    @click.prevent="activeTab = 'swarm'; window.location.hash = 'swarm'" href="#">Swarm
+                    Configuration</a>
+            @endif
             <a :class="activeTab === 'advanced' && 'text-white'"
                 @click.prevent="activeTab = 'advanced'; window.location.hash = 'advanced'" href="#">Advanced</a>
             @if ($application->build_pack !== 'static')
@@ -13,6 +18,7 @@
                     href="#">Environment
                     Variables</a>
             @endif
+
             @if ($application->git_based())
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
@@ -55,6 +61,9 @@
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
                 <livewire:project.application.general :application="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'swarm'" class="h-full">
+                <livewire:project.application.swarm :application="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'advanced'" class="h-full">
                 <livewire:project.application.advanced :application="$application" />

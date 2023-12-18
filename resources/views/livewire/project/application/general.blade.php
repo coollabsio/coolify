@@ -70,8 +70,11 @@
             @if ($application->build_pack !== 'dockercompose')
                 <h3>Docker Registry</h3>
                 @if ($application->destination->server->isSwarm())
-                    <div>Docker Swarm requires the image to be available in a registry. More info <a class="underline"
-                            href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                    @if ($application->build_pack !== 'dockerimage')
+                        <div>Docker Swarm requires the image to be available in a registry. More info <a
+                                class="underline" href="https://coolify.io/docs/docker-registries"
+                                target="_blank">here</a>.</div>
+                    @endif
                 @else
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Push the built image to a docker registry. More info <a class="underline"
@@ -135,7 +138,8 @@
                                 label="Docker Compose Location"
                                 helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
                         </div>
-                        <div class="pt-4">The following commands are for advanced use cases. Only modify them if you know what are
+                        <div class="pt-4">The following commands are for advanced use cases. Only modify them if you
+                            know what are
                             you doing.</div>
                         <div class="flex gap-2">
                             <x-forms.input placeholder="docker compose build"
@@ -199,8 +203,10 @@
                             required
                             helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
                     @endif
-                    <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
-                        helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
+                    @if (!$application->destination->server->isSwarm())
+                        <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
+                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
+                    @endif
                 </div>
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
                 <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
