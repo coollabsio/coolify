@@ -25,19 +25,24 @@
                     @endif
                 @endforeach
             </x-forms.select>
-            <div class="w-64">
+            <div class="w-72">
                 @if ($is_swarm_worker)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
-                        label="Is it a Swarm Manager?" />
+                        helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
+                        label="Is it a Swarm Manager?<span class='font-bold text-warning'>(alpha)</span>" />
                 @else
                     <x-forms.checkbox instantSave type="checkbox" id="is_swarm_manager"
-                        label="Is it a Swarm Manager?" />
+                        helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
+                        label="Is it a Swarm Manager?<span class='font-bold text-warning'>(alpha)</span>" />
                 @endif
                 @if ($is_swarm_manager)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
-                        label="Is it a Swarm Worker?" />
+                        helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
+                        label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
                 @else
-                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_worker" label="Is it a Swarm Worker?" />
+                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_worker"
+                        helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
+                        label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
                 @endif
             </div>
             <x-forms.button type="submit">
