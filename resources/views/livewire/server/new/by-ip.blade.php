@@ -25,7 +25,7 @@
                     @endif
                 @endforeach
             </x-forms.select>
-            <div class="w-72">
+            {{-- <div class="w-72">
                 @if ($is_swarm_worker)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
@@ -44,7 +44,7 @@
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
                 @endif
-            </div>
+            </div> --}}
             <x-forms.button type="submit">
                 Save New Server
             </x-forms.button>

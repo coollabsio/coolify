@@ -54,7 +54,7 @@
                     <x-forms.checkbox instantSave
                         helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                         id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
-                    @if ($server->settings->is_swarm_worker)
+                    {{-- @if ($server->settings->is_swarm_worker)
                         <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
                             helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
                             label="Is it a Swarm Manager?<span class='font-bold text-warning'>(alpha)</span>" />
@@ -71,7 +71,7 @@
                         <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
                             helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
                             label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
-                    @endif
+                    @endif --}}
                 @endif
 
             </div>
