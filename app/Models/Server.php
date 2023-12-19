@@ -391,6 +391,9 @@ class Server extends BaseModel
     public function validateConnection()
     {
         $server = Server::find($this->id);
+        if (!$server) {
+            return false;
+        }
         if ($server->skipServer()) {
             return false;
         }
