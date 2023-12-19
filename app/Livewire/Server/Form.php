@@ -25,7 +25,7 @@ class Form extends Component
         'server.settings.is_cloudflare_tunnel' => 'required|boolean',
         'server.settings.is_reachable' => 'required',
         'server.settings.is_swarm_manager' => 'required|boolean',
-        // 'server.settings.is_swarm_worker' => 'required|boolean',
+        'server.settings.is_swarm_worker' => 'required|boolean',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -37,16 +37,13 @@ class Form extends Component
         'server.settings.is_cloudflare_tunnel' => 'Cloudflare Tunnel',
         'server.settings.is_reachable' => 'Is reachable',
         'server.settings.is_swarm_manager' => 'Swarm Manager',
-        // 'server.settings.is_swarm_worker' => 'Swarm Worker',
+        'server.settings.is_swarm_worker' => 'Swarm Worker',
     ];
 
     public function mount()
     {
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
-        if (!$this->server->isFunctional()) {
-            $this->validateServer();
-        }
     }
     public function serverRefresh($install = true)
     {

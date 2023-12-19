@@ -21,7 +21,10 @@ class CheckProxy
             $status = getContainerStatus($server, 'coolify-proxy_traefik');
             $server->proxy->set('status', $status);
             $server->save();
-            return false;
+            if ($status === 'running') {
+                return false;
+            }
+            return true;
         } else {
             $status = getContainerStatus($server, 'coolify-proxy');
             if ($status === 'running') {

@@ -73,6 +73,10 @@ class Heading extends Component
             $this->dispatch('error', 'Please load a Compose file first.');
             return;
         }
+        if ($this->application->destination->server->isSwarm() && is_null($this->application->docker_registry_image_name)) {
+            $this->dispatch('error', 'Please set a Docker image name first.');
+            return;
+        }
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,

@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Sleep;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -72,7 +71,7 @@ class Server extends BaseModel
 
     static public function isUsable()
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true);
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false);
     }
 
     static public function destinationsByServer(string $server_id)
@@ -150,30 +149,35 @@ class Server extends BaseModel
         }
         return false;
     }
-    public function isServerReady()
+    public function isServerReady(int $tries = 3)
     {
-        $serverUptimeCheckNumber = $this->unreachable_count;
-        $serverUptimeCheckNumberMax = 8;
+        $serverUptimeCheckNumber = $this->unreachable_count + 1;
+        $serverUptimeCheckNumberMax = $tries;
 
-        $currentTime = now()->timestamp;
-        $runtime = 50;
+        ray('server: ' . $this->name);
+        ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
+        ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
 
-        $isReady = false;
-        // Run for 50 seconds max and check every 5 seconds for 8 times
-        while ($currentTime + $runtime > now()->timestamp) {
-            ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
+        $result = $this->validateConnection();
+        if ($result) {
+            if ($this->unreachable_notification_sent === true) {
+                $this->update(['unreachable_notification_sent' => false]);
+            }
+            return true;
+        } else {
             if ($serverUptimeCheckNumber >= $serverUptimeCheckNumberMax) {
+                // Reached max number of retries
                 if ($this->unreachable_notification_sent === false) {
                     ray('Server unreachable, sending notification...');
                     $this->team?->notify(new Unreachable($this));
                     $this->update(['unreachable_notification_sent' => true]);
                 }
-                $this->settings()->update([
-                    'is_reachable' => false,
-                ]);
-                $this->update([
-                    'unreachable_count' => 0,
-                ]);
+                if ($this->settings->is_reachable === true) {
+                    $this->settings()->update([
+                        'is_reachable' => false,
+                    ]);
+                }
+
                 foreach ($this->applications() as $application) {
                     $application->update(['status' => 'exited']);
                 }
@@ -190,23 +194,13 @@ class Server extends BaseModel
                         $db->update(['status' => 'exited']);
                     }
                 }
-                $isReady = false;
-                break;
-            }
-            $result = $this->validateConnection();
-            // ray('validateConnection: ' . $result);
-            if (!$result) {
-                $serverUptimeCheckNumber++;
+            } else {
                 $this->update([
-                    'unreachable_count' => $serverUptimeCheckNumber,
+                    'unreachable_count' => $this->unreachable_count + 1,
                 ]);
-                Sleep::for(5)->seconds();
-                continue;
             }
-            $isReady = true;
-            break;
+            return false;
         }
-        return $isReady;
     }
     public function getDiskUsage()
     {
@@ -380,9 +374,20 @@ class Server extends BaseModel
     {
         return data_get($this, 'settings.is_swarm_manager') || data_get($this, 'settings.is_swarm_worker');
     }
+    public function isSwarmManager()
+    {
+        return data_get($this, 'settings.is_swarm_manager');
+    }
+    public function isSwarmWorker()
+    {
+        return data_get($this, 'settings.is_swarm_worker');
+    }
     public function validateConnection()
     {
         $server = Server::find($this->id);
+        if (!$server) {
+            return false;
+        }
         if ($server->skipServer()) {
             return false;
         }

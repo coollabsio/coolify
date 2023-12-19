@@ -202,6 +202,14 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
+            @if ($isDatabase)
+                <div class="flex items-center justify-center pt-4">
+                    <x-forms.checkbox instantSave wire:model="includeSwarm"
+                        helper="Swarm clusters are excluded from this list by default. For database, services or complex compose deployments with databases to work with Swarm,
+                you need to set a few things on the server. Read more <a class='text-white underline' href='https://coolify.io/docs/swarm#database-requirements' target='_blank'>here</a>."
+                        label="Include Swarm Clusters" />
+                </div>
+            @endif
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
                 @forelse($servers as $server)
                     <div class="box group" wire:click="setServer({{ $server }})">
@@ -232,27 +240,29 @@
             </ul>
 
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
-
-                @foreach ($standaloneDockers as $standaloneDocker)
-                    <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
-                        <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:text-white">
-                                Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
-                            </div>
-                            <div class="text-xs group-hover:text-white">
-                                network: {{ $standaloneDocker->network }}</div>
-                        </div>
-                    </div>
-                @endforeach
-                @foreach ($swarmDockers as $swarmDocker)
-                    <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
-                        <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:text-white">
-                                Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                @if ($server->isSwarm())
+                    @foreach ($swarmDockers as $swarmDocker)
+                        <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
+                            <div class="flex flex-col mx-6">
+                                <div class="font-bold group-hover:text-white">
+                                    Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endforeach
+                    @endforeach
+                @else
+                    @foreach ($standaloneDockers as $standaloneDocker)
+                        <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
+                            <div class="flex flex-col mx-6">
+                                <div class="font-bold group-hover:text-white">
+                                    Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
+                                </div>
+                                <div class="text-xs group-hover:text-white">
+                                    network: {{ $standaloneDocker->network }}</div>
+                            </div>
+                        </div>
+                    @endforeach
+                @endif
                 <a wire:navigate href="{{ route('destination.new', ['server_id' => $server_id]) }}"
                     class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
                     <div class="flex flex-col mx-6 ">

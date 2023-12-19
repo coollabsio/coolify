@@ -22,7 +22,10 @@ class ByIp extends Component
     public string $user = 'root';
     public int $port = 22;
     public bool $is_swarm_manager = false;
+    public bool $is_swarm_worker = false;
+    public $selected_swarm_cluster = null;
 
+    public $swarm_managers = [];
     protected $rules = [
         'name' => 'required|string',
         'description' => 'nullable|string',
@@ -30,6 +33,7 @@ class ByIp extends Component
         'user' => 'required|string',
         'port' => 'required|integer',
         'is_swarm_manager' => 'required|boolean',
+        'is_swarm_worker' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
@@ -38,12 +42,17 @@ class ByIp extends Component
         'user' => 'User',
         'port' => 'Port',
         'is_swarm_manager' => 'Swarm Manager',
+        'is_swarm_worker' => 'Swarm Worker',
     ];
 
     public function mount()
     {
         $this->name = generate_random_name();
         $this->private_key_id = $this->private_keys->first()->id;
+        $this->swarm_managers = Server::isUsable()->get()->where('settings.is_swarm_manager', true);
+        if ($this->swarm_managers->count() > 0) {
+            $this->selected_swarm_cluster = $this->swarm_managers->first()->id;
+        }
     }
 
     public function setPrivateKey(string $private_key_id)
@@ -53,7 +62,7 @@ class ByIp extends Component
 
     public function instantSave()
     {
-        $this->dispatch('success', 'Application settings updated!');
+        // $this->dispatch('success', 'Application settings updated!');
     }
 
     public function submit()
@@ -63,7 +72,7 @@ class ByIp extends Component
             if (is_null($this->private_key_id)) {
                 return $this->dispatch('error', 'You must select a private key');
             }
-            $server = Server::create([
+            $payload = [
                 'name' => $this->name,
                 'description' => $this->description,
                 'ip' => $this->ip,
@@ -75,8 +84,13 @@ class ByIp extends Component
                     "type" => ProxyTypes::TRAEFIK_V2->value,
                     "status" => ProxyStatus::EXITED->value,
                 ],
-            ]);
+            ];
+            if ($this->is_swarm_worker) {
+                $payload['swarm_cluster'] = $this->selected_swarm_cluster;
+            }
+            $server = Server::create($payload);
             $server->settings->is_swarm_manager = $this->is_swarm_manager;
+            $server->settings->is_swarm_worker = $this->is_swarm_worker;
             $server->settings->save();
             $server->addInitialNetwork();
             return $this->redirectRoute('server.show', $server->uuid, navigate: true);

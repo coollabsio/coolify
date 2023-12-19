@@ -15,10 +15,16 @@ function get_proxy_path()
 }
 function connectProxyToNetworks(Server $server)
 {
-    // Standalone networks
-    $networks = collect($server->standaloneDockers)->map(function ($docker) {
-        return $docker['network'];
-    });
+    if ($server->isSwarm()) {
+        $networks = collect($server->swarmDockers)->map(function ($docker) {
+            return $docker['network'];
+        });
+    } else {
+        // Standalone networks
+        $networks = collect($server->standaloneDockers)->map(function ($docker) {
+            return $docker['network'];
+        });
+    }
     // Service networks
     foreach ($server->services()->get() as $service) {
         $networks->push($service->networks());
@@ -41,16 +47,30 @@ function connectProxyToNetworks(Server $server)
         $networks->push($network);
     }
     $networks = collect($networks)->flatten()->unique();
-    if ($networks->count() === 0) {
-        $networks = collect(['coolify']);
+    if ($server->isSwarm()) {
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify-overlay']);
+        }
+        $commands = $networks->map(function ($network) {
+            return [
+                "echo 'Connecting coolify-proxy to $network network...'",
+                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --driver overlay --attachable $network >/dev/null",
+                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+            ];
+        });
+    } else {
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
+        $commands = $networks->map(function ($network) {
+            return [
+                "echo 'Connecting coolify-proxy to $network network...'",
+                "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
+                "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
+            ];
+        });
     }
-    $commands = $networks->map(function ($network) {
-        return [
-            "echo 'Connecting coolify-proxy to $network network...'",
-            "docker network ls --format '{{.Name}}' | grep '^$network$' >/dev/null || docker network create --attachable $network >/dev/null",
-            "docker network connect $network coolify-proxy >/dev/null 2>&1 || true",
-        ];
-    });
+
     return $commands->flatten();
 }
 function generate_default_proxy_configuration(Server $server)
@@ -60,14 +80,18 @@ function generate_default_proxy_configuration(Server $server)
         $networks = collect($server->swarmDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify-overlay']);
+        }
     } else {
         $networks = collect($server->standaloneDockers)->map(function ($docker) {
             return $docker['network'];
         })->unique();
+        if ($networks->count() === 0) {
+            $networks = collect(['coolify']);
+        }
     }
-    if ($networks->count() === 0) {
-        $networks = collect(['coolify']);
-    }
+
     $array_of_networks = collect([]);
     $networks->map(function ($network) use ($array_of_networks) {
         $array_of_networks[$network] = [

@@ -13,7 +13,11 @@ class Show extends Component
 
     public function scan()
     {
-        $alreadyAddedNetworks = $this->server->standaloneDockers;
+        if ($this->server->isSwarm()) {
+            $alreadyAddedNetworks = $this->server->swarmDockers;
+        } else {
+            $alreadyAddedNetworks = $this->server->standaloneDockers;
+        }
         $networks = instant_remote_process(['docker network ls --format "{{json .}}"'], $this->server, false);
         $this->networks = format_docker_command_output_to_json($networks)->filter(function ($network) {
             return $network['Name'] !== 'bridge' && $network['Name'] !== 'host' && $network['Name'] !== 'none';

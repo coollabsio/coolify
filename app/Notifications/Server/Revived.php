@@ -54,7 +54,7 @@ class Revived extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "Coolify:  Server '{$this->server->name}' revived. All automations & integrations are turned on again!";
+        $message = "Coolify: Server '{$this->server->name}' revived. All automations & integrations are turned on again!";
         return $message;
     }
     public function toTelegram(): array

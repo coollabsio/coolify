@@ -70,8 +70,11 @@
             @if ($application->build_pack !== 'dockercompose')
                 <h3>Docker Registry</h3>
                 @if ($application->destination->server->isSwarm())
-                    <div>Docker Swarm requires the image to be available in a registry. More info <a class="underline"
-                            href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                    @if ($application->build_pack !== 'dockerimage')
+                        <div>Docker Swarm requires the image to be available in a registry. More info <a
+                                class="underline" href="https://coolify.io/docs/docker-registries"
+                                target="_blank">here</a>.</div>
+                    @endif
                 @else
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Push the built image to a docker registry. More info <a class="underline"
@@ -126,37 +129,58 @@
                         </div>
                     @endif
                 @endif
-                <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
-                        helper="Directory to use as root. Useful for monorepos." />
-                    @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
-                        <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
-                            label="Dockerfile Location"
-                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
-                    @endif
-                    @if ($application->build_pack === 'dockercompose')
-                        <span wire:init='loadComposeFile(true)'></span>
-                        <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
-                            label="Docker Compose Location"
-                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
-                        {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
-                            label="Docker Compose Location For Pull Requests"
-                            helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
-                    @endif
-                    @if ($application->build_pack === 'dockerfile')
-                        <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target"
-                            helper="Useful if you have multi-staged dockerfile." />
-                    @endif
-                    @if ($application->could_set_build_commands())
-                        @if ($application->settings->is_static)
-                            <x-forms.input placeholder="/dist" id="application.publish_directory"
-                                label="Publish Directory" required />
-                        @else
-                            <x-forms.input placeholder="/" id="application.publish_directory"
-                                label="Publish Directory" />
+                @if ($application->build_pack === 'dockercompose')
+                    <div class="flex flex-col gap-2" wire:init='loadComposeFile(true)'>
+                        <div class="flex gap-2">
+                            <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
+                                helper="Directory to use as root. Useful for monorepos." />
+                            <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_location"
+                                label="Docker Compose Location"
+                                helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }}</span>" />
+                        </div>
+                        <div class="pt-4">The following commands are for advanced use cases. Only modify them if you
+                            know what are
+                            you doing.</div>
+                        <div class="flex gap-2">
+                            <x-forms.input placeholder="docker compose build"
+                                id="application.docker_compose_custom_build_command"
+                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} build</span>"
+                                label="Custom Build Command" />
+                            <x-forms.input placeholder="docker compose up -d"
+                                id="application.docker_compose_custom_start_command"
+                                helper="If you use this, you need to specify paths relatively and should use the same compose file in the custom command, otherwise the automatically configured labels / etc won't work.<br><br>So in your case, use: <span class='text-warning'>docker compose -f .{{ Str::start($application->base_directory . $application->docker_compose_location, '/') }} up -d</span>"
+                                label="Custom Start Command" />
+                            {{-- <x-forms.input placeholder="/docker-compose.yaml" id="application.docker_compose_pr_location"
+                    label="Docker Compose Location For Pull Requests"
+                    helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->docker_compose_pr_location, '/') }}</span>" /> --}}
+                        </div>
+                    </div>
+                @else
+                    <div class="flex flex-col gap-2 xl:flex-row">
+                        <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
+                            helper="Directory to use as root. Useful for monorepos." />
+                        @if ($application->build_pack === 'dockerfile' && !$application->dockerfile)
+                            <x-forms.input placeholder="/Dockerfile" id="application.dockerfile_location"
+                                label="Dockerfile Location"
+                                helper="It is calculated together with the Base Directory:<br><span class='text-warning'>{{ Str::start($application->base_directory . $application->dockerfile_location, '/') }}</span>" />
                         @endif
-                    @endif
-                </div>
+
+                        @if ($application->build_pack === 'dockerfile')
+                            <x-forms.input id="application.dockerfile_target_build" label="Docker Build Stage Target"
+                                helper="Useful if you have multi-staged dockerfile." />
+                        @endif
+                        @if ($application->could_set_build_commands())
+                            @if ($application->settings->is_static)
+                                <x-forms.input placeholder="/dist" id="application.publish_directory"
+                                    label="Publish Directory" required />
+                            @else
+                                <x-forms.input placeholder="/" id="application.publish_directory"
+                                    label="Publish Directory" />
+                            @endif
+                        @endif
+                    </div>
+                @endif
+
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
@@ -179,8 +203,10 @@
                             required
                             helper="A comma separated list of ports your application uses. The first port will be used as default healthcheck port if nothing defined in the Healthcheck menu. Be sure to set this correctly." />
                     @endif
-                    <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
-                        helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
+                    @if (!$application->destination->server->isSwarm())
+                        <x-forms.input placeholder="3000:3000" id="application.ports_mappings" label="Ports Mappings"
+                            helper="A comma separated list of ports you would like to map to the host system. Useful when you do not want to use domains.<br><br><span class='inline-block font-bold text-warning'>Example:</span><br>3000:3000,3002:3002<br><br>Rolling update is not supported if you have a port mapped to the host." />
+                    @endif
                 </div>
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
                 <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>

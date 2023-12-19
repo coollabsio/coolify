@@ -11,7 +11,16 @@
         <div class="flex gap-2 ">
             Available for using:
             @forelse ($server->standaloneDockers as $docker)
-                <a wire:navigate href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
+                <a wire:navigate
+                    href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
+                    <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
+                </a>
+            @empty
+                <div class="">N/A</div>
+            @endforelse
+            @forelse ($server->swarmDockers as $docker)
+                <a wire:navigate
+                    href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
                     <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
                 </a>
             @empty

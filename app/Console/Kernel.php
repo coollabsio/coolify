@@ -56,15 +56,19 @@ class Kernel extends ConsoleKernel
             $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
+            $containerServers = $servers->where('settings.is_swarm_worker', false);
         } else {
             $servers = Server::all()->where('ip', '!=', '1.2.3.4');
+            $containerServers = $servers->where('settings.is_swarm_worker', false);
         }
-        foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();
+        foreach ($containerServers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
             if ($server->isLogDrainEnabled()) {
                 $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
             }
+        }
+        foreach ($servers as $server) {
+            $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
