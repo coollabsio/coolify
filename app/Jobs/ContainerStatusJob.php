@@ -17,33 +17,37 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Sleep;
 
 class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
+    public $tries = 5;
+    public function backoff(): int
+    {
+        return isDev() ? 1 : 5;
+    }
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->id))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))];
     }
 
     public function uniqueId(): int
     {
-        return $this->server->id;
+        return $this->server->uuid;
     }
 
     public function __construct(public Server $server)
     {
-        $this->handle();
+        // $this->handle();
     }
 
     public function handle()
     {
+        if (!$this->server->isServerReady($this->tries)) {
+            throw new \RuntimeException('Server is not ready.');
+        };
         try {
-            if (!$this->server->isServerReady()) {
-                return;
-            };
             if ($this->server->isSwarm()) {
                 $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
                 $containerReplicates = instant_remote_process(["docker service ls --format '{{json .}}'"], $this->server, false);
