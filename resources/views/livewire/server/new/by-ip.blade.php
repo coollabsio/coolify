@@ -25,26 +25,40 @@
                     @endif
                 @endforeach
             </x-forms.select>
-            {{-- <div class="w-72">
+            <div class="w-72">
+                <div class="pt-6"> Swarm support is in alpha version. </div>
                 @if ($is_swarm_worker)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?<span class='font-bold text-warning'>(alpha)</span>" />
+                        label="Is it a Swarm Manager?" />
                 @else
-                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_manager"
+                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_manager"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Manager?<span class='font-bold text-warning'>(alpha)</span>" />
+                        label="Is it a Swarm Manager?" />
                 @endif
                 @if ($is_swarm_manager)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
+                        label="Is it a Swarm Worker?" />
                 @else
-                    <x-forms.checkbox instantSave type="checkbox" id="is_swarm_worker"
+                    <x-forms.checkbox type="checkbox" instantSave id="is_swarm_worker"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                        label="Is it a Swarm Worker?<span class='font-bold text-warning'>(alpha)</span>" />
+                        label="Is it a Swarm Worker?" />
                 @endif
-            </div> --}}
+                @if ($is_swarm_worker)
+                <div class="py-4">
+                    <x-forms.select label="Select a Swarm Cluster" id="selected_swarm_cluster" required>
+                        @foreach ($swarm_managers as $server)
+                            @if ($loop->first)
+                                <option selected value="{{ $server->id }}">{{ $server->name }}</option>
+                            @else
+                                <option value="{{ $server->id }}">{{ $server->name }}</option>
+                            @endif
+                        @endforeach
+                    </x-forms.select>
+                </div>
+                @endif
+            </div>
             <x-forms.button type="submit">
                 Save New Server
             </x-forms.button>

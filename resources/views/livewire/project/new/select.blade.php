@@ -205,7 +205,7 @@
             @if ($isDatabase)
                 <div class="flex items-center justify-center pt-4">
                     <x-forms.checkbox instantSave wire:model="includeSwarm"
-                        helper="Swarm clusters are excluded from this list by default. For database (or services with database) to work with Swarm,
+                        helper="Swarm clusters are excluded from this list by default. For database, services or complex compose deployments with databases to work with Swarm,
                 you need to set a few things on the server. Read more <a class='text-white underline' href='https://coolify.io/docs/swarm#database-requirements' target='_blank'>here</a>."
                         label="Include Swarm Clusters" />
                 </div>
