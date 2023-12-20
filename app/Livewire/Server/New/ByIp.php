@@ -93,7 +93,7 @@ class ByIp extends Component
             $server->settings->is_swarm_worker = $this->is_swarm_worker;
             $server->settings->save();
             $server->addInitialNetwork();
-            return $this->redirectRoute('server.show', $server->uuid, navigate: true);
+            return $this->redirectRoute('server.show', $server->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
