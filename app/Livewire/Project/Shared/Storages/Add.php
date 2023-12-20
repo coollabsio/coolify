@@ -31,14 +31,16 @@ class Add extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $applicationUuid = $this->parameters['application_uuid'];
-        $application = Application::where('uuid', $applicationUuid)->first();
-        if (!$application) {
-            abort(404);
-        }
-        if ($application->destination->server->isSwarm()) {
-            $this->isSwarm = true;
-            $this->rules['host_path'] = 'required|string';
+        if (data_get($this->parameters, 'application_uuid')) {
+            $applicationUuid = $this->parameters['application_uuid'];
+            $application = Application::where('uuid', $applicationUuid)->first();
+            if (!$application) {
+                abort(404);
+            }
+            if ($application->destination->server->isSwarm()) {
+                $this->isSwarm = true;
+                $this->rules['host_path'] = 'required|string';
+            }
         }
     }
 
