@@ -202,14 +202,14 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
-            @if ($isDatabase)
+            {{-- @if ($isDatabase)
                 <div class="flex items-center justify-center pt-4">
                     <x-forms.checkbox instantSave wire:model="includeSwarm"
                         helper="Swarm clusters are excluded from this list by default. For database, services or complex compose deployments with databases to work with Swarm,
                 you need to set a few things on the server. Read more <a class='text-white underline' href='https://coolify.io/docs/swarm#database-requirements' target='_blank'>here</a>."
                         label="Include Swarm Clusters" />
                 </div>
-            @endif
+            @endif --}}
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
                 @forelse($servers as $server)
                     <div class="box group" wire:click="setServer({{ $server }})">
