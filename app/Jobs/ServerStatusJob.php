@@ -17,17 +17,22 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public ?int $disk_usage = null;
+    public $tries = 4;
+    public function backoff(): int
+    {
+        return isDev() ? 1 : 3;
+    }
     public function __construct(public Server $server)
     {
     }
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->id))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))];
     }
 
     public function uniqueId(): int
     {
-        return $this->server->id;
+        return $this->server->uuid;
     }
 
     public function handle(): void
