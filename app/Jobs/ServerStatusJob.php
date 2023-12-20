@@ -17,22 +17,30 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public ?int $disk_usage = null;
+    public $tries = 4;
+    public function backoff(): int
+    {
+        return isDev() ? 1 : 3;
+    }
     public function __construct(public Server $server)
     {
     }
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->id))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))];
     }
 
     public function uniqueId(): int
     {
-        return $this->server->id;
+        return $this->server->uuid;
     }
 
-    public function handle(): void
+    public function handle()
     {
         ray("checking server status for {$this->server->id}");
+        if (!$this->server->isServerReady(4)) {
+            throw new \RuntimeException('Server is not reachable.');
+        };
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
@@ -40,7 +48,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
-            handleError($e);
+            return handleError($e);
         }
     }
     public function cleanup(bool $notify = false): void

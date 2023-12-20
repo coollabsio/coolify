@@ -216,7 +216,7 @@ return [
             ],
             'long-running' => [
                 'autoScalingStrategy' => 'size',
-                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 2),
+                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 6),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],
@@ -231,7 +231,7 @@ return [
             ],
             'long-running' => [
                 'autoScalingStrategy' => 'size',
-                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 2),
+                'maxProcesses' => env('HORIZON_MAX_PROCESSES', 6),
                 'balanceMaxShift' => env('HORIZON_BALANCE_MAX_SHIFT', 1),
                 'balanceCooldown' => env('HORIZON_BALANCE_COOLDOWN', 1),
             ],

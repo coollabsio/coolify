@@ -22,10 +22,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public $tries = 5;
+    public $tries = 4;
     public function backoff(): int
     {
-        return isDev() ? 1 : 5;
+        return isDev() ? 1 : 3;
     }
     public function middleware(): array
     {
