@@ -14,20 +14,23 @@ use Visus\Cuid2\Cuid2;
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
     $containers = collect([]);
-    $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
-    $containers = format_docker_command_output_to_json($containers);
-    $containers = $containers->map(function ($container) use ($pullRequestId) {
-        $labels = data_get($container, 'Labels');
-        if (!str($labels)->contains("coolify.pullRequestId=")) {
-            data_set($container, 'Labels', $labels . ",coolify.pullRequestId={$pullRequestId}");
-            return $container;
-        }
-        if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
-            return $container;
-        }
-        return null;
-    });
-    $containers = $containers->filter();
+    if (!$server->isSwarm()) {
+        $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
+        $containers = format_docker_command_output_to_json($containers);
+        $containers = $containers->map(function ($container) use ($pullRequestId) {
+            $labels = data_get($container, 'Labels');
+            if (!str($labels)->contains("coolify.pullRequestId=")) {
+                data_set($container, 'Labels', $labels . ",coolify.pullRequestId={$pullRequestId}");
+                return $container;
+            }
+            if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
+                return $container;
+            }
+            return null;
+        });
+        $containers = $containers->filter();
+        return $containers;
+    }
     return $containers;
 }
 
