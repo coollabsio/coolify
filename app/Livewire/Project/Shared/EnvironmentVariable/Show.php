@@ -65,7 +65,11 @@ class Show extends Component
 
     public function delete()
     {
-        $this->env->delete();
-        $this->dispatch('refreshEnvs');
+        try {
+            $this->env->delete();
+            $this->dispatch('refreshEnvs');
+        } catch (\Exception $e) {
+            return handleError($e);
+        }
     }
 }
