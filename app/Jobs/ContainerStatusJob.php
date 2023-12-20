@@ -29,7 +29,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     }
     public function middleware(): array
     {
-        return [(new WithoutOverlapping($this->server->uuid))->dontRelease()];
+        return [(new WithoutOverlapping($this->server->uuid))];
     }
 
     public function uniqueId(): int
