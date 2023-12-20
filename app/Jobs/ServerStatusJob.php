@@ -35,7 +35,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         return $this->server->uuid;
     }
 
-    public function handle(): void
+    public function handle()
     {
         ray("checking server status for {$this->server->id}");
         if (!$this->server->isServerReady(4)) {
@@ -48,7 +48,7 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('ServerStatusJob failed with: ' . $e->getMessage());
             ray($e->getMessage());
-            handleError($e);
+            return handleError($e);
         }
     }
     public function cleanup(bool $notify = false): void
