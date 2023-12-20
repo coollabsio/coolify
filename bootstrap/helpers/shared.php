@@ -1330,7 +1330,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if ($value?->startsWith('$')) {
                     $foundEnv = EnvironmentVariable::where([
                         'key' => $key,
-                        'service_id' => $resource->id,
+                        'application_id' => $resource->id,
+                        'is_preview' => false,
                     ])->first();
                     $value = Str::of(replaceVariables($value));
                     $key = $value;
@@ -1397,14 +1398,22 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $defaultValue = data_get($foundEnv, 'value');
                         }
                         $isBuildTime = data_get($foundEnv, 'is_build_time', false);
-                        EnvironmentVariable::updateOrCreate([
-                            'key' => $key->value(),
-                            'application_id' => $resource->id,
-                        ], [
-                            'value' => $defaultValue,
-                            'is_build_time' => $isBuildTime,
-                            'application_id' => $resource->id,
-                        ]);
+                        if ($foundEnv) {
+                            $foundEnv->update([
+                                'key' => $key,
+                                'application_id' => $resource->id,
+                                'is_build_time' => $isBuildTime,
+                                'value' => $defaultValue,
+                            ]);
+                        } else {
+                            EnvironmentVariable::create([
+                                'key' => $key,
+                                'value' => $defaultValue,
+                                'is_build_time' => $isBuildTime,
+                                'application_id' => $resource->id,
+                                'is_preview' => false,
+                            ]);
+                        }
                     }
                 }
             }
