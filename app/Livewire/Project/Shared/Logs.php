@@ -34,7 +34,15 @@ class Logs extends Component
             $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;
-            $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+            if ($this->server->isSwarm()) {
+                $containers = collect([
+                    [
+                        'Names' => $this->resource->uuid . '_' . $this->resource->uuid,
+                    ]
+                ]);
+            } else {
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+            }
             if ($containers->count() > 0) {
                 $containers->each(function ($container) {
                     $this->containers->push(str_replace('/', '', $container['Names']));
@@ -62,7 +70,7 @@ class Logs extends Component
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
-            if (str(data_get($this,'resource.status'))->startsWith('running')) {
+            if (str(data_get($this, 'resource.status'))->startsWith('running')) {
                 $this->containers->push($this->container);
             }
         } else if (data_get($this->parameters, 'service_uuid')) {

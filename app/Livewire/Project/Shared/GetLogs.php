@@ -73,9 +73,17 @@ class GetLogs extends Component
         if (!$refresh && $this->resource?->getMorphClass() === 'App\Models\Service') return;
         if ($this->container) {
             if ($this->showTimeStamps) {
-                $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");
+                if ($this->server->isSwarm()) {
+                    $sshCommand = generateSshCommand($this->server, "docker service logs -n {$this->numberOfLines} -t {$this->container}");
+                } else {
+                    $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} -t {$this->container}");
+                }
             } else {
-                $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} {$this->container}");
+                if ($this->server->isSwarm()) {
+                    $sshCommand = generateSshCommand($this->server, "docker service logs -n {$this->numberOfLines} {$this->container}");
+                } else {
+                    $sshCommand = generateSshCommand($this->server, "docker logs -n {$this->numberOfLines} {$this->container}");
+                }
             }
             if ($refresh) {
                 $this->outputs = '';
