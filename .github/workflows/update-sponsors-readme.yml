@@ -15,9 +15,6 @@ jobs:
         with:
           token: ${{ secrets.SPONSORS_PAT }}
           file: 'README.md'
-          minimum: 15
-          maximum: 9999
-          marker: 'sponsors'
 
       - name: Deploy to GitHub Pages 🚀
         uses: JamesIves/github-pages-deploy-action@v4
