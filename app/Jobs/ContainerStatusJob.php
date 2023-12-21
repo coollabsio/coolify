@@ -45,7 +45,8 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         if (!$this->server->isServerReady($this->tries)) {
-            throw new \RuntimeException('Server is not reachable.');
+            $this->fail('Server is not reachable.');
+            return;
         };
         try {
             if ($this->server->isSwarm()) {
