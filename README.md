@@ -22,9 +22,17 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="appwrite logo" width="200"/></a>
 <a href="https://appwrite.io" target="_blank"><img src="./other/logos/appwrite.svg" alt="appwrite logo" width="200"/></a>
 
-## Github Sponsors
-
-<!-- sponsors --><a href="https://github.com/Remi-Toussaint"><img src="https://github.com/Remi-Toussaint.png" width="60px" alt="Remi_Toussaint" /></a><a href="https://github.com/AustinGil"><img src="https://github.com/AustinGil.png" width="60px" alt="Austin Gil" /></a><!-- sponsors -->
+## Github Sponsors ($15+)
+<a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>
+<a href="https://github.com/Niki2k1"><img src="https://github.com/Niki2k1.png" width="60px" alt="Niklas Lausch" /></a>
+<a href="https://github.com/pixelinfinito"><img src="https://github.com/pixelinfinito.png" width="60px" alt="Pixel Infinito" /></a>
+<a href="https://github.com/whitesidest"><img src="https://avatars.githubusercontent.com/u/12365916?s=52&v=4" width="60px" alt="Tyler Whitesides" /></a>
+<a href="https://github.com/aniftyco"><img src="https://github.com/aniftyco.png" width="60px" alt="NiftyCo" /></a>
+<a href="https://github.com/iujlaki"><img src="https://github.com/iujlaki.png" width="60px" alt="Imre Ujlaki" /></a>
+<a href="https://github.com/Illyism"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
+<a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
+<a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
+<a href="https://github.com/cccareers"><img src="https://github.com/cccareers.png" width="60px" alt="Creating Coding Careers" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>
