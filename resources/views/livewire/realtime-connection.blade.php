@@ -18,7 +18,7 @@
                                 clearInterval(checkPusherInterval);
                             }
                         } else {
-                            console.log('Coolify is now connected to the new realtime service introduced in beta.154.');
+                            console.log('Coolify Realtime Service is connected!');
                             clearInterval(checkPusherInterval);
                         }
                     } else {
