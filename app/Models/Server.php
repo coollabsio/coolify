@@ -154,17 +154,21 @@ class Server extends BaseModel
         if ($this->skipServer()) {
             return false;
         }
+        $serverUptimeCheckNumber = $this->unreachable_count;
         if ($this->unreachable_count < $tries) {
             $serverUptimeCheckNumber = $this->unreachable_count + 1;
         }
+        if ($this->unreachable_count > $tries) {
+            $serverUptimeCheckNumber = $tries;
+        }
+
         $serverUptimeCheckNumberMax = $tries;
 
-        ray('server: ' . $this->name);
-        ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
-        ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
+        // ray('server: ' . $this->name);
+        // ray('serverUptimeCheckNumber: ' . $serverUptimeCheckNumber);
+        // ray('serverUptimeCheckNumberMax: ' . $serverUptimeCheckNumberMax);
 
         $result = $this->validateConnection();
-        ray($result);
         if ($result) {
             if ($this->unreachable_notification_sent === true) {
                 $this->update(['unreachable_notification_sent' => false]);
