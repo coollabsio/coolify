@@ -123,7 +123,7 @@ class Select extends Component
                 $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
                 break;
         }
-        if (str($type)->startsWith('one-click-service') || str($type)->startsWith('docker-compose-empty') || str($type)->startsWith('docker-image')) {
+        if (str($type)->startsWith('one-click-service') || str($type)->startsWith('docker-compose-empty')) {
             $this->isDatabase = true;
             $this->includeSwarm = false;
             $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
