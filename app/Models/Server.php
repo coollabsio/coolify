@@ -156,6 +156,8 @@ class Server extends BaseModel
         }
         if ($this->unreachable_count < $tries) {
             $serverUptimeCheckNumber = $this->unreachable_count + 1;
+        } else {
+            $serverUptimeCheckNumber = 0;
         }
         $serverUptimeCheckNumberMax = $tries;
 
