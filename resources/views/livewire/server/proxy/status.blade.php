@@ -1,4 +1,4 @@
-<div>
+<div x-init="$wire.checkProxy()">
     @if ($server->isFunctional())
         <div class="flex gap-2">
             @if (data_get($server, 'proxy.status') === 'running')

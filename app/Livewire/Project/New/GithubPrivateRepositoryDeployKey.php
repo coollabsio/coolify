@@ -136,7 +136,7 @@ class GithubPrivateRepositoryDeployKey extends Component
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,
-            ], navigate: true);
+            ], navigate: false);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

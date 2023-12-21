@@ -39,7 +39,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function __construct(public Server $server)
     {
-        // $this->handle();
+        $this->handle();
     }
 
     public function handle()

@@ -74,6 +74,6 @@ CMD ["nginx", "-g", "daemon off;"]
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,
             'project_uuid' => $project->uuid,
-        ], navigate: true);
+        ], navigate: false);
     }
 }
