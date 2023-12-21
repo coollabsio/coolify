@@ -862,6 +862,10 @@ class Application extends BaseModel
             if (!$only_checkout) {
                 $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base);
             }
+            else {
+                $git_clone_command = "git clone {$fullRepoUrl} -b {$this->git_branch} {$baseDir}";
+            }
+
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, "mkdir -p /root/.ssh"),
@@ -979,6 +983,7 @@ class Application extends BaseModel
         //     $fileList->push(".$prComposeFile");
         // }
         $commands = collect([
+            "rm -rf /tmp/{$uuid}",
             "mkdir -p /tmp/{$uuid} && cd /tmp/{$uuid}",
             $cloneCommand,
             "git sparse-checkout init --cone",
