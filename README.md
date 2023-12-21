@@ -24,7 +24,7 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 
 ## Github Sponsors
 
-<!-- sponsors --><!-- sponsors -->
+<!-- sponsors --><a href="https://github.com/Remi-Toussaint"><img src="https://github.com/Remi-Toussaint.png" width="60px" alt="Remi_Toussaint" /></a><!-- sponsors -->
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>
