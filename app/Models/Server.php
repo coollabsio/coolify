@@ -154,11 +154,11 @@ class Server extends BaseModel
         if ($this->skipServer()) {
             return false;
         }
+        $serverUptimeCheckNumber = $this->unreachable_count;
         if ($this->unreachable_count < $tries) {
             $serverUptimeCheckNumber = $this->unreachable_count + 1;
-        } else {
-            $serverUptimeCheckNumber = 0;
         }
+
         $serverUptimeCheckNumberMax = $tries;
 
         ray('server: ' . $this->name);
