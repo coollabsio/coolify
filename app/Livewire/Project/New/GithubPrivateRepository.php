@@ -151,11 +151,11 @@ class GithubPrivateRepository extends Component
             $application->name = generate_application_name($this->selected_repository_owner . '/' . $this->selected_repository_repo, $this->selected_branch_name, $application->uuid);
             $application->save();
 
-            return $this->redirectRoute('project.application.configuration', [
+            return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

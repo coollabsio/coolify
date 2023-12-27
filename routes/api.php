@@ -7,6 +7,7 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Service\StartService;
 use App\Models\User;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Visus\Cuid2\Cuid2;
@@ -110,7 +111,7 @@ Route::middleware(['throttle:5'])->group(function () {
             $token = request()->token;
             $email = decrypt($token);
             if (!User::whereEmail($email)->exists()) {
-                return redirect('/');
+                return redirect(RouteServiceProvider::HOME);
             }
             if (User::whereEmail($email)->first()->marketing_emails === false) {
                 return 'You have already unsubscribed from marketing emails.';

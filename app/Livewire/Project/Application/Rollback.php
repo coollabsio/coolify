@@ -29,12 +29,12 @@ class Rollback extends Component
             commit: $commit,
             force_rebuild: false,
         );
-        return $this->redirectRoute('project.application.deployment', [
+        return redirect()->route('project.application.deployment', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,
             'environment_name' => $this->parameters['environment_name'],
-        ], navigate: true);
+        ]);
     }
 
     public function loadImages($showToast = false)

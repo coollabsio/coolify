@@ -64,11 +64,11 @@ class DockerImage extends Component
             'name' => 'docker-image-' . $application->uuid,
             'fqdn' => $fqdn
         ]);
-        return $this->redirectRoute('project.application.configuration', [
+        return redirect()->route('project.application.configuration', [
             'application_uuid' => $application->uuid,
             'environment_name' => $environment->name,
             'project_uuid' => $project->uuid,
-        ], navigate: false);
+        ]);
     }
     public function render()
     {

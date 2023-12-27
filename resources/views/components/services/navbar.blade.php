@@ -1,5 +1,5 @@
 <div class="navbar-main" x-data>
-    <a wire:navigate class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+    <a  class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.service.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>

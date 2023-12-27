@@ -3,6 +3,7 @@
 namespace App\Livewire\Subscription;
 
 use App\Models\InstanceSettings;
+use App\Providers\RouteServiceProvider;
 use Livewire\Component;
 
 class Show extends Component
@@ -11,7 +12,7 @@ class Show extends Component
     public bool $alreadySubscribed = false;
     public function mount() {
         if (!isCloud()) {
-            return $this->redirect('/', navigate: true);
+            return redirect(RouteServiceProvider::HOME);
         }
         $this->settings = InstanceSettings::get();
         $this->alreadySubscribed = currentTeam()->subscription()->exists();

@@ -11,7 +11,7 @@
         <x-forms.button type="submit">Filter</x-forms.button>
     </form>
     @forelse ($deployments as $deployment)
-        <a wire:navigate @class([
+        <a  @class([
             'bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline',
             'hover:bg-coolgray-200' => data_get($deployment, 'status') === 'queued',
             'border-warning hover:bg-warning hover:text-black' =>

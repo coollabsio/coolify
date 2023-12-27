@@ -24,6 +24,6 @@ class Delete extends Component
         });
 
         refreshSession();
-        return $this->redirectRoute('team.index', navigate: true);
+        return redirect()->route('team.index');
     }
 }

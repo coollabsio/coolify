@@ -1,19 +1,19 @@
 <div class="navbar-main">
-    <a wire:navigate class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
+    <a  class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
     @if(!$application->destination->server->isSwarm())
-    <a wire:navigate class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+    <a  class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
         href="{{ route('project.application.command', $parameters) }}">
         <button>Execute Command</button>
     </a>
     @endif
-    <a wire:navigate class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
+    <a  class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a wire:navigate class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
+    <a  class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
         href="{{ route('project.application.deployments', $parameters) }}">
         <button>Deployments</button>
     </a>

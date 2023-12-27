@@ -36,7 +36,7 @@ class Form extends Component
                 instant_remote_process(['docker network rm -f ' . $this->destination->network], $this->destination->server);
             }
             $this->destination->delete();
-            return $this->redirectRoute('dashboard', navigate: true);
+            return redirect()->route('dashboard');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
