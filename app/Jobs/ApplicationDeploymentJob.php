@@ -1129,6 +1129,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
+        }  if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('SOURCE_COMMIT'))->isEmpty()) {
+            if (!is_null($this->commit)) {
+                $environment_variables->push("SOURCE_COMMIT={$this->commit}");
+            }
         }
         return $environment_variables->all();
     }
