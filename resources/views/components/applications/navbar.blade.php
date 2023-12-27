@@ -43,7 +43,7 @@
             @endif
             @if ($application->build_pack !== 'dockercompose')
                 @if ($application->destination->server->isSwarm())
-                    <button title="Restart without rebuilding" wire:click='deploy'
+                    <button title="Redeploy Swarm Service (rolling update)" wire:click='deploy'
                         class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
                         <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                             <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
