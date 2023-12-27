@@ -954,7 +954,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'memswap_limit' => $this->application->limits_memory_swap,
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
                     'mem_reservation' => $this->application->limits_memory_reservation,
-                    'cpus' => (int) $this->application->limits_cpus,
+                    'cpus' => (float) $this->application->limits_cpus,
                     'cpuset' => $this->application->limits_cpuset,
                     'cpu_shares' => $this->application->limits_cpu_shares,
                 ]
