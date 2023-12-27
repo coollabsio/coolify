@@ -1,19 +1,19 @@
 <div class="navbar-main">
-    <a  class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
+    <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.application.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
-    @if(!$application->destination->server->isSwarm())
-    <a  class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
-        href="{{ route('project.application.command', $parameters) }}">
-        <button>Execute Command</button>
-    </a>
+    @if (!$application->destination->server->isSwarm())
+        <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+            href="{{ route('project.application.command', $parameters) }}">
+            <button>Execute Command</button>
+        </a>
     @endif
-    <a  class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
+    <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a  class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
+    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
         href="{{ route('project.application.deployments', $parameters) }}">
         <button>Deployments</button>
     </a>
@@ -42,21 +42,32 @@
                 </button>
             @endif
             @if ($application->build_pack !== 'dockercompose')
-                <button title="Restart without rebuilding" wire:click='restart'
-                    class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
-                    <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                            stroke-width="2">
-                            <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
-                            <path d="M20 4v5h-5" />
-                        </g>
-                    </svg>
-                    @if ($application->destination->server->isSwarm())
-                    Update Service
-                    @else
-                    Restart
-                    @endif
-                </button>
+                @if ($application->destination->server->isSwarm())
+                    <button title="Restart without rebuilding" wire:click='deploy'
+                        class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
+                        <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2">
+                                <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                <path d="M20 4v5h-5" />
+                            </g>
+                        </svg>
+                        Update Service
+                    </button>
+                @else
+                    <button title="Restart without rebuilding" wire:click='restart'
+                        class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
+                        <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2">
+                                <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
+                                <path d="M20 4v5h-5" />
+                            </g>
+                        </svg>
+
+                        Restart
+                    </button>
+                @endif
                 {{-- @if (isDev())
                     <button title="Restart without rebuilding" wire:click='restartNew'
                         class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
