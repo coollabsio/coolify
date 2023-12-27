@@ -7,6 +7,7 @@ use App\Jobs\CleanupHelperContainersJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\InstanceSettings;
+use App\Models\ScheduledDatabaseBackup;
 use App\Models\Server;
 use App\Models\Service;
 use App\Models\ServiceApplication;
@@ -31,6 +32,9 @@ class Init extends Command
         if ($cleanup) {
             echo "Running cleanup\n";
             $this->cleanup_stucked_resources();
+            // Required for falsely deleted coolify db
+            $this->restore_coolify_db_backup();
+
             // $this->cleanup_ssh();
         }
         $this->cleanup_in_progress_application_deployments();
@@ -49,6 +53,30 @@ class Init extends Command
             } else {
                 $settings->update(['is_auto_update_enabled' => false]);
             }
+        }
+    }
+    private function restore_coolify_db_backup() {
+        try {
+            $database = StandalonePostgresql::withTrashed()->find(0);
+            if ($database && $database->trashed()) {
+                echo "Restoring coolify db backup\n";
+                $database->restore();
+                $scheduledBackup = ScheduledDatabaseBackup::find(0);
+                if (!$scheduledBackup) {
+                    ScheduledDatabaseBackup::create([
+                        'id' => 0,
+                        'enabled' => true,
+                        'save_s3' => false,
+                        'frequency' => '0 0 * * *',
+                        'database_id' => $database->id,
+                        'database_type' => 'App\Models\StandalonePostgresql',
+                        'team_id' => 0,
+                    ]);
+                }
+
+            }
+        } catch(\Throwable $e) {
+            echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
         }
     }
     private function cleanup_stucked_helper_containers()
@@ -134,7 +162,7 @@ class Init extends Command
             echo "Error in application: {$e->getMessage()}\n";
         }
         try {
-            $postgresqls = StandalonePostgresql::all();
+            $postgresqls = StandalonePostgresql::all()->where('id', '!=', 0);
             foreach ($postgresqls as $postgresql) {
                 if (!data_get($postgresql, 'environment')) {
                     echo 'Postgresql without environment: ' . $postgresql->name . ' soft deleting\n';
