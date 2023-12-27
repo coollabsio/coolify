@@ -58,7 +58,7 @@ class Init extends Command
     private function restore_coolify_db_backup() {
         try {
             $database = StandalonePostgresql::withTrashed()->find(0);
-            if ($database) {
+            if ($database && $database->trashed()) {
                 echo "Restoring coolify db backup\n";
                 $database->restore();
                 $scheduledBackup = ScheduledDatabaseBackup::find(0);
