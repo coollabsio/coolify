@@ -27,10 +27,10 @@ class AddEnvironment extends Component
                 'project_id' => $this->project->id,
             ]);
 
-            return $this->redirectRoute('project.resources', [
+            return redirect()->route('project.resources', [
                 'project_uuid' => $this->project->uuid,
                 'environment_name' => $environment->name,
-            ], navigate: true);
+            ]);
         } catch (\Throwable $e) {
             handleError($e, $this);
         } finally {

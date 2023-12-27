@@ -32,6 +32,7 @@ use App\Models\PrivateKey;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -47,7 +48,7 @@ if (isDev()) {
 
 Route::get('/api/v1/test/realtime', function () {
     if (auth()->user()?->currentTeam()->id !== 0) {
-        return redirect('/');
+        return redirect(RouteServiceProvider::HOME);
     }
     TestEvent::dispatch('asd');
     return 'Look at your other tab.';
@@ -89,7 +90,7 @@ Route::get('/verify', function () {
 Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
     $request->fulfill();
     send_internal_notification("User {$request->user()->name} verified their email address.");
-    return redirect('/');
+    return redirect(RouteServiceProvider::HOME);
 })->middleware(['auth'])->name('verify.verify');
 
 Route::middleware(['throttle:login'])->group(function () {
@@ -243,7 +244,7 @@ Route::middleware(['auth'])->group(function () {
 
 Route::any('/{any}', function () {
     if (auth()->user()) {
-        return redirect('/');
+        return redirect(RouteServiceProvider::HOME);
     }
-    return redirect('/login');
+    return redirect()->route('login');
 })->where('any', '.*');

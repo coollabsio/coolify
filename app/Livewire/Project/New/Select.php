@@ -55,10 +55,10 @@ class Select extends Component
 
     public function updatedSelectedEnvironment()
     {
-        return $this->redirectRoute('project.resources.new', [
+        return redirect()->route('project.resources.new', [
             'project_uuid' => $this->parameters['project_uuid'],
             'environment_name' => $this->selectedEnvironment,
-        ], navigate: true);
+        ]);
     }
 
     // public function addExistingPostgresql()

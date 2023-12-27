@@ -43,7 +43,7 @@ class Form extends Component
     {
         try {
             $this->storage->delete();
-            return $this->redirectRoute('team.storages.all', navigate: true);
+            return redirect()->route('team.storages.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

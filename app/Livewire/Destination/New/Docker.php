@@ -86,7 +86,7 @@ class Docker extends Component
                 }
             }
             $this->createNetworkAndAttachToProxy();
-            return $this->redirectRoute('destination.show', $docker->uuid, navigate: true);
+            return redirect()->route('destination.show', $docker->uuid);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

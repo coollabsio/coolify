@@ -4,7 +4,7 @@
                 class="transition rounded w-11 h-11" src="{{ asset('coolify-transparent.png') }}"></a>
         <ul class="flex flex-col h-full gap-4 menu flex-nowrap">
             <li title="Dashboard">
-                <a wire:navigate class="hover:bg-transparent" href="/">
+                <a  class="hover:bg-transparent" href="/">
                     <svg xmlns="http://www.w3.org/2000/svg" class="{{ request()->is('/') ? 'text-warning icon' : 'icon' }}"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -13,7 +13,7 @@
                 </a>
             </li>
             <li title="Servers">
-                <a wire:navigate class="hover:bg-transparent" href="/servers">
+                <a  class="hover:bg-transparent" href="/servers">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         class="{{ request()->is('server/*') || request()->is('servers') ? 'text-warning icon' : 'icon' }}"
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -28,7 +28,7 @@
                 </a>
             </li>
             <li title="Projects">
-                <a wire:navigate class="hover:bg-transparent" href="/projects">
+                <a  class="hover:bg-transparent" href="/projects">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         class="{{ request()->is('project/*') || request()->is('projects') ? 'text-warning icon' : 'icon' }}"
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -41,7 +41,7 @@
                 </a>
             </li>
             <li title="Command Center">
-                <a wire:navigate class="hover:bg-transparent" href="/command-center">
+                <a  class="hover:bg-transparent" href="/command-center">
                     <svg xmlns="http://www.w3.org/2000/svg"
                         class="{{ request()->is('command-center') ? 'text-warning icon' : 'icon' }}" viewBox="0 0 24 24"
                         stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -53,7 +53,7 @@
                 </a>
             </li>
             <li title="Source">
-                <a wire:navigate class="hover:bg-transparent" href="{{ route('source.all') }}">
+                <a  class="hover:bg-transparent" href="{{ route('source.all') }}">
                     <svg class="icon" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
                         <path fill="currentColor"
                             d="m6.793 1.207l.353.354l-.353-.354ZM1.207 6.793l-.353-.354l.353.354Zm0 1.414l.354-.353l-.354.353Zm5.586 5.586l-.354.353l.354-.353Zm1.414 0l-.353-.354l.353.354Zm5.586-5.586l.353.354l-.353-.354Zm0-1.414l-.354.353l.354-.353ZM8.207 1.207l.354-.353l-.354.353ZM6.44.854L.854 6.439l.707.707l5.585-5.585L6.44.854ZM.854 8.56l5.585 5.585l.707-.707l-5.585-5.585l-.707.707Zm7.707 5.585l5.585-5.585l-.707-.707l-5.585 5.585l.707.707Zm5.585-7.707L8.561.854l-.707.707l5.585 5.585l.707-.707Zm0 2.122a1.5 1.5 0 0 0 0-2.122l-.707.707a.5.5 0 0 1 0 .708l.707.707ZM6.44 14.146a1.5 1.5 0 0 0 2.122 0l-.707-.707a.5.5 0 0 1-.708 0l-.707.707ZM.854 6.44a1.5 1.5 0 0 0 0 2.122l.707-.707a.5.5 0 0 1 0-.708L.854 6.44Zm6.292-4.878a.5.5 0 0 1 .708 0L8.56.854a1.5 1.5 0 0 0-2.122 0l.707.707Zm-2 1.293l1 1l.708-.708l-1-1l-.708.708ZM7.5 5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 6V5Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 4.5H8ZM7.5 4a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 3v1Zm0-1A1.5 1.5 0 0 0 6 4.5h1a.5.5 0 0 1 .5-.5V3Zm.646 2.854l1.5 1.5l.707-.708l-1.5-1.5l-.707.708ZM10.5 8a.5.5 0 0 1-.5-.5H9A1.5 1.5 0 0 0 10.5 9V8Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 12 7.5h-1Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 10.5 6v1Zm0-1A1.5 1.5 0 0 0 9 7.5h1a.5.5 0 0 1 .5-.5V6ZM7 5.5v4h1v-4H7Zm.5 5.5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 12v-1Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 10.5H8Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 9v1Zm0-1A1.5 1.5 0 0 0 6 10.5h1a.5.5 0 0 1 .5-.5V9Z" />
@@ -61,7 +61,7 @@
                 </a>
             </li>
             <li title="Security">
-                <a wire:navigate class="hover:bg-transparent" href="{{ route('security.private-key.index') }}">
+                <a  class="hover:bg-transparent" href="{{ route('security.private-key.index') }}">
                     <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                             stroke-width="2"
@@ -70,7 +70,7 @@
                 </a>
             </li>
             <li title="Teams">
-                <a wire:navigate class="hover:bg-transparent" href="{{ route('team.index') }}">
+                <a  class="hover:bg-transparent" href="{{ route('team.index') }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -103,7 +103,7 @@
                 </a>
             </li>
             <li title="Profile">
-                <a wire:navigate class="hover:bg-transparent" href="/profile">
+                <a  class="hover:bg-transparent" href="/profile">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
                         stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                         <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -116,7 +116,7 @@
 
             @if (isInstanceAdmin())
                 <li title="Settings" class="mt-auto">
-                    <a wire:navigate class="hover:bg-transparent" href="/settings">
+                    <a  class="hover:bg-transparent" href="/settings">
                         <svg xmlns="http://www.w3.org/2000/svg"
                             class="{{ request()->is('settings*') ? 'text-warning icon' : 'icon' }}" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"

@@ -954,7 +954,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'memswap_limit' => $this->application->limits_memory_swap,
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
                     'mem_reservation' => $this->application->limits_memory_reservation,
-                    'cpus' => (int) $this->application->limits_cpus,
+                    'cpus' => (float) $this->application->limits_cpus,
                     'cpuset' => $this->application->limits_cpuset,
                     'cpu_shares' => $this->application->limits_cpu_shares,
                 ]
@@ -1129,6 +1129,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
+        }  if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('SOURCE_COMMIT'))->isEmpty()) {
+            if (!is_null($this->commit)) {
+                $environment_variables->push("SOURCE_COMMIT={$this->commit}");
+            }
         }
         return $environment_variables->all();
     }

@@ -37,7 +37,7 @@ class CheckLicense extends Component
             } catch (\Throwable $e) {
                 session()->flash('error', 'Something went wrong. Please contact support. <br>Error: ' . $e->getMessage());
                 ray($e->getMessage());
-                return $this->redirect('/settings/license', navigate: true);
+                return redirect()->route('settings.license');
             }
         }
     }

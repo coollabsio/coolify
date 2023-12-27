@@ -17,7 +17,7 @@ class Show extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
-                return $this->redirectRoute('server.all', navigate: true);
+                return redirect()->route('server.all');
             }
 
         } catch (\Throwable $e) {

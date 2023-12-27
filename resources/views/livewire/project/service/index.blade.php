@@ -68,7 +68,7 @@
                                     <div class="text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a wire:navigate
+                                    <a
                                         class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                         href="{{ route('project.service.show', [...$parameters, 'service_name' => $application->name]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
@@ -115,7 +115,7 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a wire:navigate
+                                    <a
                                         class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                         href="{{ route('project.service.show', [...$parameters, 'service_name' => $database->name]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"

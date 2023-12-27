@@ -184,11 +184,11 @@ class PublicGitRepository extends Component
             $application->fqdn = $fqdn;
             $application->save();
 
-            return $this->redirectRoute('project.application.configuration', [
+            return redirect()->route('project.application.configuration', [
                 'application_uuid' => $application->uuid,
                 'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,
-            ], navigate: false);
+            ]);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

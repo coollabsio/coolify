@@ -10,7 +10,7 @@
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($project->environments as $environment)
-            <a wire:navigate class="items-center justify-center font-bold box"
+            <a  class="items-center justify-center font-bold box"
                 href="{{ route('project.resources', [$project->uuid, $environment->name]) }}">
                 {{ $environment->name }}
             </a>

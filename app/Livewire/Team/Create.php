@@ -30,7 +30,7 @@ class Create extends Component
             ]);
             auth()->user()->teams()->attach($team, ['role' => 'admin']);
             refreshSession();
-            return $this->redirectRoute('team.index', navigate: true);
+            return redirect()->route('team.index');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

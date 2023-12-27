@@ -152,10 +152,10 @@ class CloneProject extends Component
                 }
                 $newService->parse();
             }
-            return $this->redirectRoute('project.resources', [
+            return redirect()->route('project.resources', [
                 'project_uuid' => $newProject->uuid,
                 'environment_name' => $newEnvironment->name,
-            ], navigate: true);
+            ]);
         } catch (\Exception $e) {
             return handleError($e, $this);
         }

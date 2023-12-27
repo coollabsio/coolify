@@ -19,7 +19,7 @@ class Delete extends Component
                 return;
             }
             $this->server->delete();
-            return $this->redirectRoute('server.all', navigate: true);
+            return redirect()->route('server.all');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

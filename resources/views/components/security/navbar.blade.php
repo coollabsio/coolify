@@ -10,10 +10,10 @@
         </ol>
     </nav>
     <nav class="navbar-main">
-        <a wire:navigate href="{{ route('security.private-key.index') }}">
+        <a  href="{{ route('security.private-key.index') }}">
             <button>Private Keys</button>
         </a>
-        <a wire:navigate href="{{ route('security.api-tokens') }}">
+        <a  href="{{ route('security.api-tokens') }}">
             <button>API tokens</button>
         </a>
         <div class="flex-1"></div>

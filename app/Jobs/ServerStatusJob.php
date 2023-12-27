@@ -37,10 +37,6 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
-        ray("checking server status for {$this->server->id}");
-        if (!$this->server->isServerReady(4)) {
-            throw new \RuntimeException('Server is not reachable.');
-        };
         try {
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);

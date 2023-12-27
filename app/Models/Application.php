@@ -633,7 +633,7 @@ class Application extends BaseModel
                     'memswap_limit' => $this->limits_memory_swap,
                     'mem_swappiness' => $this->limits_memory_swappiness,
                     'mem_reservation' => $this->limits_memory_reservation,
-                    'cpus' => (int) $this->limits_cpus,
+                    'cpus' => (float) $this->limits_cpus,
                     'cpuset' => $this->limits_cpuset,
                     'cpu_shares' => $this->limits_cpu_shares,
                 ]

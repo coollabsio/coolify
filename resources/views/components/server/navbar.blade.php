@@ -8,32 +8,32 @@
     </div>
     <div class="subtitle ">{{ data_get($server, 'name') }}</div>
     <nav class="navbar-main">
-        <a wire:navigate class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
+        <a  class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [
                 'server_uuid' => data_get($parameters, 'server_uuid'),
             ]) }}">
             <button>General</button>
         </a>
-        <a wire:navigate class="{{ request()->routeIs('server.private-key') ? 'text-white' : '' }}"
+        <a  class="{{ request()->routeIs('server.private-key') ? 'text-white' : '' }}"
             href="{{ route('server.private-key', [
                 'server_uuid' => data_get($parameters, 'server_uuid'),
             ]) }}">
             <button>Private Key</button>
         </a>
         @if (!$server->isSwarmWorker())
-            <a wire:navigate class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
+            <a  class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
                 href="{{ route('server.proxy', [
                     'server_uuid' => data_get($parameters, 'server_uuid'),
                 ]) }}">
                 <button>Proxy</button>
             </a>
-            <a wire:navigate class="{{ request()->routeIs('server.destinations') ? 'text-white' : '' }}"
+            <a  class="{{ request()->routeIs('server.destinations') ? 'text-white' : '' }}"
                 href="{{ route('server.destinations', [
                     'server_uuid' => data_get($parameters, 'server_uuid'),
                 ]) }}">
                 <button>Destinations</button>
             </a>
-            <a wire:navigate class="{{ request()->routeIs('server.log-drains') ? 'text-white' : '' }}"
+            <a  class="{{ request()->routeIs('server.log-drains') ? 'text-white' : '' }}"
                 href="{{ route('server.log-drains', [
                     'server_uuid' => data_get($parameters, 'server_uuid'),
                 ]) }}">
