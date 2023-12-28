@@ -216,55 +216,60 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     foreach ($domains as $loop => $domain) {
-        $uuid = new Cuid2(7);
-        $url = Url::fromString($domain);
-        $host = $url->getHost();
-        $path = $url->getPath();
-        $schema = $url->getScheme();
-        $port = $url->getPort();
-        if (is_null($port) && !is_null($onlyPort)) {
-            $port = $onlyPort;
+        try {
+            $uuid = new Cuid2(7);
+            $url = Url::fromString($domain);
+            $host = $url->getHost();
+            $path = $url->getPath();
+            $schema = $url->getScheme();
+            $port = $url->getPort();
+            if (is_null($port) && !is_null($onlyPort)) {
+                $port = $onlyPort;
+            }
+            $http_label = "{$uuid}-{$loop}-http";
+            $https_label = "{$uuid}-{$loop}-https";
+
+            if ($schema === 'https') {
+                // Set labels for https
+                $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
+                $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
+                if ($port) {
+                    $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
+                    $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
+                }
+                if ($path !== '/') {
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix");
+                    $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+                }
+
+                $labels->push("traefik.http.routers.{$https_label}.tls=true");
+                $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
+
+                // Set labels for http (redirect to https)
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                if ($is_force_https_enabled) {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
+                }
+            } else {
+                // Set labels for http
+                $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
+                $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
+                if ($port) {
+                    $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
+                    $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
+                }
+                if ($path !== '/') {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
+                    $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+                }
+            }
+        } catch(\Throwable $e) {
+            continue;
         }
-        $http_label = "{$uuid}-{$loop}-http";
-        $https_label = "{$uuid}-{$loop}-https";
 
-        if ($schema === 'https') {
-            // Set labels for https
-            $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-            $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
-            $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
-            if ($port) {
-                $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
-                $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
-            }
-            if ($path !== '/') {
-                $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix");
-                $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
-            }
-
-            $labels->push("traefik.http.routers.{$https_label}.tls=true");
-            $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
-
-            // Set labels for http (redirect to https)
-            $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-            $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
-            if ($is_force_https_enabled) {
-                $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
-            }
-        } else {
-            // Set labels for http
-            $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
-            $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
-            $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
-            if ($port) {
-                $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
-                $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
-            }
-            if ($path !== '/') {
-                $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
-                $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-            }
-        }
     }
 
     return $labels;
