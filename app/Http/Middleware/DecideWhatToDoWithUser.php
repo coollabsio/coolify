@@ -32,7 +32,7 @@ class DecideWhatToDoWithUser
                 if (Str::startsWith($request->path(), 'invitations')) {
                     return $next($request);
                 }
-                return redirect()->route('subscription');
+                return redirect()->route('subscription.index');
             }
         }
         if (showBoarding() && !in_array($request->path(), allowedPathsForBoardingAccounts())) {
