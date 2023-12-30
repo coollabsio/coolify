@@ -13,6 +13,7 @@ use App\Livewire\Project\Service\Show as ServiceShow;
 use App\Livewire\Dev\Compose as Compose;
 use App\Livewire\Dashboard;
 use App\Livewire\Project\CloneProject;
+use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
 use App\Livewire\Security\ApiTokens;
@@ -113,6 +114,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/project/{project_uuid}/{environment_name}/new', [ProjectController::class, 'new'])->name('project.resources.new');
     Route::get('/project/{project_uuid}/{environment_name}', [ProjectController::class, 'resources'])->name('project.resources');
+    Route::get('/project/{project_uuid}/{environment_name}/edit', EnvironmentEdit::class)->name('project.environment.edit');
 
     // Applications
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}', ApplicationConfiguration::class)->name('project.application.configuration');
