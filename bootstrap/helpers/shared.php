@@ -102,6 +102,7 @@ function refreshSession(?Team $team = null): void
 }
 function handleError(?Throwable $error = null, ?Livewire\Component $livewire = null, ?string $customErrorMessage = null)
 {
+    ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
@@ -227,11 +228,15 @@ function base_ip(): string
 }
 function getFqdnWithoutPort(String $fqdn)
 {
-    $url = Url::fromString($fqdn);
-    $host = $url->getHost();
-    $scheme = $url->getScheme();
-    $path = $url->getPath();
-    return "$scheme://$host$path";
+    try {
+        $url = Url::fromString($fqdn);
+        $host = $url->getHost();
+        $scheme = $url->getScheme();
+        $path = $url->getPath();
+        return "$scheme://$host$path";
+    } catch (\Throwable $e) {
+        return $fqdn;
+    }
 }
 /**
  * If fqdn is set, return it, otherwise return public ip.
@@ -1520,6 +1525,9 @@ function parseEnvVariable(Str|string $value)
             $command = $value->after('SERVICE_')->before('_');
             $forService = $value->after('SERVICE_')->after('_')->before('_');
             $port = $value->afterLast('_');
+            if (filter_var($port, FILTER_VALIDATE_INT) === false) {
+                $port = null;
+            }
         } else {
             // SERVICE_BASE64_64_UMAMI
             $command = $value->after('SERVICE_')->beforeLast('_');

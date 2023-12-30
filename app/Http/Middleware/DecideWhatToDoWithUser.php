@@ -25,14 +25,14 @@ class DecideWhatToDoWithUser
             if ($request->path() === 'verify' || in_array($request->path(), allowedPathsForInvalidAccounts()) || $request->routeIs('verify.verify')) {
                 return $next($request);
             }
-            return redirect()-route('verify.email');
+            return redirect()->route('verify.email');
         }
         if (!isSubscriptionActive() && !isSubscriptionOnGracePeriod()) {
             if (!in_array($request->path(), allowedPathsForUnsubscribedAccounts())) {
                 if (Str::startsWith($request->path(), 'invitations')) {
                     return $next($request);
                 }
-                return redirect()->route('subscription');
+                return redirect()->route('subscription.index');
             }
         }
         if (showBoarding() && !in_array($request->path(), allowedPathsForBoardingAccounts())) {
