@@ -382,6 +382,9 @@ class Application extends BaseModel
 
     public function deploymentType()
     {
+        if (isDev() && data_get($this, 'private_key_id') === 0) {
+            return 'deploy_key';
+        }
         if (data_get($this, 'private_key_id')) {
             return 'deploy_key';
         } else if (data_get($this, 'source')) {
@@ -859,13 +862,12 @@ class Application extends BaseModel
             }
             $private_key = base64_encode($private_key);
             $git_clone_command_base = "GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" {$git_clone_command} {$customRepository} {$baseDir}";
-            if (!$only_checkout) {
+            if ($only_checkout) {
+                $git_clone_command = $git_clone_command_base;
+            } else {
                 $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base);
             }
-            else {
-                $git_clone_command = "git clone {$fullRepoUrl} -b {$this->git_branch} {$baseDir}";
-            }
-
+            ray($git_clone_command);
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, "mkdir -p /root/.ssh"),
