@@ -54,6 +54,9 @@
                     href="#">Resource Limits
                 </a>
             @endif
+            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'" href="#">Scheduled Tasks
+            </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
@@ -96,6 +99,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.shared.resource-limits :resource="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+                <livewire:project.shared.scheduled-task.all :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$application" />

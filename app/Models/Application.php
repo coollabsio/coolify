@@ -315,6 +315,11 @@ class Application extends BaseModel
         return $this->hasMany(EnvironmentVariable::class)->where('is_preview', true)->where('key', 'like', 'NIXPACKS_%');
     }
 
+    public function scheduled_tasks(): HasMany
+    {
+        return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
+    }
+
     public function private_key()
     {
         return $this->belongsTo(PrivateKey::class);
