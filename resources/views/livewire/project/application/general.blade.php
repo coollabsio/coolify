@@ -189,7 +189,7 @@
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
-                        label="Docker Compose Content" helper="You need to modify the docker compose file." />
+                        label="Docker Compose Content (applicationId: {{$application->id}})" helper="You need to modify the docker compose file." />
                 @else
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
                         label="Docker Compose Content" helper="You need to modify the docker compose file." />
