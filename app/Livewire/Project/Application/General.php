@@ -116,6 +116,9 @@ class General extends Component
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         $this->customLabels = $this->application->parseContainerLabels();
+        if (!$this->customLabels) {
+            $this->resetDefaultLabels(false);
+        }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
@@ -207,6 +210,9 @@ class General extends Component
             }
             $this->validate();
             if ($this->ports_exposes !== $this->application->ports_exposes) {
+                $this->resetDefaultLabels(false);
+            }
+            if (!$this->customLabels) {
                 $this->resetDefaultLabels(false);
             }
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
