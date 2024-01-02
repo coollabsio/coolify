@@ -1295,6 +1295,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             });
         } else {
             $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
+            $this->application_deployment_queue->update([
+                'status' => ApplicationDeploymentStatus::FAILED->value,
+            ]);
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
             );
