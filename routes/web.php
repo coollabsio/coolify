@@ -16,6 +16,7 @@ use App\Livewire\Project\CloneProject;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
+use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Server\All;
 use App\Livewire\Server\Create;
@@ -127,6 +128,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/logs', Logs::class)->name('project.application.logs');
     Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/command', ExecuteContainerCommand::class)->name('project.application.command');
+    Route::get('/project/{project_uuid}/{environment_name}/application/{application_uuid}/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
+
 
     // Databases
     Route::get('/project/{project_uuid}/{environment_name}/database/{database_uuid}', [DatabaseController::class, 'configuration'])->name('project.database.configuration');

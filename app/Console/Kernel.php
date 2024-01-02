@@ -5,12 +5,14 @@ namespace App\Console;
 use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\DatabaseBackupJob;
+use App\Jobs\ScheduledTaskJob;
 use App\Jobs\InstanceAutoUpdateJob;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\PullHelperImageJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\InstanceSettings;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledTask;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Console\Scheduling\Schedule;
@@ -30,6 +32,7 @@ class Kernel extends ConsoleKernel
             $this->check_resources($schedule);
             $this->check_scheduled_backups($schedule);
             $this->pull_helper_image($schedule);
+            $this->check_scheduled_tasks($schedule);
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
@@ -41,6 +44,7 @@ class Kernel extends ConsoleKernel
             $this->check_scheduled_backups($schedule);
             $this->check_resources($schedule);
             $this->pull_helper_image($schedule);
+            $this->check_scheduled_tasks($schedule);
         }
     }
     private function pull_helper_image($schedule)
@@ -105,6 +109,32 @@ class Kernel extends ConsoleKernel
                 backup: $scheduled_backup
             ))->cron($scheduled_backup->frequency)->onOneServer();
         }
+    }
+
+    private function check_scheduled_tasks($schedule) {
+        $scheduled_tasks = ScheduledTask::all();
+        if ($scheduled_tasks->isEmpty()) {
+            ray('no scheduled tasks');
+            return;
+        }
+        foreach ($scheduled_tasks as $scheduled_task) {
+            $service = $scheduled_task->service()->get();
+            $application = $scheduled_task->application()->get();
+
+            if (!$application && !$service) {
+                ray('application/service attached to scheduled task does not exist');
+                $scheduled_task->delete();
+                continue;
+            }
+
+            if (isset(VALID_CRON_STRINGS[$scheduled_task->frequency])) {
+                $scheduled_task->frequency = VALID_CRON_STRINGS[$scheduled_task->frequency];
+            }
+            $schedule->job(new ScheduledTaskJob(
+                task: $scheduled_task
+            ))->cron($scheduled_task->frequency)->onOneServer();
+        }
+
     }
 
     protected function commands(): void

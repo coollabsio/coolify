@@ -33,7 +33,6 @@ class Add extends Component
 
     public function submit()
     {
-        error_log("*** IN SUBMIT");
         $this->validate();
         $isValid = validate_cron_expression($this->frequency);
         if (!$isValid) {

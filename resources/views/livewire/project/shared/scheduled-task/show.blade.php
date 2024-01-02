@@ -5,17 +5,32 @@
                     class="font-bold text-warning">({{ $task->name }})</span>?</p>
         </x-slot:modalBody>
     </x-modal>
-    <form wire:submit='submit'
-        class="flex flex-col gap-2 p-4 m-2 border lg:items-center border-coolgray-300 lg:m-0 lg:p-0 lg:border-0 lg:flex-row">
-        <x-forms.input id="task.name" />
-        <x-forms.input id="task.command" />
-        <div class="flex gap-2">
-            <x-forms.button type="submit">
-                Update
-            </x-forms.button>
-            <x-forms.button isError isModal modalId="{{ $modalId }}">
-                Delete
-            </x-forms.button>
+
+    <h1>Scheduled Backup</h1>
+    <livewire:project.application.heading :application="$resource" />
+
+    <form wire:submit="submit">
+        <div class="flex flex-col gap-2 pb-10">
+            <div class="flex items-end gap-2 pt-4">
+                <h2>Scheduled Task</h2>
+                <x-forms.button type="submit">
+                    Save
+                </x-forms.button>
+
+                {{-- @if (Str::of($status)->startsWith('running'))
+                    <livewire:project.database.backup-now :backup="$backup" />
+                @endif --}}
+
+                <x-forms.button isError isModal modalId="{{ $modalId }}">
+                    Delete
+                </x-forms.button>
+
+            </div>
         </div>
+
+        <x-forms.input placeholder="Run cron" id="task.name" label="Name" required />
+        <x-forms.input placeholder="php artisan schedule:run" id="task.command" label="Command" required />
+        <x-forms.input placeholder="0 0 * * * or daily" id="task.frequency" label="Frequency" required />
+        <x-forms.input placeholder="php" id="task.container" label="Container name" />
     </form>
 </div>
