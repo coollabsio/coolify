@@ -19,10 +19,33 @@ Thank you so much!
 
 Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and [Appwrite](https://appwrite.io)!
 
-<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="appwrite logo" width="200"/></a>
+<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 <a href="https://appwrite.io" target="_blank"><img src="./other/logos/appwrite.svg" alt="appwrite logo" width="200"/></a>
 
 ## Github Sponsors ($15+)
+<a href="https://bc.direct">
+<svg version="1.1" id="Calque_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="60px" height="60px"
+	 viewBox="0 0 290 250" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#FFFFFF;}
+	.st1{fill:#116DFF;}
+</style>
+	<g>
+		<path class="st1" d="M158.6,96.4c0.4,2.3,2.9,3.7,5.1,2.9L206.9,84c19.8-7.1,31.6-27.5,27.8-48.2l0,0c-4.8-26-31.7-41.5-56.6-32.7
+			l0,0c-19.8,7.1-31.6,27.5-27.8,48.2L158.6,96.4z"/>
+		<path class="st1" d="M269.1,95.4L269.1,95.4c-16-13.7-39.6-13.7-55.7,0l-34.9,29.7c-1.8,1.5-1.8,4.3,0,5.9l34.9,29.7
+			c16,13.7,39.6,13.7,55.7,0l0,0C289.3,143.7,289.3,112.6,269.1,95.4z"/>
+		<path class="st1" d="M206.9,172.2l-43.2-15.4c-2.2-0.8-4.7,0.6-5.1,2.9l-8.3,45.1c-3.8,20.7,8,41.1,27.8,48.2l0,0
+			c24.9,8.9,51.8-6.7,56.6-32.7l0,0C238.5,199.7,226.7,179.3,206.9,172.2z"/>
+		<path class="st1" d="M128.8,159.8c-0.4-2.3-2.9-3.7-5.1-2.9l-43.2,15.4c-19.8,7.1-31.6,27.5-27.8,48.2l0,0
+			c4.8,26,31.7,41.5,56.6,32.7l0,0c19.8-7.1,31.6-27.5,27.8-48.2L128.8,159.8z"/>
+		<path class="st1" d="M108.8,131.1c1.8-1.5,1.8-4.3,0-5.9L73.9,95.4c-16-13.7-39.6-13.7-55.7,0l0,0c-20.1,17.1-20.1,48.2,0,65.4
+			l0,0c16,13.7,39.6,13.7,55.7,0L108.8,131.1z"/>
+		<path class="st1" d="M80.5,84l43.2,15.4c2.2,0.8,4.7-0.6,5.1-2.9l8.3-45.1c3.8-20.7-8-41.1-27.8-48.2l0,0
+			C84.3-5.7,57.4,9.8,52.6,35.8l0,0C48.8,56.5,60.6,76.9,80.5,84z"/>
+	</g>
+</svg></a>
+<a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/Niki2k1"><img src="https://github.com/Niki2k1.png" width="60px" alt="Niklas Lausch" /></a>
 <a href="https://github.com/pixelinfinito"><img src="https://github.com/pixelinfinito.png" width="60px" alt="Pixel Infinito" /></a>
@@ -32,7 +55,6 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 <a href="https://github.com/Illyism"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
-<a href="https://github.com/cccareers"><img src="https://github.com/cccareers.png" width="60px" alt="Creating Coding Careers" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>

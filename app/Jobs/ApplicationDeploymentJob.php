@@ -446,8 +446,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_image_names();
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
-        $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
-        $yaml = Yaml::dump($composeFile->toArray(), 10);
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $yaml = $composeFile = $this->application->docker_compose_raw;
+        } else {
+            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+            $yaml = Yaml::dump($composeFile->toArray(), 10);
+        }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
