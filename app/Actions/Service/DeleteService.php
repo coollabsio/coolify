@@ -21,14 +21,14 @@ class DeleteService
             foreach ($storages as $storage) {
                 $storagesToDelete->push($storage);
             }
-            $application->delete();
+            $application->forceDelete();
         }
         foreach ($service->databases()->get() as $database) {
             $storages = $database->persistentStorages()->get();
             foreach ($storages as $storage) {
                 $storagesToDelete->push($storage);
             }
-            $database->delete();
+            $database->forceDelete();
         }
         foreach ($storagesToDelete as $storage) {
             $commands[] = "docker volume rm -f $storage->name";

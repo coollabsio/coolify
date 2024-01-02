@@ -55,7 +55,8 @@ class Init extends Command
             }
         }
     }
-    private function restore_coolify_db_backup() {
+    private function restore_coolify_db_backup()
+    {
         try {
             $database = StandalonePostgresql::withTrashed()->find(0);
             if ($database && $database->trashed()) {
@@ -73,9 +74,8 @@ class Init extends Command
                         'team_id' => 0,
                     ]);
                 }
-
             }
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             echo "Error in restoring coolify db backup: {$e->getMessage()}\n";
         }
     }
@@ -138,6 +138,89 @@ class Init extends Command
     }
     private function cleanup_stucked_resources()
     {
+
+        try {
+            $applications = Application::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($applications as $application) {
+                echo "Deleting stucked application: {$application->name}\n";
+                $application->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked application: {$e->getMessage()}\n";
+        }
+        try {
+            $postgresqls = StandalonePostgresql::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($postgresqls as $postgresql) {
+                echo "Deleting stucked postgresql: {$postgresql->name}\n";
+                $postgresql->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked postgresql: {$e->getMessage()}\n";
+        }
+        try {
+            $redis = StandaloneRedis::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($redis as $redis) {
+                echo "Deleting stucked redis: {$redis->name}\n";
+                $redis->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked redis: {$e->getMessage()}\n";
+        }
+        try {
+            $mongodbs = StandaloneMongodb::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($mongodbs as $mongodb) {
+                echo "Deleting stucked mongodb: {$mongodb->name}\n";
+                $mongodb->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked mongodb: {$e->getMessage()}\n";
+        }
+        try {
+            $mysqls = StandaloneMysql::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($mysqls as $mysql) {
+                echo "Deleting stucked mysql: {$mysql->name}\n";
+                $mysql->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked mysql: {$e->getMessage()}\n";
+        }
+        try {
+            $mariadbs = StandaloneMariadb::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($mariadbs as $mariadb) {
+                echo "Deleting stucked mariadb: {$mariadb->name}\n";
+                $mariadb->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked mariadb: {$e->getMessage()}\n";
+        }
+        try {
+            $services = Service::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($services as $service) {
+                echo "Deleting stucked service: {$service->name}\n";
+                $service->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked service: {$e->getMessage()}\n";
+        }
+        try {
+            $serviceApps = ServiceApplication::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($serviceApps as $serviceApp) {
+                echo "Deleting stucked serviceapp: {$serviceApp->name}\n";
+                $serviceApp->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked serviceapp: {$e->getMessage()}\n";
+        }
+        try {
+            $serviceDbs = ServiceDatabase::withTrashed()->whereNotNull('deleted_at')->get();
+            foreach ($serviceDbs as $serviceDb) {
+                echo "Deleting stucked serviceapp: {$serviceDb->name}\n";
+                $serviceDb->forceDelete();
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stucked serviceapp: {$e->getMessage()}\n";
+        }
+
         // Cleanup any resources that are not attached to any environment or destination or server
         try {
             $applications = Application::all();
