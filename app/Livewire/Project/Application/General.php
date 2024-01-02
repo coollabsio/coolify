@@ -116,6 +116,11 @@ class General extends Component
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         $this->customLabels = $this->application->parseContainerLabels();
+        if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+            $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+            $this->application->custom_labels = base64_encode($this->customLabels);
+            $this->application->save();
+        }
         $this->initialDockerComposeLocation = $this->application->docker_compose_location;
         $this->checkLabelUpdates();
     }
@@ -201,7 +206,12 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            ray($this->initialDockerComposeLocation, $this->application->docker_compose_location);
+            if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+                $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+                $this->application->custom_labels = base64_encode($this->customLabels);
+                $this->application->save();
+            }
+
             if ($this->application->build_pack === 'dockercompose' && $this->initialDockerComposeLocation !== $this->application->docker_compose_location) {
                 $this->loadComposeFile();
             }
@@ -209,6 +219,7 @@ class General extends Component
             if ($this->ports_exposes !== $this->application->ports_exposes) {
                 $this->resetDefaultLabels(false);
             }
+
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
