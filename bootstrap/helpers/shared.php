@@ -1399,6 +1399,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $key = $value;
                             $defaultValue = null;
                         }
+                        $foundEnv = EnvironmentVariable::where([
+                            'key' => $key,
+                            'application_id' => $resource->id,
+                            'is_preview' => false,
+                        ])->first();
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
