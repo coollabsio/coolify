@@ -1230,11 +1230,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }");
             } else {
-                $this->execute_remote_command(
-                    [
-                        executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
-                    ],
-                );
+                if ($this->application->build_pack === 'nixpacks') {
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
+                        ],
+                    );
+                }
                 if ($this->force_rebuild) {
                     $this->execute_remote_command([
                         executeInDocker($this->deployment_uuid, "docker build --no-cache $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
@@ -1287,12 +1289,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     executeInDocker($this->deployment_uuid, "docker build --pull $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]);
             } else {
+                if ($this->application->build_pack === 'nixpacks') {
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
+                        ],
+                    );
+                }
 
-                $this->execute_remote_command(
-                    [
-                        executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
-                    ],
-                );
                 if ($this->force_rebuild) {
                     $this->execute_remote_command([
                         executeInDocker($this->deployment_uuid, "docker build --no-cache $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
