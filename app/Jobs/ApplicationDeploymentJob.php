@@ -883,7 +883,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // if ($this->pull_request_id !== 0) {
             // $cacheKey = "{$this->application->uuid}-pr-{$this->pull_request_id}";
         // }
-        $nixpacks_command = "nixpacks build --no-cache {$this->env_args} --no-error-without-start";
+        $nixpacks_command = "nixpacks build {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
