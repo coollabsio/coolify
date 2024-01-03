@@ -8,9 +8,9 @@ ARG DOCKER_COMPOSE_VERSION=2.21.0
 # https://github.com/docker/buildx/releases
 ARG DOCKER_BUILDX_VERSION=0.11.2
 # https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.31.0
+ARG PACK_VERSION=0.32.1
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.18.0
+ARG NIXPACKS_VERSION=1.20.0
 
 USER root
 WORKDIR /artifacts
