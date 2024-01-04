@@ -1,8 +1,10 @@
-<x-collapsible>
-    <x-slot:title>
+<div tabindex="0" x-data="{ open: false }"
+    class="transition border rounded cursor-pointer collapse collapse-arrow border-coolgray-200"
+    :class="open ? 'collapse-open' : 'collapse-close'">
+    <div class="flex flex-col justify-center text-sm select-text collapse-title" x-on:click="open = !open">
         <div>{{ $workdir }}{{ $fs_path }} -> {{ $fileStorage->mount_path }}</div>
-    </x-slot:title>
-    <x-slot:action>
+    </div>
+    <div class="collapse-content">
         <form wire:submit='submit' class="flex flex-col gap-2">
             <div class="w-64">
                 <x-forms.checkbox instantSave label="Is directory?" id="fileStorage.is_directory"></x-forms.checkbox>
@@ -21,5 +23,5 @@
             @endif
             {{-- @endif --}}
         </form>
-    </x-slot:action>
-</x-collapsible>
+    </div>
+</div>
