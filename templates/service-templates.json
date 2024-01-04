@@ -469,6 +469,17 @@
             "internet"
         ]
     },
+    "stirling-pdf": {
+        "documentation": "https:\/\/github.com\/Stirling-Tools\/Stirling-PDF",
+        "slogan": "Stirling is a powerful web based PDF manipulation tool",
+        "compose": "c2VydmljZXM6CiAgc3RpcmxpbmctcGRmOgogICAgaW1hZ2U6ICdmcm9vb2RsZS9zLXBkZjpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdzdGlybGluZy10cmFpbmluZy1kYXRhOi91c3Ivc2hhcmUvdGVzc2VyYWN0LW9jci81L3Rlc3NkYXRhJwogICAgICAtICdzdGlybGluZy1jb25maWdzOi9jb25maWdzJwogICAgICAtICdzdGlybGluZy1jdXN0b20tZmlsZXM6L2N1c3RvbUZpbGVzLycKICAgICAgLSAnc3RpcmxpbmctbG9nczovbG9ncy8nCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU1BERgogICAgICAtIERPQ0tFUl9FTkFCTEVfU0VDVVJJVFk9ZmFsc2UK",
+        "tags": [
+            "pdf",
+            "manipulation",
+            "web",
+            "tool"
+        ]
+    },
     "trigger-with-external-database": {
         "documentation": "https:\/\/trigger.dev\/docs\/documentation\/guides\/self-hosting",
         "slogan": "The open source Background Jobs framework for TypeScript",
