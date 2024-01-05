@@ -164,9 +164,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $ips = collect([]);
             if (count($allContainers) > 0) {
                 $allContainers = $allContainers[0];
+                $allContainers = collect($allContainers)->sort()->values();
                 foreach ($allContainers as $container) {
                     $containerName = data_get($container, 'Name');
                     if ($containerName === 'coolify-proxy') {
+                        continue;
+                    }
+                    if (preg_match('/-(\d{12})/',$containerName)) {
                         continue;
                     }
                     $containerIp = data_get($container, 'IPv4Address');
@@ -446,8 +450,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_image_names();
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
-        $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
-        $yaml = Yaml::dump($composeFile->toArray(), 10);
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $yaml = $composeFile = $this->application->docker_compose_raw;
+        } else {
+            $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
+            $yaml = Yaml::dump($composeFile->toArray(), 10);
+        }
         $this->docker_compose_base64 = base64_encode($yaml);
         $this->execute_remote_command([
             executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}{$this->docker_compose_location}"), "hidden" => true
@@ -871,11 +879,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function nixpacks_build_cmd()
     {
         $this->generate_env_variables();
-        $cacheKey = $this->application->uuid;
-        if ($this->pull_request_id !== 0) {
-            $cacheKey = "{$this->application->uuid}-pr-{$this->pull_request_id}";
-        }
-        $nixpacks_command = "nixpacks build --cache-key '{$cacheKey}' -o {$this->workdir} {$this->env_args} --no-error-without-start";
+        // $cacheKey = $this->application->uuid;
+        // if ($this->pull_request_id !== 0) {
+            // $cacheKey = "{$this->application->uuid}-pr-{$this->pull_request_id}";
+        // }
+        $nixpacks_command = "nixpacks build {$this->env_args} --no-error-without-start";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -885,7 +893,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->install_command) {
             $nixpacks_command .= " --install-cmd \"{$this->application->install_command}\"";
         }
-        $nixpacks_command .= " {$this->workdir}";
+        $nixpacks_command .= " -o {$this->workdir} {$this->workdir}";
         return $nixpacks_command;
     }
 
@@ -1129,7 +1137,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
-        }  if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('SOURCE_COMMIT'))->isEmpty()) {
+        }
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('SOURCE_COMMIT'))->isEmpty()) {
             if (!is_null($this->commit)) {
                 $environment_variables->push("SOURCE_COMMIT={$this->commit}");
             }
@@ -1192,6 +1201,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->settings->is_static || $this->application->build_pack === 'static') {
             if ($this->application->static_image) {
                 $this->pull_latest_image($this->application->static_image);
+                $this->execute_remote_command(
+                    ["echo -n 'Continue with the building process.'"],
+                );
             }
             if ($this->application->build_pack === 'static') {
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -1218,9 +1230,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }");
             } else {
-                $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
-                ]);
+                if ($this->application->build_pack === 'nixpacks') {
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
+                        ],
+                    );
+                }
+                if ($this->force_rebuild) {
+                    $this->execute_remote_command([
+                        executeInDocker($this->deployment_uuid, "docker build --no-cache $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                    ]);
+                } else {
+                    $this->execute_remote_command([
+                        executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
+                    ]);
+                }
+                // }
 
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
 WORKDIR /usr/share/nginx/html/
@@ -1263,9 +1289,23 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     executeInDocker($this->deployment_uuid, "docker build --pull $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
                 ]);
             } else {
-                $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
-                ]);
+                if ($this->application->build_pack === 'nixpacks') {
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "cp {$this->workdir}/Dockerfile {$this->workdir}/.nixpacks/Dockerfile")
+                        ],
+                    );
+                }
+
+                if ($this->force_rebuild) {
+                    $this->execute_remote_command([
+                        executeInDocker($this->deployment_uuid, "docker build --no-cache $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    ]);
+                } else {
+                    $this->execute_remote_command([
+                        executeInDocker($this->deployment_uuid, "docker build $this->buildTarget $this->addHosts --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->production_image_name {$this->workdir}"), "hidden" => true
+                    ]);
+                }
             }
         }
         $this->execute_remote_command([
@@ -1291,6 +1331,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             });
         } else {
             $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
+            $this->application_deployment_queue->update([
+                'status' => ApplicationDeploymentStatus::FAILED->value,
+            ]);
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
             );

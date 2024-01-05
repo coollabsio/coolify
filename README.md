@@ -19,10 +19,12 @@ Thank you so much!
 
 Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and [Appwrite](https://appwrite.io)!
 
-<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="appwrite logo" width="200"/></a>
+<a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 <a href="https://appwrite.io" target="_blank"><img src="./other/logos/appwrite.svg" alt="appwrite logo" width="200"/></a>
 
 ## Github Sponsors ($15+)
+<a href="https://bc.direct"><img width="60px" alt="BC Direct" src="https://github.com/coollabsio/coolify/assets/5845193/a4063c41-95ed-4a32-8814-cd1475572e37"/></a>
+<a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/Niki2k1"><img src="https://github.com/Niki2k1.png" width="60px" alt="Niklas Lausch" /></a>
 <a href="https://github.com/pixelinfinito"><img src="https://github.com/pixelinfinito.png" width="60px" alt="Pixel Infinito" /></a>
@@ -32,7 +34,6 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 <a href="https://github.com/Illyism"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
-<a href="https://github.com/cccareers"><img src="https://github.com/cccareers.png" width="60px" alt="Creating Coding Careers" /></a>
 
 ## Organizations
 <a href="https://opencollective.com/coollabsio/organization/0/website"><img src="https://opencollective.com/coollabsio/organization/0/avatar.svg"></a>

@@ -41,11 +41,11 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         dispatch(new ApplicationDeploymentNewJob(
             deployment: $deployment,
             application: Application::find($application_id)
-        ))->onConnection('long-running')->onQueue('long-running');
+        ));
     } else {
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
-        ))->onConnection('long-running')->onQueue('long-running');
+        ));
     }
 }
 
@@ -57,11 +57,11 @@ function queue_next_deployment(Application $application, bool $isNew = false)
             dispatch(new ApplicationDeploymentNewJob(
                 deployment: $next_found,
                 application: $application
-            ))->onConnection('long-running')->onQueue('long-running');
+            ));
         } else {
             dispatch(new ApplicationDeploymentJob(
                 application_deployment_queue_id: $next_found->id,
-            ))->onConnection('long-running')->onQueue('long-running');
+            ));
         }
     }
 }

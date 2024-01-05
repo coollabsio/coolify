@@ -1035,7 +1035,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
                 data_set($service, 'labels', $serviceLabels->toArray());
                 data_forget($service, 'is_database');
-                data_set($service, 'restart', RESTART_MODE);
+                if (!data_get($service, 'restart')) {
+                    data_set($service, 'restart', RESTART_MODE);
+                }
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
@@ -1399,6 +1401,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $key = $value;
                             $defaultValue = null;
                         }
+                        $foundEnv = EnvironmentVariable::where([
+                            'key' => $key,
+                            'application_id' => $resource->id,
+                            'is_preview' => false,
+                        ])->first();
                         if ($foundEnv) {
                             $defaultValue = data_get($foundEnv, 'value');
                         }
@@ -1468,7 +1475,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
             data_set($service, 'labels', $serviceLabels->toArray());
             data_forget($service, 'is_database');
-            data_set($service, 'restart', RESTART_MODE);
+            if (!data_get($service, 'restart')) {
+                data_set($service, 'restart', RESTART_MODE);
+            }
             data_set($service, 'container_name', $containerName);
             data_forget($service, 'volumes.*.content');
             data_forget($service, 'volumes.*.isDirectory');

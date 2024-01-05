@@ -48,7 +48,10 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-                        @if (count($parsedServices) > 0)
+                        <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
+                            label="Raw Compose Deployment"
+                            helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker-compose'>documentation.</a>" />
+                        @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
                                     <div class="flex items-end gap-2">
@@ -184,8 +187,13 @@
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
-                <x-forms.textarea rows="10" readonly id="application.docker_compose"
-                    label="Docker Compose Content" helper="You need to modify the docker compose file." />
+                @if ($application->settings->is_raw_compose_deployment_enabled)
+                    <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
+                        label="Docker Compose Content (applicationId: {{$application->id}})" helper="You need to modify the docker compose file." />
+                @else
+                    <x-forms.textarea rows="10" readonly id="application.docker_compose"
+                        label="Docker Compose Content" helper="You need to modify the docker compose file." />
+                @endif
                 {{-- <x-forms.textarea rows="10" readonly id="application.docker_compose_pr"
                     label="Docker PR Compose Content" helper="You need to modify the docker compose file." /> --}}
             @endif
