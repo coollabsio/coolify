@@ -6,7 +6,7 @@
         </x-slot:modalBody>
     </x-modal>
 
-    <h1>Scheduled Backup</h1>
+    <h1>Scheduled Task</h1>
     @if ($type === 'application')
     <livewire:project.application.heading :application="$resource" />
     @elseif ($type === 'service')

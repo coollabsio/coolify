@@ -7,7 +7,6 @@ use Livewire\Component;
 
 class Executions extends Component
 {
-    public $backup;
     public $executions = [];
     public $selectedKey;
     public function getListeners()
