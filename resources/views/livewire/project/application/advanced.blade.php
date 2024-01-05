@@ -5,9 +5,10 @@
         </div>
         <div>Advanced configuration for your application.</div>
         <div class="flex flex-col w-full pt-4">
-
-            <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave id="application.settings.is_log_drain_enabled" label="Drain Logs" />
+            @if (!$application->settings->is_raw_compose_deployment_enabled)
+                <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
+                    instantSave id="application.settings.is_log_drain_enabled" label="Drain Logs" />
+            @endif
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
                 instantSave id="application.settings.is_force_https_enabled" label="Force Https" />

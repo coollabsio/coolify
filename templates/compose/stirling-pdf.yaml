@@ -1,0 +1,15 @@
+# documentation: https://github.com/Stirling-Tools/Stirling-PDF
+# slogan: Stirling is a powerful web based PDF manipulation tool
+# tags: pdf, manipulation, web, tool
+
+services:
+  stirling-pdf:
+    image: frooodle/s-pdf:latest
+    volumes:
+      - stirling-training-data:/usr/share/tesseract-ocr/5/tessdata
+      - stirling-configs:/configs
+      - stirling-custom-files:/customFiles/
+      - stirling-logs:/logs/
+    environment:
+      - SERVICE_FQDN_SPDF
+      - DOCKER_ENABLE_SECURITY=false

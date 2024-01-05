@@ -33,14 +33,6 @@ return [
         'sync' => [
             'driver' => 'sync',
         ],
-        'long-running' => [
-            'driver' => 'redis',
-            'connection' => 'default',
-            'queue' => 'long-running',
-            'retry_after' => 3600,
-            'block_for' => null,
-            'after_commit' => true,
-        ],
         'database' => [
             'driver' => 'database',
             'table' => 'jobs',
