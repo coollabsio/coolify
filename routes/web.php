@@ -143,6 +143,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}', ServiceIndex::class)->name('project.service.configuration');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/{service_name}', ServiceShow::class)->name('project.service.show');
     Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/command', ExecuteContainerCommand::class)->name('project.service.command');
+    Route::get('/project/{project_uuid}/{environment_name}/service/{service_uuid}/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
+
 });
 
 Route::middleware(['auth'])->group(function () {

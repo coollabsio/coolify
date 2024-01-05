@@ -7,7 +7,11 @@
     </x-modal>
 
     <h1>Scheduled Backup</h1>
+    @if ($type === 'application')
     <livewire:project.application.heading :application="$resource" />
+    @elseif ($type === 'service')
+    <livewire:project.service.navbar :service="$resource" :parameters="$parameters" />
+    @endif
 
     <form wire:submit="submit">
         <div class="flex flex-col gap-2 pb-10">
@@ -16,10 +20,6 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-
-                {{-- @if (Str::of($status)->startsWith('running'))
-                    <livewire:project.database.backup-now :backup="$backup" />
-                @endif --}}
 
                 <x-forms.button isError isModal modalId="{{ $modalId }}">
                     Delete
@@ -33,4 +33,10 @@
         <x-forms.input placeholder="0 0 * * * or daily" id="task.frequency" label="Frequency" required />
         <x-forms.input placeholder="php" id="task.container" label="Container name" />
     </form>
+
+    <div class="pt-10">
+        <h3 class="py-4">Recent executions</h3>
+        <livewire:project.shared.scheduled-task.executions key="{{ $task->id }}" selectedKey=""
+            :executions="$task->executions->take(-20)" />
+    </div>
 </div>

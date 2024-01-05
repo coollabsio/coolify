@@ -33,6 +33,7 @@ class All extends Component
             $task->command = $data['command'];
             $task->frequency = $data['frequency'];
             $task->container = $data['container'];
+            $task->team_id = currentTeam()->id;
 
             switch ($this->resource->type()) {
                 case 'application':

@@ -396,6 +396,10 @@ class Service extends BaseModel
         }
         return null;
     }
+    public function scheduled_tasks(): HasMany
+    {
+        return $this->hasMany(ScheduledTask::class)->orderBy('name', 'asc');
+    }
     public function environment_variables(): HasMany
     {
         return $this->hasMany(EnvironmentVariable::class)->orderBy('key', 'asc');

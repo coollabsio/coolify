@@ -26,6 +26,10 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
+            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
+                href="#">Scheduled Tasks
+            </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
@@ -160,6 +164,9 @@
                 <div x-cloak x-show="activeTab === 'environment-variables'">
                     <livewire:project.shared.environment-variable.all :resource="$service" />
                 </div>
+            </div>
+            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />

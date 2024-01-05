@@ -23,6 +23,7 @@ return new class extends Migration
 
             $table->foreignId('application_id')->nullable();
             $table->foreignId('service_id')->nullable();
+            $table->foreignId('team_id');
         });
     }
 
