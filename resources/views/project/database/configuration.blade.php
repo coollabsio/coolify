@@ -39,6 +39,11 @@
                 window.location.hash = 'resource-limits'"
                 href="#">Resource Limits
             </a>
+            <a :class="activeTab === 'import' && 'text-white'"
+                @click.prevent="activeTab = 'import';
+                window.location.hash = 'import'"
+                href="#">Import
+            </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
@@ -73,6 +78,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.shared.resource-limits :resource="$database" />
+            </div>
+            <div x-cloak x-show="activeTab === 'import'">
+                <livewire:project.database.import :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$database" />

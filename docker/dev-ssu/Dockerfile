@@ -37,3 +37,7 @@ RUN /bin/bash -c "if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     curl -L https://github.com/cloudflare/cloudflared/releases/download/${CLOUDFLARED_VERSION}/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared && chmod +x /usr/local/bin/cloudflared \
     ;fi"
 
+RUN { \
+    echo 'upload_max_filesize=256M'; \
+    echo 'post_max_size=256M'; \
+  } > /etc/php/current_version/cli/conf.d/upload-limits.ini
