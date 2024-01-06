@@ -101,12 +101,27 @@ function generate_default_proxy_configuration(Server $server)
     $labels = [
         "traefik.enable=true",
         "traefik.http.routers.traefik.entrypoints=http",
-        "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
         "traefik.http.routers.traefik.service=api@internal",
         "traefik.http.services.traefik.loadbalancer.server.port=8080",
         // Global Middlewares
         "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
         "traefik.http.middlewares.gzip.compress=true",
+        // https WWW to non-WWW
+        "traefik.http.middlewares.https-www-to-non-www.redirectregex.regex=^https?://www\\.(.+)",
+        "traefik.http.middlewares.https-www-to-non-www.redirectregex.replacement=https://\$1",
+        "traefik.http.middlewares.https-www-to-non-www.redirectregex.permanent=true",
+        // https Non-WWW to WWW
+        "traefik.http.middlewares.https-non-www-to-www.redirectregex.regex=^https?://(?:www\\.)?(.+)",
+        "traefik.http.middlewares.https-non-www-to-www.redirectregex.replacement=https://www.\$\${1}",
+        "traefik.http.middlewares.https-non-www-to-www.redirectregex.permanent=true",
+        // http www to non-WWW
+        "traefik.http.middlewares.http-www-to-non-www.redirectregex.regex=^http://www\\.(.+)",
+        "traefik.http.middlewares.http-www-to-non-www.redirectregex.replacement=http://\$1",
+        "traefik.http.middlewares.http-www-to-non-www.redirectregex.permanent=true",
+        // http Non-WWW to WWW
+        "traefik.http.middlewares.http-non-www-to-www.redirectregex.regex=^http://(?:www\\.)?(.+)",
+        "traefik.http.middlewares.http-non-www-to-www.redirectregex.replacement=http://www.\$\${1}",
+        "traefik.http.middlewares.http-non-www-to-www.redirectregex.permanent=true",
     ];
     $config = [
         "version" => "3.8",
