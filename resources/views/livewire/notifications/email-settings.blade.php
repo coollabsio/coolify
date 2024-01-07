@@ -1,7 +1,7 @@
 <div>
     <dialog id="sendTestEmail" class="modal">
         <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
-            <x-forms.input placeholder="test@example.com" id="emails" label="Recepients" required />
+            <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
             <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
                 Send Email
             </x-forms.button>
