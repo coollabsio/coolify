@@ -20,7 +20,7 @@
                                 clip-rule="evenodd"></path>
                         </svg>
                         <a class="text-xs truncate lg:text-sm"
-                            href="{{ route('project.resources', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+                            href="{{ route('project.resource.index', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
                     </div>
                 </li>
                 <li>

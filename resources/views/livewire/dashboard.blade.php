@@ -30,7 +30,7 @@
         <div class="gap-2 border border-transparent cursor-pointer box group">
             @if (data_get($project, 'environments.0.name'))
                 <a  class="flex flex-col flex-1 mx-6 hover:no-underline"
-                    href="{{ route('project.resources', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
+                    href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                     <div class="font-bold text-white">{{ $project->name }}</div>
                     <div class="description">
                         {{ $project->description }}</div>
@@ -45,7 +45,7 @@
             @endif
             <div class="flex items-center">
                 <a  class="mx-4 rounded group-hover:text-white hover:no-underline"
-                    href="{{ route('project.resources.new', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
+                    href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                     <span class="font-bold hover:text-warning">+ New Resource</span>
                 </a>
                 <a  class="mx-4 rounded group-hover:text-white"

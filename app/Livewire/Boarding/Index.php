@@ -274,7 +274,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->skipBoarding();
         return redirect()->route(
-            'project.resources.new',
+            'project.resource.create',
             [
                 'project_uuid' => $this->createdProject->uuid,
                 'environment_name' => 'production',

@@ -52,7 +52,7 @@ class Previews extends Component
                 force_rebuild: true,
                 pull_request_id: $pull_request_id,
             );
-            return redirect()->route('project.application.deployment', [
+            return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
                 'application_uuid' => $this->parameters['application_uuid'],
                 'deployment_uuid' => $this->deployment_uuid,

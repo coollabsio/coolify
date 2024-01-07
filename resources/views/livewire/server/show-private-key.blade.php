@@ -1,7 +1,7 @@
 <div>
     <div class="flex items-end gap-2 pb-6 ">
         <h2>Private Key</h2>
-        <a href="{{ route('security.private-key.new') }}">
+        <a href="{{ route('security.private-key.create') }}">
             <x-forms.button>Add a new Private Key</x-forms.button>
         </a>
         <x-forms.button wire:click.prevent='checkConnection'>

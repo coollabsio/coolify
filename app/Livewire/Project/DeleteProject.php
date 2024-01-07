@@ -25,6 +25,6 @@ class DeleteProject extends Component
             return $this->dispatch('error', 'Project has resources defined, please delete them first.');
         }
         $project->delete();
-        return redirect()->route('projects');
+        return redirect()->route('project.index');
     }
 }

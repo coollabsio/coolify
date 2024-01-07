@@ -4,7 +4,6 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
 use Livewire\Component;
 
 class Configuration extends Component

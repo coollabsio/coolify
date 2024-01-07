@@ -162,6 +162,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             // Notify user that this container should not be there.
                         }
                     }
+                    if (data_get($container,'Name') === '/coolify-db') {
+                        $foundDatabases[] = 0;
+                    }
+
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
@@ -212,7 +216,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $name = data_get($exitedService, 'name');
                 $fqdn = data_get($exitedService, 'fqdn');
-                $containerName = $name ? "$name ($fqdn)" : $fqdn;
+                $containerName = $name ? "$name, available at $fqdn" : $fqdn;
                 $projectUuid = data_get($service, 'environment.project.uuid');
                 $serviceUuid = data_get($service, 'uuid');
                 $environmentName = data_get($service, 'environment.name');

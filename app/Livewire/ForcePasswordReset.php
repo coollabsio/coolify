@@ -22,6 +22,10 @@ class ForcePasswordReset extends Component
     {
         $this->email = auth()->user()->email;
     }
+    public function render()
+    {
+        return view('livewire.force-password-reset')->layout('layouts.simple');
+    }
     public function submit()
     {
         try {
