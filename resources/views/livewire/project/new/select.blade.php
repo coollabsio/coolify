@@ -77,7 +77,7 @@
                             Based on an existing Docker Image
                         </div>
                         <div class="description">
-                            You can deploy an existing Docker Image form any Registry, without Git.
+                            You can deploy an existing Docker Image from any Registry, without Git.
                         </div>
                     </div>
                 </div>
