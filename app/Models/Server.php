@@ -358,10 +358,10 @@ class Server extends BaseModel
     public function validateOS(): bool | Stringable
     {
         $os_release = instant_remote_process(['cat /etc/os-release'], $this);
-        $data = collect(explode("\n", $os_release));
+        $releaseLines = collect(explode("\n", $os_release));
         $collectedData = collect([]);
-        foreach ($data as $data) {
-            $item = Str::of($data)->trim();
+        foreach ($releaseLines as $line) {
+            $item = Str::of($line)->trim();
             $collectedData->put($item->before('=')->value(), $item->after('=')->lower()->replace('"', '')->value());
         }
         $ID = data_get($collectedData, 'ID');
