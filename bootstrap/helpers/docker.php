@@ -226,8 +226,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if (is_null($port) && !is_null($onlyPort)) {
                 $port = $onlyPort;
             }
-            $http_label = "{$uuid}-{$loop}-http";
-            $https_label = "{$uuid}-{$loop}-https";
+            $http_label = "http-{$loop}-{$uuid}";
+            $https_label = "https-{$loop}-{$uuid}";
 
             if ($schema === 'https') {
                 // Set labels for https
@@ -275,7 +275,7 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
         }
     }
 
-    return $labels;
+    return $labels->sort();
 }
 function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
 {
