@@ -17,16 +17,16 @@ class Index extends Component
         if (isInstanceAdmin()) {
             $settings = InstanceSettings::get();
             $database = StandalonePostgresql::whereName('coolify-db')->first();
+            $s3s = S3Storage::whereTeamId(0)->get() ?? [];
             if ($database) {
                 if ($database->status !== 'running') {
                     $database->status = 'running';
                     $database->save();
                 }
-                $s3s = S3Storage::whereTeamId(0)->get();
+                $this->database = $database;
             }
             $this->settings = $settings;
-            $this->database = $database;
-            $this->s3s = $s3s ?? [];
+            $this->s3s = $s3s;
         } else {
             return redirect()->route('dashboard');
         }
