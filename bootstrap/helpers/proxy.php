@@ -155,7 +155,7 @@ function generate_default_proxy_configuration(Server $server)
         ],
     ];
     if (isDev()) {
-        $config['services']['traefik']['command'][] = "--log.level=debug";
+        // $config['services']['traefik']['command'][] = "--log.level=debug";
         $config['services']['traefik']['command'][] = "--accesslog.filepath=/traefik/access.log";
         $config['services']['traefik']['command'][] = "--accesslog.bufferingsize=100";
     }
