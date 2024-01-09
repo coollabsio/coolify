@@ -679,7 +679,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                             "echo 'Attempt {$counter} of {$this->application->health_check_retries} | Healthcheck status: {$this->saved_outputs->get('health_check')}'"
                         ],
                     );
-                    if (Str::of($this->saved_outputs->get('health_check'))->contains('healthy')) {
+                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'healthy') {
                         $this->newVersionIsHealthy = true;
                         $this->application->update(['status' => 'running']);
                         $this->execute_remote_command(
@@ -687,6 +687,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                                 "echo 'New container is healthy.'"
                             ],
                         );
+                        break;
+                    }
+                    if (Str::of($this->saved_outputs->get('health_check'))->replace('"', '')->value() === 'unhealthy') {
+                        $this->newVersionIsHealthy = false;
                         break;
                     }
                     $counter++;
