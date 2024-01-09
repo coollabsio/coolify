@@ -1,4 +1,4 @@
-FROM serversideup/php:8.2-fpm-nginx-v2.2.0 as base
+FROM serversideup/php:8.2-fpm-nginx as base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
@@ -11,7 +11,7 @@ COPY --from=base --chown=9999:9999 /var/www/html .
 RUN npm install
 RUN npm run build
 
-FROM serversideup/php:8.2-fpm-nginx-v2.2.0
+FROM serversideup/php:8.2-fpm-nginx
 
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
@@ -31,7 +31,7 @@ RUN apt-get update
 RUN apt-get install postgresql-client-$POSTGRES_VERSION -y
 
 # Coolify requirements
-RUN apt-get install -y php-pgsql openssh-client git git-lfs jq lsof
+RUN apt-get install -y php8.2-pgsql openssh-client git git-lfs jq lsof
 RUN apt-get -y autoremove && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc/*
 
 COPY docker/prod-ssu/nginx.conf /etc/nginx/conf.d/custom.conf
