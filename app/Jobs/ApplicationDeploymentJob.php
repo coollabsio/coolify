@@ -350,6 +350,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_image_names();
         $this->check_image_locally_or_remotely();
         if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty()) {
+            $this->execute_remote_command([
+                "echo 'Image found ({$this->production_image_name}) with the same Git Commit SHA. Restarting container.'",
+            ]);
             $this->create_workdir();
             $this->generate_compose_file();
             $this->rolling_update();
@@ -604,6 +607,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->rolling_update();
     }
 
+    private function framework_based_notification()
+    {
+        // Laravel old env variables
+        if ($this->pull_request_id === 0) {
+            $nixpacks_php_fallback_path = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
+            $nixpacks_php_root_dir = $this->application->environment_variables->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
+        } else {
+            $nixpacks_php_fallback_path = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_FALLBACK_PATH')->first();
+            $nixpacks_php_root_dir = $this->application->environment_variables_preview->where('key', 'NIXPACKS_PHP_ROOT_DIR')->first();
+        }
+        if ($nixpacks_php_fallback_path?->value === '/index.php' && $nixpacks_php_root_dir?->value === '/app/public' && $this->newVersionIsHealthy === false) {
+            $this->execute_remote_command(
+                [
+                    "echo 'There was a change in how Laravel is deployed. Please update your environment variables to match the new deployment method. More details here: https://coolify.io/docs/frameworks/laravel#requirements'", 'type' => 'err'
+                ],
+            );
+        }
+    }
     private function rolling_update()
     {
         if ($this->server->isSwarm()) {
@@ -640,6 +661,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->application_deployment_queue->addLogEntry("Rolling update completed.");
             }
         }
+        $this->framework_based_notification();
     }
     private function health_check()
     {
@@ -873,7 +895,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_nixpacks_confs()
     {
         $nixpacks_command = $this->nixpacks_build_cmd();
-        ray($nixpacks_command);
         $this->execute_remote_command(
             [
                 "echo -n 'Generating nixpacks configuration with: $nixpacks_command'",
