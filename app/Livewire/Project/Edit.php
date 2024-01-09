@@ -12,6 +12,15 @@ class Edit extends Component
         'project.name' => 'required|min:3|max:255',
         'project.description' => 'nullable|string|max:255',
     ];
+    public function mount() {
+        $projectUuid = request()->route('project_uuid');
+        $teamId = currentTeam()->id;
+        $project = Project::where('team_id', $teamId)->where('uuid', $projectUuid)->first();
+        if (!$project) {
+            return redirect()->route('dashboard');
+        }
+        $this->project = $project;
+    }
 
     public function submit()
     {

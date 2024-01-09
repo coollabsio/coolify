@@ -1,6 +1,5 @@
 <x-emails.layout>
-    Connection could not be establised with one of your S3 Storage ({{ $name }}). Please fix it
-    [here]({{ $url }}).
+Connection could not be establised with one of your S3 Storage ({{ $name }}). Please fix it [here]({{ $url }}).
 
-    {{ $reason }}
+{{ $reason }}
 </x-emails.layout>

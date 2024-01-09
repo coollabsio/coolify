@@ -408,7 +408,7 @@ function generateFqdn(Server $server, string $random)
 }
 function sslip(Server $server)
 {
-    if (isDev()) {
+    if (isDev() && $server->id === 0) {
         return "http://127.0.0.1.sslip.io";
     }
     if ($server->ip === 'host.docker.internal') {
