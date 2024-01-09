@@ -1,4 +1,4 @@
-FROM serversideup/php:8.2-fpm-nginx as base
+FROM serversideup/php:8.1-fpm-nginx-v2.2.0 as base
 WORKDIR /var/www/html
 
 COPY composer.json composer.lock ./
@@ -11,7 +11,7 @@ COPY --from=base --chown=9999:9999 /var/www/html .
 RUN npm install
 RUN npm run build
 
-FROM serversideup/php:8.2-fpm-nginx
+FROM serversideup/php:8.1-fpm-nginx-v2.2.0
 
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
