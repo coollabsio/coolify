@@ -1,7 +1,7 @@
-<x-layout>
+<div>
     <h1>Configuration</h1>
     <livewire:project.database.heading :database="$database" />
-    <x-modal modalId="startDatabase">
+    <x-modal modalId="startDatabase" noSubmit>
         <x-slot:modalBody>
             <livewire:activity-monitor header="Database Startup Logs" />
         </x-slot:modalBody>
@@ -87,4 +87,4 @@
             </div>
         </div>
     </div>
-</x-layout>
+</div>
