@@ -7,7 +7,7 @@
             </x-forms.button>
         </div>
         @isset($rate_limit_remaining)
-            <div class="pt-1 ">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>
+            <div class="pt-1 ">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
         @if (count($pull_requests) > 0)
             <div wire:loading.remove wire:target='load_prs'>
@@ -84,7 +84,7 @@
                             wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove Preview
                         </x-forms.button>
                         <a
-                            href="{{ route('project.application.deployments', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
+                            href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
                             <x-forms.button class="bg-coolgray-500">
                                 Get Deployment Logs
                             </x-forms.button>

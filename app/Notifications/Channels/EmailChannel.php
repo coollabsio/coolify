@@ -14,8 +14,8 @@ class EmailChannel
     {
         try {
             $this->bootConfigs($notifiable);
-            $recepients = $notifiable->getRecepients($notification);
-            if (count($recepients) === 0) {
+            $recipients = $notifiable->getRecepients($notification);
+            if (count($recipients) === 0) {
                 throw new Exception('No email recipients found');
             }
 
@@ -24,7 +24,7 @@ class EmailChannel
                 [],
                 [],
                 fn (Message $message) => $message
-                    ->to($recepients)
+                    ->to($recipients)
                     ->subject($mailMessage->subject)
                     ->html((string)$mailMessage->render())
             );
@@ -35,8 +35,8 @@ class EmailChannel
             }
             ray($e->getMessage());
             $message = "EmailChannel error: {$e->getMessage()}. Failed to send email to:";
-            if (isset($recepients)) {
-                $message .= implode(', ', $recepients);
+            if (isset($recipients)) {
+                $message .= implode(', ', $recipients);
             }
             if (isset($mailMessage)) {
                 $message .= " with subject: {$mailMessage->subject}";

@@ -1,7 +1,7 @@
 <nav class="flex pt-2 pb-10">
     <ol class="flex items-center">
         <li class="inline-flex items-center">
-            <a wire:nagivate class="text-xs truncate lg:text-sm"
+            <a wire:navigate class="text-xs truncate lg:text-sm"
                 href="{{ route('project.show', ['project_uuid' => $this->parameters['project_uuid']]) }}">
                 {{ data_get($resource, 'environment.project.name', 'Undefined Name') }}</a>
         </li>
@@ -14,7 +14,7 @@
                         clip-rule="evenodd"></path>
                 </svg>
                 <a  class="text-xs truncate lg:text-sm"
-                    href="{{ route('project.resources', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">{{ $this->parameters['environment_name'] }}</a>
+                    href="{{ route('project.resource.index', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">{{ $this->parameters['environment_name'] }}</a>
             </div>
         </li>
         <li>

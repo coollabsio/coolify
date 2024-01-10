@@ -302,7 +302,7 @@
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
                     Once you connected your server, Coolify will start managing it and do a
-                    lot of adminstrative tasks for you. You can also write your own scripts to
+                    lot of administrative tasks for you. You can also write your own scripts to
                     automate your server<span class="text-warning">*</span>.
                 </div>
             </div>
@@ -384,7 +384,7 @@
                     <div class="text-2xl font-semibold text-white">Powerful API</div>
                 </div>
                 <div class="mt-1 text-base leading-7 text-gray-300">
-                    Programatically deploy, query, and manage your servers & resources.
+                    Programmatically deploy, query, and manage your servers & resources.
                     Integrate to your CI/CD pipelines, or build your own custom integrations. <span
                         class="text-warning">*</span>
                 </div>

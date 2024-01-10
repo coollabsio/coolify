@@ -27,7 +27,7 @@ class AddEnvironment extends Component
                 'project_id' => $this->project->id,
             ]);
 
-            return redirect()->route('project.resources', [
+            return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->project->uuid,
                 'environment_name' => $environment->name,
             ]);

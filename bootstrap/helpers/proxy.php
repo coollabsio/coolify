@@ -101,7 +101,6 @@ function generate_default_proxy_configuration(Server $server)
     $labels = [
         "traefik.enable=true",
         "traefik.http.routers.traefik.entrypoints=http",
-        "traefik.http.routers.traefik.middlewares=traefik-basic-auth@file",
         "traefik.http.routers.traefik.service=api@internal",
         "traefik.http.services.traefik.loadbalancer.server.port=8080",
         // Global Middlewares
@@ -156,7 +155,7 @@ function generate_default_proxy_configuration(Server $server)
         ],
     ];
     if (isDev()) {
-        $config['services']['traefik']['command'][] = "--log.level=debug";
+        // $config['services']['traefik']['command'][] = "--log.level=debug";
         $config['services']['traefik']['command'][] = "--accesslog.filepath=/traefik/access.log";
         $config['services']['traefik']['command'][] = "--accesslog.bufferingsize=100";
     }

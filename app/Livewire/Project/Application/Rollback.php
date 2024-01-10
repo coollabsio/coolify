@@ -29,7 +29,7 @@ class Rollback extends Component
             commit: $commit,
             force_rebuild: false,
         );
-        return redirect()->route('project.application.deployment', [
+        return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $deployment_uuid,

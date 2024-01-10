@@ -39,7 +39,7 @@ class Heading extends Component
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));
         }
-        if ($showNotification) $this->dispatch('success', 'Application status updated.');
+        if ($showNotification) $this->dispatch('success', "Application ({$this->application->name}) status updated.");
     }
 
     public function force_deploy_without_cache()
@@ -60,7 +60,7 @@ class Heading extends Component
             force_rebuild: false,
             is_new_deployment: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
@@ -83,7 +83,7 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
-        return redirect()->route('project.application.deployment', [
+        return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
@@ -113,7 +113,7 @@ class Heading extends Component
             restart_only: true,
             is_new_deployment: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
@@ -128,7 +128,7 @@ class Heading extends Component
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );
-        return redirect()->route('project.application.deployment', [
+        return redirect()->route('project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],
             'application_uuid' => $this->parameters['application_uuid'],
             'deployment_uuid' => $this->deploymentUuid,
