@@ -8,7 +8,6 @@
     <div class="flex flex-wrap gap-2">
         @forelse($resource->scheduled_tasks as $task)
             <a class="flex flex-col box"
-
                 @if ($resource->type() == 'application')
                 href="{{ route('project.application.scheduled-tasks', [...$parameters, 'task_uuid' => $task->uuid]) }}">
                 @elseif  ($resource->type() == 'service')
@@ -19,7 +18,7 @@
                 <div>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}</div>
             </a>
         @empty
-            <div>No scheduled tasks configured.</div>
+            <div class="text-neutral-500">No scheduled tasks configured.</div>
         @endforelse
     </div>
 </div>

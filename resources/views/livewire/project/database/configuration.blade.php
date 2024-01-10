@@ -31,6 +31,11 @@
                 window.location.hash = 'storages'"
                 href="#">Storages
             </a>
+            <a :class="activeTab === 'import' && 'text-white'"
+                @click.prevent="activeTab = 'import';
+            window.location.hash = 'import'" href="#">Import
+                Backup
+            </a>
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
@@ -39,11 +44,7 @@
                 window.location.hash = 'resource-limits'"
                 href="#">Resource Limits
             </a>
-            <a :class="activeTab === 'import' && 'text-white'"
-                @click.prevent="activeTab = 'import';
-                window.location.hash = 'import'"
-                href="#">Import
-            </a>
+
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
