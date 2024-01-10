@@ -99,7 +99,7 @@ class Init extends Command
             return;
         }
         try {
-            Http::get("https://get.coollabs.io/coolify/v4/alive?appId=$id&version=$version");
+            Http::get("https://undead.coollabs.io/coolify/v4/alive?appId=$id&version=$version");
             echo "I am alive!\n";
         } catch (\Throwable $e) {
             echo "Error in alive: {$e->getMessage()}\n";

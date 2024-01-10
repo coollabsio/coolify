@@ -2,7 +2,7 @@
     <h1>Configuration</h1>
     <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
-        <div class="flex flex-col gap-4 min-w-fit">
+        <div class="flex flex-col gap-4 xl:w-48">
             <a :class="activeTab === 'general' && 'text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             @if ($application->destination->server->isSwarm())
