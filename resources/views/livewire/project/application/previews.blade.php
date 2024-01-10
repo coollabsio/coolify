@@ -7,7 +7,7 @@
             </x-forms.button>
         </div>
         @isset($rate_limit_remaining)
-            <div class="pt-1 ">Requests remaning till rate limited by Git: {{ $rate_limit_remaining }}</div>
+            <div class="pt-1 ">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
         @if (count($pull_requests) > 0)
             <div wire:loading.remove wire:target='load_prs'>

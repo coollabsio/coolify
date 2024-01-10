@@ -10,8 +10,8 @@
             helper="
     You can use these variables in your Docker Compose file and Coolify will generate default values or replace them with the values you set on the UI forms.<br>
     <br>
-    - SERVICE_FQDN_*: FQDN - could be changable from the UI. (example: SERVICE_FQDN_GHOST)<br>
-    - SERVICE_URL_*: URL parsed from FQDN - could be changable from the UI. (example: SERVICE_URL_GHOST)<br>
+    - SERVICE_FQDN_*: FQDN - could be changeable from the UI. (example: SERVICE_FQDN_GHOST)<br>
+    - SERVICE_URL_*: URL parsed from FQDN - could be changeable from the UI. (example: SERVICE_URL_GHOST)<br>
     - SERVICE_BASE64_64_*: Generated 'base64' string with length of '64' (example: SERVICE_BASE64_64_GHOST, to generate 32 bit: SERVICE_BASE64_32_GHOST)<br>
     - SERVICE_USER_*: Generated user (example: SERVICE_USER_MYSQL)<br>
     - SERVICE_PASSWORD_*: Generated password (example: SERVICE_PASSWORD_MYSQL)<br>"
