@@ -31,7 +31,7 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 <a href="https://github.com/whitesidest"><img src="https://avatars.githubusercontent.com/u/12365916?s=52&v=4" width="60px" alt="Tyler Whitesides" /></a>
 <a href="https://github.com/aniftyco"><img src="https://github.com/aniftyco.png" width="60px" alt="NiftyCo" /></a>
 <a href="https://github.com/iujlaki"><img src="https://github.com/iujlaki.png" width="60px" alt="Imre Ujlaki" /></a>
-<a href="https://github.com/Illyism"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
+<a href="https://il.ly"><img src="https://github.com/Illyism.png" width="60px" alt="Ilias Ism" /></a>
 <a href="https://github.com/urtho"><img src="https://github.com/urtho.png" width="60px" alt="Paweł Pierścionek" /></a>
 <a href="https://github.com/monocursive"><img src="https://github.com/monocursive.png" width="60px" alt="Michael Mazurczak" /></a>
 
