@@ -1,25 +1,30 @@
 <div class="flex flex-col-reverse gap-2">
     @forelse($executions as $execution)
-            <a class="flex flex-col box" wire:click="selectTask({{ data_get($execution, 'id') }})"
-                @class([
-                    'border-green-500' => data_get($execution, 'status') === 'success',
-                    'border-red-500' => data_get($execution, 'status') === 'failed',
-                ])>
-                @if (data_get($execution, 'status') === 'running')
+        @if (data_get($execution, 'id') == $selectedKey)
+            <div class="p-2">
+                @if (data_get($execution, 'message'))
+                    <div>
+                        <pre>{{ data_get($execution, 'message') }}</pre>
+                    </div>
+                @else
+                    <div>No output was recorded for this execution.</div>
+                @endif
+            </div>
+        @endif
+        <a wire:click="selectTask({{ data_get($execution, 'id') }})" @class([
+            'flex flex-col border-l border-dashed transition-colors box-without-bg bg-coolgray-100 hover:bg-coolgray-100',
+            'bg-coolgray-200 text-white hover:bg-coolgray-200' =>
+                data_get($execution, 'id') == $selectedKey,
+            'border-green-500' => data_get($execution, 'status') === 'success',
+            'border-red-500' => data_get($execution, 'status') === 'failed',
+        ])>
+            @if (data_get($execution, 'status') === 'running')
                 <div class="absolute top-2 right-2">
                     <x-loading />
                 </div>
-                @endif
-                <div>Status: {{ data_get($execution, 'status') }}</div>
-                <div>Started At: {{ data_get($execution, 'created_at') }}</div>
-                @if (data_get($execution, 'id') == $selectedKey)
-                    @if (data_get($execution, 'message'))
-                        <div>Output: <pre>{{ data_get($execution, 'message') }}</pre></div>
-                    @else
-                        <div>No output was recorded for this execution.</div>
-                    @endif
-                @endif
-            </a>
+            @endif
+            <div>Status: {{ data_get($execution, 'status') }}</div>
+            <div>Started At: {{ data_get($execution, 'created_at') }}</div>
         </a>
     @empty
         <div>No executions found.</div>

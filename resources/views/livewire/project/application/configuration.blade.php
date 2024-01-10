@@ -18,7 +18,9 @@
                     href="#">Environment
                     Variables</a>
             @endif
-
+            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+            @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'" href="#">Scheduled Tasks
+        </a>
             @if ($application->git_based())
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
@@ -54,9 +56,7 @@
                     href="#">Resource Limits
                 </a>
             @endif
-            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
-                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'" href="#">Scheduled Tasks
-            </a>
+
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
