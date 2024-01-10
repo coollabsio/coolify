@@ -170,6 +170,10 @@ class General extends Component
             $this->application->fqdn = null;
             $this->application->settings->save();
         }
+        if ($this->application->build_pack === 'static') {
+            $this->application->ports_exposes = $this->ports_exposes = 80;
+            $this->resetDefaultLabels(false);
+        }
         $this->submit();
     }
     public function checkLabelUpdates()
