@@ -1,4 +1,4 @@
-<div>
+<x-layout>
     <h1>Configuration</h1>
     <livewire:project.database.heading :database="$database" />
     <x-modal modalId="startDatabase">
@@ -41,7 +41,8 @@
             </a>
             <a :class="activeTab === 'import' && 'text-white'"
                 @click.prevent="activeTab = 'import';
-            window.location.hash = 'import'" href="#">Import
+                window.location.hash = 'import'"
+                href="#">Import
             </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
@@ -86,4 +87,4 @@
             </div>
         </div>
     </div>
-</div>
+</x-layout>
