@@ -178,6 +178,7 @@ class General extends Component
             $this->resetDefaultLabels(false);
         }
         $this->submit();
+        $this->dispatch('build_pack_updated');
     }
     public function checkLabelUpdates()
     {
