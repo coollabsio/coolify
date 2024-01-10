@@ -13,6 +13,19 @@
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'; if(window.location.search) window.location.search = ''"
                 href="#">Storages
             </a>
+            <a :class="activeTab === 'environment-variables' && 'text-white'"
+                @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
+                href="#">Environment
+                Variables</a>
+            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
+                href="#">Scheduled Tasks
+            </a>
+            <a :class="activeTab === 'danger' && 'text-white'"
+                @click.prevent="activeTab = 'danger';
+                window.location.hash = 'danger'"
+                href="#">Danger Zone
+         
             @if (
                 $serviceDatabase?->databaseType() === 'standalone-mysql' ||
                     $serviceDatabase?->databaseType() === 'standalone-postgresql' ||
@@ -56,6 +69,13 @@
                     <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="$s3s" />
                     <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                 </div>
+            </div>
+            <div x-cloak x-show="activeTab === 'scheduled-tasks'">
+                <livewire:project.shared.scheduled-task.all :resource="$service" />
+            </div>
+            <div x-cloak x-show="activeTab === 'danger'">
+                <livewire:project.shared.danger :resource="$service" />
+            </div>
             @endisset
         </div>
     </div>
