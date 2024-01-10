@@ -162,7 +162,6 @@ class General extends Component
     }
     public function updatedApplicationBuildPack()
     {
-        ray($this->application->build_pack);
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = false;
             $this->application->settings->save();
