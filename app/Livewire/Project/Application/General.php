@@ -162,9 +162,13 @@ class General extends Component
     }
     public function updatedApplicationBuildPack()
     {
+        ray($this->application->build_pack);
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = false;
             $this->application->settings->save();
+        } else {
+            $this->application->ports_exposes = $this->ports_exposes = 3000;
+            $this->resetDefaultLabels(false);
         }
         if ($this->application->build_pack === 'dockercompose') {
             $this->application->fqdn = null;
