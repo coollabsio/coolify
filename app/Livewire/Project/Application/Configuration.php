@@ -4,13 +4,14 @@ namespace App\Livewire\Project\Application;
 
 use App\Models\Application;
 use App\Models\Server;
-use App\Models\StandaloneDocker;
 use Livewire\Component;
 
 class Configuration extends Component
 {
     public Application $application;
     public $servers;
+    protected $listeners = ['build_pack_updated' => '$refresh'];
+
     public function mount()
     {
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();

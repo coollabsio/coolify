@@ -226,8 +226,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             if (is_null($port) && !is_null($onlyPort)) {
                 $port = $onlyPort;
             }
-            $http_label = "{$uuid}-{$loop}-http";
-            $https_label = "{$uuid}-{$loop}-https";
+            $http_label = "http-{$loop}-{$uuid}";
+            $https_label = "https-{$loop}-{$uuid}";
 
             if ($schema === 'https') {
                 // Set labels for https
@@ -249,6 +249,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 // Set labels for http (redirect to https)
                 $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
+                if ($port) {
+                    $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
+                    $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
+                }
                 if ($is_force_https_enabled) {
                     $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
                 }
@@ -258,27 +262,26 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
                 $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
                 if ($port) {
-                    $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
+                    $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($path !== '/') {
                     $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
                     $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
                 }
             }
-        } catch(\Throwable $e) {
+        } catch (\Throwable $e) {
             continue;
         }
-
     }
 
-    return $labels;
+    return $labels->sort();
 }
 function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array
 {
     $ports = $application->settings->is_static ? [80] : $application->ports_exposes_array;
     $onlyPort = null;
-    if (count($ports) === 1) {
+    if (count($ports) > 0) {
         $onlyPort = $ports[0];
     }
     $pull_request_id = data_get($preview, 'pull_request_id', 0);

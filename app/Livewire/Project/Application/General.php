@@ -165,12 +165,20 @@ class General extends Component
         if ($this->application->build_pack !== 'nixpacks') {
             $this->application->settings->is_static = false;
             $this->application->settings->save();
+        } else {
+            $this->application->ports_exposes = $this->ports_exposes = 3000;
+            $this->resetDefaultLabels(false);
         }
         if ($this->application->build_pack === 'dockercompose') {
             $this->application->fqdn = null;
             $this->application->settings->save();
         }
+        if ($this->application->build_pack === 'static') {
+            $this->application->ports_exposes = $this->ports_exposes = 80;
+            $this->resetDefaultLabels(false);
+        }
         $this->submit();
+        $this->dispatch('build_pack_updated');
     }
     public function checkLabelUpdates()
     {

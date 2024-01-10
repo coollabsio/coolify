@@ -13,8 +13,8 @@
         href="{{ route('project.application.logs', $parameters) }}">
         <button>Logs</button>
     </a>
-    <a class="{{ request()->routeIs('project.application.deployments') ? 'text-white' : '' }}"
-        href="{{ route('project.application.deployments', $parameters) }}">
+    <a class="{{ request()->routeIs('project.application.deployment.index') ? 'text-white' : '' }}"
+        href="{{ route('project.application.deployment.index', $parameters) }}">
         <button>Deployments</button>
     </a>
     <x-applications.links :application="$application" />

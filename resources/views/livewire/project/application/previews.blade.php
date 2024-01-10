@@ -84,7 +84,7 @@
                             wire:click="stop({{ data_get($preview, 'pull_request_id') }})">Remove Preview
                         </x-forms.button>
                         <a
-                            href="{{ route('project.application.deployments', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
+                            href="{{ route('project.application.deployment.index', [...$parameters, 'pull_request_id' => data_get($preview, 'pull_request_id')]) }}">
                             <x-forms.button class="bg-coolgray-500">
                                 Get Deployment Logs
                             </x-forms.button>

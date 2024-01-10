@@ -15,7 +15,7 @@ class Logs extends Component
         try {
             $this->server = Server::ownedByCurrentTeam()->whereUuid(request()->server_uuid)->first();
             if (is_null($this->server)) {
-                return redirect()->route('server.all');
+                return redirect()->route('server.index');
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

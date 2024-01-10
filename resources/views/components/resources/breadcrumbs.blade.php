@@ -14,7 +14,7 @@
                         clip-rule="evenodd"></path>
                 </svg>
                 <a  class="text-xs truncate lg:text-sm"
-                    href="{{ route('project.resources', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">{{ $this->parameters['environment_name'] }}</a>
+                    href="{{ route('project.resource.index', ['environment_name' => $this->parameters['environment_name'], 'project_uuid' => $this->parameters['project_uuid']]) }}">{{ $this->parameters['environment_name'] }}</a>
             </div>
         </li>
         <li>

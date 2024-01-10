@@ -52,7 +52,7 @@ class BackupEdit extends Component
             $url = $url->getPath() .  "#{$url->getFragment()}";
             return redirect($url);
         } else {
-            return redirect()->route('project.database.backups.all', $this->parameters);
+            return redirect()->route('project.database.backup.index', $this->parameters);
         }
 
     }

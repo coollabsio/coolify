@@ -755,7 +755,6 @@ class Application extends BaseModel
         // if (count($this->ports_mappings_array) > 0) {
         // $deployment->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
         $containers = getCurrentApplicationContainerStatus($server, $this->id, $pullRequestId);
-        ray($containers);
         // if ($pullRequestId === 0) {
         //     $containers = $containers->filter(function ($container) use ($containerName) {
         //         return data_get($container, 'Names') !== $containerName;
@@ -867,7 +866,6 @@ class Application extends BaseModel
             } else {
                 $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command_base);
             }
-            ray($git_clone_command);
             if ($exec_in_docker) {
                 $commands = collect([
                     executeInDocker($deployment_uuid, "mkdir -p /root/.ssh"),

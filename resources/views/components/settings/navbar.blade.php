@@ -2,8 +2,8 @@
     <h1>Settings</h1>
     <div class="subtitle">Instance wide settings for Coolify.</div>
     <nav class="navbar-main">
-        <a class="{{ request()->routeIs('settings.configuration') ? 'text-white' : '' }}"
-            href="{{ route('settings.configuration') }}">
+        <a class="{{ request()->routeIs('settings.index') ? 'text-white' : '' }}"
+            href="{{ route('settings.index') }}">
             <button>Configuration</button>
         </a>
         @if (isCloud())
