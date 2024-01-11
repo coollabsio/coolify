@@ -108,8 +108,8 @@ class ExecuteContainerCommand extends Component
         $this->validate();
         try {
             // Wrap command to prevent escaped execution in the host.
-            $cmd = 'sh -c "' . str_replace('"', '\"', $this->command)  . '"';
-
+            $cmd = 'sh -c "if [ -f ~/.profile ]; then . ~/.profile; fi; ' . str_replace('"', '\"', $this->command)  . '"';
+            ray($cmd);
             if (!empty($this->workDir)) {
                 $exec = "docker exec -w {$this->workDir} {$this->container} {$cmd}";
             } else {
