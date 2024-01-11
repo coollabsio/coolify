@@ -32,7 +32,7 @@
                     <input wire:model="file"
                         class="block w-full text-sm rounded cursor-pointer text-whiteborder bg-coolgray-100 border-coolgray-400 focus:outline-none"
                         aria-describedby="file_input_help" id="file_input" type="file">
-                    <p class="mt-1 text-sm text-neutral-500" id="file_input_help">Max file size: 100MB
+                    <p class="mt-1 text-sm text-neutral-500" id="file_input_help">Max file size: 256MB
                     </p>
 
                     @error('file')
