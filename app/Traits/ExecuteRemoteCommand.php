@@ -59,7 +59,7 @@ trait ExecuteRemoteCommand
                 $this->application_deployment_queue->save();
 
                 if ($this->save) {
-                    $this->saved_outputs[$this->save] = Str::of($output)->trim();
+                    $this->saved_outputs[$this->save] .= Str::of($output)->trim();
                 }
             });
             $this->application_deployment_queue->update([
