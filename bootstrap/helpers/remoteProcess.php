@@ -126,7 +126,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
         $ssh_command .= '-o ProxyCommand="/usr/local/bin/cloudflared access ssh --hostname %h" ';
     }
-    $command = "PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
+    $command = "test -f ~/.profile && . ~/.profile; PATH=\$PATH:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/host/usr/local/sbin:/host/usr/local/bin:/host/usr/sbin:/host/usr/bin:/host/sbin:/host/bin && $command";
     $ssh_command .= "-i {$privateKeyLocation} "
         . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
         . '-o PasswordAuthentication=no '
