@@ -3,14 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Events\TestEvent;
-use App\Models\InstanceSettings;
-use App\Models\S3Storage;
-use App\Models\StandalonePostgresql;
 use App\Models\TeamInvitation;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Http\Request;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Crypt;
@@ -35,25 +34,25 @@ class Controller extends BaseController
     public function verify() {
         return view('auth.verify-email');
     }
-    public function email_verify() {
-        request()->fulfill();
+    public function email_verify(EmailVerificationRequest $request) {
+        $request->fulfill();
         $name = request()->user()?->name;
         send_internal_notification("User {$name} verified their email address.");
         return redirect(RouteServiceProvider::HOME);
     }
-    public function forgot_password() {
+    public function forgot_password(Request $request) {
         if (is_transactional_emails_active()) {
-            $arrayOfRequest = request()->only(Fortify::email());
-            request()->merge([
+            $arrayOfRequest = $request->only(Fortify::email());
+            $request->merge([
                 'email' => Str::lower($arrayOfRequest['email']),
             ]);
             $type = set_transanctional_email_settings();
             if (!$type) {
                 return response()->json(['message' => 'Transactional emails are not active'], 400);
             }
-            request()->validate([Fortify::email() => 'required|email']);
+            $request->validate([Fortify::email() => 'required|email']);
             $status = Password::broker(config('fortify.passwords'))->sendResetLink(
-                request()->only(Fortify::email())
+                $request->only(Fortify::email())
             );
             if ($status == Password::RESET_LINK_SENT) {
                 return app(SuccessfulPasswordResetLinkRequestResponse::class, ['status' => $status]);
