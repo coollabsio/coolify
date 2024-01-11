@@ -67,16 +67,49 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Support\Facades\Password;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Fortify;
+use Illuminate\Support\Str;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
 
-Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
+Route::post('/forgot-password', function (Request $request) {
+    if (is_transactional_emails_active()) {
+        $arrayOfRequest = $request->only(Fortify::email());
+        $request->merge([
+            'email' => Str::lower($arrayOfRequest['email']),
+        ]);
+        $type = set_transanctional_email_settings();
+        if (!$type) {
+            return response()->json(['message' => 'Transactional emails are not active'], 400);
+        }
+        $request->validate([Fortify::email() => 'required|email']);
+        $status = Password::broker(config('fortify.passwords'))->sendResetLink(
+            $request->only(Fortify::email())
+        );
+        if ($status == Password::RESET_LINK_SENT) {
+            return app(SuccessfulPasswordResetLinkRequestResponse::class, ['status' => $status]);
+        }
+        if ($status == Password::RESET_THROTTLED) {
+            return response('Already requested a password reset in the past minutes.', 400);
+        }
+        return app(FailedPasswordResetLinkRequestResponse::class, ['status' => $status]);
+    }
+    return response()->json(['message' => 'Transactional emails are not active'], 400);
+})->name('password.forgot');
 Route::get('/api/v1/test/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
-Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
+Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+    $request->fulfill();
+    send_internal_notification("User {$request->user()->name} verified their email address.");
+    return redirect(RouteServiceProvider::HOME);
+})->middleware(['auth'])->name('verify.verify');
 Route::middleware(['throttle:login'])->group(function () {
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
