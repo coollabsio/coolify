@@ -72,6 +72,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private bool $is_debug_enabled;
     private $build_args;
     private $env_args;
+    private $env_nixpacks_args;
     private $docker_compose;
     private $docker_compose_base64;
     private ?string $nixpacks_plan = null;
@@ -692,7 +693,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         [
                             "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
                             "hidden" => true,
-                            "save" => "health_check"
+                            "save" => "health_check",
+                            "append" => false
                         ],
 
                     );
@@ -854,7 +856,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ],
             );
         }
-
         if ($this->saved_outputs->get('git_commit_sha')) {
             $this->commit = $this->saved_outputs->get('git_commit_sha')->before("\t");
         }
@@ -910,9 +911,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->nixpacks_plan) {
                 $parsed = Toml::Parse($this->nixpacks_plan);
                 // Do any modifications here
-                $cmds = collect(data_get($parsed, 'phases.setup.cmds', []));
+                // $cmds = collect(data_get($parsed, 'phases.setup.cmds', []));
                 $this->generate_env_variables();
-                data_set($parsed, 'phases.setup.cmds', $cmds);
+                // data_set($parsed, 'phases.setup.cmds', $cmds);
+                ray($this->env_args->toArray());
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
@@ -922,7 +924,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function nixpacks_build_cmd()
     {
-        $nixpacks_command = "nixpacks plan -f toml";
+        $this->generate_nixpacks_env_variables();
+        $nixpacks_command = "nixpacks plan -f toml {$this->env_nixpacks_args}";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -935,26 +938,33 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $nixpacks_command .= " {$this->workdir}";
         return $nixpacks_command;
     }
+    private function generate_nixpacks_env_variables()
+    {
+        $this->env_nixpacks_args = collect([]);
+        if ($this->pull_request_id === 0) {
+            foreach ($this->application->nixpacks_environment_variables as $env) {
+                $this->env_nixpacks_args->push("--env {$env->key}={$env->value}");
+            }
+        } else {
+            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
+                $this->env_nixpacks_args->push("--env {$env->key}={$env->value}");
+            }
+        }
 
+        $this->env_nixpacks_args = $this->env_nixpacks_args->implode(' ');
+    }
     private function generate_env_variables()
     {
         $this->env_args = collect([]);
         if ($this->pull_request_id === 0) {
-            foreach ($this->application->nixpacks_environment_variables as $env) {
-                $this->env_args->put($env->key, $env->value);
-            }
             foreach ($this->application->build_environment_variables as $env) {
                 $this->env_args->put($env->key, $env->value);
             }
         } else {
-            foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $this->env_args->put($env->key, $env->value);
-            }
             foreach ($this->application->build_environment_variables_preview as $env) {
                 $this->env_args->put($env->key, $env->value);
             }
         }
-        // $this->env_args = $this->env_args->implode(' ');
     }
 
     private function generate_compose_file()
