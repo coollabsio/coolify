@@ -67,6 +67,47 @@ function savePrivateKeyToFs(Server $server)
     return $location;
 }
 
+function generateScpCommand(Server $server, string $source, string $dest)
+{
+    $user = $server->user;
+    $port = $server->port;
+    $privateKeyLocation = savePrivateKeyToFs($server);
+    $timeout = config('constants.ssh.command_timeout');
+    $connectionTimeout = config('constants.ssh.connection_timeout');
+    $serverInterval = config('constants.ssh.server_interval');
+
+    $scp_command = "timeout $timeout scp ";
+    $scp_command .= "-i {$privateKeyLocation} "
+        . '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '
+        . '-o PasswordAuthentication=no '
+        . "-o ConnectTimeout=$connectionTimeout "
+        . "-o ServerAliveInterval=$serverInterval "
+        . '-o RequestTTY=no '
+        . '-o LogLevel=ERROR '
+        . "-P {$port} "
+        . "{$source} "
+        . "{$user}@{$server->ip}:{$dest}";
+
+    return $scp_command;
+}
+function instant_scp(string $source, string $dest, Server $server, $throwError = true)
+{
+    $timeout = config('constants.ssh.command_timeout');
+    $scp_command = generateScpCommand($server, $source, $dest);
+    $process = Process::timeout($timeout)->run($scp_command);
+    $output = trim($process->output());
+    $exitCode = $process->exitCode();
+    if ($exitCode !== 0) {
+        if (!$throwError) {
+            return null;
+        }
+        return excludeCertainErrors($process->errorOutput(), $exitCode);
+    }
+    if ($output === 'null') {
+        $output = null;
+    }
+    return $output;
+}
 function generateSshCommand(Server $server, string $command, bool $isMux = true)
 {
     $user = $server->user;

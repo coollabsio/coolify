@@ -28,7 +28,7 @@ ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensu
     ;;
 esac
 
-# Ovewrite LATEST_VERSION if user pass a version number
+# Overwrite LATEST_VERSION if user pass a version number
 if [ "$1" != "" ]; then
     LATEST_VERSION=$1
     LATEST_VERSION="${LATEST_VERSION,,}"

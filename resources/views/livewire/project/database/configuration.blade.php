@@ -1,7 +1,7 @@
 <div>
     <h1>Configuration</h1>
     <livewire:project.database.heading :database="$database" />
-    <x-modal modalId="startDatabase">
+    <x-modal modalId="startDatabase" noSubmit>
         <x-slot:modalBody>
             <livewire:activity-monitor header="Database Startup Logs" />
         </x-slot:modalBody>
@@ -31,6 +31,11 @@
                 window.location.hash = 'storages'"
                 href="#">Storages
             </a>
+            <a :class="activeTab === 'import' && 'text-white'"
+                @click.prevent="activeTab = 'import';
+            window.location.hash = 'import'" href="#">Import
+                Backup
+            </a>
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
@@ -39,6 +44,7 @@
                 window.location.hash = 'resource-limits'"
                 href="#">Resource Limits
             </a>
+
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
@@ -73,6 +79,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-limits'">
                 <livewire:project.shared.resource-limits :resource="$database" />
+            </div>
+            <div x-cloak x-show="activeTab === 'import'">
+                <livewire:project.database.import :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$database" />

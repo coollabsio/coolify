@@ -7,7 +7,7 @@
             server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>
             in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network.</a>
     </div>
-    {{-- Additonal Destinations:
+    {{-- Additional Destinations:
     {{$resource->additional_destinations}} --}}
     {{-- @if (count($servers) > 0)
         <div>

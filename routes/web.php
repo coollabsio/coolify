@@ -50,6 +50,7 @@ use App\Livewire\Project\Service\Index as ServiceIndex;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Shared\ExecuteContainerCommand;
 use App\Livewire\Project\Shared\Logs;
+use App\Livewire\Project\Shared\ScheduledTask\Show as ScheduledTaskShow;
 
 use App\Livewire\Security\ApiTokens;
 use App\Livewire\Security\PrivateKey\Create as SecurityPrivateKeyCreate;
@@ -67,6 +68,12 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Support\Facades\Password;
+use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
+use Laravel\Fortify\Fortify;
+use Illuminate\Support\Str;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
@@ -139,6 +146,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/deployment/{deployment_uuid}', DeploymentShow::class)->name('project.application.deployment.show');
         Route::get('/logs', Logs::class)->name('project.application.logs');
         Route::get('/command', ExecuteContainerCommand::class)->name('project.application.command');
+        Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.application.scheduled-tasks');
     });
     Route::prefix('project/{project_uuid}/{environment_name}/database/{database_uuid}')->group(function () {
         Route::get('/', DatabaseConfiguration::class)->name('project.database.configuration');
@@ -151,6 +159,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
         Route::get('/{service_name}', ServiceIndex::class)->name('project.service.index');
         Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
+        Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');

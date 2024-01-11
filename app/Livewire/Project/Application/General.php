@@ -209,7 +209,7 @@ class General extends Component
     public function updatedApplicationFqdn()
     {
         $this->resetDefaultLabels(false);
-        $this->dispatch('success', 'Labels reseted to default!');
+        $this->dispatch('success', 'Labels reset to default!');
     }
     public function submit($showToaster = true)
     {

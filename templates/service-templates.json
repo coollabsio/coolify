@@ -121,7 +121,7 @@
     },
     "embystat": {
         "documentation": "https:\/\/github.com\/mregni\/EmbyStat\/wiki\/docker",
-        "slogan": "EmyStat is an open-source, self-hosted web analytics tool, designed to provide insight into website traffic and user behavior, of your local Emby deployement, all within your control.",
+        "slogan": "EmyStat is an open-source, self-hosted web analytics tool, designed to provide insight into website traffic and user behavior, of your local Emby deployment, all within your control.",
         "compose": "c2VydmljZXM6CiAgZW1ieXN0YXQ6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvZW1ieXN0YXQ6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0VNQllTVEFUCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgdm9sdW1lczoKICAgICAgLSAnZW1ieXN0YXQtY29uZmlnOi9jb25maWcnCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gY3VybAogICAgICAgIC0gJy1mJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6NjU1NScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
         "tags": [
             "media",
