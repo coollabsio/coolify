@@ -2,7 +2,7 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a  class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'service_name' => null]) }}">
                 <button><- Back</button>
             </a>
@@ -25,7 +25,7 @@
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
                 href="#">Danger Zone
-         
+            </a>
             @if (
                 $serviceDatabase?->databaseType() === 'standalone-mysql' ||
                     $serviceDatabase?->databaseType() === 'standalone-postgresql' ||
@@ -76,7 +76,7 @@
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />
             </div>
-            @endisset
-        </div>
+        @endisset
     </div>
+</div>
 </div>
