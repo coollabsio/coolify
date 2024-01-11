@@ -911,16 +911,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $parsed = Toml::Parse($this->nixpacks_plan);
                 // Do any modifications here
                 $cmds = collect(data_get($parsed, 'phases.setup.cmds', []));
+                $this->generate_env_variables();
                 data_set($parsed, 'phases.setup.cmds', $cmds);
-                $this->nixpacks_plan = json_encode($parsed);
+                $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
+                data_set($parsed, 'variables', $merged_envs->toArray());
+                $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
             }
         }
     }
 
     private function nixpacks_build_cmd()
     {
-        $this->generate_env_variables();
-        $nixpacks_command = "nixpacks plan -f toml {$this->env_args}";
+        $nixpacks_command = "nixpacks plan -f toml";
         if ($this->application->build_command) {
             $nixpacks_command .= " --build-cmd \"{$this->application->build_command}\"";
         }
@@ -939,21 +941,20 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+                $this->env_args->put($env->key, $env->value);
             }
             foreach ($this->application->build_environment_variables as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+                $this->env_args->put($env->key, $env->value);
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+                $this->env_args->put($env->key, $env->value);
             }
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->env_args->push("--env {$env->key}={$env->value}");
+                $this->env_args->put($env->key, $env->value);
             }
         }
-
-        $this->env_args = $this->env_args->implode(' ');
+        // $this->env_args = $this->env_args->implode(' ');
     }
 
     private function generate_compose_file()
@@ -1288,14 +1289,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, "rm /artifacts/thegameplan.json"), "hidden" => true]);
                 } else {
                     if ($this->force_rebuild) {
-                        $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
-                        ]);
+                        $build_command = "docker build --no-cache {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $base64_build_command = base64_encode($build_command);
                     } else {
-                        $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}"), "hidden" => true
-                        ]);
+                        $build_command =  "docker build {$this->buildTarget} --network {$this->destination->network} -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t $this->build_image_name {$this->workdir}";
+                        $base64_build_command = base64_encode($build_command);
                     }
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
+                        ]
+                    );
                 }
 
                 $dockerfile = base64_encode("FROM {$this->application->static_image}
@@ -1321,6 +1328,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 }
             }");
             }
+            $build_command = "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+            $base64_build_command = base64_encode($build_command);
             $this->execute_remote_command(
                 [
                     executeInDocker($this->deployment_uuid, "echo '{$dockerfile}' | base64 -d > {$this->workdir}/Dockerfile")
@@ -1329,15 +1338,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     executeInDocker($this->deployment_uuid, "echo '{$nginx_config}' | base64 -d > {$this->workdir}/nginx.conf")
                 ],
                 [
-                    executeInDocker($this->deployment_uuid, "docker build {$this->addHosts} --network host -f {$this->workdir}/Dockerfile {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}"), "hidden" => true
+                    executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                ],
+                [
+                    executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
                 ]
             );
         } else {
             // Pure Dockerfile based deployment
             if ($this->application->dockerfile) {
-                $this->execute_remote_command([
-                    executeInDocker($this->deployment_uuid, "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}"), "hidden" => true
-                ]);
+                $build_command = "docker build --pull {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                $base64_build_command = base64_encode($build_command);
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                    ],
+                    [
+                        executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
+                    ]
+                );
             } else {
                 if ($this->application->build_pack === 'nixpacks') {
                     $this->nixpacks_plan = base64_encode($this->nixpacks_plan);
@@ -1354,14 +1373,20 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     $this->execute_remote_command([executeInDocker($this->deployment_uuid, "rm /artifacts/thegameplan.json"), "hidden" => true]);
                 } else {
                     if ($this->force_rebuild) {
-                        $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}"), "hidden" => true
-                        ]);
+                        $build_command = "docker build --no-cache {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $base64_build_command = base64_encode($build_command);
                     } else {
-                        $this->execute_remote_command([
-                            executeInDocker($this->deployment_uuid, "docker build  {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}"), "hidden" => true
-                        ]);
+                        $build_command = "docker build {$this->buildTarget} {$this->addHosts} --network host -f {$this->workdir}{$this->dockerfile_location} {$this->build_args} --progress plain -t {$this->production_image_name} {$this->workdir}";
+                        $base64_build_command = base64_encode($build_command);
                     }
+                    $this->execute_remote_command(
+                        [
+                            executeInDocker($this->deployment_uuid, "echo '{$base64_build_command}' | base64 -d > /artifacts/build.sh"), "hidden" => true
+                        ],
+                        [
+                            executeInDocker($this->deployment_uuid, "bash /artifacts/build.sh"), "hidden" => true
+                        ]
+                    );
                 }
             }
         }
@@ -1441,11 +1466,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->build_args = collect(["--build-arg SOURCE_COMMIT=\"{$this->commit}\""]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $this->build_args->push("--build-arg {$env->key}=\"{$env->value}\"");
+                $value = escapeshellarg($env->value);
+                $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->build_args->push("--build-arg {$env->key}=\"{$env->value}\"");
+                $value = escapeshellarg($env->value);
+                $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         }
 
