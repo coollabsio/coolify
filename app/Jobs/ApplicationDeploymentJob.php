@@ -203,7 +203,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     dispatch(new ContainerStatusJob($this->server));
                 }
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
-                $this->application->isConfigurationChanged(true);
+                $this->application->isConfigurationChanged(false);
                 return;
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
