@@ -32,10 +32,11 @@ trait ExecuteRemoteCommand
             $hidden = data_get($single_command, 'hidden', false);
             $customType = data_get($single_command, 'type');
             $ignore_errors = data_get($single_command, 'ignore_errors', false);
+            $append = data_get($single_command, 'append', true);
             $this->save = data_get($single_command, 'save');
 
             $remote_command = generateSshCommand($this->server, $command);
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType) {
+            $process = Process::timeout(3600)->idleTimeout(3600)->start($remote_command, function (string $type, string $output) use ($command, $hidden, $customType, $append) {
                 $output = Str::of($output)->trim();
                 if ($output->startsWith('╔')) {
                     $output = "\n" . $output;
@@ -59,7 +60,15 @@ trait ExecuteRemoteCommand
                 $this->application_deployment_queue->save();
 
                 if ($this->save) {
-                    $this->saved_outputs[$this->save] = Str::of($output)->trim();
+                    if (data_get($this->saved_outputs, $this->save, null) === null) {
+                        data_set($this->saved_outputs, $this->save, str());
+                    }
+                    if ($append) {
+                        $this->saved_outputs[$this->save] .= str($output)->trim();
+                        $this->saved_outputs[$this->save] = str($this->saved_outputs[$this->save]);
+                    } else {
+                        $this->saved_outputs[$this->save] = str($output)->trim();
+                    }
                 }
             });
             $this->application_deployment_queue->update([
