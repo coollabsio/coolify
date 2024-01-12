@@ -1027,7 +1027,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        if ($this->application->limits_cpuset !== 0) {
+        if (!is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
         }
         if ($this->server->isSwarm()) {

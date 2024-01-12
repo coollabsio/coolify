@@ -68,7 +68,7 @@ class StartMysql
                 ]
             ]
         ];
-        if ($this->database->limits_cpuset !== 0) {
+        if (!is_null($this->database->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
         }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {

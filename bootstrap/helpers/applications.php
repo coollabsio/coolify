@@ -178,7 +178,7 @@ function generateComposeFile(string $deploymentUuid, Server $server, string $net
             ]
         ]
     ];
-    if ($application->limits_cpuset !== 0) {
+    if (!is_null($application->limits_cpuset)) {
         data_set($docker_compose, "services.{$containerName}.cpuset", $application->limits_cpuset);
     }
     if ($server->isLogDrainEnabled() && $application->isLogDrainEnabled()) {

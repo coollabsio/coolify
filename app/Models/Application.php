@@ -653,7 +653,7 @@ class Application extends BaseModel
                 ]
             ]
         ];
-        if ($this->limits_cpuset !== 0) {
+        if (!is_null($this->limits_cpuset)) {
             data_set($docker_compose, "services.{$container_name}.cpuset", $this->limits_cpuset);
         }
         if ($server->isSwarm()) {
