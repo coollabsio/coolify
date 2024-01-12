@@ -80,7 +80,7 @@ a {
 }
 
 .description {
-    @apply pt-2 text-xs font-bold text-neutral-500 group-hover:text-white;
+    @apply text-xs font-bold text-neutral-500 group-hover:text-white;
 }
 
 .lds-heart {
