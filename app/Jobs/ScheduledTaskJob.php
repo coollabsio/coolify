@@ -108,7 +108,7 @@ class ScheduledTaskJob implements ShouldQueue
                     'message' => $this->task_output ?? $e->getMessage(),
                 ]);
             }
-            send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
+            // send_internal_notification('ScheduledTaskJob failed with: ' . $e->getMessage());
             throw $e;
         }
     }
