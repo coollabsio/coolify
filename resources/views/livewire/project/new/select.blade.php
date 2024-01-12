@@ -202,10 +202,7 @@
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
             </ul>
-            @if ($isDatabase)
-                <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
-                    be activated soon. Stay tuned.</div>
-            @endif
+
             {{-- @if ($isDatabase)
                 <div class="flex items-center justify-center pt-4">
                     <x-forms.checkbox instantSave wire:model="includeSwarm"
@@ -235,6 +232,10 @@
                     </div>
                 @endforelse
             </div>
+            @if ($isDatabase)
+                <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
+                    be activated soon. Stay tuned.</div>
+            @endif
         @endif
         @if ($current_step === 'destinations')
             <ul class="pb-10 steps">
@@ -267,7 +268,7 @@
                         </div>
                     @endforeach
                 @endif
-                <a  href="{{ route('destination.new', ['server_id' => $server_id]) }}"
+                <a href="{{ route('destination.new', ['server_id' => $server_id]) }}"
                     class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
                     <div class="flex flex-col mx-6 ">
                         <div class="font-bold text-white">
