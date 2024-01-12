@@ -738,9 +738,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->generate_nixpacks_confs();
         }
         $this->generate_compose_file();
+
         // Needs separate preview variables
         $this->generate_build_env_variables();
-        $this->add_build_env_variables_to_dockerfile();
+        if ($this->application->build_pack !== 'nixpacks') {
+            $this->add_build_env_variables_to_dockerfile();
+        }
         $this->build_image();
         $this->stop_running_container();
         if ($this->application->destination->server->isSwarm()) {
