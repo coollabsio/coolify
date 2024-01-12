@@ -203,7 +203,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     dispatch(new ContainerStatusJob($this->server));
                 }
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
-                $this->application->isConfigurationChanged(true);
+                $this->application->isConfigurationChanged(false);
                 return;
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
@@ -738,13 +738,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->generate_nixpacks_confs();
         }
         $this->generate_compose_file();
+
         // Needs separate preview variables
         $this->generate_build_env_variables();
-        $this->add_build_env_variables_to_dockerfile();
+        if ($this->application->build_pack !== 'nixpacks') {
+            $this->add_build_env_variables_to_dockerfile();
+        }
         $this->build_image();
         $this->stop_running_container();
         if ($this->application->destination->server->isSwarm()) {
-            ray("{$this->workdir}{$this->docker_compose_location}");
             $this->push_to_docker_registry();
             $this->execute_remote_command(
                 [
@@ -911,10 +913,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->nixpacks_plan) {
                 $parsed = Toml::Parse($this->nixpacks_plan);
                 // Do any modifications here
-                // $cmds = collect(data_get($parsed, 'phases.setup.cmds', []));
                 $this->generate_env_variables();
-                // data_set($parsed, 'phases.setup.cmds', $cmds);
-                ray($this->env_args->toArray());
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);

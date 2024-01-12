@@ -72,7 +72,7 @@ class Kernel extends ConsoleKernel
             }
         }
         foreach ($servers as $server) {
-            $schedule->job(new ServerStatusJob($server))->everyTenMinutes()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyFiveMinutes()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)

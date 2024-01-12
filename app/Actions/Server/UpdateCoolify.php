@@ -22,6 +22,7 @@ class UpdateCoolify
             if (!$this->server) {
                 return;
             }
+            CleanupDocker::run($this->server, false);
             $this->latestVersion = get_latest_version_of_coolify();
             $this->currentVersion = config('version');
             ray('latest version:' . $this->latestVersion . " current version: " . $this->currentVersion . ' force: ' . $force);
