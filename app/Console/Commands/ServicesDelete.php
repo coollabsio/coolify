@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\DeleteResourceJob;
 use App\Models\Application;
 use App\Models\Server;
 use App\Models\Service;
@@ -91,7 +92,7 @@ class ServicesDelete extends Command
                 if (!$confirmed) {
                     break;
                 }
-                $toDelete->delete();
+                DeleteResourceJob::dispatch($toDelete);
             }
         }
     }
@@ -115,7 +116,7 @@ class ServicesDelete extends Command
                 if (!$confirmed) {
                     return;
                 }
-                $toDelete->delete();
+                DeleteResourceJob::dispatch($toDelete);
             }
         }
     }
@@ -139,7 +140,7 @@ class ServicesDelete extends Command
                 if (!$confirmed) {
                     return;
                 }
-                $toDelete->delete();
+                DeleteResourceJob::dispatch($toDelete);
             }
         }
     }
