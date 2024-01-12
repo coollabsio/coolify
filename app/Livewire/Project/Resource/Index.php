@@ -103,6 +103,7 @@ class Index extends Component
                     'environment_name' => data_get($service, 'environment.name'),
                     'service_uuid' => data_get($service, 'uuid')
                 ]);
+                $service->status = serviceStatus($service);
             }
             return $service;
         });

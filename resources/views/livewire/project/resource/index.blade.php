@@ -150,6 +150,23 @@
                     </template>
                 </a>
             </template>
+            <template x-for="item in filteredServices" :key="item.id">
+                <a class="relative box group" :href="item.hrefLink">
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white" x-text="item.name"></div>
+                        <div class="description" x-text="item.description"></div>
+                    </div>
+                    <template x-if="item.status.startsWith('running')">
+                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                    </template>
+                    <template x-if="item.status.startsWith('exited')">
+                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                    </template>
+                    <template x-if="item.status.startsWith('degraded')">
+                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                    </template>
+                </a>
+            </template>
         </div>
     </div>
 </div>
@@ -164,6 +181,7 @@
             mongodbs: @js($mongodbs),
             mysqls: @js($mysqls),
             mariadbs: @js($mariadbs),
+            services: @js($services),
             get filteredApplications() {
                 if (this.search === '') {
                     return this.applications;
@@ -221,6 +239,16 @@
                 }
                 this.mariadbs = Object.values(this.mariadbs);
                 return this.mariadbs.filter(item => {
+                    return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
+                        item.description?.toLowerCase().includes(this.search.toLowerCase());
+                });
+            },
+            get filteredServices() {
+                if (this.search === '') {
+                    return this.services;
+                }
+                this.services = Object.values(this.services);
+                return this.services.filter(item => {
                     return item.name.toLowerCase().includes(this.search.toLowerCase()) ||
                         item.description?.toLowerCase().includes(this.search.toLowerCase());
                 });
