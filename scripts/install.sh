@@ -127,9 +127,8 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/ssh/keys
-mkdir -p /data/coolify/ssh/mux
-mkdir -p /data/coolify/source
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy}
+mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
 chown -R 9999:root /data/coolify
