@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Actions\Server\CleanupDocker;
 use App\Models\Server;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -43,9 +44,7 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
             ray('Usage before: ' . $this->usageBefore);
             if ($this->usageBefore >= $this->server->settings->cleanup_after_percentage) {
                 ray('Cleaning up ' . $this->server->name);
-                instant_remote_process(['docker image prune -af'], $this->server, false);
-                instant_remote_process(['docker container prune -f --filter "label=coolify.managed=true"'], $this->server, false);
-                instant_remote_process(['docker builder prune -af'], $this->server, false);
+                CleanupDocker::run($this->server);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter <  $this->usageBefore) {
                     ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
