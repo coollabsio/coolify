@@ -57,7 +57,6 @@ class StartMysql
                     'mem_swappiness' => $this->database->limits_memory_swappiness,
                     'mem_reservation' => $this->database->limits_memory_reservation,
                     'cpus' => (float) $this->database->limits_cpus,
-                    'cpuset' => $this->database->limits_cpuset,
                     'cpu_shares' => $this->database->limits_cpu_shares,
                 ]
             ],
@@ -69,6 +68,9 @@ class StartMysql
                 ]
             ]
         ];
+        if (!is_null($this->database->limits_cpuset)) {
+            data_set($docker_compose, "services.{$container_name}.cpuset", $this->database->limits_cpuset);
+        }
         if ($this->database->destination->server->isLogDrainEnabled() && $this->database->isLogDrainEnabled()) {
             $docker_compose['services'][$container_name]['logging'] = [
                 'driver' => 'fluentd',

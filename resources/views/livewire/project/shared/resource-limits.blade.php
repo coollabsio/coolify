@@ -7,9 +7,15 @@
         <div class="">Limit your container resources by CPU & memory.</div>
         <h3 class="pt-4">Limit CPUs</h3>
         <div class="flex gap-2">
-            <x-forms.input placeholder="1.5" label="Number of CPUs" id="resource.limits_cpus" />
-            <x-forms.input placeholder="0-2" label="CPU sets to use" id="resource.limits_cpuset" />
-            <x-forms.input placeholder="1024" label="CPU Weight" id="resource.limits_cpu_shares" />
+            <x-forms.input placeholder="1.5"
+                helper="0 means use all CPUs. Floating point number, like 0.002 or 1.5. More info <a target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>here</a>."
+                label="Number of CPUs" id="resource.limits_cpus" />
+            <x-forms.input placeholder="0-2"
+                helper="Empty means, use all CPU sets. 0-2 will use CPU 0, CPU 1 and CPU 2. More info <a target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>here</a>."
+                label="CPU sets to use" id="resource.limits_cpuset" />
+            <x-forms.input placeholder="1024"
+                helper="More info <a target='_blank' href='https://docs.docker.com/engine/reference/run/#cpu-share-constraint'>here</a>."
+                label="CPU Weight" id="resource.limits_cpu_shares" />
         </div>
         <h3 class="pt-4">Limit Memory</h3>
         <div class="flex gap-2">

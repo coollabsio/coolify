@@ -44,9 +44,6 @@ class ResourceLimits extends Component
             if (!$this->resource->limits_cpus) {
                 $this->resource->limits_cpus = "0";
             }
-            if (!$this->resource->limits_cpuset) {
-                $this->resource->limits_cpuset = "0";
-            }
             if (!$this->resource->limits_cpu_shares) {
                 $this->resource->limits_cpu_shares = 1024;
             }

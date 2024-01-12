@@ -429,7 +429,7 @@ class Application extends BaseModel
     }
     public function isConfigurationChanged($save = false)
     {
-        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->port_exposes . $this->port_mappings . $this->base_directory . $this->publish_directory . $this->health_check_path  . $this->health_check_port . $this->health_check_host . $this->health_check_method . $this->health_check_return_code . $this->health_check_scheme . $this->health_check_response_text . $this->health_check_interval . $this->health_check_timeout . $this->health_check_retries . $this->health_check_start_period . $this->health_check_enabled . $this->limits_memory  . $this->limits_swap . $this->limits_swappiness . $this->limits_reservation . $this->limits_cpus . $this->limits_cpuset . $this->limits_cpu_shares . $this->dockerfile . $this->dockerfile_location . $this->custom_labels;
+        $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->port_exposes . $this->port_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
             $newConfigHash .= json_encode($this->environment_variables->all());
         } else {
@@ -642,7 +642,6 @@ class Application extends BaseModel
                     'mem_swappiness' => $this->limits_memory_swappiness,
                     'mem_reservation' => $this->limits_memory_reservation,
                     'cpus' => (float) $this->limits_cpus,
-                    'cpuset' => $this->limits_cpuset,
                     'cpu_shares' => $this->limits_cpu_shares,
                 ]
             ],
@@ -654,6 +653,9 @@ class Application extends BaseModel
                 ]
             ]
         ];
+        if (!is_null($this->limits_cpuset)) {
+            data_set($docker_compose, "services.{$container_name}.cpuset", $this->limits_cpuset);
+        }
         if ($server->isSwarm()) {
             data_forget($docker_compose, 'services.' . $container_name . '.container_name');
             data_forget($docker_compose, 'services.' . $container_name . '.expose');
