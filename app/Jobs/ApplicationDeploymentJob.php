@@ -1016,7 +1016,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
                     'mem_reservation' => $this->application->limits_memory_reservation,
                     'cpus' => (float) $this->application->limits_cpus,
-                    'cpuset' => $this->application->limits_cpuset,
                     'cpu_shares' => $this->application->limits_cpu_shares,
                 ]
             ],
@@ -1028,6 +1027,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if ($this->application->limits_cpuset !== 0) {
+            data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
+        }
         if ($this->server->isSwarm()) {
             data_forget($docker_compose, 'services.' . $this->container_name . '.container_name');
             data_forget($docker_compose, 'services.' . $this->container_name . '.expose');

@@ -167,7 +167,6 @@ function generateComposeFile(string $deploymentUuid, Server $server, string $net
                 'mem_swappiness' => $application->limits_memory_swappiness,
                 'mem_reservation' => $application->limits_memory_reservation,
                 'cpus' => (int) $application->limits_cpus,
-                'cpuset' => $application->limits_cpuset,
                 'cpu_shares' => $application->limits_cpu_shares,
             ]
         ],
@@ -179,6 +178,9 @@ function generateComposeFile(string $deploymentUuid, Server $server, string $net
             ]
         ]
     ];
+    if ($application->limits_cpuset !== 0) {
+        data_set($docker_compose, "services.{$containerName}.cpuset", $application->limits_cpuset);
+    }
     if ($server->isLogDrainEnabled() && $application->isLogDrainEnabled()) {
         $docker_compose['services'][$containerName]['logging'] = [
             'driver' => 'fluentd',
