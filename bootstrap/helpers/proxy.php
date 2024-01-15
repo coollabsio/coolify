@@ -288,7 +288,7 @@ function setup_dynamic_configuration()
             ], $server);
 
             if (config('app.env') == 'local') {
-                ray($yaml);
+                // ray($yaml);
             }
         }
     }

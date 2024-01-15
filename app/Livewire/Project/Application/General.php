@@ -209,7 +209,7 @@ class General extends Component
     public function updatedApplicationFqdn()
     {
         $this->resetDefaultLabels(false);
-        $this->dispatch('success', 'Labels reset to default!');
+        // $this->dispatch('success', 'Labels reset to default!');
     }
     public function submit($showToaster = true)
     {
@@ -235,9 +235,16 @@ class General extends Component
                 ]);
             }
             if (data_get($this->application, 'fqdn')) {
-                $domains = Str::of($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-                    return Str::of($domain)->trim()->lower();
+                $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+                $domains = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+                    return str($domain)->trim()->lower();
                 });
+                $domains = $domains->unique();
+                foreach ($domains as $domain) {
+                    if (!validate_dns_entry($domain, $this->application->destination->server)) {
+                        $showToaster && $this->dispatch('error', "Validating DNS settings for: $domain failed.<br>Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='underline' href='https://coolify.io/docs/dns-settings'>documentation</a> for further help.");
+                    }
+                }
                 $this->application->fqdn = $domains->implode(',');
             }
 

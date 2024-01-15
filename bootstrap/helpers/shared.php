@@ -22,14 +22,11 @@ use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
-use Illuminate\Database\QueryException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
@@ -40,6 +37,7 @@ use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
 use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
+use PurplePixie\PhpDns\DNSQuery;
 
 function base_configuration_dir(): string
 {
@@ -1591,4 +1589,51 @@ function getRealtime()
     } else {
         return $envDefined;
     }
+}
+
+function validate_dns_entry(string $fqdn, Server $server)
+{
+    $url = Url::fromString($fqdn);
+    $host = $url->getHost();
+    if (str($host)->contains('sslip.io')) {
+        return true;
+    }
+    $settings = InstanceSettings::get();
+    $is_dns_validation_enabled = data_get($settings, 'is_dns_validation_enabled');
+    if (!$is_dns_validation_enabled) {
+        return true;
+    }
+    $dnsServers = data_get($settings, 'custom_dns_servers');
+    $dnsServers = str($dnsServers)->explode(',');
+    if ($server->id === 0) {
+        $ip = data_get($settings, 'public_ipv4') || data_get($settings, 'public_ipv6') || $server->ip;
+    } else {
+        $ip = $server->ip;
+    }
+    $foundMatch = false;
+    $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
+    foreach ($dnsServers as $dnsServer) {
+        try {
+            ray("Checking $host on $dnsServer");
+            $query = new DNSQuery($dnsServer);
+            $results = $query->query($host, $type);
+            if ($results === false || $query->hasError()) {
+                ray("Error: " . $query->getLasterror());
+            } else {
+                foreach ($results as $result) {
+                    if ($result->getType() == $type) {
+                        if ($result->getData() === $ip) {
+                            ray($host . " has IP address " . $result->getData());
+                            ray($result->getString());
+                            $foundMatch = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+        }
+    }
+    ray("Found match: $foundMatch");
+    return $foundMatch;
 }
