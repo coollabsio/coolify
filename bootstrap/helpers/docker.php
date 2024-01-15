@@ -215,6 +215,8 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
+    $labels->push("traefik.http.middlewares.gzip.compress=true");
+    $labels->push("traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https");
     foreach ($domains as $loop => $domain) {
         try {
             $uuid = new Cuid2(7);
@@ -229,7 +231,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
 
-            $labels->push("traefik.http.middlewares.gzip.compress=true");
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -256,7 +257,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($is_force_https_enabled) {
-                    $labels->push("traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https");
                     $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
                 }
             } else {
