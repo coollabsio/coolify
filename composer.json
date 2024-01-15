@@ -28,6 +28,7 @@
         "nubs/random-name-generator": "^2.2",
         "phpseclib/phpseclib": "~3.0",
         "poliander/cron": "^3.0",
+        "purplepixie/phpdns": "^2.1",
         "pusher/pusher-php-server": "^7.2",
         "resend/resend-laravel": "^0.5.0",
         "sentry/sentry-laravel": "^3.4",

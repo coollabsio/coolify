@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.153}"
+    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.190}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
@@ -10,6 +10,7 @@ services:
       - /data/coolify/ssh:/var/www/html/storage/app/ssh
       - /data/coolify/applications:/var/www/html/storage/app/applications
       - /data/coolify/databases:/var/www/html/storage/app/databases
+      - /data/coolify/services:/var/www/html/storage/app/services
       - /data/coolify/backups:/var/www/html/storage/app/backups
     environment:
       - APP_ID

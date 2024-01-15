@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "44337ff4ff1d9c435d9776fec01ebe9c",
+    "content-hash": "de3b59fade9b132d2582a40dcf3c00f9",
     "packages": [
         {
             "name": "amphp/amp",
@@ -6286,6 +6286,54 @@
                 "source": "https://github.com/bobthecow/psysh/tree/v0.11.22"
             },
             "time": "2023-10-14T21:56:36+00:00"
+        },
+        {
+            "name": "purplepixie/phpdns",
+            "version": "2.1.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/purplepixie/phpdns.git",
+                "reference": "e1e4f18a60d01947e2aac7157325a9e2e7755bf7"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/purplepixie/phpdns/zipball/e1e4f18a60d01947e2aac7157325a9e2e7755bf7",
+                "reference": "e1e4f18a60d01947e2aac7157325a9e2e7755bf7",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=7.4"
+            },
+            "require-dev": {
+                "phpunit/phpunit": "^9.5"
+            },
+            "type": "library",
+            "extra": {
+                "branch-alias": {
+                    "dev-master": "2.0-dev"
+                }
+            },
+            "autoload": {
+                "psr-0": {
+                    "PurplePixie": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "GPL-3.0-only"
+            ],
+            "authors": [
+                {
+                    "name": "David Cutting",
+                    "email": "dcutting@purplepixie.org"
+                }
+            ],
+            "description": "PHP DNS Direct Query Module",
+            "support": {
+                "issues": "https://github.com/purplepixie/phpdns/issues",
+                "source": "https://github.com/purplepixie/phpdns/tree/2.1.0"
+            },
+            "time": "2023-11-06T15:37:19+00:00"
         },
         {
             "name": "pusher/pusher-php-server",

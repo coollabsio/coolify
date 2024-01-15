@@ -29,7 +29,7 @@
 
         @if ($database->started_at)
             <div class="flex gap-2">
-                <x-forms.input label="Initial Username" id="database.postgres_username" placeholder="If empty: postgres"
+                <x-forms.input label="Initial Username" id="database.postgres_user" placeholder="If empty: postgres"
                     readonly helper="You can only change this in the database." />
                 <x-forms.input label="Initial Password" id="database.postgres_password" type="password" required
                     readonly helper="You can only change this in the database." />

@@ -39,7 +39,7 @@ class Heading extends Component
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));
         }
-        if ($showNotification) $this->dispatch('success', "Application ({$this->application->name}) status updated.");
+        if ($showNotification) $this->dispatch('success', "Application status updated.");
     }
 
     public function force_deploy_without_cache()

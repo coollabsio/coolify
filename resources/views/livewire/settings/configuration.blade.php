@@ -9,8 +9,10 @@
         <div>General configuration for your Coolify instance.</div>
 
         <div class="flex flex-col gap-2 pt-4">
-            <div class="flex gap-2 w-96">
+            <div class="flex items-end gap-2">
                 <x-forms.input id="settings.fqdn" label="Instance's Domain" placeholder="https://coolify.io" />
+                <x-forms.input id="settings.custom_dns_servers" label="DNS Servers" helper="DNS servers for validation FQDNS againts. A comma separated list of DNS servers." placeholder="1.1.1.1,8.8.8.8" />
+                <x-forms.checkbox instantSave id="is_dns_validation_enabled" label="Validate DNS settings?" />
             </div>
 
             {{-- <div class="flex gap-2 ">

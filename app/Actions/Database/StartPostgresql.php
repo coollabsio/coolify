@@ -50,12 +50,8 @@ class StartPostgresql
                     ],
                     'healthcheck' => [
                         'test' => [
-                            'CMD-SHELL',
-                            'pg_isready',
-                            '-d',
-                            $this->database->postgres_db,
-                            '-U',
-                            $this->database->postgres_user,
+                            "CMD-SHELL",
+                            "psql -U {$this->database->postgres_user} -d {$this->database->postgres_db} -c 'SELECT 1' || exit 1"
                         ],
                         'interval' => '5s',
                         'timeout' => '5s',

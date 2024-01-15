@@ -76,7 +76,7 @@ class Form extends Component
             $this->server->settings->is_usable = true;
             $this->server->settings->save();
         } else {
-            $this->dispatch('error', 'Server is not reachable. Please check your connection and configuration.');
+            $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.');
             return;
         }
     }
@@ -85,7 +85,7 @@ class Form extends Component
         try {
             $uptime = $this->server->validateConnection();
             if (!$uptime) {
-                $install && $this->dispatch('error', 'Server is not reachable. Please check your connection and configuration.');
+                $install &&  $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.');
                 return;
             }
             $supported_os_type = $this->server->validateOS();

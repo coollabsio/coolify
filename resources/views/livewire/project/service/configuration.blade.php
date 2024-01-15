@@ -68,8 +68,7 @@
                                     <div class="text-xs">{{ $application->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a
-                                        class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                    <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                         href="{{ route('project.service.index', [...$parameters, 'service_name' => $application->name]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
@@ -115,8 +114,7 @@
                                     <div class="text-xs">{{ $database->status }}</div>
                                 </div>
                                 <div class="flex items-center px-4">
-                                    <a
-                                        class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
+                                    <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
                                         href="{{ route('project.service.index', [...$parameters, 'service_name' => $database->name]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
@@ -157,9 +155,7 @@
                 <livewire:project.shared.execute-container-command :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
-                <div x-cloak x-show="activeTab === 'environment-variables'">
-                    <livewire:project.shared.environment-variable.all :resource="$service" />
-                </div>
+                <livewire:project.shared.environment-variable.all :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />

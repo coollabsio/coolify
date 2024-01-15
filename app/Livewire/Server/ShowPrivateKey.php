@@ -39,7 +39,7 @@ class ShowPrivateKey extends Component
             if ($uptime) {
                 $this->dispatch('success', 'Server is reachable.');
             } else {
-                $this->dispatch('error', 'Server is not reachable. Please check your connection and private key configuration.');
+                $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.');
                 return;
             }
         } catch (\Throwable $e) {

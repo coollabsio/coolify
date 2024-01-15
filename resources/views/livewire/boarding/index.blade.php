@@ -56,6 +56,8 @@
                         Please make sure you have the correct public key in your ~/.ssh/authorized_keys file for user
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
+                        <br />
+                        Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="box" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again

@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -64,6 +64,44 @@ sles | opensuse-leap | opensuse-tumbleweed)
     exit
     ;;
 esac
+
+# Detect OpenSSH server
+SSH_DETECTED=false
+if [ -x "$(command -v systemctl)" ]; then
+    if systemctl status sshd >/dev/null 2>&1; then
+        echo "OpenSSH server is installed and running."
+        SSH_DETECTED=true
+    fi
+elif [ -x "$(command -v service)" ]; then
+    if service sshd status >/dev/null 2>&1; then
+        echo "OpenSSH server is installed and running."
+        SSH_DETECTED=true
+    fi
+fi
+if [ "$SSH_DETECTED" = "false" ]; then
+    echo "###############################################################################"
+    echo "WARNING: Could not detect if OpenSSH server is installed and running - this does not mean that it is not installed, just that we could not detect it."
+    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
+    echo "###############################################################################"
+fi
+
+# Detect SSH PermitRootLogin
+SSH_PERMIT_ROOT_LOGIN=false
+SSH_PERMIT_ROOT_LOGIN_CONFIG=$(grep "^PermitRootLogin" /etc/ssh/sshd_config | awk '{print $2}') || SSH_PERMIT_ROOT_LOGIN_CONFIG="N/A (commented out or not found at all)"
+if [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "prohibit-password" ] || [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "yes" ] || [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "without-password" ]; then
+    echo "PermitRootLogin is enabled."
+    SSH_PERMIT_ROOT_LOGIN=true
+fi
+
+
+if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
+    echo "###############################################################################"
+    echo "WARNING: PermitRootLogin is not enabled in /etc/ssh/sshd_config."
+    echo -e "It is set to $SSH_PERMIT_ROOT_LOGIN_CONFIG. Should be prohibit-password, yes or without-password.\n"
+    echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
+    echo "(Currently we only support root user to login via SSH, this will be changed in the future.)"
+    echo "###############################################################################"
+fi
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker."
@@ -127,9 +165,8 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/ssh/keys
-mkdir -p /data/coolify/ssh/mux
-mkdir -p /data/coolify/source
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy}
+mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
 chown -R 9999:root /data/coolify
