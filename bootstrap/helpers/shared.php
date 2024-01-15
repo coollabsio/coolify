@@ -1593,6 +1593,9 @@ function getRealtime()
 
 function validate_dns_entry(string $fqdn, Server $server)
 {
+    # https://www.cloudflare.com/ips-v4/#
+    $cloudflare_ips = collect(['173.245.48.0/20', '103.21.244.0/22', '103.22.200.0/22', '103.31.4.0/22', '141.101.64.0/18', '108.162.192.0/18', '190.93.240.0/20', '188.114.96.0/20', '197.234.240.0/22', '198.41.128.0/17', '162.158.0.0/15', '104.16.0.0/13', '172.64.0.0/13', '131.0.72.0/22']);
+
     $url = Url::fromString($fqdn);
     $host = $url->getHost();
     if (str($host)->contains('sslip.io')) {
@@ -1603,29 +1606,34 @@ function validate_dns_entry(string $fqdn, Server $server)
     if (!$is_dns_validation_enabled) {
         return true;
     }
-    $dnsServers = data_get($settings, 'custom_dns_servers');
-    $dnsServers = str($dnsServers)->explode(',');
+    $dns_servers = data_get($settings, 'custom_dns_servers');
+    $dns_servers = str($dns_servers)->explode(',');
     if ($server->id === 0) {
         $ip = data_get($settings, 'public_ipv4') || data_get($settings, 'public_ipv6') || $server->ip;
     } else {
         $ip = $server->ip;
     }
-    $foundMatch = false;
+    $found_matching_ip = false;
     $type = \PurplePixie\PhpDns\DNSTypes::NAME_A;
-    foreach ($dnsServers as $dnsServer) {
+    foreach ($dns_servers as $dns_server) {
         try {
-            ray("Checking $host on $dnsServer");
-            $query = new DNSQuery($dnsServer);
+            ray("Checking $host on $dns_server");
+            $query = new DNSQuery($dns_server);
             $results = $query->query($host, $type);
             if ($results === false || $query->hasError()) {
                 ray("Error: " . $query->getLasterror());
             } else {
                 foreach ($results as $result) {
                     if ($result->getType() == $type) {
+                        if (ip_match($result->getData(), $cloudflare_ips->toArray(), $match)) {
+                            ray("Found match in Cloudflare IPs: $match");
+                            $found_matching_ip = true;
+                            break;
+                        }
                         if ($result->getData() === $ip) {
                             ray($host . " has IP address " . $result->getData());
                             ray($result->getString());
-                            $foundMatch = true;
+                            $found_matching_ip = true;
                             break;
                         }
                     }
@@ -1634,6 +1642,18 @@ function validate_dns_entry(string $fqdn, Server $server)
         } catch (\Exception $e) {
         }
     }
-    ray("Found match: $foundMatch");
-    return $foundMatch;
+    ray("Found match: $found_matching_ip");
+    return $found_matching_ip;
+}
+
+function ip_match($ip, $cidrs, &$match = null)
+{
+    foreach ((array) $cidrs as $cidr) {
+        list($subnet, $mask) = explode('/', $cidr);
+        if (((ip2long($ip) & ($mask = ~((1 << (32 - $mask)) - 1))) == (ip2long($subnet) & $mask))) {
+            $match = $cidr;
+            return true;
+        }
+    }
+    return false;
 }

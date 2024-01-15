@@ -52,7 +52,7 @@
             <div class="w-64">
                 @if (!$server->isLocalhost())
                     <x-forms.checkbox instantSave
-                        helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                        helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                         id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                     @if ($server->isSwarm())
                         <div class="pt-6"> Swarm support is in alpha version. </div>
