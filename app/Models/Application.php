@@ -1066,7 +1066,7 @@ class Application extends BaseModel
         $customLabels = base64_decode($this->custom_labels);
         if (mb_detect_encoding($customLabels, 'ASCII', true) === false) {
             ray('custom_labels contains non-ascii characters');
-            $customLabels = str(implode(",", generateLabelsApplication($this, $preview)))->replace(',', "\n");
+            $customLabels = str(implode("|", generateLabelsApplication($this, $preview)))->replace("|", "\n");
         }
         $this->custom_labels = base64_encode($customLabels);
         $this->save();
