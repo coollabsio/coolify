@@ -163,7 +163,7 @@ Route::post('/source/gitlab/events/manual', function () {
                 }
             }
             if ($x_gitlab_event === 'merge_request') {
-                if ($action === 'open' ||$action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
+                if ($action === 'open' || $action === 'opened' || $action === 'synchronize' || $action === 'reopened' || $action === 'reopen' || $action === 'update') {
                     if ($application->isPRDeployable()) {
                         $deployment_uuid = new Cuid2(7);
                         $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
@@ -197,7 +197,7 @@ Route::post('/source/gitlab/events/manual', function () {
                         ]);
                         ray('Preview deployments disabled for ' . $application->name);
                     }
-                } else if ($action === 'closed') {
+                } else if ($action === 'closed' || $action === 'close') {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
                         $found->delete();
