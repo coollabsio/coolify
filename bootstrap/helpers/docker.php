@@ -230,7 +230,6 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $https_label = "https-{$loop}-{$uuid}";
 
             $labels->push("traefik.http.middlewares.gzip.compress=true");
-            $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
@@ -240,8 +239,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
                 if ($path !== '/') {
-                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix");
                     $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix,gzip");
+                } else {
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
                 }
 
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
@@ -267,8 +268,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($path !== '/') {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix");
                     $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix,gzip");
+                } else {
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
                 }
             }
         } catch (\Throwable $e) {
