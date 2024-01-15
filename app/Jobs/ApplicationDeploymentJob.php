@@ -477,7 +477,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         } else {
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
             );
         }
 
@@ -521,7 +521,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             );
         } else {
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
             );
         }
         $this->application_deployment_queue->addLogEntry("New container started.");
@@ -756,7 +756,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->execute_remote_command(
                 ["echo -n 'Starting preview deployment.'"],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} up -d"), "hidden" => true],
             );
         }
     }
@@ -917,6 +917,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $merged_envs = $this->env_args->merge(collect(data_get($parsed, 'variables', [])));
                 data_set($parsed, 'variables', $merged_envs->toArray());
                 $this->nixpacks_plan = json_encode($parsed, JSON_PRETTY_PRINT);
+                ray($this->nixpacks_plan);
             }
         }
     }
@@ -964,6 +965,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->env_args->put($env->key, $env->value);
             }
         }
+        $this->env_args->put('SOURCE_COMMIT', $this->commit);
     }
 
     private function generate_compose_file()
@@ -1190,12 +1192,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         }
         // Add PORT if not exists, use the first port as default
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
         }
-        if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('SOURCE_COMMIT'))->isEmpty()) {
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
             if (!is_null($this->commit)) {
                 $environment_variables->push("SOURCE_COMMIT={$this->commit}");
+            } else {
+                $environment_variables->push("SOURCE_COMMIT=unknown");
             }
         }
         return $environment_variables->all();
@@ -1440,11 +1444,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} build"), "hidden" => true],
             );
         } else {
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} build"), "hidden" => true],
             );
         }
         $this->application_deployment_queue->addLogEntry("New images built.");
@@ -1456,16 +1460,16 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $this->application_deployment_queue->addLogEntry("Pulling latest images from the registry.");
             $this->execute_remote_command(
                 [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} pull"), "hidden" => true],
-                [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
             );
         } else {
             if ($this->docker_compose_location) {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
                 );
             } else {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} up --build -d"), "hidden" => true],
                 );
             }
         }
