@@ -396,12 +396,14 @@ class Server extends BaseModel
     {
         $server = Server::find($this->id);
         if (!$server) {
+            echo 'Server not found?!';
             return false;
         }
         if ($server->skipServer()) {
             return false;
         }
         $uptime = instant_remote_process(['uptime'], $server, false);
+        echo "Uptime: $uptime\n";
         if (!$uptime) {
             $server->settings()->update([
                 'is_reachable' => false,
