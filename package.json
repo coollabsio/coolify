@@ -20,7 +20,7 @@
     "dependencies": {
         "@tailwindcss/typography": "0.5.10",
         "alpinejs": "3.13.3",
-        "daisyui": "4.6.0",
+        "daisyui": "4.4.19",
         "ioredis": "5.3.2",
         "tailwindcss-scrollbar": "0.1.0"
     }
