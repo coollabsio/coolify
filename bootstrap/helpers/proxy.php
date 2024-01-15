@@ -103,9 +103,6 @@ function generate_default_proxy_configuration(Server $server)
         "traefik.http.routers.traefik.entrypoints=http",
         "traefik.http.routers.traefik.service=api@internal",
         "traefik.http.services.traefik.loadbalancer.server.port=8080",
-        // Global Middlewares
-        "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https",
-        "traefik.http.middlewares.gzip.compress=true",
     ];
     $config = [
         "version" => "3.8",
@@ -198,10 +195,23 @@ function setup_dynamic_configuration()
             $traefik_dynamic_conf = [
                 'http' =>
                 [
+                    'middlewares' => [
+                        'redirect-to-https' => [
+                            'redirectscheme' => [
+                                'scheme' => 'https',
+                            ],
+                        ],
+                        'gzip' => [
+                            'compress' => true,
+                        ],
+                    ],
                     'routers' =>
                     [
                         'coolify-http' =>
                         [
+                            'middlewares' => [
+                                0 => 'gzip',
+                            ],
                             'entryPoints' => [
                                 0 => 'http',
                             ],
@@ -251,7 +261,7 @@ function setup_dynamic_configuration()
 
             if ($schema === 'https') {
                 $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
-                    0 => 'redirect-to-https@docker',
+                    0 => 'redirect-to-https',
                 ];
 
                 $traefik_dynamic_conf['http']['routers']['coolify-https'] = [

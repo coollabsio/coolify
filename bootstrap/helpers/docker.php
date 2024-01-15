@@ -229,11 +229,12 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
 
+            $labels->push("traefik.http.middlewares.gzip.compress=true");
+            $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
             if ($schema === 'https') {
                 // Set labels for https
                 $labels->push("traefik.http.routers.{$https_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$https_label}.entryPoints=https");
-                $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
                 if ($port) {
                     $labels->push("traefik.http.routers.{$https_label}.service={$https_label}");
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
@@ -254,13 +255,13 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($is_force_https_enabled) {
+                    $labels->push("traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https");
                     $labels->push("traefik.http.routers.{$http_label}.middlewares=redirect-to-https");
                 }
             } else {
                 // Set labels for http
                 $labels->push("traefik.http.routers.{$http_label}.rule=Host(`{$host}`) && PathPrefix(`{$path}`)");
                 $labels->push("traefik.http.routers.{$http_label}.entryPoints=http");
-                $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
                 if ($port) {
                     $labels->push("traefik.http.services.{$http_label}.loadbalancer.server.port=$port");
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
