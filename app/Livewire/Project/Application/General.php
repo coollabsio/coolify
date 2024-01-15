@@ -117,7 +117,7 @@ class General extends Component
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         $this->customLabels = $this->application->parseContainerLabels();
         if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
-            $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+            $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
         }
@@ -182,7 +182,7 @@ class General extends Component
     }
     public function checkLabelUpdates()
     {
-        if (md5($this->application->custom_labels) !== md5(implode(",", generateLabelsApplication($this->application)))) {
+        if (md5($this->application->custom_labels) !== md5(implode("|", generateLabelsApplication($this->application)))) {
             $this->labelsChanged = true;
         } else {
             $this->labelsChanged = false;
@@ -201,7 +201,7 @@ class General extends Component
     }
     public function resetDefaultLabels($showToaster = true)
     {
-        $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+        $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
         $this->ports_exposes = $this->application->ports_exposes;
         $this->submit($showToaster);
     }
@@ -215,7 +215,7 @@ class General extends Component
     {
         try {
             if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
-                $this->customLabels = str(implode(",", generateLabelsApplication($this->application)))->replace(',', "\n");
+                $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();
             }
