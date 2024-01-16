@@ -3,7 +3,7 @@
     <div class="flex gap-2">
         <x-server.sidebar :server="$server" :parameters="$parameters" />
         <div class="w-full">
-            @if ($server->proxyType() !== 'NONE' && $server->isFunctional())
+            @if ($server->isFunctional())
                 <livewire:server.proxy :server="$server" />
             @endif
         </div>
