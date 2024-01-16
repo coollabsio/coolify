@@ -71,7 +71,7 @@ class Server extends BaseModel
 
     static public function isUsable()
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false);
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false);
     }
 
     static public function destinationsByServer(string $server_id)
@@ -328,7 +328,7 @@ class Server extends BaseModel
     }
     public function isProxyShouldRun()
     {
-        if ($this->proxyType() === ProxyTypes::NONE->value) {
+        if ($this->proxyType() === ProxyTypes::NONE->value || $this->settings->is_build_server) {
             return false;
         }
         // foreach ($this->applications() as $application) {
@@ -436,7 +436,7 @@ class Server extends BaseModel
         }
         $this->settings->is_usable = true;
         $this->settings->save();
-        $this->validateCoolifyNetwork(isSwarm: false);
+        $this->validateCoolifyNetwork(isSwarm: false, isBuildServer: $this->settings->is_build_server);
         return true;
     }
     public function validateDockerSwarm()
@@ -466,8 +466,11 @@ class Server extends BaseModel
         $this->settings->save();
         return true;
     }
-    public function validateCoolifyNetwork($isSwarm = false)
+    public function validateCoolifyNetwork($isSwarm = false, $isBuildServer = false)
     {
+        if ($isBuildServer) {
+            return;
+        }
         if ($isSwarm) {
             return instant_remote_process(["docker network create --attachable --driver overlay coolify-overlay >/dev/null 2>&1 || true"], $this, false);
         } else {

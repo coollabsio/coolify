@@ -26,6 +26,7 @@ class Form extends Component
         'server.settings.is_reachable' => 'required',
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
+        'server.settings.is_build_server' => 'required|boolean',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -38,6 +39,7 @@ class Form extends Component
         'server.settings.is_reachable' => 'Is reachable',
         'server.settings.is_swarm_manager' => 'Swarm Manager',
         'server.settings.is_swarm_worker' => 'Swarm Worker',
+        'server.settings.is_build_server' => 'Build Server',
     ];
 
     public function mount()

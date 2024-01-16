@@ -104,7 +104,7 @@ class Select extends Component
         if ($this->includeSwarm) {
             $this->servers = $this->allServers;
         } else {
-            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
         }
     }
     public function setType(string $type)
@@ -120,13 +120,13 @@ class Select extends Component
             case 'mongodb':
                 $this->isDatabase = true;
                 $this->includeSwarm = false;
-                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+                $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
                 break;
         }
         if (str($type)->startsWith('one-click-service') || str($type)->startsWith('docker-compose-empty')) {
             $this->isDatabase = true;
             $this->includeSwarm = false;
-            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false);
+            $this->servers = $this->allServers->where('settings.is_swarm_worker', false)->where('settings.is_swarm_manager', false)->where('settings.is_build_server', false);
         }
         if ($type === "existing-postgresql") {
             $this->current_step = $type;

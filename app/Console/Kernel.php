@@ -60,10 +60,10 @@ class Kernel extends ConsoleKernel
             $servers = Server::all()->whereNotNull('team.subscription')->where('team.subscription.stripe_trial_already_ended', false)->where('ip', '!=', '1.2.3.4');
             $own = Team::find(0)->servers;
             $servers = $servers->merge($own);
-            $containerServers = $servers->where('settings.is_swarm_worker', false);
+            $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         } else {
             $servers = Server::all()->where('ip', '!=', '1.2.3.4');
-            $containerServers = $servers->where('settings.is_swarm_worker', false);
+            $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
             $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
@@ -111,7 +111,8 @@ class Kernel extends ConsoleKernel
         }
     }
 
-    private function check_scheduled_tasks($schedule) {
+    private function check_scheduled_tasks($schedule)
+    {
         $scheduled_tasks = ScheduledTask::all();
         if ($scheduled_tasks->isEmpty()) {
             ray('no scheduled tasks');
@@ -134,7 +135,6 @@ class Kernel extends ConsoleKernel
                 task: $scheduled_task
             ))->cron($scheduled_task->frequency)->onOneServer();
         }
-
     }
 
     protected function commands(): void

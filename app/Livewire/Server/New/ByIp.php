@@ -25,6 +25,8 @@ class ByIp extends Component
     public bool $is_swarm_worker = false;
     public $selected_swarm_cluster = null;
 
+    public bool $is_build_server = false;
+
     public $swarm_managers = [];
     protected $rules = [
         'name' => 'required|string',
@@ -34,6 +36,7 @@ class ByIp extends Component
         'port' => 'required|integer',
         'is_swarm_manager' => 'required|boolean',
         'is_swarm_worker' => 'required|boolean',
+        'is_build_server' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'name' => 'Name',
@@ -43,6 +46,7 @@ class ByIp extends Component
         'port' => 'Port',
         'is_swarm_manager' => 'Swarm Manager',
         'is_swarm_worker' => 'Swarm Worker',
+        'is_build_server' => 'Build Server',
     ];
 
     public function mount()
@@ -89,8 +93,14 @@ class ByIp extends Component
                 $payload['swarm_cluster'] = $this->selected_swarm_cluster;
             }
             $server = Server::create($payload);
-            $server->settings->is_swarm_manager = $this->is_swarm_manager;
-            $server->settings->is_swarm_worker = $this->is_swarm_worker;
+            if ($this->is_build_server) {
+                $this->is_swarm_manager = false;
+                $this->is_swarm_worker = false;
+            } else {
+                $server->settings->is_swarm_manager = $this->is_swarm_manager;
+                $server->settings->is_swarm_worker = $this->is_swarm_worker;
+            }
+            $server->settings->is_build_server = $this->is_build_server;
             $server->settings->save();
             $server->addInitialNetwork();
             return redirect()->route('server.show', $server->uuid);

@@ -8,5 +8,5 @@ class Destination extends Component
 {
     public $resource;
     public $servers = [];
-    public $additionalServers = [];
+    public $additional_servers = [];
 }

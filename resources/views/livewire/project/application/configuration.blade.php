@@ -18,9 +18,11 @@
                     href="#">Environment
                     Variables</a>
             @endif
-            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
-            @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'" href="#">Scheduled Tasks
-        </a>
+            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
+                <a :class="activeTab === 'storages' && 'text-white'"
+                    @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
+                </a>
+            @endif
             @if ($application->git_based())
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
@@ -28,11 +30,12 @@
             <a :class="activeTab === 'server' && 'text-white'"
                 @click.prevent="activeTab = 'server'; window.location.hash = 'server'" href="#">Server
             </a>
-            @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
-                <a :class="activeTab === 'storages' && 'text-white'"
-                    @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
-                </a>
-            @endif
+
+            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+                @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
+                href="#">Scheduled Tasks
+            </a>
+
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>

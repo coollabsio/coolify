@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Enums\ProcessStatus;
+use App\Models\User;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
@@ -10,14 +11,16 @@ class ActivityMonitor extends Component
 {
     public ?string $header = null;
     public $activityId;
+    public $eventToDispatch = 'activityFinished';
     public $isPollingActive = false;
 
     protected $activity;
     protected $listeners = ['newMonitorActivity'];
 
-    public function newMonitorActivity($activityId)
+    public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished')
     {
         $this->activityId = $activityId;
+        $this->eventToDispatch = $eventToDispatch;
 
         $this->hydrateActivity();
 
@@ -35,13 +38,28 @@ class ActivityMonitor extends Component
         // $this->setStatus(ProcessStatus::IN_PROGRESS);
         $exit_code = data_get($this->activity, 'properties.exitCode');
         if ($exit_code !== null) {
-            if ($exit_code === 0) {
-                // $this->setStatus(ProcessStatus::FINISHED);
-            } else {
-                // $this->setStatus(ProcessStatus::ERROR);
-            }
+            // if ($exit_code === 0) {
+            //     // $this->setStatus(ProcessStatus::FINISHED);
+            // } else {
+            //     // $this->setStatus(ProcessStatus::ERROR);
+            // }
             $this->isPollingActive = false;
-            $this->dispatch('activityFinished');
+            if ($exit_code === 0) {
+                if ($this->eventToDispatch !== null) {
+                    if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
+                        $causer_id = data_get($this->activity, 'causer_id');
+                        $user = User::find($causer_id);
+                        if ($user) {
+                            foreach($user->teams as $team) {
+                                $teamId = $team->id;
+                                $this->eventToDispatch::dispatch($teamId);
+                            }
+                        }
+                        return;
+                    }
+                    $this->dispatch($this->eventToDispatch);
+                }
+            }
         }
     }
 

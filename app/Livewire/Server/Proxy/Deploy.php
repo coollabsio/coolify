@@ -4,6 +4,7 @@ namespace App\Livewire\Server\Proxy;
 
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
+use App\Events\ProxyStatusChanged;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -14,7 +15,17 @@ class Deploy extends Component
     public ?string $currentRoute = null;
     public ?string $serverIp = null;
 
-    protected $listeners = ['proxyStatusUpdated', 'traefikDashboardAvailable', 'serverRefresh' => 'proxyStatusUpdated', "checkProxy", "startProxy"];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:team.{$teamId},ProxyStatusChanged" => 'proxyStarted',
+            'proxyStatusUpdated',
+            'traefikDashboardAvailable',
+            'serverRefresh' => 'proxyStatusUpdated',
+            "checkProxy", "startProxy"
+        ];
+    }
 
     public function mount()
     {
@@ -29,12 +40,14 @@ class Deploy extends Component
     {
         $this->traefikDashboardAvailable = $data;
     }
+    public function proxyStarted()
+    {
+        CheckProxy::run($this->server, true);
+        $this->dispatch('success', 'Proxy started.');
+    }
     public function proxyStatusUpdated()
     {
         $this->server->refresh();
-    }
-    public function ip()
-    {
     }
     public function checkProxy()
     {
@@ -50,7 +63,7 @@ class Deploy extends Component
     {
         try {
             $activity = StartProxy::run($this->server);
-            $this->dispatch('newMonitorActivity', $activity->id);
+            $this->dispatch('newMonitorActivity', $activity->id, ProxyStatusChanged::class);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -77,6 +90,5 @@ class Deploy extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-
     }
 }

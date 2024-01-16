@@ -227,7 +227,6 @@ class General extends Component
             if ($this->ports_exposes !== $this->application->ports_exposes) {
                 $this->resetDefaultLabels(false);
             }
-
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',

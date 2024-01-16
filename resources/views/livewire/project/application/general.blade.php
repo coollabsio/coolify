@@ -64,25 +64,25 @@
                 </div>
             @endif
             @if ($application->build_pack !== 'dockercompose')
-            <div class="flex items-end gap-2">
-                <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
-                    helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
-                <x-forms.button wire:click="getWildcardDomain">Generate Domain
-                </x-forms.button>
-            </div>
-        @endif
+                <div class="flex items-end gap-2">
+                    <x-forms.input placeholder="https://coolify.io" id="application.fqdn" label="Domains"
+                        helper="You can specify one domain with path or more with comma. You can specify a port to bind the domain to.<br><br><span class='text-helper'>Example</span><br>- http://app.coolify.io, https://cloud.coolify.io/dashboard<br>- http://app.coolify.io/api/v3<br>- http://app.coolify.io:3000 -> app.coolify.io will point to port 3000 inside the container. " />
+                    <x-forms.button wire:click="getWildcardDomain">Generate Domain
+                    </x-forms.button>
+                </div>
+            @endif
             @if ($application->build_pack !== 'dockercompose')
                 <h3>Docker Registry</h3>
                 @if ($application->destination->server->isSwarm())
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Docker Swarm requires the image to be available in a registry. More info <a
-                                class="underline" href="https://coolify.io/docs/docker-registries"
+                                class="underline" href="https://coolify.io/docs/docker/registry"
                                 target="_blank">here</a>.</div>
                     @endif
                 @else
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Push the built image to a docker registry. More info <a class="underline"
-                                href="https://coolify.io/docs/docker-registries" target="_blank">here</a>.</div>
+                                href="https://coolify.io/docs/docker/registry" target="_blank">here</a>.</div>
                     @endif
                 @endif
                 <div class="flex flex-col gap-2 xl:flex-row">
@@ -190,7 +190,8 @@
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
                 @if ($application->settings->is_raw_compose_deployment_enabled)
                     <x-forms.textarea rows="10" readonly id="application.docker_compose_raw"
-                        label="Docker Compose Content (applicationId: {{$application->id}})" helper="You need to modify the docker compose file." />
+                        label="Docker Compose Content (applicationId: {{ $application->id }})"
+                        helper="You need to modify the docker compose file." />
                 @else
                     <x-forms.textarea rows="10" readonly id="application.docker_compose"
                         label="Docker Compose Content" helper="You need to modify the docker compose file." />

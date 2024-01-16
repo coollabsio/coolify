@@ -26,8 +26,14 @@
                 @endforeach
             </x-forms.select>
             <div class="w-96">
-                <div class="pt-6"> Swarm support is in alpha version. Read the docs <a class='text-white' href='https://coolify.io/docs/docker/swarm#deploy-with-persistent-storage' target='_blank'>here</a>.</div>
-                @if ($is_swarm_worker)
+                <x-forms.checkbox instantSave type="checkbox" id="is_build_server" label="Use it as a build server?" />
+            </div>
+            <div class="w-96">
+                <h3 class="pt-6">Swarm Support</h3>
+                <div> Swarm support is in alpha version. Read the docs <a class='text-white'
+                        href='https://coolify.io/docs/docker/swarm#deploy-with-persistent-storage'
+                        target='_blank'>here</a>.</div>
+                @if ($is_swarm_worker || $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_manager"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Manager?" />
@@ -36,7 +42,7 @@
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Manager?" />
                 @endif
-                @if ($is_swarm_manager)
+                @if ($is_swarm_manager|| $is_build_server)
                     <x-forms.checkbox disabled instantSave type="checkbox" id="is_swarm_worker"
                         helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                         label="Is it a Swarm Worker?" />
