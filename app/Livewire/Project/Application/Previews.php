@@ -49,8 +49,9 @@ class Previews extends Component
             queue_application_deployment(
                 application_id: $this->application->id,
                 deployment_uuid: $this->deployment_uuid,
-                force_rebuild: true,
+                force_rebuild: false,
                 pull_request_id: $pull_request_id,
+                git_type: $found->git_type ?? null,
             );
             return redirect()->route('project.application.deployment.show', [
                 'project_uuid' => $this->parameters['project_uuid'],
