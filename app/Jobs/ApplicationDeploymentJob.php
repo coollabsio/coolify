@@ -265,13 +265,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else {
                 $this->write_deployment_configurations();
             }
-            $this->execute_remote_command(
-                [
-                    "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
-                    "hidden" => true,
-                    "ignore_errors" => true,
-                ]
-            );
+            // $this->execute_remote_command(
+            //     [
+            //         "docker rm -f {$this->deployment_uuid} >/dev/null 2>&1",
+            //         "hidden" => true,
+            //         "ignore_errors" => true,
+            //     ]
+            // );
             $this->execute_remote_command(
                 [
                     "docker image prune -f >/dev/null 2>&1",
@@ -889,6 +889,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         );
         if ($this->saved_outputs->get('nixpacks_type')) {
             $this->nixpacks_type = $this->saved_outputs->get('nixpacks_type');
+            if (str($this->nixpacks_type)->isEmpty()) {
+                throw new RuntimeException('Nixpacks failed to detect the application type. Please check the documentation of Nixpacks: https://nixpacks.com/docs/providers');
+            }
         }
         if ($this->saved_outputs->get('nixpacks_plan')) {
             $this->nixpacks_plan = $this->saved_outputs->get('nixpacks_plan');
