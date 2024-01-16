@@ -48,10 +48,5 @@
                 @endforeach
             </div>
         @endif
-        @if (
-            $resource->persistentStorages()->get()->count() == 0 &&
-                $resource->fileStorages()->get()->count() == 0)
-            <div class="pt-4">No storages found.</div>
-        @endif
     @endif
 </div>
