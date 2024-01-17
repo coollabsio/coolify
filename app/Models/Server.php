@@ -198,7 +198,7 @@ class Server extends BaseModel
                 foreach ($this->databases() as $database) {
                     $database->update(['status' => 'exited']);
                 }
-                foreach ($this->services() as $service) {
+                foreach ($this->services()->get() as $service) {
                     $apps = $service->applications()->get();
                     $dbs = $service->databases()->get();
                     foreach ($apps as $app) {

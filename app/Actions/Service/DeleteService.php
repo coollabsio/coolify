@@ -10,8 +10,10 @@ class DeleteService
     use AsAction;
     public function handle(Service $service)
     {
-        StopService::run($service);
         $server = data_get($service, 'server');
+        if ($server->isFunctional()) {
+            StopService::run($service);
+        }
         $storagesToDelete = collect([]);
 
         $service->environment_variables()->delete();

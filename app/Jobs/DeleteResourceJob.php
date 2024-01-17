@@ -31,11 +31,16 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
     {
         try {
             $server = $this->resource->destination->server;
+            $this->resource->delete();
             if (!$server->isFunctional()) {
-                $this->resource->forceDelete();
+                if ($this->resource->type() === 'service') {
+                    ray('dispatching delete service');
+                    DeleteService::dispatch($this->resource);
+                } else {
+                    $this->resource->forceDelete();
+                }
                 return 'Server is not functional';
             }
-            $this->resource->delete();
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource);
