@@ -59,7 +59,7 @@
                             helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                             id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                         @if ($server->isSwarm())
-                            <div class="pt-6"> Swarm support is in alpha version. </div>
+                            <div class="pt-6"> Swarm support is experimental. </div>
                         @endif
                         @if ($server->settings->is_swarm_worker)
                             <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"

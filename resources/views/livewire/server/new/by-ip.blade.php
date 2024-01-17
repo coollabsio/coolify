@@ -30,7 +30,7 @@
             </div>
             <div class="w-96">
                 <h3 class="pt-6">Swarm Support</h3>
-                <div> Swarm support is in alpha version. Read the docs <a class='text-white'
+                <div> Swarm support is experimental. Read the docs <a class='text-white'
                         href='https://coolify.io/docs/docker/swarm#deploy-with-persistent-storage'
                         target='_blank'>here</a>.</div>
                 @if ($is_swarm_worker || $is_build_server)
