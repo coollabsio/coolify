@@ -30,18 +30,22 @@ class PublicGitRepository extends Component
     public GithubApp|GitlabApp|string $git_source = 'other';
     public string $git_host;
     public string $git_repository;
+    public $build_pack;
+    public bool $show_is_static = true;
 
     protected $rules = [
         'repository_url' => 'required|url',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
+        'build_pack' => 'required|string',
     ];
     protected $validationAttributes = [
         'repository_url' => 'repository',
         'port' => 'port',
         'is_static' => 'static',
         'publish_directory' => 'publish directory',
+        'build_pack' => 'build pack',
     ];
 
     public function mount()
@@ -53,7 +57,18 @@ class PublicGitRepository extends Component
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
     }
-
+    public function updatedBuildPack()
+    {
+        if ($this->build_pack === 'nixpacks') {
+            $this->show_is_static = true;
+        } else if ($this->build_pack === 'static') {
+            $this->show_is_static = false;
+            $this->is_static = false;
+        } else {
+            $this->show_is_static = false;
+            $this->is_static = false;
+        }
+    }
     public function instantSave()
     {
         if ($this->is_static) {
@@ -157,6 +172,7 @@ class PublicGitRepository extends Component
                     'environment_id' => $environment->id,
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
+                    'build_pack' => $this->build_pack,
                 ];
             } else {
                 $application_init = [
@@ -170,7 +186,8 @@ class PublicGitRepository extends Component
                     'destination_id' => $destination->id,
                     'destination_type' => $destination_class,
                     'source_id' => $this->git_source->id,
-                    'source_type' => $this->git_source->getMorphClass()
+                    'source_type' => $this->git_source->getMorphClass(),
+                    'build_pack' => $this->build_pack,
                 ];
             }
 
