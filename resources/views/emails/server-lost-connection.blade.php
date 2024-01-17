@@ -3,7 +3,7 @@ Coolify cannot connect to your server ({{ $name }}). Please check your server an
 
 All automations & integrations are turned off!
 
-IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn onall automations & integrations.
+IMPORTANT: We automatically try to revive your server. If your server is back online, we will automatically turn on all automations & integrations.
 
 If you have any questions, please contact us.
 </x-emails.layout>
