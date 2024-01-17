@@ -66,7 +66,7 @@
                 @endif
             </div>
             <x-forms.button type="submit">
-                Save Server
+                Continue
             </x-forms.button>
         </form>
     @endif
