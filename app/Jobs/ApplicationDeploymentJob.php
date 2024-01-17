@@ -204,7 +204,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if (data_get($this->application, 'settings.is_build_server_enabled')) {
             $teamId = data_get($this->application, 'environment.project.team.id');
-            $buildServers = Server::where('team_id', $teamId)->whereRelation('settings', 'is_build_server', true)->get();
+            $buildServers = Server::buildServers($teamId)->get();
             if ($buildServers->count() === 0) {
                 $this->application_deployment_queue->addLogEntry("Build server feature activated, but no suitable build server found. Using the deployment server.");
                 $this->build_server = $this->server;

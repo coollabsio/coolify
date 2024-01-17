@@ -141,6 +141,10 @@ class Server extends BaseModel
     {
         return $this->ip === 'host.docker.internal' || $this->id === 0;
     }
+    static public function buildServers($teamId)
+    {
+        return Server::whereTeamId($teamId)->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_build_server', true);
+    }
     public function skipServer()
     {
         if ($this->ip === '1.2.3.4') {
