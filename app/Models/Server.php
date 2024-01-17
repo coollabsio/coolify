@@ -112,7 +112,7 @@ class Server extends BaseModel
                 ]);
             } else {
                 StandaloneDocker::create([
-                    'name' => 'coolify-overlay',
+                    'name' => 'coolify',
                     'network' => 'coolify',
                     'server_id' => $this->id,
                 ]);
