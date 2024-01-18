@@ -10,6 +10,15 @@
                         Check repository
                     </x-forms.button>
                 </div>
+                @if (!$branch_found)
+                    <div>
+                        <p>Public repositories: <span class='text-helper'>https://...</span></p>
+                        <p>Private repositories: <span class='text-helper'>git@...</span></p>
+                        <p>Preselect branch: <span
+                                class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/static</span> to
+                            select 'static' branch.</p>
+                    </div>
+                @endif
                 @if ($branch_found)
                     @if ($rate_limit_remaining && $rate_limit_reset)
                         <div class="flex gap-2 py-2">
@@ -21,12 +30,20 @@
                     <div class="flex flex-col gap-2 pb-6">
                         <div class="flex gap-2">
                             @if ($git_source === 'other')
-                                <x-forms.input id="git_branch" label="Selected branch"
+                                <x-forms.input id="git_branch" label="Branch"
                                     helper="You can select other branches after configuration is done." />
                             @else
-                                <x-forms.input disabled id="git_branch" label="Selected branch"
+                                <x-forms.input disabled id="git_branch" label="Branch"
                                     helper="You can select other branches after configuration is done." />
                             @endif
+                            <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
+                                <option value="nixpacks">Nixpacks</option>
+                                <option value="static">Static</option>
+                                <option value="dockerfile">Dockerfile</option>
+                                <option value="dockercompose">Docker Compose</option>
+                            </x-forms.select>
+                        </div>
+                        @if ($show_is_static)
                             @if ($is_static)
                                 <x-forms.input id="publish_directory" label="Publish Directory"
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
@@ -34,14 +51,14 @@
                                 <x-forms.input type="number" id="port" label="Port" :readonly="$is_static"
                                     helper="The port your application listens on." />
                             @endif
-                        </div>
-                        <div class="w-52">
-                            <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                                helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-                        </div>
+                            <div class="w-52">
+                                <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                                    helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                            </div>
+                        @endif
                     </div>
                     <x-forms.button wire:click.prevent='submit'>
-                        Save New Application
+                        Continue
                     </x-forms.button>
                 @endif
             </div>

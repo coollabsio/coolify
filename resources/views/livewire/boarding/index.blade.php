@@ -57,7 +57,7 @@
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <br />
-                        Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.
+                        Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
                         <x-forms.button class="box" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
@@ -242,7 +242,7 @@
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
                         to run optimal.<br><br>Minimum Docker Engine version is: 22<br><br>To manually install Docker
                         Engine, check <a target="_blank" class="underline text-warning"
-                            href="https://coolify.io/docs/servers#install-docker-engine-manually">this
+                            href="https://docs.docker.com/engine/install/#server">this
                             documentation</a>.</p>
                 </x-slot:explanation>
             </x-boarding-step>

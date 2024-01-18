@@ -13,7 +13,7 @@
             @endif
         </div>
         <div class="w-48">
-            <x-forms.checkbox instantSave id="team.telegram_enabled" label="Notification Enabled" />
+            <x-forms.checkbox instantSave id="team.telegram_enabled" label="Enabled" />
         </div>
         <div class="flex gap-2">
             <x-forms.input type="password"

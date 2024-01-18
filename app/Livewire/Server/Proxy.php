@@ -33,7 +33,6 @@ class Proxy extends Component
     {
         $this->server->proxy = null;
         $this->server->save();
-        $this->dispatch('proxyStatusUpdated');
     }
 
     public function select_proxy($proxy_type)

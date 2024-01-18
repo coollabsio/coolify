@@ -26,6 +26,7 @@ class Form extends Component
         'server.settings.is_reachable' => 'required',
         'server.settings.is_swarm_manager' => 'required|boolean',
         'server.settings.is_swarm_worker' => 'required|boolean',
+        'server.settings.is_build_server' => 'required|boolean',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -38,6 +39,7 @@ class Form extends Component
         'server.settings.is_reachable' => 'Is reachable',
         'server.settings.is_swarm_manager' => 'Swarm Manager',
         'server.settings.is_swarm_worker' => 'Swarm Worker',
+        'server.settings.is_build_server' => 'Build Server',
     ];
 
     public function mount()
@@ -76,7 +78,7 @@ class Form extends Component
             $this->server->settings->is_usable = true;
             $this->server->settings->save();
         } else {
-            $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.');
+            $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
             return;
         }
     }
@@ -85,12 +87,12 @@ class Form extends Component
         try {
             $uptime = $this->server->validateConnection();
             if (!$uptime) {
-                $install &&  $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/configuration#openssh-server">documentation</a> for further help.');
+                $install &&  $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
                 return;
             }
             $supported_os_type = $this->server->validateOS();
             if (!$supported_os_type) {
-                $install && $this->dispatch('error', 'Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://coolify.io/docs/servers#install-docker-engine-manually">documentation</a>.');
+                $install && $this->dispatch('error', 'Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.');
                 return;
             }
             $dockerInstalled = $this->server->validateDockerEngine();

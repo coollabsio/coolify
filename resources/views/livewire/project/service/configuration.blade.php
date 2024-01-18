@@ -7,6 +7,14 @@
                 @click.prevent="activeTab = 'service-stack';
                 window.location.hash = 'service-stack'"
                 href="#">Service Stack</a>
+            <a :class="activeTab === 'environment-variables' && 'text-white'"
+                @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
+                href="#">Environment
+                Variables</a>
+            <a :class="activeTab === 'storages' && 'text-white'"
+                @click.prevent="activeTab = 'storages';
+                window.location.hash = 'storages'"
+                href="#">Storages</a>
             <a :class="activeTab === 'execute-command' && 'text-white'"
                 @click.prevent="activeTab = 'execute-command';
                 window.location.hash = 'execute-command'"
@@ -15,17 +23,9 @@
                 @click.prevent="activeTab = 'logs';
                 window.location.hash = 'logs'"
                 href="#">Logs</a>
-            <a :class="activeTab === 'storages' && 'text-white'"
-                @click.prevent="activeTab = 'storages';
-                window.location.hash = 'storages'"
-                href="#">Storages</a>
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            <a :class="activeTab === 'environment-variables' && 'text-white'"
-                @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
-                href="#">Environment
-                Variables</a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"

@@ -16,6 +16,7 @@ class Advanced extends Component
         'application.settings.is_force_https_enabled' => 'boolean|required',
         'application.settings.is_log_drain_enabled' => 'boolean|required',
         'application.settings.is_gpu_enabled' => 'boolean|required',
+        'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.gpu_driver' => 'string|required',
         'application.settings.gpu_count' => 'string|required',
         'application.settings.gpu_device_ids' => 'string|required',

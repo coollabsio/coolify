@@ -35,7 +35,7 @@
             <div class="flex flex-col w-full gap-2 lg:flex-row">
                 <x-forms.input id="server.name" label="Name" required />
                 <x-forms.input id="server.description" label="Description" />
-                @if (!$server->settings->is_swarm_worker)
+                @if (!$server->settings->is_swarm_worker && !$server->settings->is_build_server)
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
                         helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example:</span><br>In case you set:<span class='text-helper'>https://example.com</span> your applications will get:<br> <span class='text-helper'>https://randomId.example.com</span>" />
                 @endif
@@ -51,29 +51,34 @@
             </div>
             <div class="w-64">
                 @if (!$server->isLocalhost())
-                    <x-forms.checkbox instantSave
-                        helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
-                        id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
-                    @if ($server->isSwarm())
-                        <div class="pt-6"> Swarm support is in alpha version. </div>
-                    @endif
-                    @if ($server->settings->is_swarm_worker)
-                        <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                            helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                            label="Is it a Swarm Manager?" />
+                    @if ($server->settings->is_build_server)
+                        <x-forms.checkbox instantSave disabled id="server.settings.is_build_server"
+                            label="Use it as a build server?" />
                     @else
-                        <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                            helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                            label="Is it a Swarm Manager?" />
-                    @endif
-                    @if ($server->settings->is_swarm_manager)
-                        <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                            helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                            label="Is it a Swarm Worker?" />
-                    @else
-                        <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                            helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/swarm' target='_blank'>here</a>."
-                            label="Is it a Swarm Worker?" />
+                        <x-forms.checkbox instantSave
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                            id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
+                        @if ($server->isSwarm())
+                            <div class="pt-6"> Swarm support is experimental. </div>
+                        @endif
+                        @if ($server->settings->is_swarm_worker)
+                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                label="Is it a Swarm Manager?" />
+                        @else
+                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
+                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                label="Is it a Swarm Manager?" />
+                        @endif
+                        @if ($server->settings->is_swarm_manager)
+                            <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                label="Is it a Swarm Worker?" />
+                        @else
+                            <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
+                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                label="Is it a Swarm Worker?" />
+                        @endif
                     @endif
                 @endif
             </div>

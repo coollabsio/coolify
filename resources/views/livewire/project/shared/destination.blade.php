@@ -1,7 +1,8 @@
 <div>
     <h2>Server</h2>
-    <div class="">The destination server where your application will be deployed to.</div>
-    <div class="py-4 ">
+    <div class="">Server related configurations.</div>
+    <h3 class="pt-4">Destination Server & Network</h3>
+    <div class="py-4">
         <a class="box"
             href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}">On
             server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>

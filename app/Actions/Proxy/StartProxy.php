@@ -2,6 +2,7 @@
 
 namespace App\Actions\Proxy;
 
+use App\Events\ProxyStatusChanged;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -13,7 +14,6 @@ class StartProxy
     public function handle(Server $server, bool $async = true): string|Activity
     {
         try {
-
             $proxyType = $server->proxyType();
             $commands = collect([]);
             $proxy_path = get_proxy_path();

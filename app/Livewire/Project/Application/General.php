@@ -67,6 +67,7 @@ class General extends Component
         'application.docker_compose_custom_start_command' => 'nullable',
         'application.docker_compose_custom_build_command' => 'nullable',
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
+        'application.settings.is_build_server_enabled' => 'boolean|required',
     ];
     protected $validationAttributes = [
         'application.name' => 'name',
@@ -100,6 +101,7 @@ class General extends Component
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
         'application.settings.is_raw_compose_deployment_enabled' => 'Is raw compose deployment enabled',
+        'application.settings.is_build_server_enabled' => 'Is build server enabled',
     ];
     public function mount()
     {
@@ -227,7 +229,6 @@ class General extends Component
             if ($this->ports_exposes !== $this->application->ports_exposes) {
                 $this->resetDefaultLabels(false);
             }
-
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
