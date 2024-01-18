@@ -30,7 +30,7 @@ class Init extends Command
         $this->alive();
         $cleanup = $this->option('cleanup');
         if ($cleanup) {
-            echo "Running cleanup\n";
+            echo "Running cleanups...\n";
             $this->cleanup_stucked_resources();
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();

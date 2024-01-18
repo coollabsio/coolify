@@ -12,6 +12,7 @@ class CleanupQueue extends Command
 
     public function handle()
     {
+        echo "Running queue cleanup...\n";
         $prefix = config('database.redis.options.prefix');
         $keys = Redis::connection()->keys('*:laravel*');
         foreach ($keys as $key) {
