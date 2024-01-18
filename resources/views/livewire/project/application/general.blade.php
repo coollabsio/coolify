@@ -72,7 +72,7 @@
                 </div>
             @endif
             @if ($application->build_pack !== 'dockercompose')
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 pt-8">
                     <h3>Docker Registry</h3>
                     @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
                         <x-helper
@@ -119,12 +119,18 @@
             @endif
 
             @if ($application->build_pack !== 'dockerimage')
-                <h3>Build</h3>
+                <h3 class="pt-8">Build</h3>
+                @if ($application->build_pack !== 'dockercompose')
+                    <div class="w-96">
+                        <x-forms.checkbox
+                            helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/server/build-server' class='underline' target='_blank'>documentation</a>."
+                            instantSave id="application.settings.is_build_server_enabled"
+                            label="Use a Build Server? (experimental)" />
+                    </div>
+                @endif
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
-                        <div>Nixpacks will detect the required configuration automatically.
-                            <a class="underline" href="https://coolify.io/docs/frameworks/">Framework Specific Docs</a>
-                        </div>
+
                         <div class="flex flex-col gap-2 xl:flex-row">
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.install_command" label="Install Command" />
@@ -132,6 +138,9 @@
                                 id="application.build_command" label="Build Command" />
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.start_command" label="Start Command" />
+                        </div>
+                        <div>Nixpacks will detect the required configuration automatically.
+                            <a class="underline" href="https://coolify.io/docs/frameworks/">Framework Specific Docs</a>
                         </div>
                     @endif
                 @endif
@@ -162,10 +171,6 @@
                         </div>
                     </div>
                 @else
-                    <x-forms.checkbox
-                        helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/server/build-server' class='underline' target='_blank'>documentation</a>."
-                        instantSave id="application.settings.is_build_server_enabled"
-                        label="Use a Build Server? (experimental)" />
                     <div class="flex flex-col gap-2 xl:flex-row">
                         <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
                             helper="Directory to use as root. Useful for monorepos." />
@@ -210,7 +215,7 @@
                 <x-forms.textarea label="Dockerfile" id="application.dockerfile" rows="6"> </x-forms.textarea>
             @endif
             @if ($application->build_pack !== 'dockercompose')
-                <h3>Network</h3>
+                <h3 class="pt-8">Network</h3>
                 <div class="flex flex-col gap-2 xl:flex-row">
                     @if ($application->settings->is_static || $application->build_pack === 'static')
                         <x-forms.input id="application.ports_exposes" label="Ports Exposes" readonly />
