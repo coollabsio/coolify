@@ -37,12 +37,12 @@ class ContainerStopped extends Notification implements ShouldQueue
 
     public function toDiscord(): string
     {
-        $message = "Coolify: A resource has been stopped unexpectedly on {$this->server->name}";
+        $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";
         return $message;
     }
     public function toTelegram(): array
     {
-        $message = "Coolify: A resource has been stopped unexpectedly on {$this->server->name}";
+        $message = "Coolify: A resource ($this->name) has been stopped unexpectedly on {$this->server->name}";
         $payload = [
             "message" => $message,
         ];
