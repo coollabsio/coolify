@@ -72,17 +72,19 @@
                 </div>
             @endif
             @if ($application->build_pack !== 'dockercompose')
-                <h3>Docker Registry</h3>
+                <div class="flex items-center gap-2">
+                    <h3>Docker Registry</h3>
+                    @if ($application->build_pack !== 'dockerimage' && !$application->destination->server->isSwarm())
+                        <x-helper
+                            helper='Push the built image to a docker registry. More info <a class="underline"
+                href="https://coolify.io/docs/docker/registry" target="_blank">here</a>' />
+                    @endif
+                </div>
                 @if ($application->destination->server->isSwarm())
                     @if ($application->build_pack !== 'dockerimage')
                         <div>Docker Swarm requires the image to be available in a registry. More info <a
                                 class="underline" href="https://coolify.io/docs/docker/registry"
                                 target="_blank">here</a>.</div>
-                    @endif
-                @else
-                    @if ($application->build_pack !== 'dockerimage')
-                        <div>Push the built image to a docker registry. More info <a class="underline"
-                                href="https://coolify.io/docs/docker/registry" target="_blank">here</a>.</div>
                     @endif
                 @endif
                 <div class="flex flex-col gap-2 xl:flex-row">
@@ -160,6 +162,10 @@
                         </div>
                     </div>
                 @else
+                    <x-forms.checkbox
+                        helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental. For more info, check the <a href='https://coolify.io/docs/server/build-server' class='underline' target='_blank'>documentation</a>."
+                        instantSave id="application.settings.is_build_server_enabled"
+                        label="Use a Build Server? (experimental)" />
                     <div class="flex flex-col gap-2 xl:flex-row">
                         <x-forms.input placeholder="/" id="application.base_directory" label="Base Directory"
                             helper="Directory to use as root. Useful for monorepos." />

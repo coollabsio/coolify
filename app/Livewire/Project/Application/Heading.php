@@ -78,7 +78,7 @@ class Heading extends Component
             return;
         }
         if (data_get($this->application, 'settings.is_build_server_enabled') && is_null($this->application->docker_registry_image_name)) {
-            $this->dispatch('error', 'To use a build server you must set a Docker image name first.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/build-server">documentation</a>');
+            $this->dispatch('error', 'To use a build server you must set a Docker image name first.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/server/build-server">documentation</a>');
             return;
         }
         $this->setDeploymentUuid();

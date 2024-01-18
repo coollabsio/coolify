@@ -6,9 +6,6 @@
         <div>Advanced configuration for your application.</div>
         <div class="flex flex-col pt-4 ">
             <h4>General</h4>
-            <x-forms.checkbox
-                helper="Use a build server to build your application. You can configure your build server in the Server settings. This is experimental."
-                instantSave id="application.settings.is_build_server_enabled" label="Use a Build Server? (experimental)" />
             @if ($application->git_based())
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
                     id="application.settings.is_auto_deploy_enabled" label="Auto Deploy" />
