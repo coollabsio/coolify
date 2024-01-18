@@ -13,7 +13,7 @@
                                     $wire.showNotification = true;
                                 @endif
                                 console.error(
-                                    'Coolify could not connect to the new realtime service introduced in beta.154. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/cloudflare-tunnels) or get help on Discord (https://coollabs.io/discord).)'
+                                    'Coolify could not connect to the new realtime service introduced in beta.154. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/cloudflare/tunnels) or get help on Discord (https://coollabs.io/discord).)'
                                 );
                                 clearInterval(checkPusherInterval);
                             }
@@ -26,7 +26,7 @@
                             $wire.showNotification = true;
                         @endif
                         console.error(
-                            'Coolify could not connect to the new realtime service introduced in beta.154. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/cloudflare-tunnels) or get help on Discord (https://coollabs.io/discord).)'
+                            'Coolify could not connect to the new realtime service introduced in beta.154. This will cause unusual problems on the UI if not fixed! Please check the related documentation (https://coolify.io/docs/cloudflare/tunnels) or get help on Discord (https://coollabs.io/discord).)'
                         );
                         clearInterval(checkPusherInterval);
                     }
@@ -38,7 +38,7 @@
                 <span><span class="font-bold text-left text-red-500">WARNING: </span>Coolify could not connect to the new
                     realtime service introduced in beta.154. <br>This will cause unusual problems on the UI if not
                     fixed!<br><br>Please check the
-                    related <a href='https://coolify.io/docs/cloudflare-tunnels' target='_blank'>documentation</a> or get
+                    related <a href='https://coolify.io/docs/cloudflare/tunnels' target='_blank'>documentation</a> or get
                     help on <a href='https://coollabs.io/discord' target='_blank'>Discord</a>.</span>
                 <x-forms.button class="bg-coolgray-400" wire:click='disable'>Acknowledge the problem and disable this
                     popup</x-forms.button>
