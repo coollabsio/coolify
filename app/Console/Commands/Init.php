@@ -54,6 +54,7 @@ class Init extends Command
                 $settings->update(['is_auto_update_enabled' => false]);
             }
         }
+        $this->call('cleanup:queue');
     }
     private function restore_coolify_db_backup()
     {

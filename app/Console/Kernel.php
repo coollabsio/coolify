@@ -46,7 +46,6 @@ class Kernel extends ConsoleKernel
             $this->pull_helper_image($schedule);
             $this->check_scheduled_tasks($schedule);
         }
-        $schedule->command('cleanup:queue')->everyMinute()->onOneServer();
     }
     private function pull_helper_image($schedule)
     {
