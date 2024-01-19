@@ -21,7 +21,7 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
+ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux) ;;
 *)
     echo "This script only supports Debian, Redhat or Sles based operating systems for now."
     exit
@@ -52,7 +52,7 @@ ubuntu | debian | raspbian)
     apt update -y >/dev/null 2>&1
     apt install -y curl wget git jq >/dev/null 2>&1
     ;;
-centos | fedora | rhel | ol | rocky)
+centos | fedora | rhel | ol | rocky | almalinux)
     dnf install -y curl wget git jq >/dev/null 2>&1
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
