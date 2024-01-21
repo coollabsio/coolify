@@ -14,6 +14,7 @@ class StackForm extends Component
         'service.docker_compose' => 'required',
         'service.name' => 'required',
         'service.description' => 'nullable',
+        'service.connect_to_docker_network' => 'nullable',
     ];
     public $validationAttributes = [];
     public function mount()
@@ -43,6 +44,9 @@ class StackForm extends Component
 
         $this->service->docker_compose_raw = $raw;
         $this->submit();
+    }
+    public function instantSave() {
+        $this->service->save();
     }
 
     public function submit()

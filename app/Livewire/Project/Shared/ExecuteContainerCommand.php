@@ -79,21 +79,21 @@ class ExecuteContainerCommand extends Component
             $this->resource = $resource;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
-            if (!str(data_get($this,'resource.status'))->startsWith('exited')) {
+            // if (!str(data_get($this,'resource.status'))->startsWith('exited')) {
                 $this->containers->push($this->container);
-            }
+            // }
         } else if (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->resource->applications()->get()->each(function ($application) {
-                if (str(data_get($application, 'status'))->contains('running')) {
+                // if (str(data_get($application, 'status'))->contains('running')) {
                     $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
-                }
+                // }
             });
             $this->resource->databases()->get()->each(function ($database) {
-                if (str(data_get($database, 'status'))->contains('running')) {
+                // if (str(data_get($database, 'status'))->contains('running')) {
                     $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
-                }
+                // }
             });
 
             $this->server = $this->resource->server;

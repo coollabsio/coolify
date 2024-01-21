@@ -1,6 +1,6 @@
 <div class="flex flex-row items-center gap-4 px-2 form-control min-w-fit hover:bg-coolgray-100">
-    <label class="flex gap-4 px-0 label">
-        <span class="flex gap-2 label-text min-w-fit">
+    <label class="flex gap-4 px-0 min-w-fit label">
+        <span class="flex gap-2 label-text">
             @if ($label)
                 {!! $label !!}
             @else
