@@ -3,6 +3,7 @@
 namespace App\Actions\Database;
 
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Yaml\Yaml;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -106,7 +107,7 @@ class StartRedis
                 'target' => '/usr/local/etc/redis/redis.conf',
                 'read_only' => true,
             ];
-            $docker_compose['services'][$container_name]['command'] =  $startCommand . ' /usr/local/etc/redis/redis.conf';
+            $docker_compose['services'][$container_name]['command'] = "redis-server /usr/local/etc/redis/redis.conf --requirepass {$this->database->redis_password} --appendonly yes";
         }
         $docker_compose = Yaml::dump($docker_compose, 10);
         $docker_compose_base64 = base64_encode($docker_compose);
@@ -165,8 +166,9 @@ class StartRedis
             return;
         }
         $filename = 'redis.conf';
-        $content = $this->database->redis_conf;
-        $content_base64 = base64_encode($content);
-        $this->commands[] = "echo '{$content_base64}' | base64 -d > $this->configuration_dir/{$filename}";
+        Storage::disk('local')->put("tmp/redis.conf_{$this->database->uuid}", $this->database->redis_conf);
+        $path = Storage::path("tmp/redis.conf_{$this->database->uuid}");
+        instant_scp($path, "{$this->configuration_dir}/{$filename}", $this->database->destination->server);
+        Storage::disk('local')->delete("tmp/redis.conf_{$this->database->uuid}");
     }
 }
