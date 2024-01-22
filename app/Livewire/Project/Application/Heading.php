@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
-use App\Events\ApplicationStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\Application;
