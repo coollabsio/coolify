@@ -1036,6 +1036,9 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (!data_get($service, 'restart')) {
                     data_set($service, 'restart', RESTART_MODE);
                 }
+                if (data_get($service, 'restart') === 'no') {
+                    $savedService->update(['exclude_from_status' => true]);
+                }
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
