@@ -429,6 +429,13 @@ const magicActions = [{
     tags: 'api,tokens,rest',
     icon: 'goto',
     sequence: ['main', 'redirect']
+},
+{
+    id: 26,
+    name: 'Goto: Team Shared Variables',
+    tags: 'team,shared,variables',
+    icon: 'goto',
+    sequence: ['main', 'redirect']
 }
 ]
 const initialState = {
@@ -664,6 +671,9 @@ async function redirect() {
             break;
         case 25:
             targetUrl.pathname = `/security/api-tokens`
+            break;
+        case 26:
+            targetUrl.pathname = `/team/shared-variables`
             break;
     }
     window.location.href = targetUrl;
