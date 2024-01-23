@@ -27,7 +27,9 @@ class Project extends BaseModel
             $project->settings()->delete();
         });
     }
-
+    public function environment_variables() {
+        return $this->hasMany(SharedEnvironmentVariable::class);
+    }
     public function environments()
     {
         return $this->hasMany(Environment::class);

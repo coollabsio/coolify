@@ -140,7 +140,7 @@ class StartMysql
     {
         $environment_variables = collect();
         foreach ($this->database->runtime_environment_variables as $env) {
-            $environment_variables->push("$env->key=$env->value");
+            $environment_variables->push("$env->key=$env->real_value");
         }
 
         if ($environment_variables->filter(fn ($env) => Str::of($env)->contains('MYSQL_ROOT_PASSWORD'))->isEmpty()) {

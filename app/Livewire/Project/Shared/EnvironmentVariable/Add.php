@@ -32,7 +32,6 @@ class Add extends Component
     public function submit()
     {
         $this->validate();
-        ray($this->key, $this->value, $this->is_build_time);
         $this->dispatch('saveKey', [
             'key' => $this->key,
             'value' => $this->value,

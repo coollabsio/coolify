@@ -8,7 +8,7 @@
             <ol class="flex items-center">
                 <li class="inline-flex items-center">
                     <a class="text-xs truncate lg:text-sm"
-                        href="{{ route('project.show', ['project_uuid' => request()->route('project_uuid')]) }}">
+                        href="{{ route('project.show', ['project_uuid' => data_get($parameters, 'project_uuid')]) }}">
                         {{ $project->name }}</a>
                 </li>
                 <li>
@@ -20,7 +20,7 @@
                                 clip-rule="evenodd"></path>
                         </svg>
                         <a class="text-xs truncate lg:text-sm"
-                            href="{{ route('project.resource.index', ['environment_name' => request()->route('environment_name'), 'project_uuid' => request()->route('project_uuid')]) }}">{{ request()->route('environment_name') }}</a>
+                            href="{{ route('project.resource.index', ['environment_name' => data_get($parameters, 'environment_name'), 'project_uuid' => data_get($parameters, 'project_uuid')]) }}">{{ data_get($parameters, 'environment_name') }}</a>
                     </div>
                 </li>
                 <li>
@@ -41,4 +41,18 @@
             <x-forms.input label="Description" id="environment.description" />
         </div>
     </form>
+    <div class="flex gap-2 pt-10">
+        <h2>Shared Variables</h2>
+        <x-forms.button class="btn" onclick="newVariable.showModal()">+ Add</x-forms.button>
+        <livewire:project.shared.environment-variable.add />
+    </div>
+    <div class="pb-4">You can use this anywhere.</div>
+    <div class="flex flex-col gap-2">
+        @forelse ($environment->environment_variables->sort()->sortBy('real_value') as $env)
+            <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
+                :env="$env" type="environment" />
+        @empty
+            <div class="text-neutral-500">No environment variables found.</div>
+        @endforelse
+    </div>
 </div>

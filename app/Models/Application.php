@@ -263,6 +263,10 @@ class Application extends BaseModel
                 : explode(',', $this->ports_exposes)
         );
     }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
     public function serviceType()
     {
         $found = str(collect(SPECIFIC_SERVICES)->filter(function ($service) {
@@ -431,7 +435,7 @@ class Application extends BaseModel
     {
         $newConfigHash = $this->fqdn . $this->git_repository . $this->git_branch . $this->git_commit_sha . $this->build_pack . $this->static_image . $this->install_command  . $this->build_command . $this->start_command . $this->port_exposes . $this->port_mappings . $this->base_directory . $this->publish_directory . $this->dockerfile . $this->dockerfile_location . $this->custom_labels;
         if ($this->pull_request_id === 0 || $this->pull_request_id === null) {
-            $newConfigHash .= json_encode($this->environment_variables->all());
+            $newConfigHash .= json_encode($this->environment_variables());
         } else {
             $newConfigHash .= json_encode($this->environment_variables_preview->all());
         }

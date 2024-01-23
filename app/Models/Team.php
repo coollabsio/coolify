@@ -70,7 +70,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
 
         );
     }
-
+    public function environment_variables() {
+        return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
+    }
     public function members()
     {
         return $this->belongsToMany(User::class, 'team_user', 'team_id', 'user_id')->withPivot('role');

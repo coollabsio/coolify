@@ -74,7 +74,10 @@ class StandalonePostgresql extends BaseModel
 
         );
     }
-
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
     public function type(): string
     {
         return 'standalone-postgresql';

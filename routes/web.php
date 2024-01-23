@@ -67,6 +67,7 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
+use App\Livewire\TeamSharedVariablesIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Support\Facades\Password;
@@ -117,6 +118,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/notifications', TeamNotificationIndex::class)->name('team.notification.index');
+        Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
         Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
         Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
         Route::get('/storages/{storage_uuid}', TeamStorageShow::class)->name('team.storage.show');

@@ -168,3 +168,6 @@ tr td:first-child {
 input.input-sm {
     @apply pr-10;
 }
+option{
+    @apply text-white;
+}
