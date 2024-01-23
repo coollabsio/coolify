@@ -33,6 +33,10 @@
                             helper="Need to set a secret to be able to use this webhook. It should match with the secret in GitLab."
                             label="GitLab Webhook Secret" id="resource.manual_webhook_secret_gitlab"></x-forms.input>
                     </div>
+                    <div class="flex gap-2">
+                        <x-forms.input readonly label="Bitbucket" id="bitbucketManualWebhook"></x-forms.input>
+                        <x-forms.input type="password" helper="Need to set a secret to be able to use this webhook. It should match with the secret in Bitbucket." label="Bitbucket Webhook Secret" id="resource.manual_webhook_secret_bitbucket"></x-forms.input>
+                    </div>
                     <x-forms.button type="submit">Save</x-forms.button>
                 </form>
             @else
