@@ -43,8 +43,14 @@
     </form>
     <div class="flex gap-2 pt-10">
         <h2>Shared Variables</h2>
-        <x-forms.button class="btn" onclick="newVariable.showModal()">+ Add</x-forms.button>
-        <livewire:project.shared.environment-variable.add />
+        <x-slide-over>
+            <x-slot:title>New Shared Variable</x-slot:title>
+            <x-slot:content>
+                <livewire:project.shared.environment-variable.add  />
+            </x-slot:content>
+            <button @click="slideOverOpen=true"
+                class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+ Add</button>
+        </x-slide-over>
     </div>
     <div class="pb-4">You can use this anywhere.</div>
     <div class="flex flex-col gap-2">

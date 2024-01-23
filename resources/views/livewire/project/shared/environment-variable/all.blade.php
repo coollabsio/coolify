@@ -4,20 +4,13 @@
             <h2>Environment Variables</h2>
             @if ($resource->type() !== 'service')
                 <x-slide-over>
-                    <x-slot:title>Add Environment Variables</x-slot:title>
+                    <x-slot:title>New Environment Variable</x-slot:title>
                     <x-slot:content>
-                        <form class="flex flex-col gap-2 rounded" wire:submit='submit'>
-                            <x-forms.input placeholder="NODE_ENV" id="key" label="Name" required />
-                            <x-forms.input placeholder="production" id="value" label="Value" required />
-                            <x-forms.button type="submit">
-                                Save
-                            </x-forms.button>
-                        </form>
+                        <livewire:project.shared.environment-variable.add />
                     </x-slot:content>
                     <button @click="slideOverOpen=true"
                         class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+ Add</button>
                 </x-slide-over>
-                {{-- <x-forms.button class="btn" onclick="newVariable.showModal()">+ Add</x-forms.button> --}}
             @endif
             <x-forms.button
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
@@ -46,12 +39,12 @@
         @endif
     @else
         <form wire:submit='saveVariables(false)' class="flex flex-col gap-2">
-            <x-forms.textarea rows=25 class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
+            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
             <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
         </form>
         @if ($showPreview)
             <form wire:submit='saveVariables(true)' class="flex flex-col gap-2">
-                <x-forms.textarea rows=25 class="whitespace-pre-wrap" label="Preview Environment Variables"
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Environment Variables"
                     id="variablesPreview"></x-forms.textarea>
                 <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
             </form>
