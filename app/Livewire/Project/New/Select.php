@@ -156,6 +156,10 @@ class Select extends Component
 
     public function setDestination(string $destination_uuid)
     {
+        if (!$this->server_id) {
+            $this->current_step = 'servers';
+            return;
+        }
         $this->destination_uuid = $destination_uuid;
         return redirect()->route('project.resource.create', [
             'project_uuid' => $this->parameters['project_uuid'],
