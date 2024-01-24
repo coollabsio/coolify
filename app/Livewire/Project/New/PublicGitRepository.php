@@ -30,7 +30,7 @@ class PublicGitRepository extends Component
     public GithubApp|GitlabApp|string $git_source = 'other';
     public string $git_host;
     public string $git_repository;
-    public $build_pack;
+    public $build_pack = 'nixpacks';
     public bool $show_is_static = true;
 
     protected $rules = [

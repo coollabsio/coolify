@@ -17,7 +17,7 @@ class Change extends Component
     public ?bool $preview_deployment_permissions = true;
 
     public $parameters;
-    public GithubApp $github_app;
+    public ?GithubApp $github_app;
     public string $name;
     public bool $is_system_wide;
 
