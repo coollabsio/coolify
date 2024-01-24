@@ -49,10 +49,32 @@ class EnvironmentVariable extends Model
             set: fn (?string $value = null) => $this->set_environment_variables($value),
         );
     }
-    protected function realValue(): Attribute
+    public function realValue(): Attribute
     {
+        $resource = null;
+        if ($this->application_id) {
+            $resource = Application::find($this->application_id);
+        } else if ($this->service_id) {
+            $resource = Service::find($this->service_id);
+        } else if ($this->database_id) {
+            $resource = StandalonePostgresql::find($this->database_id);
+            if (!$resource) {
+                $resource = StandaloneMysql::find($this->database_id);
+                if (!$resource) {
+                    $resource = StandaloneRedis::find($this->database_id);
+                    if (!$resource) {
+                        $resource = StandaloneMongodb::find($this->database_id);
+                        if (!$resource) {
+                            $resource = StandaloneMariadb::find($this->database_id);
+                        }
+                    }
+                }
+            }
+        }
         return Attribute::make(
-            get: fn () => $this->get_real_environment_variables($this->value),
+            get: function () use ($resource) {
+                return $this->get_real_environment_variables($this->value, $resource);
+            }
         );
     }
     protected function isShared(): Attribute
@@ -112,7 +134,7 @@ class EnvironmentVariable extends Model
             }
         }
     }
-    private function get_real_environment_variables(?string $environment_variable = null): string|null
+    private function get_real_environment_variables(?string $environment_variable = null, $resource = null): string|null
     {
         if (!$environment_variable) {
             return null;
@@ -123,7 +145,14 @@ class EnvironmentVariable extends Model
             $variable = Str::after($environment_variable, "{$type}.");
             $variable = Str::before($variable, '}}');
             $variable = Str::of($variable)->trim()->value;
-            $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $this->team()->id)->first();
+            if ($type === 'environment') {
+                $id = $resource->environment->id;
+            } else if ($type === 'project') {
+                $id = $resource->environment->project->id;
+            } else {
+                $id = $this->team()->id;
+            }
+            $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $this->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
                 return $environment_variable_found->value;
             }
