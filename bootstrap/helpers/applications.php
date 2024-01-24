@@ -24,8 +24,11 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         'commit' => $commit,
         'git_type' => $git_type
     ]);
-    $queued_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'queued')->get()->sortByDesc('created_at');
-    $running_deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('status', 'in_progress')->get()->sortByDesc('created_at');
+    $server = Application::find($application_id)->destination->server;
+    $deployments = ApplicationDeploymentQueue::where('application_id', $application_id);
+    $queued_deployments = $deployments->where('status', 'queued')->get()->sortByDesc('created_at');
+    $running_deployments = $deployments->where('status', 'in_progress')->get()->sortByDesc('created_at');
+    $all_deployments = $deployments->where('status', 'queued')->orWhere('status', 'in_progress')->get();
     ray('Q:' . $queued_deployments->count() . 'R:' . $running_deployments->count() . '| Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
     if ($queued_deployments->count() > 1) {
         $queued_deployments = $queued_deployments->skip(1);
@@ -35,6 +38,9 @@ function queue_application_deployment(int $application_id, string $deployment_uu
         });
     }
     if ($running_deployments->count() > 0) {
+        return;
+    }
+    if ($all_deployments->count() >= $server->settings->concurrent_builds) {
         return;
     }
     if ($is_new_deployment) {
@@ -51,7 +57,8 @@ function queue_application_deployment(int $application_id, string $deployment_uu
 
 function queue_next_deployment(Application $application, bool $isNew = false)
 {
-    $next_found = ApplicationDeploymentQueue::where('application_id', $application->id)->where('status', 'queued')->first();
+    $next_found = ApplicationDeploymentQueue::where('status', 'queued')->get()->sortByDesc('created_at')->first();
+    ray('Next found: ' . $next_found);
     if ($next_found) {
         if ($isNew) {
             dispatch(new ApplicationDeploymentNewJob(

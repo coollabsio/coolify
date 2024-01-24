@@ -220,7 +220,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->build_server = $this->server;
             $this->original_server = $this->server;
         }
-        ray($this->build_server);
         try {
             if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
@@ -311,7 +310,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function push_to_docker_registry($forceFail = false)
     {
-        ray((str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()));
         if (
             $this->application->docker_registry_image_name &&
             $this->application->build_pack !== 'dockerimage' &&
