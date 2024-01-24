@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->integer('concurrent_builds')->default(3);
+            $table->integer('concurrent_builds')->default(2);
         });
     }
 
