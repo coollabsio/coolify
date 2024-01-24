@@ -89,51 +89,6 @@ class EnvironmentVariable extends Model
             }
         );
     }
-    private function team()
-    {
-        if ($this->application_id) {
-            $application = Application::find($this->application_id);
-            if ($application) {
-                return $application->team();
-            }
-        }
-        if ($this->service_id) {
-            $service = Service::find($this->service_id);
-            if ($service) {
-                return $service->team();
-            }
-        }
-        if ($this->standalone_postgresql_id) {
-            $standalone_postgresql = StandalonePostgresql::find($this->standalone_postgresql_id);
-            if ($standalone_postgresql) {
-                return $standalone_postgresql->team();
-            }
-        }
-        if ($this->standalone_mysql_id) {
-            $standalone_mysql = StandaloneMysql::find($this->standalone_mysql_id);
-            if ($standalone_mysql) {
-                return $standalone_mysql->team();
-            }
-        }
-        if ($this->standalone_redis_id) {
-            $standalone_redis = StandaloneRedis::find($this->standalone_redis_id);
-            if ($standalone_redis) {
-                return $standalone_redis->team();
-            }
-        }
-        if ($this->standalone_mongodb_id) {
-            $standalone_mongodb = StandaloneMongodb::find($this->standalone_mongodb_id);
-            if ($standalone_mongodb) {
-                return $standalone_mongodb->team();
-            }
-        }
-        if ($this->standalone_mariadb_id) {
-            $standalone_mariadb = StandaloneMariadb::find($this->standalone_mariadb_id);
-            if ($standalone_mariadb) {
-                return $standalone_mariadb->team();
-            }
-        }
-    }
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null): string|null
     {
         if (!$environment_variable) {
@@ -150,9 +105,9 @@ class EnvironmentVariable extends Model
             } else if ($type === 'project') {
                 $id = $resource->environment->project->id;
             } else {
-                $id = $this->team()->id;
+                $id = $resource->team()->id;
             }
-            $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $this->team()->id)->where("{$type}_id", $id)->first();
+            $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
                 return $environment_variable_found->value;
             }
