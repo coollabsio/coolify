@@ -1006,7 +1006,7 @@ class Application extends BaseModel
         if (!$composeFileContent) {
             $this->docker_compose_location = $initialDockerComposeLocation;
             $this->save();
-            throw new \Exception("Could not load base compose file from $workdir$composeFile");
+            throw new \RuntimeException("Could not load base compose file from $workdir$composeFile");
         } else {
             $this->docker_compose_raw = $composeFileContent;
             $this->save();

@@ -95,7 +95,7 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
-        $this->selected_branch_name = data_get($this->branches,'0.name');
+        $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
     }
 
     protected function loadBranchByPage()
