@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\SubscriptionTrialEndedJob;
 use App\Jobs\SubscriptionTrialEndsSoonJob;
 use App\Models\Application;
@@ -593,6 +594,16 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => true,
                 ]);
                 break;
+            case 'invoice.payment_failed':
+                $customerId = data_get($data, 'customer');
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $team = data_get($subscription, 'team');
+                if (!$team) {
+                    throw new Exception('No team found for subscription: ' . $subscription->id);
+                }
+                SubscriptionInvoiceFailedJob::dispatch($team);
+                send_internal_notification('Invoice payment failed: ' . $subscription->team->id);
+                break;
             case 'payment_intent.payment_failed':
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
@@ -610,7 +621,11 @@ Route::post('/payments/stripe/events', function () {
                     send_internal_notification('Subscription excluded.');
                     break;
                 }
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    Sleep::for(5)->seconds();
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                }
                 $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
                 $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
@@ -703,129 +718,129 @@ Route::post('/payments/stripe/events', function () {
         return response($e->getMessage(), 400);
     }
 });
-Route::post('/payments/paddle/events', function () {
-    try {
-        $payload = request()->all();
-        $signature = request()->header('Paddle-Signature');
-        $ts = Str::of($signature)->after('ts=')->before(';');
-        $h1 = Str::of($signature)->after('h1=');
-        $signedPayload = $ts->value . ':' . request()->getContent();
-        $verify = hash_hmac('sha256', $signedPayload, config('subscription.paddle_webhook_secret'));
-        if (!hash_equals($verify, $h1->value)) {
-            return response('Invalid signature.', 400);
-        }
-        $eventType = data_get($payload, 'event_type');
-        $webhook = Webhook::create([
-            'type' => 'paddle',
-            'payload' => $payload,
-        ]);
-        // TODO - Handle events
-        switch ($eventType) {
-            case 'subscription.activated':
-        }
-        ray('Subscription event: ' . $eventType);
-        $webhook->update([
-            'status' => 'success',
-        ]);
-    } catch (Exception $e) {
-        ray($e->getMessage());
-        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
-        $webhook->update([
-            'status' => 'failed',
-            'failure_reason' => $e->getMessage(),
-        ]);
-    } finally {
-        return response('OK');
-    }
-});
-Route::post('/payments/lemon/events', function () {
-    try {
-        $secret = config('subscription.lemon_squeezy_webhook_secret');
-        $payload = request()->collect();
-        $hash = hash_hmac('sha256', $payload, $secret);
-        $signature = request()->header('X-Signature');
+// Route::post('/payments/paddle/events', function () {
+//     try {
+//         $payload = request()->all();
+//         $signature = request()->header('Paddle-Signature');
+//         $ts = Str::of($signature)->after('ts=')->before(';');
+//         $h1 = Str::of($signature)->after('h1=');
+//         $signedPayload = $ts->value . ':' . request()->getContent();
+//         $verify = hash_hmac('sha256', $signedPayload, config('subscription.paddle_webhook_secret'));
+//         if (!hash_equals($verify, $h1->value)) {
+//             return response('Invalid signature.', 400);
+//         }
+//         $eventType = data_get($payload, 'event_type');
+//         $webhook = Webhook::create([
+//             'type' => 'paddle',
+//             'payload' => $payload,
+//         ]);
+//         // TODO - Handle events
+//         switch ($eventType) {
+//             case 'subscription.activated':
+//         }
+//         ray('Subscription event: ' . $eventType);
+//         $webhook->update([
+//             'status' => 'success',
+//         ]);
+//     } catch (Exception $e) {
+//         ray($e->getMessage());
+//         send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
+//         $webhook->update([
+//             'status' => 'failed',
+//             'failure_reason' => $e->getMessage(),
+//         ]);
+//     } finally {
+//         return response('OK');
+//     }
+// });
+// Route::post('/payments/lemon/events', function () {
+//     try {
+//         $secret = config('subscription.lemon_squeezy_webhook_secret');
+//         $payload = request()->collect();
+//         $hash = hash_hmac('sha256', $payload, $secret);
+//         $signature = request()->header('X-Signature');
 
-        if (!hash_equals($hash, $signature)) {
-            return response('Invalid signature.', 400);
-        }
+//         if (!hash_equals($hash, $signature)) {
+//             return response('Invalid signature.', 400);
+//         }
 
-        $webhook = Webhook::create([
-            'type' => 'lemonsqueezy',
-            'payload' => $payload,
-        ]);
-        $event = data_get($payload, 'meta.event_name');
-        ray('Subscription event: ' . $event);
-        $email = data_get($payload, 'data.attributes.user_email');
-        $team_id = data_get($payload, 'meta.custom_data.team_id');
-        if (is_null($team_id) || empty($team_id)) {
-            throw new Exception('No team_id found in webhook payload.');
-        }
-        $subscription_id = data_get($payload, 'data.id');
-        $order_id = data_get($payload, 'data.attributes.order_id');
-        $product_id = data_get($payload, 'data.attributes.product_id');
-        $variant_id = data_get($payload, 'data.attributes.variant_id');
-        $variant_name = data_get($payload, 'data.attributes.variant_name');
-        $customer_id = data_get($payload, 'data.attributes.customer_id');
-        $status = data_get($payload, 'data.attributes.status');
-        $trial_ends_at = data_get($payload, 'data.attributes.trial_ends_at');
-        $renews_at = data_get($payload, 'data.attributes.renews_at');
-        $ends_at = data_get($payload, 'data.attributes.ends_at');
-        $update_payment_method = data_get($payload, 'data.attributes.urls.update_payment_method');
-        $team = Team::find($team_id);
-        $found = $team->members->where('email', $email)->first();
-        if (!$found->isAdmin()) {
-            throw new Exception("User {$email} is not an admin or owner of team {$team->id}.");
-        }
-        switch ($event) {
-            case 'subscription_created':
-            case 'subscription_updated':
-            case 'subscription_resumed':
-            case 'subscription_unpaused':
-                send_internal_notification("LemonSqueezy Event (`$event`): `" . $email  . '` with status `' . $status . '`, tier: `' . $variant_name . '`');
-                $subscription = Subscription::updateOrCreate([
-                    'team_id' => $team_id,
-                ], [
-                    'lemon_subscription_id' => $subscription_id,
-                    'lemon_customer_id' => $customer_id,
-                    'lemon_order_id' => $order_id,
-                    'lemon_product_id' => $product_id,
-                    'lemon_variant_id' => $variant_id,
-                    'lemon_status' => $status,
-                    'lemon_variant_name' => $variant_name,
-                    'lemon_trial_ends_at' => $trial_ends_at,
-                    'lemon_renews_at' => $renews_at,
-                    'lemon_ends_at' => $ends_at,
-                    'lemon_update_payment_menthod_url' => $update_payment_method,
-                ]);
-                break;
-            case 'subscription_cancelled':
-            case 'subscription_paused':
-            case 'subscription_expired':
-                $subscription = Subscription::where('team_id', $team_id)->where('lemon_order_id', $order_id)->first();
-                if ($subscription) {
-                    send_internal_notification("LemonSqueezy Event (`$event`): " . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
-                    $subscription->update([
-                        'lemon_status' => $status,
-                        'lemon_trial_ends_at' => $trial_ends_at,
-                        'lemon_renews_at' => $renews_at,
-                        'lemon_ends_at' => $ends_at,
-                        'lemon_update_payment_menthod_url' => $update_payment_method,
-                    ]);
-                }
-                break;
-        }
+//         $webhook = Webhook::create([
+//             'type' => 'lemonsqueezy',
+//             'payload' => $payload,
+//         ]);
+//         $event = data_get($payload, 'meta.event_name');
+//         ray('Subscription event: ' . $event);
+//         $email = data_get($payload, 'data.attributes.user_email');
+//         $team_id = data_get($payload, 'meta.custom_data.team_id');
+//         if (is_null($team_id) || empty($team_id)) {
+//             throw new Exception('No team_id found in webhook payload.');
+//         }
+//         $subscription_id = data_get($payload, 'data.id');
+//         $order_id = data_get($payload, 'data.attributes.order_id');
+//         $product_id = data_get($payload, 'data.attributes.product_id');
+//         $variant_id = data_get($payload, 'data.attributes.variant_id');
+//         $variant_name = data_get($payload, 'data.attributes.variant_name');
+//         $customer_id = data_get($payload, 'data.attributes.customer_id');
+//         $status = data_get($payload, 'data.attributes.status');
+//         $trial_ends_at = data_get($payload, 'data.attributes.trial_ends_at');
+//         $renews_at = data_get($payload, 'data.attributes.renews_at');
+//         $ends_at = data_get($payload, 'data.attributes.ends_at');
+//         $update_payment_method = data_get($payload, 'data.attributes.urls.update_payment_method');
+//         $team = Team::find($team_id);
+//         $found = $team->members->where('email', $email)->first();
+//         if (!$found->isAdmin()) {
+//             throw new Exception("User {$email} is not an admin or owner of team {$team->id}.");
+//         }
+//         switch ($event) {
+//             case 'subscription_created':
+//             case 'subscription_updated':
+//             case 'subscription_resumed':
+//             case 'subscription_unpaused':
+//                 send_internal_notification("LemonSqueezy Event (`$event`): `" . $email  . '` with status `' . $status . '`, tier: `' . $variant_name . '`');
+//                 $subscription = Subscription::updateOrCreate([
+//                     'team_id' => $team_id,
+//                 ], [
+//                     'lemon_subscription_id' => $subscription_id,
+//                     'lemon_customer_id' => $customer_id,
+//                     'lemon_order_id' => $order_id,
+//                     'lemon_product_id' => $product_id,
+//                     'lemon_variant_id' => $variant_id,
+//                     'lemon_status' => $status,
+//                     'lemon_variant_name' => $variant_name,
+//                     'lemon_trial_ends_at' => $trial_ends_at,
+//                     'lemon_renews_at' => $renews_at,
+//                     'lemon_ends_at' => $ends_at,
+//                     'lemon_update_payment_menthod_url' => $update_payment_method,
+//                 ]);
+//                 break;
+//             case 'subscription_cancelled':
+//             case 'subscription_paused':
+//             case 'subscription_expired':
+//                 $subscription = Subscription::where('team_id', $team_id)->where('lemon_order_id', $order_id)->first();
+//                 if ($subscription) {
+//                     send_internal_notification("LemonSqueezy Event (`$event`): " . $subscription_id . ' for team ' . $team_id . ' with status ' . $status);
+//                     $subscription->update([
+//                         'lemon_status' => $status,
+//                         'lemon_trial_ends_at' => $trial_ends_at,
+//                         'lemon_renews_at' => $renews_at,
+//                         'lemon_ends_at' => $ends_at,
+//                         'lemon_update_payment_menthod_url' => $update_payment_method,
+//                     ]);
+//                 }
+//                 break;
+//         }
 
-        $webhook->update([
-            'status' => 'success',
-        ]);
-    } catch (Exception $e) {
-        ray($e->getMessage());
-        send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
-        $webhook->update([
-            'status' => 'failed',
-            'failure_reason' => $e->getMessage(),
-        ]);
-    } finally {
-        return response('OK');
-    }
-});
+//         $webhook->update([
+//             'status' => 'success',
+//         ]);
+//     } catch (Exception $e) {
+//         ray($e->getMessage());
+//         send_internal_notification('Subscription webhook failed: ' . $e->getMessage());
+//         $webhook->update([
+//             'status' => 'failed',
+//             'failure_reason' => $e->getMessage(),
+//         ]);
+//     } finally {
+//         return response('OK');
+//     }
+// });
