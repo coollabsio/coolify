@@ -54,8 +54,8 @@
                         <x-forms.input id="publish_directory" required label="Publish Directory" />
                     @endif
                 </div>
-                <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />
                 @if ($show_is_static)
+                    <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />
                     <div class="w-52">
                         <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
                             helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
