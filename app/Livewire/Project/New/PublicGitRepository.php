@@ -61,9 +61,11 @@ class PublicGitRepository extends Component
     {
         if ($this->build_pack === 'nixpacks') {
             $this->show_is_static = true;
+            $this->port = 3000;
         } else if ($this->build_pack === 'static') {
             $this->show_is_static = false;
             $this->is_static = false;
+            $this->port = 80;
         } else {
             $this->show_is_static = false;
             $this->is_static = false;
