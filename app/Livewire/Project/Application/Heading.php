@@ -55,6 +55,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: false,
             is_new_deployment: true,
@@ -83,6 +84,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
@@ -112,6 +114,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
             is_new_deployment: true,
@@ -128,6 +131,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );

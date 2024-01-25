@@ -149,6 +149,7 @@ Route::post('/source/gitlab/events/manual', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
+                        server_id: $application->destination->server->id,
                         application_id: $application->id,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
@@ -177,6 +178,7 @@ Route::post('/source/gitlab/events/manual', function () {
                             ]);
                         }
                         queue_application_deployment(
+                            server_id: $application->destination->server->id,
                             application_id: $application->id,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
@@ -296,6 +298,7 @@ Route::post('/source/github/events/manual', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
+                        server_id: $application->destination->server->id,
                         application_id: $application->id,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
@@ -319,6 +322,7 @@ Route::post('/source/github/events/manual', function () {
                             ]);
                         }
                         queue_application_deployment(
+                            server_id: $application->destination->server->id,
                             application_id: $application->id,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
@@ -424,6 +428,7 @@ Route::post('/source/github/events', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
+                        server_id: $application->destination->server->id,
                         application_id: $application->id,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
@@ -447,6 +452,7 @@ Route::post('/source/github/events', function () {
                             ]);
                         }
                         queue_application_deployment(
+                            server_id: $application->destination->server->id,
                             application_id: $application->id,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,

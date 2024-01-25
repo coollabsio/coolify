@@ -1,21 +1,18 @@
 <?php
 
-use App\Jobs\ApplicationDeployDockerImageJob;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\ApplicationDeploymentNewJob;
-use App\Jobs\ApplicationDeploySimpleDockerfileJob;
-use App\Jobs\ApplicationRestartJob;
-use App\Jobs\MultipleApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use Symfony\Component\Yaml\Yaml;
 
-function queue_application_deployment(int $application_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
+function queue_application_deployment(int $application_id, int $server_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
 {
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,
+        'server_id' => $server_id,
         'deployment_uuid' => $deployment_uuid,
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
@@ -26,10 +23,14 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     ]);
     $server = Application::find($application_id)->destination->server;
     $deployments = ApplicationDeploymentQueue::where('application_id', $application_id);
+
     $queued_deployments = $deployments->where('status', 'queued')->get()->sortByDesc('created_at');
     $running_deployments = $deployments->where('status', 'in_progress')->get()->sortByDesc('created_at');
-    $all_deployments = $deployments->where('status', 'queued')->orWhere('status', 'in_progress')->get();
+
+    $deployments_per_server = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', 'queued')->orWhere('status', 'in_progress')->get();
+
     ray('Q:' . $queued_deployments->count() . 'R:' . $running_deployments->count() . '| Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
+
     if ($queued_deployments->count() > 1) {
         $queued_deployments = $queued_deployments->skip(1);
         $queued_deployments->each(function ($queued_deployment, $key) {
@@ -40,7 +41,7 @@ function queue_application_deployment(int $application_id, string $deployment_uu
     if ($running_deployments->count() > 0) {
         return;
     }
-    if ($all_deployments->count() >= $server->settings->concurrent_builds) {
+    if ($deployments_per_server->count() >= $server->settings->concurrent_builds) {
         return;
     }
     if ($is_new_deployment) {

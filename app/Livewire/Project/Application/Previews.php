@@ -48,6 +48,7 @@ class Previews extends Component
             }
             queue_application_deployment(
                 application_id: $this->application->id,
+                server_id: $this->application->destination->server->id,
                 deployment_uuid: $this->deployment_uuid,
                 force_rebuild: false,
                 pull_request_id: $pull_request_id,
