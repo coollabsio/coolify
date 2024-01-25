@@ -17,7 +17,7 @@
         </div>
 
         <x-forms.button type="submit">
-            Save New S3 Storage
+            Continue
         </x-forms.button>
     </form>
 </div>
