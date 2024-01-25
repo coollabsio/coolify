@@ -42,7 +42,7 @@
                 <button>close</button>
             </form>
         </dialog>
-        <x-toaster-hub />
+        <x-toast />
         <x-version class="fixed left-2 bottom-1" />
         <script data-navigate-once>
             @auth
@@ -89,7 +89,9 @@
                     fetch('/api/health')
                         .then(response => {
                             if (response.ok) {
-                                Toaster.success('Coolify is back online. Reloading...')
+                                window.toast('Coolify is back online. Reloading...', {
+                                    type: 'success',
+                                })
                                 if (checkHealthInterval) clearInterval(checkHealthInterval);
                                 setTimeout(() => {
                                     window.location.reload();
@@ -110,7 +112,9 @@
                             if (response.ok) {
                                 console.log('It\'s alive. Waiting for server to be dead...');
                             } else {
-                                Toaster.success('Update done, restarting Coolify!')
+                                window.toast('Update done, restarting Coolify!', {
+                                    type: 'success',
+                                })
                                 console.log('It\'s dead. Reviving... Standby... Bzz... Bzz...')
                                 if (checkIfIamDeadInterval) clearInterval(checkIfIamDeadInterval);
                                 revive();
@@ -134,16 +138,36 @@
                     }
                 })
                 window.Livewire.on('info', (message) => {
-                    if (message) Toaster.info(message)
+                    if (message.length > 0) {
+                        window.toast(message[0], {
+                            type: 'info',
+                            description: message[1],
+                        })
+                    }
                 })
                 window.Livewire.on('error', (message) => {
-                    if (message) Toaster.error(message)
+                    if (message.length > 0) {
+                        window.toast(message[0], {
+                            type: 'danger',
+                            description: message[1],
+                        })
+                    }
                 })
                 window.Livewire.on('warning', (message) => {
-                    if (message) Toaster.warning(message)
+                    if (message.length > 0) {
+                        window.toast(message[0], {
+                            type: 'warning',
+                            description: message[1],
+                        })
+                    }
                 })
                 window.Livewire.on('success', (message) => {
-                    if (message) Toaster.success(message)
+                    if (message.length > 0) {
+                        window.toast(message[0], {
+                            type: 'success',
+                            description: message[1],
+                        })
+                    }
                 })
                 window.Livewire.on('installDocker', () => {
                     installDocker.showModal();

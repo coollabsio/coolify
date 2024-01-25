@@ -381,7 +381,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function just_restart()
     {
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch}.'");
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->set_base_dir();
