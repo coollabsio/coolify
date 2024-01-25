@@ -6,6 +6,7 @@ use App\Actions\Database\StartMysql;
 use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Service\StartService;
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
@@ -23,8 +24,27 @@ use Visus\Cuid2\Cuid2;
 |
 */
 
+$middlewares = ['auth:sanctum'];
+if (isDev()) {
+    $middlewares = [];
+}
+
 Route::get('/health', function () {
     return 'OK';
+});
+Route::group([
+    'middleware' => $middlewares,
+    'prefix' => 'v1'
+], function () {
+    Route::get('/deployments', function() {
+        return ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->get([
+            "id",
+            "server_id",
+            "status"
+          ])->groupBy("server_id")->map(function($item) {
+            return $item;
+          })->toArray();
+    });
 });
 Route::group([
     'middleware' => ['auth:sanctum'],

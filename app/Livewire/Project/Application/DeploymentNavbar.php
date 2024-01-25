@@ -42,22 +42,25 @@ class DeploymentNavbar extends Component
     {
         try {
             $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
-            $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+            if ($this->application_deployment_queue->logs) {
+                $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
 
-            $new_log_entry = [
-                'command' => $kill_command,
-                'output' => "Deployment cancelled by user.",
-                'type' => 'stderr',
-                'order' => count($previous_logs) + 1,
-                'timestamp' => Carbon::now('UTC'),
-                'hidden' => false,
-            ];
-            $previous_logs[] = $new_log_entry;
-            $this->application_deployment_queue->update([
-                'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
-            ]);
-            instant_remote_process([$kill_command], $this->server);
+                $new_log_entry = [
+                    'command' => $kill_command,
+                    'output' => "Deployment cancelled by user.",
+                    'type' => 'stderr',
+                    'order' => count($previous_logs) + 1,
+                    'timestamp' => Carbon::now('UTC'),
+                    'hidden' => false,
+                ];
+                $previous_logs[] = $new_log_entry;
+                $this->application_deployment_queue->update([
+                    'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
+                ]);
+                instant_remote_process([$kill_command], $this->server);
+            }
         } catch (\Throwable $e) {
+            ray($e);
             return handleError($e, $this);
         } finally {
             $this->application_deployment_queue->update([
