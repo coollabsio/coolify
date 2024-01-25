@@ -29,12 +29,17 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public string $repository_url;
     public string $branch;
+
+    public $build_pack = 'nixpacks';
+    public bool $show_is_static = true;
+
     protected $rules = [
         'repository_url' => 'required',
         'branch' => 'required|string',
         'port' => 'required|numeric',
         'is_static' => 'required|boolean',
         'publish_directory' => 'nullable|string',
+        'build_pack' => 'required|string',
     ];
     protected $validationAttributes = [
         'repository_url' => 'Repository',
@@ -42,6 +47,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'port' => 'Port',
         'is_static' => 'Is static',
         'publish_directory' => 'Publish directory',
+        'build_pack' => 'Build pack',
     ];
     private object $repository_url_parsed;
     private GithubApp|GitlabApp|string $git_source = 'other';
@@ -62,6 +68,20 @@ class GithubPrivateRepositoryDeployKey extends Component
         }
     }
 
+    public function updatedBuildPack()
+    {
+        if ($this->build_pack === 'nixpacks') {
+            $this->show_is_static = true;
+            $this->port = 3000;
+        } else if ($this->build_pack === 'static') {
+            $this->show_is_static = false;
+            $this->is_static = false;
+            $this->port = 80;
+        } else {
+            $this->show_is_static = false;
+            $this->is_static = false;
+        }
+    }
     public function instantSave()
     {
         if ($this->is_static) {

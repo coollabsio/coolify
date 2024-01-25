@@ -40,23 +40,29 @@
                 <li class="step step-secondary">Select a Private Key</li>
                 <li class="step step-secondary">Select a Repository, Branch & Save</li>
             </ul>
-            <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
+            <form class="flex flex-col gap-2 pt-2" wire:submit='submit'>
+                <x-forms.input id="repository_url" required label="Repository Url" helper="{!! __('repository.url') !!}" />
                 <div class="flex gap-2">
-                    <x-forms.input id="repository_url" required label="Repository URL"
-                        helper="{!! __('repository.url') !!}" />
                     <x-forms.input id="branch" required label="Branch" />
+                    <x-forms.select wire:model.live="build_pack" label="Build Pack" required>
+                        <option value="nixpacks">Nixpacks</option>
+                        <option value="static">Static</option>
+                        <option value="dockerfile">Dockerfile</option>
+                        <option value="dockercompose">Docker Compose</option>
+                    </x-forms.select>
                     @if ($is_static)
                         <x-forms.input id="publish_directory" required label="Publish Directory" />
-                    @else
-                        <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static" />
                     @endif
                 </div>
-                <div class="w-52">
-                    <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
-                        helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
-                </div>
-                <x-forms.button type="submit">
-                    Save New Application
+                <x-forms.input type="number" required id="port" label="Port" :readonly="$is_static || $build_pack === 'static'" />
+                @if ($show_is_static)
+                    <div class="w-52">
+                        <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
+                            helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
+                    </div>
+                @endif
+                <x-forms.button type="submit" class="mt-4">
+                    Continue
                 </x-forms.button>
             </form>
         @endif
