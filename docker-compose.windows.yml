@@ -21,8 +21,7 @@ services:
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
     env_file:
-      - path: ./.env
-        required: true
+      - .env
     environment:
       - APP_ID
       - APP_ENV=production
@@ -61,21 +60,20 @@ services:
     container_name: coolify-db
     restart: always
     env_file:
-      - path: ./.env
-        required: true
+      - .env
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME}"
+      POSTGRES_USER: "${DB_USERNAME:-coolify}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE}"
+      POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME}",
+          "pg_isready -U ${DB_USERNAME:-coolify}",
           "-d",
-          "${DB_DATABASE}"
+          "${DB_DATABASE:-coolify}"
         ]
       interval: 5s
       retries: 10
@@ -86,8 +84,7 @@ services:
     restart: always
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     env_file:
-      - path: ./.env
-        required: true
+      - .env
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
     volumes:
@@ -102,8 +99,7 @@ services:
     container_name: coolify-realtime
     restart: always
     env_file:
-      - path: ./.env
-        required: true
+      - .env
     ports:
       - "${SOKETI_PORT:-6001}:6001"
     environment:
