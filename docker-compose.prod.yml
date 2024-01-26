@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.190}"
+    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:latest}"
     volumes:
       - type: bind
         source: /data/coolify/source/.env
