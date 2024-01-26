@@ -404,11 +404,11 @@ window.customToastHTML = `
                                             fill="currentColor"></path>
                                     </svg>
                                     <p class="font-medium leading-none text-neutral-200"
-                                        x-text="toast.message">
+                                        x-html="toast.message">
                                     </p>
                                 </div>
                                 <p x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
-                                    class="mt-1.5 text-xs leading-none opacity-70" x-text="toast.description"></p>
+                                    class="mt-1.5 text-xs leading-none opacity-70" x-html="toast.description"></p>
                             </div>
                         </template>
                         <template x-if="toast.html">
