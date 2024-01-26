@@ -1,13 +1,5 @@
 version: "3.8"
 
-x-testing-host: &testing-host-base
-  build:
-    dockerfile: Dockerfile
-    context: ./docker/testing-host
-  networks:
-    - coolify
-  init: true
-
 services:
   coolify:
     build:
@@ -73,7 +65,8 @@ services:
     networks:
       - coolify
   testing-host:
-    <<: *testing-host-base
+    image: "ghcr.io/coollabsio/coolify-testing-host:latest"
+    init: true
     container_name: coolify-testing-host
     volumes:
       - /:/host
