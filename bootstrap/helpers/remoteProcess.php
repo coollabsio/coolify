@@ -120,7 +120,7 @@ function generateSshCommand(Server $server, string $command)
     $delimiter = 'EOF-COOLIFY-SSH';
     $ssh_command = "timeout $timeout ssh ";
 
-    if (config('coolify.mux_enabled') === true && config('coolify.is_windows_docker_desktop') === false) {
+    if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {
