@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
-use App\Enums\ProxyTypes;
+use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -158,6 +158,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->preview->fqdn = $preview_fqdn;
                 $this->preview->save();
             }
+            ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
         }
     }
 
@@ -254,8 +255,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->push_to_docker_registry();
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
+            if ($this->pull_request_id !== 0) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+            }
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
+            if ($this->pull_request_id !== 0) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
+            }
             $this->fail($e);
             throw $e;
         } finally {

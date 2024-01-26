@@ -69,6 +69,7 @@ function githubApi(GithubApp|GitlabApp|null $source, string $endpoint, string $m
     }
     $json = $response->json();
     if ($response->failed() && $throwError) {
+        ray($json);
         throw new \Exception("Failed to get data from {$source->name} with error:<br><br>" . $json['message'] . "<br><br>Rate Limit resets at: " . Carbon::parse((int)$response->header('X-RateLimit-Reset'))->format('Y-m-d H:i:s') . 'UTC');
     }
     return [
