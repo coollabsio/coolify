@@ -3,12 +3,14 @@ services:
   coolify-testing-host:
     init: true
     image: "ghcr.io/coollabsio/coolify-testing-host:latest"
+    pull_policy: always
     container_name: coolify-testing-host
     volumes:
       - //var/run/docker.sock://var/run/docker.sock
       - ./:/data/coolify
   coolify:
-    image: "ghcr.io/coollabsio/coolify:next"
+    image: "ghcr.io/coollabsio/coolify:latest"
+    pull_policy: always
     container_name: coolify
     restart: always
     working_dir: /var/www/html
@@ -61,6 +63,7 @@ services:
         condition: service_healthy
   postgres:
     image: postgres:15-alpine
+    pull_policy: always
     container_name: coolify-db
     restart: always
     env_file:
@@ -84,6 +87,7 @@ services:
       timeout: 2s
   redis:
     image: redis:alpine
+    pull_policy: always
     container_name: coolify-redis
     restart: always
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
@@ -100,6 +104,7 @@ services:
       timeout: 2s
   soketi:
     image: 'quay.io/soketi/soketi:1.6-16-alpine'
+    pull_policy: always
     container_name: coolify-realtime
     restart: always
     env_file:
