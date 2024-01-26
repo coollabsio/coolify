@@ -8,41 +8,37 @@ services:
       - //var/run/docker.sock://var/run/docker.sock
       - ./:/data/coolify
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.199}"
+    image: "ghcr.io/coollabsio/coolify:next"
     container_name: coolify
     restart: always
     working_dir: /var/www/html
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
-      - type: bind
-        source: ./.env
-        target: /var/www/html/.env
-        read_only: true
       - ./ssh:/var/www/html/storage/app/ssh
       - ./applications:/var/www/html/storage/app/applications
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
     environment:
-      - IS_WINDOWS_DOCKER_DESKTOP=true
-      - APP_ID
+      - APP_ID=${APP_ID:-coolify-windows-desktop}
       - APP_ENV=production
-      - APP_NAME
-      - APP_KEY
-      - DB_PASSWORD
-      - REDIS_PASSWORD
+      - APP_NAME=${APP_NAME:-Coolify}
+      - APP_KEY=${APP_KEY:-base64:ssTlCmrIE/q7whnKMvT6DwURikg69COzGsAwFVROm80=}
+      - DB_PASSWORD=${DB_PASSWORD:-coolify}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-coolify}
       - SSL_MODE=off
       - PHP_PM_CONTROL=dynamic
       - PHP_PM_START_SERVERS=1
       - PHP_PM_MIN_SPARE_SERVERS=1
       - PHP_PM_MAX_SPARE_SERVERS=10
-      - PUSHER_APP_ID
-      - PUSHER_APP_KEY
-      - PUSHER_APP_SECRET
+      - PUSHER_APP_ID=${PUSHER_APP_ID:-coolify}
+      - PUSHER_APP_KEY=${PUSHER_APP_KEY:-coolify}
+      - PUSHER_APP_SECRET=${PUSHER_APP_SECRET:-coolify}
       - AUTOUPDATE=true
       - SELF_HOSTED=true
       - MUX_ENABLED=false
+      - IS_WINDOWS_DOCKER_DESKTOP=true
     ports:
       - "${APP_PORT:-8000}:80"
     expose:
@@ -65,7 +61,7 @@ services:
       - coolify-db:/var/lib/postgresql/data
     environment:
       POSTGRES_USER: "${DB_USERNAME:-coolify}"
-      POSTGRES_PASSWORD: "${DB_PASSWORD}"
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-coolify}"
       POSTGRES_DB: "${DB_DATABASE:-coolify}"
     healthcheck:
       test:
@@ -84,7 +80,7 @@ services:
     restart: always
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
     environment:
-      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD:-coolify}"
     volumes:
       - coolify-redis:/data
     healthcheck:
