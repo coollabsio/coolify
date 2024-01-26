@@ -8,7 +8,7 @@ services:
       - //var/run/docker.sock://var/run/docker.sock
       - ./:/data/coolify
   coolify:
-    image: "ghcr.io/coollabsio/coolify:${LATEST_IMAGE:-4.0.0-beta.199}"
+    image: "ghcr.io/coollabsio/coolify:next"
     container_name: coolify
     restart: always
     working_dir: /var/www/html
@@ -42,6 +42,7 @@ services:
       - AUTOUPDATE=true
       - SELF_HOSTED=true
       - MUX_ENABLED=false
+      - IS_WINDOWS_DOCKER_DESKTOP=true
     ports:
       - "${APP_PORT:-8000}:80"
     expose:
@@ -63,16 +64,16 @@ services:
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: "${DB_USERNAME:-coolify}"
+      POSTGRES_USER: "${DB_USERNAME}"
       POSTGRES_PASSWORD: "${DB_PASSWORD}"
-      POSTGRES_DB: "${DB_DATABASE:-coolify}"
+      POSTGRES_DB: "${DB_DATABASE}"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME:-coolify}",
+          "pg_isready -U ${DB_USERNAME}",
           "-d",
-          "${DB_DATABASE:-coolify}"
+          "${DB_DATABASE}"
         ]
       interval: 5s
       retries: 10
