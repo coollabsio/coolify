@@ -66,7 +66,8 @@ class ProductionSeeder extends Seeder
             ]);
         }
 
-        if (!isCloud() && config('coolify.is_windows_docker_desktop') === false) {
+        if (!isCloud() && config('coolify.is_windows_docker_desktop') == false) {
+            echo "Checking localhost key.\n";
             // Save SSH Keys for the Coolify Host
             $coolify_key_name = "id.root@host.docker.internal";
             $coolify_key = Storage::disk('ssh-keys')->get("{$coolify_key_name}");
