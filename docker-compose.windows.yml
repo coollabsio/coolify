@@ -15,15 +15,14 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
-      - type: bind
-        source: ./.env
-        target: /var/www/html/.env
-        read_only: true
       - ./ssh:/var/www/html/storage/app/ssh
       - ./applications:/var/www/html/storage/app/applications
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
+    env_file:
+      - path: ./.env
+        required: true
     environment:
       - APP_ID
       - APP_ENV=production
@@ -61,6 +60,9 @@ services:
     image: postgres:15-alpine
     container_name: coolify-db
     restart: always
+    env_file:
+      - path: ./.env
+        required: true
     volumes:
       - coolify-db:/var/lib/postgresql/data
     environment:
@@ -83,6 +85,9 @@ services:
     container_name: coolify-redis
     restart: always
     command: redis-server --save 20 1 --loglevel warning --requirepass ${REDIS_PASSWORD}
+    env_file:
+      - path: ./.env
+        required: true
     environment:
       REDIS_PASSWORD: "${REDIS_PASSWORD}"
     volumes:
@@ -96,6 +101,9 @@ services:
     image: 'quay.io/soketi/soketi:1.6-16-alpine'
     container_name: coolify-realtime
     restart: always
+    env_file:
+      - path: ./.env
+        required: true
     ports:
       - "${SOKETI_PORT:-6001}:6001"
     environment:
