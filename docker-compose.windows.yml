@@ -15,6 +15,10 @@ services:
     extra_hosts:
       - 'host.docker.internal:host-gateway'
     volumes:
+      - type: bind
+        source: .env
+        target: /var/www/html/.env
+        read_only: true
       - ./ssh:/var/www/html/storage/app/ssh
       - ./applications:/var/www/html/storage/app/applications
       - ./databases:/var/www/html/storage/app/databases
