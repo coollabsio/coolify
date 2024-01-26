@@ -69,12 +69,6 @@ use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 use App\Livewire\TeamSharedVariablesIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
-use Illuminate\Foundation\Auth\EmailVerificationRequest;
-use Illuminate\Support\Facades\Password;
-use Laravel\Fortify\Contracts\FailedPasswordResetLinkRequestResponse;
-use Laravel\Fortify\Contracts\SuccessfulPasswordResetLinkRequestResponse;
-use Laravel\Fortify\Fortify;
-use Illuminate\Support\Str;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
