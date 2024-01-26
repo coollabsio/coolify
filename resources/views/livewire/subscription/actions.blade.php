@@ -16,7 +16,7 @@
                         again</x-forms.button></a>
             @endif
             <div>To update your subscription (upgrade / downgrade), please <a class="text-white underline"
-                    href="{{ config('coolify.docs') }}" target="_blank">contact us.</a></div>
+                    href="{{ config('coolify.contact') }}" target="_blank">contact us.</a></div>
         </div>
     @endif
     @if (subscriptionProvider() === 'lemon')
@@ -25,7 +25,7 @@
         @if (currentTeam()->subscription->lemon_status === 'cancelled')
             <div class="pb-4">Subscriptions ends at: {{ getRenewDate() }}</div>
             <div class="py-4">If you would like to change the subscription to a lower/higher plan, <a
-                    class="text-white underline" href="{{ config('coolify.docs') }}" target="_blank">please
+                    class="text-white underline" href="{{ config('coolify.contact') }}" target="_blank">please
                     contact
                     us.</a></div>
         @else
