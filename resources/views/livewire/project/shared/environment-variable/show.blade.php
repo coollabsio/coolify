@@ -19,13 +19,19 @@
             @if ($isDisabled)
                 <x-forms.input disabled id="env.key" />
                 <x-forms.input disabled type="password" id="env.value" />
-                @if ($type !== 'service')
+                @if ($env->is_shared)
+                    <x-forms.input disabled type="password" id="env.real_value" />
+                @endif
+                @if ($type !== 'service' && !$isSharedVariable)
                     <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                 @endif
             @else
                 <x-forms.input id="env.key" />
                 <x-forms.input type="password" id="env.value" />
-                @if ($type !== 'service')
+                @if ($env->is_shared)
+                    <x-forms.input disabled type="password" id="env.real_value" />
+                @endif
+                @if ($type !== 'service' && !$isSharedVariable)
                     <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                 @endif
             @endif

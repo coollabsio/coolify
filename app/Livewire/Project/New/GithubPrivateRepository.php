@@ -39,6 +39,8 @@ class GithubPrivateRepository extends Component
     public bool $is_static = false;
     public string|null $publish_directory = null;
     protected int $page = 1;
+    public $build_pack = 'nixpacks';
+    public bool $show_is_static = true;
 
 
     public function mount()
@@ -48,6 +50,20 @@ class GithubPrivateRepository extends Component
         $this->query = request()->query();
         $this->repositories = $this->branches = collect();
         $this->github_apps = GithubApp::private();
+    }
+    public function updatedBuildPack()
+    {
+        if ($this->build_pack === 'nixpacks') {
+            $this->show_is_static = true;
+            $this->port = 3000;
+        } else if ($this->build_pack === 'static') {
+            $this->show_is_static = false;
+            $this->is_static = false;
+            $this->port = 80;
+        } else {
+            $this->show_is_static = false;
+            $this->is_static = false;
+        }
     }
     public function loadRepositories($github_app_id)
     {
@@ -95,7 +111,7 @@ class GithubPrivateRepository extends Component
                 $this->loadBranchByPage();
             }
         }
-        $this->selected_branch_name = data_get($this->branches,'0.name');
+        $this->selected_branch_name = data_get($this->branches, '0.name', 'main');
     }
 
     protected function loadBranchByPage()

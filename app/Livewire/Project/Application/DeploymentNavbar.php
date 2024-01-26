@@ -41,13 +41,10 @@ class DeploymentNavbar extends Component
     public function cancel()
     {
         try {
-            $kill_command = "kill -9 {$this->application_deployment_queue->current_process_id}";
-            if ($this->application_deployment_queue->current_process_id) {
-                $process = Process::run("ps -p {$this->application_deployment_queue->current_process_id} -o command --no-headers");
-                if (Str::of($process->output())->contains([$this->server->ip, 'EOF-COOLIFY-SSH'])) {
-                    Process::run($kill_command);
-                }
+            $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
+            if ($this->application_deployment_queue->logs) {
                 $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
+
                 $new_log_entry = [
                     'command' => $kill_command,
                     'output' => "Deployment cancelled by user.",
@@ -60,15 +57,17 @@ class DeploymentNavbar extends Component
                 $this->application_deployment_queue->update([
                     'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
                 ]);
+                instant_remote_process([$kill_command], $this->server);
             }
         } catch (\Throwable $e) {
+            ray($e);
             return handleError($e, $this);
         } finally {
             $this->application_deployment_queue->update([
                 'current_process_id' => null,
                 'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
             ]);
-            queue_next_deployment($this->application);
+            // queue_next_deployment($this->application);
         }
     }
 }

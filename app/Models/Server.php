@@ -398,6 +398,8 @@ class Server extends BaseModel
     }
     public function validateConnection()
     {
+        config()->set('coolify.mux_enabled', false);
+
         $server = Server::find($this->id);
         if (!$server) {
             return false;

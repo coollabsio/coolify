@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "de3b59fade9b132d2582a40dcf3c00f9",
+    "content-hash": "19b19082b605e09867e6ae65fb8135f6",
     "packages": [
         {
             "name": "amphp/amp",
@@ -4484,77 +4484,6 @@
                 }
             ],
             "time": "2023-02-05T15:03:45+00:00"
-        },
-        {
-            "name": "masmerise/livewire-toaster",
-            "version": "2.0.3",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/masmerise/livewire-toaster.git",
-                "reference": "89aa127df5d17b915b0818761bdf83e8915036c2"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/masmerise/livewire-toaster/zipball/89aa127df5d17b915b0818761bdf83e8915036c2",
-                "reference": "89aa127df5d17b915b0818761bdf83e8915036c2",
-                "shasum": ""
-            },
-            "require": {
-                "laravel/framework": "^10.0",
-                "livewire/livewire": "^3.0",
-                "php": "~8.2"
-            },
-            "conflict": {
-                "stevebauman/unfinalize": "*"
-            },
-            "require-dev": {
-                "dive-be/php-crowbar": "^1.0",
-                "laravel/pint": "^1.0",
-                "nunomaduro/larastan": "^2.0",
-                "orchestra/testbench": "^8.0",
-                "phpunit/phpunit": "^10.0"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "aliases": {
-                        "Toaster": "Masmerise\\Toaster\\Toaster"
-                    },
-                    "providers": [
-                        "Masmerise\\Toaster\\ToasterServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "Masmerise\\Toaster\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Muhammed Sari",
-                    "email": "support@muhammedsari.me",
-                    "role": "Developer"
-                }
-            ],
-            "description": "Beautiful toast notifications for Laravel / Livewire.",
-            "homepage": "https://github.com/masmerise/livewire-toaster",
-            "keywords": [
-                "alert",
-                "laravel",
-                "livewire",
-                "toast",
-                "toaster"
-            ],
-            "support": {
-                "issues": "https://github.com/masmerise/livewire-toaster/issues",
-                "source": "https://github.com/masmerise/livewire-toaster/tree/2.0.3"
-            },
-            "time": "2023-09-28T12:07:49+00:00"
         },
         {
             "name": "monolog/monolog",

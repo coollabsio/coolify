@@ -19,7 +19,7 @@ class Select extends Component
         public string|null $label = null,
         public string|null $helper = null,
         public bool        $required = false,
-        public string      $defaultClass = "select select-sm w-full rounded text-white text-sm bg-coolgray-100 font-normal disabled:bg-coolgray-200/50 disabled:border-none"
+        public string      $defaultClass = "select select-sm w-full rounded text-sm bg-coolgray-100 font-normal disabled:bg-coolgray-200/50 disabled:border-none"
     ) {
         //
     }

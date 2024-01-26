@@ -37,6 +37,10 @@ class StandaloneRedis extends BaseModel
             $database->environment_variables()->delete();
         });
     }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {

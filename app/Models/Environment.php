@@ -17,6 +17,9 @@ class Environment extends Model
             $this->services()->count() == 0;
     }
 
+    public function environment_variables() {
+        return $this->hasMany(SharedEnvironmentVariable::class);
+    }
     public function applications()
     {
         return $this->hasMany(Application::class);

@@ -12,14 +12,30 @@ class EnvironmentEdit extends Component
     public Application $application;
     public $environment;
     public array $parameters;
-
     protected $rules = [
         'environment.name' => 'required|min:3|max:255',
         'environment.description' => 'nullable|min:3|max:255',
     ];
-    public function mount() {
-        $this->parameters = get_route_parameters();
+    protected $listeners = ['refreshEnvs' => '$refresh', 'saveKey' => 'saveKey'];
 
+    public function saveKey($data)
+    {
+        try {
+            $this->environment->environment_variables()->create([
+                'key' => $data['key'],
+                'value' => $data['value'],
+                'type' => 'environment',
+                'team_id' => currentTeam()->id,
+            ]);
+            $this->environment->refresh();
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function mount()
+    {
+        $this->parameters = get_route_parameters();
         $this->project = Project::ownedByCurrentTeam()->where('uuid', request()->route('project_uuid'))->first();
         $this->environment = $this->project->environments()->where('name', request()->route('environment_name'))->first();
     }

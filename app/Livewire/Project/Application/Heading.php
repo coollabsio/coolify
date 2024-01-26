@@ -3,7 +3,6 @@
 namespace App\Livewire\Project\Application;
 
 use App\Actions\Application\StopApplication;
-use App\Events\ApplicationStatusChanged;
 use App\Jobs\ContainerStatusJob;
 use App\Jobs\ServerStatusJob;
 use App\Models\Application;
@@ -56,6 +55,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: false,
             is_new_deployment: true,
@@ -84,6 +84,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             force_rebuild: $force_rebuild,
         );
@@ -113,6 +114,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
             is_new_deployment: true,
@@ -129,6 +131,7 @@ class Heading extends Component
         $this->setDeploymentUuid();
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $this->deploymentUuid,
             restart_only: true,
         );

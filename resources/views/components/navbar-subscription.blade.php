@@ -13,7 +13,7 @@
                 </a>
             </li>
             <li title="Help us!">
-                <a class="hover:bg-transparent"href="https://coolify.io/sponsorships" target="_blank">
+                <a class="hover:bg-transparent" href="https://coolify.io/sponsorships" target="_blank">
                     <svg class="icon hover:text-pink-500" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
                             stroke-width="2">

@@ -25,6 +25,7 @@ class Rollback extends Component
 
         queue_application_deployment(
             application_id: $this->application->id,
+            server_id: $this->application->destination->server->id,
             deployment_uuid: $deployment_uuid,
             commit: $commit,
             force_rebuild: false,

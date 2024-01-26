@@ -220,7 +220,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->build_server = $this->server;
             $this->original_server = $this->server;
         }
-        ray($this->build_server);
         try {
             if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
@@ -311,7 +310,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function push_to_docker_registry($forceFail = false)
     {
-        ray((str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()));
         if (
             $this->application->docker_registry_image_name &&
             $this->application->build_pack !== 'dockerimage' &&
@@ -383,7 +381,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function just_restart()
     {
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch}.'");
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->set_base_dir();
@@ -417,11 +415,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $envs = collect([]);
         if ($this->pull_request_id !== 0) {
             foreach ($this->application->environment_variables_preview as $env) {
-                $envs->push($env->key . '=' . $env->value);
+                $envs->push($env->key . '=' . $env->real_value);
             }
         } else {
             foreach ($this->application->environment_variables as $env) {
-                $envs->push($env->key . '=' . $env->value);
+                $envs->push($env->key . '=' . $env->real_value);
             }
         }
         $envs_base64 = base64_encode($envs->implode("\n"));
@@ -929,11 +927,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_nixpacks_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $this->env_nixpacks_args->push("--env {$env->key}={$env->value}");
+                $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $this->env_nixpacks_args->push("--env {$env->key}={$env->value}");
+                $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
             }
         }
 
@@ -944,11 +942,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $this->env_args->put($env->key, $env->value);
+                $this->env_args->put($env->key, $env->real_value);
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->env_args->put($env->key, $env->value);
+                $this->env_args->put($env->key, $env->real_value);
             }
         }
         $this->env_args->put('SOURCE_COMMIT', $this->commit);
@@ -1159,22 +1157,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_environment_variables($ports)
     {
         $environment_variables = collect();
-        // ray('Generate Environment Variables')->green();
         if ($this->pull_request_id === 0) {
-            // ray($this->application->runtime_environment_variables)->green();
             foreach ($this->application->runtime_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->value");
+                $environment_variables->push("$env->key=$env->real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->value");
+                $environment_variables->push("$env->key=$env->real_value");
             }
         } else {
-            // ray($this->application->runtime_environment_variables_preview)->green();
             foreach ($this->application->runtime_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->value");
+                $environment_variables->push("$env->key=$env->real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->value");
+                $environment_variables->push("$env->key=$env->real_value");
             }
         }
         // Add PORT if not exists, use the first port as default
@@ -1457,12 +1452,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->build_args = collect(["--build-arg SOURCE_COMMIT=\"{$this->commit}\""]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $value = escapeshellarg($env->value);
+                $value = escapeshellarg($env->real_value);
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $value = escapeshellarg($env->value);
+                $value = escapeshellarg($env->real_value);
                 $this->build_args->push("--build-arg {$env->key}={$value}");
             }
         }
@@ -1478,11 +1473,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->value}");
+                $dockerfile->splice(1, 0, "ARG {$env->key}={$env->real_value}");
             }
         }
         $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));

@@ -45,6 +45,10 @@ class StandaloneMongodb extends BaseModel
             $database->environment_variables()->delete();
         });
     }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
+    }
     public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);

@@ -43,132 +43,134 @@
     @if ($environment->isEmpty())
         <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
             class="items-center justify-center box">+ Add New Resource</a>
-    @endif
-    <div x-data="searchComponent()">
-        <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
-        <div class="grid gap-2 pt-4 lg:grid-cols-2">
-            <template x-for="item in filteredApplications" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="pb-2 font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                        <div class="description" x-text="item.fqdn"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredPostgresqls" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredRedis" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredMongodbs" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredMysqls" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredMariadbs" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('restarting')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
-            <template x-for="item in filteredServices" :key="item.id">
-                <a class="relative box group" :href="item.hrefLink">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white" x-text="item.name"></div>
-                        <div class="description" x-text="item.description"></div>
-                    </div>
-                    <template x-if="item.status.startsWith('running')">
-                        <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('exited')">
-                        <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                    <template x-if="item.status.startsWith('degraded')">
-                        <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                    </template>
-                </a>
-            </template>
+    @else
+        <div x-data="searchComponent()">
+            <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
+            <div class="grid gap-2 pt-4 lg:grid-cols-2">
+                <template x-for="item in filteredApplications" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                            <div class="description" x-text="item.fqdn"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredPostgresqls" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredRedis" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredMongodbs" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredMysqls" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredMariadbs" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('restarting')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+                <template x-for="item in filteredServices" :key="item.id">
+                    <a class="relative box group" :href="item.hrefLink">
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white" x-text="item.name"></div>
+                            <div class="description" x-text="item.description"></div>
+                        </div>
+                        <template x-if="item.status.startsWith('running')">
+                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('exited')">
+                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                        <template x-if="item.status.startsWith('degraded')">
+                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                        </template>
+                    </a>
+                </template>
+            </div>
         </div>
-    </div>
+    @endif
+
 </div>
 
 <script>

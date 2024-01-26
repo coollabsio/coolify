@@ -91,7 +91,13 @@
             <span>You must complete this step before you can use this source!</span>
         </div>
         <div class="flex flex-col">
-            <h2>Register a GitHub App</h2>
+            <div class="flex gap-2">
+                <h2>Register a GitHub App</h2>
+                <x-forms.button class="bg-coollabs hover:bg-coollabs-100"
+                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
+                    Register Now
+                </x-forms.button>
+            </div>
             <div>You need to register a GitHub App before using this source.</div>
             <div class="py-10">
                 @if (!isCloud() || isDev())
@@ -111,16 +117,7 @@
                                 <option value="{{ config('app.url') }}">Use {{ config('app.url') }}</option>
                             @endif
                         </x-forms.select>
-                        <x-forms.button
-                            x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
-                            Register
-                        </x-forms.button>
                     </div>
-                @else
-                    <x-forms.button
-                        x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
-                        Register Now
-                    </x-forms.button>
                 @endif
                 <div class="flex flex-col gap-2 pt-4">
                     <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"

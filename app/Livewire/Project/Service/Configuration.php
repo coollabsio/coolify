@@ -30,7 +30,10 @@ class Configuration extends Component
     {
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
-        $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
+        $this->service = Service::whereUuid($this->parameters['service_uuid'])->first();
+        if (!$this->service) {
+            return redirect()->route('dashboard');
+        }
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }

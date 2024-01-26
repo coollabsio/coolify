@@ -22,8 +22,8 @@
                     instantSave id="application.settings.is_log_drain_enabled" label="Drain Logs" />
             @endif
 
-            <h4>Git</h4>
             @if ($application->git_based())
+                <h4>Git</h4>
                 <x-forms.checkbox instantSave id="application.settings.is_git_submodules_enabled" label="Git Submodules"
                     helper="Allow Git Submodules during build process." />
                 <x-forms.checkbox instantSave id="application.settings.is_git_lfs_enabled" label="Git LFS"

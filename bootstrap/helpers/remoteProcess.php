@@ -108,7 +108,7 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
     }
     return $output;
 }
-function generateSshCommand(Server $server, string $command, bool $isMux = true)
+function generateSshCommand(Server $server, string $command)
 {
     $user = $server->user;
     $port = $server->port;
@@ -120,7 +120,7 @@ function generateSshCommand(Server $server, string $command, bool $isMux = true)
     $delimiter = 'EOF-COOLIFY-SSH';
     $ssh_command = "timeout $timeout ssh ";
 
-    if ($isMux && config('coolify.mux_enabled')) {
+    if (config('coolify.mux_enabled') && config('coolify.is_windows_docker_desktop') == false) {
         $ssh_command .= '-o ControlMaster=auto -o ControlPersist=1m -o ControlPath=/var/www/html/storage/app/ssh/mux/%h_%p_%r ';
     }
     if (data_get($server, 'settings.is_cloudflare_tunnel')) {

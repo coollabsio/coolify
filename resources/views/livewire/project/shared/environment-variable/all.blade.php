@@ -2,15 +2,26 @@
     <div>
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
-            <x-forms.button class="btn" onclick="newVariable.showModal()">+ Add</x-forms.button>
-            <livewire:project.shared.environment-variable.add />
+            @if ($resource->type() !== 'service')
+                <x-slide-over>
+                    <x-slot:title>New Environment Variable</x-slot:title>
+                    <x-slot:content>
+                        <livewire:project.shared.environment-variable.add />
+                    </x-slot:content>
+                    <button @click="slideOverOpen=true"
+                        class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+ Add</button>
+                </x-slide-over>
+            @endif
             <x-forms.button
                 wire:click='switch'>{{ $view === 'normal' ? 'Developer view' : 'Normal view' }}</x-forms.button>
         </div>
         <div>Environment variables (secrets) for this resource.</div>
+        @if ($resource->type() === 'service')
+            <div>If you cannot find a variable here, or need a new one, define it in the Docker Compose file.</div>
+        @endif
     </div>
     @if ($view === 'normal')
-        @forelse ($resource->environment_variables as $env)
+        @forelse ($resource->environment_variables->sort()->sortBy('real_value') as $env)
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" :type="$resource->type()" />
         @empty
@@ -21,19 +32,19 @@
                 <h3>Preview Deployments</h3>
                 <div>Environment (secrets) variables for Preview Deployments.</div>
             </div>
-            @foreach ($resource->environment_variables_preview as $env)
+            @foreach ($resource->environment_variables_preview->sort()->sortBy('real_value') as $env)
                 <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                     :env="$env" :type="$resource->type()" />
             @endforeach
         @endif
     @else
         <form wire:submit='saveVariables(false)' class="flex flex-col gap-2">
-            <x-forms.textarea rows=25 class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
+            <x-forms.textarea rows="10" class="whitespace-pre-wrap" id="variables"></x-forms.textarea>
             <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
         </form>
         @if ($showPreview)
             <form wire:submit='saveVariables(true)' class="flex flex-col gap-2">
-                <x-forms.textarea rows=25 class="whitespace-pre-wrap" label="Preview Environment Variables"
+                <x-forms.textarea rows="10" class="whitespace-pre-wrap" label="Preview Environment Variables"
                     id="variablesPreview"></x-forms.textarea>
                 <x-forms.button type="submit" class="btn btn-primary">Save</x-forms.button>
             </form>

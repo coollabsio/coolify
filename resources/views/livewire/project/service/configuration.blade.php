@@ -26,6 +26,10 @@
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
+            <a :class="activeTab === 'resource-operations' && 'text-white'"
+                @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
+                href="#">Resource Operations
+            </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger';
                 window.location.hash = 'danger'"
@@ -156,6 +160,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$service" />
+            </div>
+            <div x-cloak x-show="activeTab === 'resource-operations'">
+                <livewire:project.shared.resource-operations :resource="$service" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$service" />

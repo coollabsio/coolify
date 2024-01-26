@@ -8,7 +8,7 @@
                 patience.
             </p>
             <div class="flex items-center justify-center mt-10 gap-x-6">
-                <a href="{{ config('coolify.docs') }}" class="font-semibold text-white ">Contact
+                <a href="{{ config('coolify.contact') }}" class="font-semibold text-white ">Contact
                     support
                     <span aria-hidden="true">&rarr;</span></a>
             </div>

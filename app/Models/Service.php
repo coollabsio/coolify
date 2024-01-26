@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
+use Symfony\Component\Yaml\Yaml;
 
 class Service extends BaseModel
 {
@@ -16,6 +17,10 @@ class Service extends BaseModel
     public function type()
     {
         return 'service';
+    }
+    public function team()
+    {
+        return data_get($this, 'environment.project.team');
     }
     public function extraFields()
     {
@@ -423,7 +428,7 @@ class Service extends BaseModel
         $envs = $this->environment_variables()->get();
         $commands[] = "rm -f .env || true";
         foreach ($envs as $env) {
-            $commands[] = "echo '{$env->key}={$env->value}' >> .env";
+            $commands[] = "echo '{$env->key}={$env->real_value}' >> .env";
         }
         if ($envs->count() === 0) {
             $commands[] = "touch .env";

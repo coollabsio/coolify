@@ -18,7 +18,7 @@
             <x-forms.checkbox class="pt-2" id="is_system_wide" label="System Wide" />
         @endif
         <x-forms.button class="mt-4" type="submit">
-            Save New Source
+            Continue
         </x-forms.button>
     </form>
 </div>

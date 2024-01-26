@@ -11,7 +11,7 @@
                     </x-forms.button>
                 </div>
                 @if (!$branch_found)
-                    <div>
+                    <div class="px-2 pt-4">
                         <p>Public repositories: <span class='text-helper'>https://...</span></p>
                         <p>Private repositories: <span class='text-helper'>git@...</span></p>
                         <p>Preselect branch: <span
@@ -42,15 +42,14 @@
                                 <option value="dockerfile">Dockerfile</option>
                                 <option value="dockercompose">Docker Compose</option>
                             </x-forms.select>
-                        </div>
-                        @if ($show_is_static)
                             @if ($is_static)
                                 <x-forms.input id="publish_directory" label="Publish Directory"
                                     helper="If there is a build process involved (like Svelte, React, Next, etc..), please specify the output directory for the build assets." />
-                            @else
-                                <x-forms.input type="number" id="port" label="Port" :readonly="$is_static"
-                                    helper="The port your application listens on." />
                             @endif
+                        </div>
+                        @if ($show_is_static)
+                            <x-forms.input type="number" id="port" label="Port" :readonly="$is_static || $build_pack === 'static'"
+                                helper="The port your application listens on." />
                             <div class="w-52">
                                 <x-forms.checkbox instantSave id="is_static" label="Is it a static site?"
                                     helper="If your application is a static site or the final build assets should be served as a static site, enable this." />
