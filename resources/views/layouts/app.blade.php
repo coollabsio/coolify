@@ -11,7 +11,7 @@
     @auth
         <livewire:realtime-connection />
     @endauth
-    <main class="pb-10 main max-w-screen-2xl">
+    <main class="pb-10 main">
         {{ $slot }}
     </main>
 @endsection

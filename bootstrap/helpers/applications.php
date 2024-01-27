@@ -6,14 +6,23 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
-function queue_application_deployment(int $application_id, int $server_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
 {
+    $application_id = $application->id;
+    $deployment_link = Url::fromString($application->link() . "/deployment/{$deployment_uuid}");
+    $deployment_url = $deployment_link->getPath();
+    $server_id = $application->destination->server->id;
+    $server_name = $application->destination->server->name;
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,
+        'application_name' => $application->name,
         'server_id' => $server_id,
+        'server_name' => $server_name,
         'deployment_uuid' => $deployment_uuid,
+        'deployment_url' => $deployment_url,
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
         'is_webhook' => $is_webhook,

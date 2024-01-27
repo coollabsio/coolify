@@ -2,18 +2,35 @@
 
 namespace App\Livewire;
 
+use App\Models\ApplicationDeploymentQueue;
 use App\Models\Project;
 use App\Models\Server;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Dashboard extends Component
 {
     public $projects = [];
-    public $servers = [];
+    public Collection $servers;
+    public Collection $deployments_per_server;
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get();
+        $this->get_deployments();
+    }
+    public function get_deployments()
+    {
+        $this->deployments_per_server = ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->whereIn("server_id", $this->servers->pluck("id"))->get([
+            "id",
+            "application_id",
+            "application_name",
+            "deployment_url",
+            "pull_request_id",
+            "server_name",
+            "server_id",
+            "status"
+        ])->sortBy('id');
     }
     // public function getIptables()
     // {

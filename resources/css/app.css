@@ -19,7 +19,7 @@ button[isError] {
 }
 
 .main {
-    @apply pt-4 pl-24 pr-10 mx-auto;
+    @apply pt-4 pl-24 pr-10 lg:pr-32 lg:pl-44;
 }
 
 .custom-modal {
