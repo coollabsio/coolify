@@ -1522,7 +1522,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->application_deployment_queue->addLogEntry("Oops something is not okay, are you okay? 😢", 'stderr');
-        $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
+        if (str($exception->getMessage())->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
+        }
 
         if ($this->application->build_pack !== 'dockercompose') {
             $this->application_deployment_queue->addLogEntry("Deployment failed. Removing the new version of your application.", 'stderr');

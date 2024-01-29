@@ -2,7 +2,8 @@
     <h1>Deployments</h1>
     <livewire:project.application.heading :application="$application" />
     {{-- <livewire:project.application.deployment.show :application="$application" :deployments="$deployments" :deployments_count="$deployments_count" /> --}}
-    <div class="flex flex-col gap-2 pb-10" @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
+    <div class="flex flex-col gap-2 pb-10"
+        @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
         <div class="flex items-end gap-2 pt-4">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
             @if ($show_next)
@@ -15,7 +16,7 @@
             <x-forms.button type="submit">Filter</x-forms.button>
         </form>
         @forelse ($deployments as $deployment)
-            <a  @class([
+            <a @class([
                 'bg-coolgray-100 p-2 border-l border-dashed transition-colors hover:no-underline',
                 'hover:bg-coolgray-200' => data_get($deployment, 'status') === 'queued',
                 'border-warning hover:bg-warning hover:text-black' =>
@@ -33,19 +34,27 @@
                         <span class=" text-warning">></span>
                         {{ $deployment->status }}
                     </div>
-                    @if (data_get($deployment, 'pull_request_id'))
-                        <div>
-                            <span class=" text-warning">></span>
-                            Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                    @if (data_get($deployment, 'is_webhook') || data_get($deployment, 'pull_request_id'))
+                        <div class="flex gap-1">
                             @if (data_get($deployment, 'is_webhook'))
-                                (Webhook)
+                                Webhook
                             @endif
-                            Webhook (SHA
-                            @if (data_get($deployment, 'commit'))
-                                {{ data_get($deployment, 'commit') }})
-                            @else
-                                HEAD)
+                            @if (data_get($deployment, 'pull_request_id'))
+                                @if (data_get($deployment, 'is_webhook'))
+                                    |
+                                @endif
+                                Pull Request #{{ data_get($deployment, 'pull_request_id') }}
+                                (SHA
+                                @if (data_get($deployment, 'commit'))
+                                    {{ data_get($deployment, 'commit') }})
+                                @else
+                                    HEAD)
+                                @endif
                             @endif
+                        </div>
+                    @else
+                        <div class="flex gap-1">
+                            Manual
                         </div>
                     @endif
                 </div>
