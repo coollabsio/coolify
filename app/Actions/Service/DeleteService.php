@@ -32,13 +32,14 @@ class DeleteService
             }
             $database->forceDelete();
         }
-        foreach ($storagesToDelete as $storage) {
-            $commands[] = "docker volume rm -f $storage->name";
+        if ($server->isFunctional()) {
+            foreach ($storagesToDelete as $storage) {
+                $commands[] = "docker volume rm -f $storage->name";
+            }
+            $commands[] = "docker rm -f $service->uuid";
+
+            instant_remote_process($commands, $server, false);
         }
-        $commands[] = "docker rm -f $service->uuid";
-
-        instant_remote_process($commands, $server, false);
-
         $service->forceDelete();
     }
 }
