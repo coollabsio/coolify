@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\ProcessStatus;
+use App\Jobs\ApplicationPullRequestUpdateJob;
 use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\SubscriptionTrialEndedJob;
 use App\Jobs\SubscriptionTrialEndsSoonJob;
@@ -149,8 +151,7 @@ Route::post('/source/gitlab/events/manual', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
-                        server_id: $application->destination->server->id,
-                        application_id: $application->id,
+                        application: $application,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
                         is_webhook: true
@@ -178,8 +179,7 @@ Route::post('/source/gitlab/events/manual', function () {
                             ]);
                         }
                         queue_application_deployment(
-                            server_id: $application->destination->server->id,
-                            application_id: $application->id,
+                            application: $application,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
                             force_rebuild: false,
@@ -234,8 +234,170 @@ Route::post('/source/gitlab/events/manual', function () {
         return handleError($e);
     }
 });
+Route::post('/source/bitbucket/events/manual', function () {
+    try {
+        $return_payloads = collect([]);
+        $payload = request()->collect();
+        $headers = request()->headers->all();
+        $x_bitbucket_token = data_get($headers, 'x-hub-signature.0', "");
+        $x_bitbucket_event = data_get($headers, 'x-event-key.0', "");
+        $handled_events = collect(['repo:push', 'pullrequest:created', 'pullrequest:rejected', 'pullrequest:fulfilled']);
+        if (!$handled_events->contains($x_bitbucket_event)) {
+            return response([
+                'status' => 'failed',
+                'message' => 'Nothing to do. Event not handled.',
+            ]);
+        }
+        if ($x_bitbucket_event === 'repo:push') {
+            $branch = data_get($payload, 'push.changes.0.new.name');
+            $full_name = data_get($payload, 'repository.full_name');
+
+            if (!$branch) {
+                return response([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. No branch found in the request.',
+                ]);
+            }
+            ray('Manual webhook bitbucket push event with branch: ' . $branch);
+        }
+        if ($x_bitbucket_event === 'pullrequest:created' || $x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
+            $branch = data_get($payload, 'pullrequest.destination.branch.name');
+            $base_branch = data_get($payload, 'pullrequest.source.branch.name');
+            $full_name = data_get($payload, 'repository.full_name');
+            $pull_request_id = data_get($payload, 'pullrequest.id');
+            $pull_request_html_url = data_get($payload, 'pullrequest.links.html.href');
+            $commit = data_get($payload, 'pullrequest.source.commit.hash');
+        }
+        $applications = Application::where('git_repository', 'like', "%$full_name%");
+        $applications = $applications->where('git_branch', $branch)->get();
+        if ($applications->isEmpty()) {
+            return response([
+                'status' => 'failed',
+                'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $full_name.",
+            ]);
+        }
+        foreach ($applications as $application) {
+            if (!$application->isPRDeployable()) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Preview deployments disabled.',
+                ]);
+                continue;
+            }
+            $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
+            $payload = request()->getContent();
+
+            list($algo, $hash) = explode('=', $x_bitbucket_token, 2);
+            $payloadHash = hash_hmac($algo, $payload, $webhook_secret);
+            if (!hash_equals($hash, $payloadHash) && !isDev()) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Invalid token.',
+                ]);
+                ray('Invalid signature');
+                continue;
+            }
+            $isFunctional = $application->destination->server->isFunctional();
+            if (!$isFunctional) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Server is not functional.',
+                ]);
+                ray('Server is not functional: ' . $application->destination->server->name);
+                continue;
+            }
+            if ($x_bitbucket_event === 'repo:push') {
+                if ($application->isPRDeployable()) {
+                    ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                    $deployment_uuid = new Cuid2(7);
+                    queue_application_deployment(
+                        application: $application,
+                        deployment_uuid: $deployment_uuid,
+                        force_rebuild: false,
+                        is_webhook: true
+                    );
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'success',
+                        'message' => 'Preview deployment queued.',
+                    ]);
+                } else {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Preview deployments disabled.',
+                    ]);
+                }
+            }
+            if ($x_bitbucket_event === 'pullrequest:created') {
+                if ($application->isPRDeployable()) {
+                    ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
+                    $deployment_uuid = new Cuid2(7);
+                    $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                    if (!$found) {
+                        ApplicationPreview::create([
+                            'git_type' => 'bitbucket',
+                            'application_id' => $application->id,
+                            'pull_request_id' => $pull_request_id,
+                            'pull_request_html_url' => $pull_request_html_url,
+                        ]);
+                    }
+                    queue_application_deployment(
+                        application: $application,
+                        pull_request_id: $pull_request_id,
+                        deployment_uuid: $deployment_uuid,
+                        force_rebuild: false,
+                        commit: $commit,
+                        is_webhook: true,
+                        git_type: 'bitbucket'
+                    );
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'success',
+                        'message' => 'Preview deployment queued.',
+                    ]);
+                } else {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Preview deployments disabled.',
+                    ]);
+                }
+            }
+            if ($x_bitbucket_event === 'pullrequest:rejected' || $x_bitbucket_event === 'pullrequest:fulfilled') {
+                ray('Pull request rejected');
+                $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
+                if ($found) {
+                    $found->delete();
+                    $container_name = generateApplicationContainerName($application, $pull_request_id);
+                    instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'success',
+                        'message' => 'Preview deployment closed.',
+                    ]);
+                } else {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'No preview deployment found.',
+                    ]);
+                }
+            }
+        }
+        ray($return_payloads);
+        return response($return_payloads);
+    } catch (Exception $e) {
+        ray($e);
+        return handleError($e);
+    }
+});
 Route::post('/source/github/events/manual', function () {
     try {
+        $return_payloads = collect([]);
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
         $x_hub_signature_256 = Str::after(request()->header('X-Hub-Signature-256'), 'sha256=');
         $content_type = request()->header('Content-Type');
@@ -284,13 +446,22 @@ Route::post('/source/github/events/manual', function () {
         foreach ($applications as $application) {
             $webhook_secret = data_get($application, 'manual_webhook_secret_github');
             $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
-            if (!hash_equals($x_hub_signature_256, $hmac)) {
+            if (!hash_equals($x_hub_signature_256, $hmac) && !isDev()) {
                 ray('Invalid signature');
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Invalid token.',
+                ]);
                 continue;
             }
             $isFunctional = $application->destination->server->isFunctional();
             if (!$isFunctional) {
-                ray('Server is not functional: ' . $application->destination->server->name);
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Server is not functional.',
+                ]);
                 continue;
             }
             if ($x_github_event === 'push') {
@@ -298,14 +469,22 @@ Route::post('/source/github/events/manual', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
-                        server_id: $application->destination->server->id,
-                        application_id: $application->id,
+                        application: $application,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
-                        is_webhook: true
+                        is_webhook: true,
                     );
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'success',
+                        'message' => 'Deployment queued.',
+                    ]);
                 } else {
-                    ray('Deployments disabled for ' . $application->name);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Deployments disabled.',
+                    ]);
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -322,19 +501,24 @@ Route::post('/source/github/events/manual', function () {
                             ]);
                         }
                         queue_application_deployment(
-                            server_id: $application->destination->server->id,
-                            application_id: $application->id,
+                            application: $application,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
                             force_rebuild: false,
                             is_webhook: true,
                             git_type: 'github'
                         );
-                        ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
-                        return response('Preview Deployment queued.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview deployment queued.',
+                        ]);
                     } else {
-                        ray('Preview deployments disabled for ' . $application->name);
-                        return response('Nothing to do. Preview Deployments disabled.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'failed',
+                            'message' => 'Preview deployments disabled.',
+                        ]);
                     }
                 }
                 if ($action === 'closed') {
@@ -344,12 +528,23 @@ Route::post('/source/github/events/manual', function () {
                         $container_name = generateApplicationContainerName($application, $pull_request_id);
                         // ray('Stopping container: ' . $container_name);
                         instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
-                        return response('Preview Deployment closed.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview deployment closed.',
+                        ]);
+                    } else {
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'failed',
+                            'message' => 'No preview deployment found.',
+                        ]);
                     }
-                    return response('Nothing to do. No Preview Deployment found');
                 }
             }
         }
+        ray($return_payloads);
+        return response($return_payloads);
     } catch (Exception $e) {
         ray($e->getMessage());
         return handleError($e);
@@ -357,6 +552,7 @@ Route::post('/source/github/events/manual', function () {
 });
 Route::post('/source/github/events', function () {
     try {
+        $return_payloads = collect([]);
         $id = null;
         $x_github_delivery = request()->header('X-GitHub-Delivery');
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
@@ -380,7 +576,7 @@ Route::post('/source/github/events', function () {
         $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
         if (config('app.env') !== 'local') {
             if (!hash_equals($x_hub_signature_256, $hmac)) {
-                return response('not cool');
+                return response('Invalid signature.');
             }
         }
         if ($x_github_event === 'push') {
@@ -420,7 +616,11 @@ Route::post('/source/github/events', function () {
         foreach ($applications as $application) {
             $isFunctional = $application->destination->server->isFunctional();
             if (!$isFunctional) {
-                ray('Server is not functional: ' . $application->destination->server->name);
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Server is not functional.',
+                ]);
                 continue;
             }
             if ($x_github_event === 'push') {
@@ -428,14 +628,22 @@ Route::post('/source/github/events', function () {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
-                        server_id: $application->destination->server->id,
-                        application_id: $application->id,
+                        application: $application,
                         deployment_uuid: $deployment_uuid,
                         force_rebuild: false,
                         is_webhook: true
                     );
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'success',
+                        'message' => 'Deployment queued.',
+                    ]);
                 } else {
-                    ray('Deployments disabled for ' . $application->name);
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Deployments disabled.',
+                    ]);
                 }
             }
             if ($x_github_event === 'pull_request') {
@@ -452,34 +660,51 @@ Route::post('/source/github/events', function () {
                             ]);
                         }
                         queue_application_deployment(
-                            server_id: $application->destination->server->id,
-                            application_id: $application->id,
+                            application: $application,
                             pull_request_id: $pull_request_id,
                             deployment_uuid: $deployment_uuid,
                             force_rebuild: false,
                             is_webhook: true,
                             git_type: 'github'
                         );
-                        ray('Deploying preview for ' . $application->name . ' with branch ' . $branch . ' and base branch ' . $base_branch . ' and pull request id ' . $pull_request_id);
-                        return response('Preview Deployment queued.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview deployment queued.',
+                        ]);
                     } else {
-                        ray('Preview deployments disabled for ' . $application->name);
-                        return response('Nothing to do. Preview Deployments disabled.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'failed',
+                            'message' => 'Preview deployments disabled.',
+                        ]);
                     }
                 }
                 if ($action === 'closed' || $action === 'close') {
                     $found = ApplicationPreview::where('application_id', $application->id)->where('pull_request_id', $pull_request_id)->first();
                     if ($found) {
+                        ApplicationPullRequestUpdateJob::dispatchSync(application: $application, preview: $found, status: ProcessStatus::CLOSED);
                         $found->delete();
                         $container_name = generateApplicationContainerName($application, $pull_request_id);
                         // ray('Stopping container: ' . $container_name);
                         instant_remote_process(["docker rm -f $container_name"], $application->destination->server);
-                        return response('Preview Deployment closed.');
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'success',
+                            'message' => 'Preview deployment closed.',
+                        ]);
+                    } else {
+                        $return_payloads->push([
+                            'application' => $application->name,
+                            'status' => 'failed',
+                            'message' => 'No preview deployment found.',
+                        ]);
                     }
-                    return response('Nothing to do. No Preview Deployment found');
                 }
             }
         }
+        ray($return_payloads);
+        return response($return_payloads);
     } catch (Exception $e) {
         ray($e->getMessage());
         return handleError($e);

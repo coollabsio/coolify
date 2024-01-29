@@ -6,15 +6,23 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
-function queue_application_deployment(int $application_id, int $server_id, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
+function queue_application_deployment(Application $application, string $deployment_uuid, int | null $pull_request_id = 0, string $commit = 'HEAD', bool $force_rebuild = false, bool $is_webhook = false, bool $restart_only = false, ?string $git_type = null, bool $is_new_deployment = false)
 {
-    $server = Application::find($application_id)->destination->server;
+    $application_id = $application->id;
+    $deployment_link = Url::fromString($application->link() . "/deployment/{$deployment_uuid}");
+    $deployment_url = $deployment_link->getPath();
+    $server_id = $application->destination->server->id;
+    $server_name = $application->destination->server->name;
     $deployment = ApplicationDeploymentQueue::create([
         'application_id' => $application_id,
+        'application_name' => $application->name,
         'server_id' => $server_id,
+        'server_name' => $server_name,
         'deployment_uuid' => $deployment_uuid,
+        'deployment_url' => $deployment_url,
         'pull_request_id' => $pull_request_id,
         'force_rebuild' => $force_rebuild,
         'is_webhook' => $is_webhook,
@@ -22,26 +30,21 @@ function queue_application_deployment(int $application_id, int $server_id, strin
         'commit' => $commit,
         'git_type' => $git_type
     ]);
-    $deployments_per_server = ApplicationDeploymentQueue::where('server_id', $server_id)->whereIn('status', ['in_progress', 'queued'])->get();
 
-    $deployments = ApplicationDeploymentQueue::where('application_id', $application_id)->where('server_id', $server_id);
-    $queued_deployments = $deployments->where('status', 'queued')->get()->sortByDesc('created_at');
-    $running_deployments = $deployments->where('status', 'in_progress')->get()->sortByDesc('created_at');
-
-    ray("serverId:{$server->id}", "concurrentBuilds:{$server->settings->concurrent_builds}", "deployments:{$deployments_per_server->count()}", "queued:{$queued_deployments->count()}", "running:{$running_deployments->count()}");
-    // ray('Q:' . $queued_deployments->count() . 'R:' . $running_deployments->count() . '| Queuing deployment: ' . $deployment_uuid . ' of applicationID: ' . $application_id . ' pull request: ' . $pull_request_id . ' with commit: ' . $commit . ' and is it forced: ' . $force_rebuild);
-
-    if ($queued_deployments->count() > 1) {
-        $queued_deployments = $queued_deployments->skip(1);
-        $queued_deployments->each(function ($queued_deployment, $key) {
-            $queued_deployment->status = 'cancelled by system';
-            $queued_deployment->save();
-        });
-    }
-    if ($running_deployments->count() > 0) {
+    $deployments = ApplicationDeploymentQueue::where('server_id', $server_id)->whereIn('status', ['in_progress', 'queued'])->get()->sortByDesc('created_at');
+    $same_application_deployments = $deployments->where('application_id', $application_id);
+    $in_progress = $same_application_deployments->filter(function ($value, $key) {
+        return $value->status === 'in_progress';
+    });
+    if ($in_progress->count() > 0) {
         return;
     }
-    if ($deployments_per_server->count() > $server->settings->concurrent_builds) {
+    $server = Server::find($server_id);
+    $concurrent_builds = $server->settings->concurrent_builds;
+
+    ray("serverId:{$server->id}", "concurrentBuilds:{$concurrent_builds}", "deployments:{$deployments->count()}", "sameApplicationDeployments:{$same_application_deployments->count()}");
+
+    if ($deployments->count() > $concurrent_builds) {
         return;
     }
     if ($is_new_deployment) {
@@ -60,8 +63,7 @@ function queue_next_deployment(Application $application, bool $isNew = false)
 {
     $server_id = $application->destination->server_id;
     $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', 'queued')->get()->sortBy('created_at')->first();;
-    // $next_found = ApplicationDeploymentQueue::where('status', 'queued')->get()->sortBy('created_at')->first();
-    ray($next_found, $server_id);
+    // ray($next_found, $server_id);
     if ($next_found) {
         if ($isNew) {
             dispatch(new ApplicationDeploymentNewJob(

@@ -7,6 +7,6 @@
     @endif
     @if (data_get($application_deployment_queue, 'status') === 'in_progress' ||
             data_get($application_deployment_queue, 'status') === 'queued')
-        <x-forms.button wire:click.prevent="cancel">Cancel Deployment</x-forms.button>
+        <x-forms.button isError wire:click.prevent="cancel">Cancel Deployment</x-forms.button>
     @endif
 </div>

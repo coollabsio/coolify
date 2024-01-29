@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Enums\ApplicationDeploymentStatus;
-use App\Enums\ProxyTypes;
+use App\Enums\ProcessStatus;
 use App\Events\ApplicationStatusChanged;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -158,6 +158,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->preview->fqdn = $preview_fqdn;
                 $this->preview->save();
             }
+            if ($this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
+            }
         }
     }
 
@@ -229,6 +232,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
                 $this->application->isConfigurationChanged(false);
                 return;
+            } else if ($this->pull_request_id !== 0) {
+                $this->deploy_pull_request();
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
             } else if ($this->application->build_pack === 'dockercompose') {
@@ -240,11 +245,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else if ($this->application->build_pack === 'static') {
                 $this->deploy_static_buildpack();
             } else {
-                if ($this->pull_request_id !== 0) {
-                    $this->deploy_pull_request();
-                } else {
-                    $this->deploy_nixpacks_buildpack();
-                }
+                $this->deploy_nixpacks_buildpack();
             }
             if ($this->server->isProxyShouldRun()) {
                 dispatch(new ContainerStatusJob($this->server));
@@ -254,8 +255,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->push_to_docker_registry();
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
+            if ($this->pull_request_id !== 0) {
+                if ($this->application->is_github_based()) {
+                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                }
+            }
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
+            if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
+            }
+            ray($e);
             $this->fail($e);
             throw $e;
         } finally {
@@ -679,7 +689,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($this->full_healthcheck_url) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
-                while ($counter < $this->application->health_check_retries) {
+                while ($counter <= $this->application->health_check_retries) {
                     $this->execute_remote_command(
                         [
                             "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
@@ -722,10 +732,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->generate_nixpacks_confs();
         }
         $this->generate_compose_file();
-
-        // Needs separate preview variables
         $this->generate_build_env_variables();
-        if ($this->application->build_pack !== 'nixpacks') {
+        if ($this->application->build_pack === 'dockerfile') {
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_image();
@@ -861,7 +869,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_git_import_commands()
     {
-        ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands($this->deployment_uuid, $this->pull_request_id, $this->git_type);
+        ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands(
+            deployment_uuid: $this->deployment_uuid,
+            pull_request_id: $this->pull_request_id,
+            git_type: $this->git_type,
+            commit: $this->commit
+        );
         return $commands;
     }
 
@@ -1489,13 +1502,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function next(string $status)
     {
+        queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
-        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value) {
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
         }
-        queue_next_deployment($this->application);
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
             $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
@@ -1507,7 +1520,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     public function failed(Throwable $exception): void
     {
         $this->application_deployment_queue->addLogEntry("Oops something is not okay, are you okay? 😢", 'stderr');
-        $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
+        if (str($exception->getMessage())->isNotEmpty()) {
+            $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
+        }
 
         if ($this->application->build_pack !== 'dockercompose') {
             $this->application_deployment_queue->addLogEntry("Deployment failed. Removing the new version of your application.", 'stderr');

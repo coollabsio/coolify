@@ -39,7 +39,7 @@
             <a :class="activeTab === 'webhooks' && 'text-white'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
-            @if ($application->git_based() && $application->build_pack !== 'static')
+            @if ($application->git_based())
                 <a :class="activeTab === 'previews' && 'text-white'"
                     @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
                     Deployments

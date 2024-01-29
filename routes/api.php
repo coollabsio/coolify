@@ -70,8 +70,7 @@ Route::group([
                 $type = $resource->getMorphClass();
                 if ($type === 'App\Models\Application') {
                     queue_application_deployment(
-                        server_id: $resource->destination->server->id,
-                        application_id: $resource->id,
+                        application: $resource,
                         deployment_uuid: new Cuid2(7),
                         force_rebuild: $force,
                     );

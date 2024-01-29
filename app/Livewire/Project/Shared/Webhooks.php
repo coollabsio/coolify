@@ -10,9 +10,11 @@ class Webhooks extends Component
     public ?string $deploywebhook = null;
     public ?string $githubManualWebhook = null;
     public ?string $gitlabManualWebhook = null;
+    public ?string $bitbucketManualWebhook = null;
     protected $rules = [
         'resource.manual_webhook_secret_github' => 'nullable|string',
         'resource.manual_webhook_secret_gitlab' => 'nullable|string',
+        'resource.manual_webhook_secret_bitbucket' => 'nullable|string',
     ];
     public function saveSecret()
     {
@@ -29,6 +31,7 @@ class Webhooks extends Component
         $this->deploywebhook = generateDeployWebhook($this->resource);
         $this->githubManualWebhook = generateGitManualWebhook($this->resource, 'github');
         $this->gitlabManualWebhook = generateGitManualWebhook($this->resource, 'gitlab');
+        $this->bitbucketManualWebhook = generateGitManualWebhook($this->resource, 'bitbucket');
     }
     public function render()
     {

@@ -15,6 +15,7 @@ class Index extends Component
     public int $skip = 0;
     public int $default_take = 40;
     public bool $show_next = false;
+    public bool $show_prev = false;
     public ?string $pull_request_id = null;
     protected $queryString = ['pull_request_id'];
     public function mount()
@@ -60,15 +61,30 @@ class Index extends Component
     {
         $this->load_deployments();
     }
+    public function previous_page(?int $take = null)
+    {
 
-    public function load_deployments(int|null $take = null)
+        if ($take) {
+            $this->skip = $this->skip - $take;
+        }
+        $this->skip = $this->skip - $this->default_take;
+        if ($this->skip < 0) {
+            $this->show_prev = false;
+            $this->skip = 0;
+        }
+        $this->load_deployments();
+    }
+    public function next_page(?int $take = null)
     {
         if ($take) {
             $this->skip = $this->skip + $take;
         }
-        $take = $this->default_take;
-
-        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $take);
+        $this->show_prev = true;
+        $this->load_deployments();
+    }
+    public function load_deployments()
+    {
+        ['deployments' => $deployments, 'count' => $count] = $this->application->deployments($this->skip, $this->default_take);
         $this->deployments = $deployments;
         $this->deployments_count = $count;
         $this->show_pull_request_only();

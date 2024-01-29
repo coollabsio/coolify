@@ -10,4 +10,5 @@ enum ProcessStatus: string
     case ERROR = 'error';
     case KILLED = 'killed';
     case CANCELLED = 'cancelled';
+    case CLOSED = 'closed';
 }
