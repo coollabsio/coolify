@@ -111,8 +111,8 @@
     @forelse ($deployments_per_server as $deployment)
         <a href="{{ url($deployment->deployment_url) }}" @class([
             'gap-2 cursor-pointer box group border-l-2 border-dotted',
-            'border-yellow-500' => $deployment->status === 'queued',
-            'border-green-500' => $deployment->status === 'in_progress',
+            'border-white' => $deployment->status === 'queued',
+            'border-yellow-500' => $deployment->status === 'in_progress',
         ])>
             <div class="flex flex-col mx-6">
                 <div class="font-bold text-white">
