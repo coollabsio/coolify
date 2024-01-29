@@ -1128,6 +1128,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         data_forget($docker_compose, 'services.' . $this->container_name);
 
+        $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+        $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
+
         $this->docker_compose = Yaml::dump($docker_compose, 10);
         $this->docker_compose_base64 = base64_encode($this->docker_compose);
         $this->execute_remote_command([executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d > {$this->workdir}/docker-compose.yml"), "hidden" => true]);

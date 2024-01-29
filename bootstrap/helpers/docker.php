@@ -3,9 +3,7 @@
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
-use App\Models\Service;
 use App\Models\ServiceApplication;
-use App\Models\ServiceDatabase;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
@@ -322,4 +320,90 @@ function isDatabaseImage(?string $image = null)
         return true;
     }
     return false;
+}
+
+function convert_docker_run_to_compose(?string $custom_docker_run_options = null)
+{
+    preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
+    $list_options = collect([
+        '--cap-add',
+        '--cap-drop',
+        '--security-opt',
+        '--sysctl',
+        '--ulimit',
+        '--device'
+    ]);
+    $mapping = collect([
+        '--cap-add' => 'cap_add',
+        '--cap-drop' => 'cap_drop',
+        '--security-opt' => 'security_opt',
+        '--sysctl' => 'sysctls',
+        '--device' => 'devices',
+        '--ulimit' => 'ulimits',
+        '--init' => 'init',
+        '--ulimit' => 'ulimits',
+        '--privileged' => 'privileged',
+    ]);
+    $options = [];
+    foreach ($matches as $match) {
+        $option = $match[1];
+        $value = isset($match[2]) && $match[2] !== '' ? $match[2] : true;
+        if ($list_options->contains($option)) {
+            $value = explode(',', $value);
+        }
+        if (array_key_exists($option, $options)) {
+            if (is_array($options[$option])) {
+                $options[$option][] = $value;
+            } else {
+                $options[$option] = [$options[$option], $value];
+            }
+        } else {
+            $options[$option] = $value;
+        }
+    }
+    $options = collect($options);
+    $compose_options = collect([]);
+    // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
+    foreach ($options as $option => $value) {
+        if (!data_get($mapping, $option)) {
+            continue;
+        }
+        if ($option === '--ulimit') {
+            $ulimits = collect([]);
+            collect($value)->map(function ($ulimit) use ($ulimits){
+                $ulimit = explode('=', $ulimit);
+                $type = $ulimit[0];
+                $limits = explode(':', $ulimit[1]);
+                if (count($limits) == 2) {
+                    $soft_limit = $limits[0];
+                    $hard_limit = $limits[1];
+                    $ulimits->put($type, [
+                        'soft' => $soft_limit,
+                        'hard' => $hard_limit
+                    ]);
+
+                } else {
+                    $soft_limit = $ulimit[1];
+                    $ulimits->put($type, [
+                        'soft' => $soft_limit,
+                    ]);
+                }
+            });
+            $compose_options->put($mapping[$option], $ulimits);
+        } else {
+            if ($list_options->contains($option)) {
+                if ($compose_options->has($mapping[$option])) {
+                    $compose_options->put($mapping[$option], $options->get($mapping[$option]) . ',' . $value);
+                } else {
+                    $compose_options->put($mapping[$option], $value);
+                }
+                continue;
+            } else {
+                $compose_options->put($mapping[$option], $value);
+                continue;
+            }
+            $compose_options->forget($option);
+        }
+    }
+    return $compose_options->toArray();
 }
