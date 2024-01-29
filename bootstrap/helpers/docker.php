@@ -324,6 +324,8 @@ function isDatabaseImage(?string $image = null)
 
 function convert_docker_run_to_compose(?string $custom_docker_run_options = null)
 {
+    $options = [];
+    $compose_options = collect([]);
     preg_match_all('/(--\w+(?:-\w+)*)(?:\s|=)?([^\s-]+)?/', $custom_docker_run_options, $matches, PREG_SET_ORDER);
     $list_options = collect([
         '--cap-add',
@@ -344,7 +346,6 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
     ]);
-    $options = [];
     foreach ($matches as $match) {
         $option = $match[1];
         $value = isset($match[2]) && $match[2] !== '' ? $match[2] : true;
@@ -362,7 +363,6 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         }
     }
     $options = collect($options);
-    $compose_options = collect([]);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
     foreach ($options as $option => $value) {
         if (!data_get($mapping, $option)) {
