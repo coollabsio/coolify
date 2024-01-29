@@ -262,10 +262,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
-            if ($this->pull_request_id !== 0) {
-                if ($this->application->is_github_based()) {
-                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
-                }
+            if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
             }
             ray($e);
             $this->fail($e);
@@ -691,7 +689,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($this->full_healthcheck_url) {
                     $this->application_deployment_queue->addLogEntry("Healthcheck URL (inside the container): {$this->full_healthcheck_url}");
                 }
-                while ($counter < $this->application->health_check_retries) {
+                while ($counter <= $this->application->health_check_retries) {
                     $this->execute_remote_command(
                         [
                             "docker inspect --format='{{json .State.Health.Status}}' {$this->container_name}",
@@ -1504,13 +1502,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function next(string $status)
     {
+        queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
-        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value) {
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value) {
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
         }
-        queue_next_deployment($this->application);
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
             $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
