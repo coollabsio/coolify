@@ -158,7 +158,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->preview->fqdn = $preview_fqdn;
                 $this->preview->save();
             }
-            ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
+            if ($this->application->is_github_based()) {
+                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
+            }
         }
     }
 
@@ -230,6 +232,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
                 $this->application->isConfigurationChanged(false);
                 return;
+            } else if ($this->pull_request_id !== 0) {
+                $this->deploy_pull_request();
             } else if ($this->application->dockerfile) {
                 $this->deploy_simple_dockerfile();
             } else if ($this->application->build_pack === 'dockercompose') {
@@ -241,11 +245,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             } else if ($this->application->build_pack === 'static') {
                 $this->deploy_static_buildpack();
             } else {
-                if ($this->pull_request_id !== 0) {
-                    $this->deploy_pull_request();
-                } else {
-                    $this->deploy_nixpacks_buildpack();
-                }
+                $this->deploy_nixpacks_buildpack();
             }
             if ($this->server->isProxyShouldRun()) {
                 dispatch(new ContainerStatusJob($this->server));
@@ -256,13 +256,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
             $this->next(ApplicationDeploymentStatus::FINISHED->value);
             if ($this->pull_request_id !== 0) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                if ($this->application->is_github_based()) {
+                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
+                }
             }
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0) {
-                ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
+                if ($this->application->is_github_based()) {
+                    ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::ERROR);
+                }
             }
+            ray($e);
             $this->fail($e);
             throw $e;
         } finally {
@@ -729,10 +734,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->generate_nixpacks_confs();
         }
         $this->generate_compose_file();
-
-        // Needs separate preview variables
         $this->generate_build_env_variables();
-        if ($this->application->build_pack !== 'nixpacks') {
+        if ($this->application->build_pack === 'dockerfile') {
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_image();
@@ -868,7 +871,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     private function generate_git_import_commands()
     {
-        ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands($this->deployment_uuid, $this->pull_request_id, $this->git_type);
+        ['commands' => $commands, 'branch' => $this->branch, 'fullRepoUrl' => $this->fullRepoUrl] = $this->application->generateGitImportCommands(
+            deployment_uuid: $this->deployment_uuid,
+            pull_request_id: $this->pull_request_id,
+            git_type: $this->git_type,
+            commit: $this->commit
+        );
         return $commands;
     }
 

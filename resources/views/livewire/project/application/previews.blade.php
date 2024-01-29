@@ -1,11 +1,13 @@
 <div>
     <livewire:project.application.preview.form :application="$application" />
     <div>
-        <div class="flex items-center gap-2">
-            <h3>Pull Requests on Git</h3>
-            <x-forms.button wire:click="load_prs">Load Pull Requests
-            </x-forms.button>
-        </div>
+        @if ($application->is_github_based())
+            <div class="flex items-center gap-2">
+                <h3>Pull Requests on Git</h3>
+                <x-forms.button wire:click="load_prs">Load Pull Requests
+                </x-forms.button>
+            </div>
+        @endif
         @isset($rate_limit_remaining)
             <div class="pt-1 ">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset

@@ -111,6 +111,13 @@ class Application extends BaseModel
     }
     // End of build packs / deployment types
 
+    public function is_github_based(): bool
+    {
+        if (data_get($this, 'source')) {
+            return true;
+        }
+        return false;
+    }
     public function link()
     {
         if (data_get($this, 'environment.project.uuid')) {
@@ -807,7 +814,7 @@ class Application extends BaseModel
         }
         return $git_clone_command;
     }
-    function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null)
+    function generateGitImportCommands(string $deployment_uuid, int $pull_request_id = 0, ?string $git_type = null, bool $exec_in_docker = true, bool $only_checkout = false, ?string $custom_base_dir = null, ?string $commit = null)
     {
         $branch = $this->git_branch;
         ['repository' => $customRepository, 'port' => $customPort] = $this->customRepository();
@@ -820,7 +827,6 @@ class Application extends BaseModel
         if ($pull_request_id !== 0) {
             $pr_branch_name = "pr-{$pull_request_id}-coolify";
         }
-
         if ($this->deploymentType() === 'source') {
             $source_html_url = data_get($this, 'source.html_url');
             $url = parse_url(filter_var($source_html_url, FILTER_SANITIZE_URL));
@@ -926,6 +932,34 @@ class Application extends BaseModel
             $fullRepoUrl = $customRepository;
             $git_clone_command = "{$git_clone_command} {$customRepository} {$baseDir}";
             $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command);
+
+            if ($pull_request_id !== 0) {
+                if ($git_type === 'gitlab') {
+                    $branch = "merge-requests/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                } else if ($git_type === 'github') {
+                    $branch = "pull/{$pull_request_id}/head:$pr_branch_name";
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git fetch origin $branch && git checkout $pr_branch_name";
+                } else if ($git_type === 'bitbucket') {
+                    if ($exec_in_docker) {
+                        $commands->push(executeInDocker($deployment_uuid, "echo 'Checking out $branch'"));
+                    } else {
+                        $commands->push("echo 'Checking out $branch'");
+                    }
+                    $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o ConnectTimeout=30 -p {$customPort} -o Port={$customPort} -o LogLevel=ERROR -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i /root/.ssh/id_rsa\" git checkout $commit";
+                }
+            }
+
             if ($exec_in_docker) {
                 $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
             } else {
