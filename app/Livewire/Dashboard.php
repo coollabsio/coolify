@@ -12,7 +12,7 @@ class Dashboard extends Component
 {
     public $projects = [];
     public Collection $servers;
-    public Collection $deployments_per_server;
+    public $deployments_per_server;
     public function mount()
     {
         $this->servers = Server::ownedByCurrentTeam()->get();
@@ -30,7 +30,7 @@ class Dashboard extends Component
             "server_name",
             "server_id",
             "status"
-        ])->sortBy('id');
+        ])->sortBy('id')->groupBy('server_name')->toArray();
     }
     // public function getIptables()
     // {
