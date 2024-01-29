@@ -603,7 +603,7 @@
     "wordpress-without-database": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
         "slogan": "WordPress with external database. Wordpress is open source software you can use to create a beautiful website, blog, or app.",
-        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgU0VSVklDRV9GUUROOiBudWxsCg==",
+        "compose": "c2VydmljZXM6CiAgd29yZHByZXNzOgogICAgaW1hZ2U6ICd3b3JkcHJlc3M6bGF0ZXN0JwogICAgdm9sdW1lczoKICAgICAgLSAnd29yZHByZXNzLWZpbGVzOi92YXIvd3d3L2h0bWwnCiAgICBlbnZpcm9ubWVudDoKICAgICAgU0VSVklDRV9GUUROOiBudWxsCiAgICAgIFdPUkRQUkVTU19EQl9IT1NUOiAkV09SRFBSRVNTX0RCX0hPU1QKICAgICAgV09SRFBSRVNTX0RCX1VTRVI6ICRXT1JEUFJFU1NfREJfVVNFUgogICAgICBXT1JEUFJFU1NfREJfUEFTU1dPUkQ6ICRXT1JEUFJFU1NfREJfUEFTU1dPUkQKICAgICAgV09SRFBSRVNTX0RCX05BTUU6ICRXT1JEUFJFU1NfREJfTkFNRQo=",
         "tags": [
             "cms",
             "blog",
