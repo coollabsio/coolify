@@ -277,14 +277,6 @@ Route::post('/source/bitbucket/events/manual', function () {
             ]);
         }
         foreach ($applications as $application) {
-            if (!$application->isPRDeployable()) {
-                $return_payloads->push([
-                    'application' => $application->name,
-                    'status' => 'failed',
-                    'message' => 'Preview deployments disabled.',
-                ]);
-                continue;
-            }
             $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
             $payload = request()->getContent();
 
@@ -310,7 +302,7 @@ Route::post('/source/bitbucket/events/manual', function () {
                 continue;
             }
             if ($x_bitbucket_event === 'repo:push') {
-                if ($application->isPRDeployable()) {
+                if ($application->isDeployable()) {
                     ray('Deploying ' . $application->name . ' with branch ' . $branch);
                     $deployment_uuid = new Cuid2(7);
                     queue_application_deployment(
@@ -328,7 +320,7 @@ Route::post('/source/bitbucket/events/manual', function () {
                     $return_payloads->push([
                         'application' => $application->name,
                         'status' => 'failed',
-                        'message' => 'Preview deployments disabled.',
+                        'message' => 'Auto deployment disabled.',
                     ]);
                 }
             }

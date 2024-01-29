@@ -14,7 +14,7 @@
             ~/.ssh/authorized_keys
             file</span>
         <x-forms.button type="submit">
-            Save Private Key
+            Continue
         </x-forms.button>
     </form>
 </div>

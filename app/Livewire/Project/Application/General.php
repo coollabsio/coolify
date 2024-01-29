@@ -61,11 +61,12 @@ class General extends Component
         'application.docker_compose_pr' => 'nullable',
         'application.docker_compose_raw' => 'nullable',
         'application.docker_compose_pr_raw' => 'nullable',
-        'application.custom_labels' => 'nullable',
         'application.dockerfile_target_build' => 'nullable',
-        'application.settings.is_static' => 'boolean|required',
         'application.docker_compose_custom_start_command' => 'nullable',
         'application.docker_compose_custom_build_command' => 'nullable',
+        'application.custom_labels' => 'nullable',
+        'application.custom_docker_run_options' => 'nullable',
+        'application.settings.is_static' => 'boolean|required',
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
     ];
@@ -97,9 +98,10 @@ class General extends Component
         'application.docker_compose_pr_raw' => 'Docker compose raw',
         'application.custom_labels' => 'Custom labels',
         'application.dockerfile_target_build' => 'Dockerfile target build',
-        'application.settings.is_static' => 'Is static',
+        'application.custom_docker_run_options' => 'Custom docker run commands',
         'application.docker_compose_custom_start_command' => 'Docker compose custom start command',
         'application.docker_compose_custom_build_command' => 'Docker compose custom build command',
+        'application.settings.is_static' => 'Is static',
         'application.settings.is_raw_compose_deployment_enabled' => 'Is raw compose deployment enabled',
         'application.settings.is_build_server_enabled' => 'Is build server enabled',
     ];
@@ -249,6 +251,9 @@ class General extends Component
                 $this->application->fqdn = $domains->implode(',');
             }
 
+            if (data_get($this->application, 'custom_docker_run_options')) {
+                $this->application->custom_docker_run_options = str($this->application->custom_docker_run_options)->trim();
+            }
             if (data_get($this->application, 'dockerfile')) {
                 $port = get_port_from_dockerfile($this->application->dockerfile);
                 if ($port && !$this->application->ports_exposes) {

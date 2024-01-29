@@ -130,7 +130,6 @@
                 @endif
                 @if ($application->could_set_build_commands())
                     @if ($application->build_pack === 'nixpacks')
-
                         <div class="flex flex-col gap-2 xl:flex-row">
                             <x-forms.input placeholder="If you modify this, you probably need to have a nixpacks.toml"
                                 id="application.install_command" label="Install Command" />
@@ -194,6 +193,13 @@
                             @endif
                         @endif
                     </div>
+                    <div>The following options are for advanced use cases. Only modify them if you
+                        know what are
+                        you doing.</div>
+                    <x-forms.input
+                        helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                        placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+                        id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @endif
 
             @endif
