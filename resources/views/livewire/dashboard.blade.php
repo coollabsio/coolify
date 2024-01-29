@@ -99,6 +99,8 @@
         <div class="flex-1"></div>
     </a>
 @endforeach
+</div>
+
 <div class="flex items-center gap-2">
     <h3 class="py-4">Deployments </h3>
     @if ($deployments_per_server->count() > 0)
@@ -130,7 +132,6 @@
     @empty
         <div>No queued / in progress deployments</div>
     @endforelse
-</div>
 </div>
 <script>
     function gotoProject(uuid, environment = 'production') {
