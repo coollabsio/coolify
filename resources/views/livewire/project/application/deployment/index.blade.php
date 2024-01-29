@@ -6,9 +6,29 @@
         @if ($skip == 0) wire:poll.5000ms='reload_deployments' @endif>
         <div class="flex items-end gap-2 pt-4">
             <h2>Deployments <span class="text-xs">({{ $deployments_count }})</span></h2>
+            @if ($show_prev)
+                <x-forms.button wire:click="previous_page({{ $default_take }})"><svg class="w-6 h-6" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="m14 6l-6 6l6 6z" />
+                    </svg></x-forms.button>
+            @else
+                <x-forms.button disabled><svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="m14 6l-6 6l6 6z" />
+                    </svg></x-forms.button>
+            @endif
             @if ($show_next)
-                <x-forms.button wire:click="load_deployments({{ $default_take }})">Next Page
-                </x-forms.button>
+                <x-forms.button wire:click="next_page({{ $default_take }})"><svg class="w-6 h-6" viewBox="0 0 24 24"
+                        xmlns="http://www.w3.org/2000/svg">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="m10 18l6-6l-6-6z" />
+                    </svg></x-forms.button>
+            @else
+                <x-forms.button disabled><svg class="w-6 h-6" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                            stroke-width="2" d="m10 18l6-6l-6-6z" />
+                    </svg></x-forms.button>
             @endif
         </div>
         <form class="flex items-end gap-2">
