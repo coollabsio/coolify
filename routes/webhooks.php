@@ -234,6 +234,92 @@ Route::post('/source/gitlab/events/manual', function () {
         return handleError($e);
     }
 });
+Route::post('/source/bitbucket/events/manual', function () {
+    try {
+        $return_payloads = collect([]);
+        $payload = request()->collect();
+        $headers = request()->headers->all();
+        $x_bitbucket_token = data_get($headers, 'x-hub-signature', [""])[0];
+        $x_bitbucket_event = data_get($headers, 'x-event-key', [""])[0];
+        if ($x_bitbucket_event === 'repo:push') {
+            $branch = data_get($payload, 'push.changes.0.new.name');
+            $name = data_get($payload, 'repository.name');
+
+            if (!$branch) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => 'Nothing to do. No branch found in the request.',
+                ]);
+                return response($return_payloads);
+            }
+            ray('Manual Webhook bitbucket Push Event with branch: ' . $branch);
+        }
+        $applications = Application::where('git_repository', 'like', "%$name%");
+        if ($x_bitbucket_event === 'repo:push') {
+            $applications = $applications->where('git_branch', $branch)->get();
+            if ($applications->isEmpty()) {
+                $return_payloads->push([
+                    'status' => 'failed',
+                    'message' => "Nothing to do. No applications found with deploy key set, branch is '$branch' and Git Repository name has $name.",
+                ]);
+                return response($return_payloads);
+            }
+        }
+        foreach ($applications as $application) {
+            $webhook_secret = data_get($application, 'manual_webhook_secret_bitbucket');
+            $payload = request()->getContent();
+
+            fwrite(STDOUT, $payload);
+
+            list($algo, $hash) = explode('=', $x_bitbucket_token, 2);
+
+            $payloadHash = hash_hmac($algo, $payload, $webhook_secret);
+
+            if (!hash_equals($hash, $payloadHash)) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Invalid token.',
+                ]);
+                ray('Invalid signature');
+                continue;
+            }
+            $isFunctional = $application->destination->server->isFunctional();
+            if (!$isFunctional) {
+                $return_payloads->push([
+                    'application' => $application->name,
+                    'status' => 'failed',
+                    'message' => 'Server is not functional',
+                ]);
+                ray('Server is not functional: ' . $application->destination->server->name);
+                continue;
+            }
+            if ($x_bitbucket_event === 'repo:push') {
+                if ($application->isDeployable()) {
+                    ray('Deploying ' . $application->name . ' with branch ' . $branch);
+                    $deployment_uuid = new Cuid2(7);
+                    queue_application_deployment(
+                        application_id: $application->id,
+                        deployment_uuid: $deployment_uuid,
+                        force_rebuild: false,
+                        is_webhook: true
+                    );
+                } else {
+                    $return_payloads->push([
+                        'application' => $application->name,
+                        'status' => 'failed',
+                        'message' => 'Deployments disabled',
+                    ]);
+                    ray('Deployments disabled for ' . $application->name);
+                }
+            }
+        }
+        return response($return_payloads);
+    } catch (Exception $e) {
+        ray($e->getMessage());
+        return handleError($e);
+    }
+});
 Route::post('/source/github/events/manual', function () {
     try {
         $x_github_event = Str::lower(request()->header('X-GitHub-Event'));
