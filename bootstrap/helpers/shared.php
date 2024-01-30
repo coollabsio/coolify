@@ -1660,3 +1660,33 @@ function ip_match($ip, $cidrs, &$match = null)
     }
     return false;
 }
+function check_fqdn_usage(ServiceApplication|Application $own_resource)
+{
+    $domains = collect($own_resource->fqdns)->map(function ($domain) {
+        return Url::fromString($domain)->getHost();
+    });
+    $apps = Application::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            $naked_domain = Url::fromString($domain)->getHost();
+            if ($domains->contains($naked_domain)) {
+                if ($app->uuid !== $own_resource->uuid ) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                }
+            }
+        }
+    }
+    $apps = ServiceApplication::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            $naked_domain = Url::fromString($domain)->getHost();
+            if ($domains->contains($naked_domain)) {
+                if ($app->uuid !== $own_resource->uuid) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                }
+            }
+        }
+    }
+}

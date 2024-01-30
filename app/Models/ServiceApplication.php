@@ -55,7 +55,6 @@ class ServiceApplication extends BaseModel
             get: fn () => is_null($this->fqdn)
                 ? []
                 : explode(',', $this->fqdn),
-
         );
     }
     public function getFilesFromServer(bool $isInit = false)

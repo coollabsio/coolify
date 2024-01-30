@@ -1116,4 +1116,12 @@ class Application extends BaseModel
         $this->save();
         return $customLabels;
     }
+    public function fqdns(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->fqdn)
+                ? []
+                : explode(',', $this->fqdn),
+        );
+    }
 }
