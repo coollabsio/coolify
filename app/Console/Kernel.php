@@ -36,6 +36,7 @@ class Kernel extends ConsoleKernel
         } else {
             // Instance Jobs
             $schedule->command('horizon:snapshot')->everyFiveMinutes();
+            // $schedule->command('cleanup:unreachable-servers')->daily();
             $schedule->job(new CleanupInstanceStuffsJob)->everyTwoMinutes()->onOneServer();
             // $schedule->job(new CheckResaleLicenseJob)->hourly()->onOneServer();
 
