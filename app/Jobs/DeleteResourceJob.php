@@ -30,25 +30,30 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         try {
-            $this->resource->delete();
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'standalone-postgresql':
                     StopDatabase::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'standalone-redis':
                     StopDatabase::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'standalone-mongodb':
                     StopDatabase::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'standalone-mysql':
                     StopDatabase::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'standalone-mariadb':
                     StopDatabase::run($this->resource);
+                    $this->resource->forceDelete();
                     break;
                 case 'service':
                     DeleteService::dispatch($this->resource);
@@ -57,8 +62,6 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
-        } finally {
-            $this->resource->forceDelete();
         }
     }
 }
