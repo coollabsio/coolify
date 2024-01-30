@@ -11,6 +11,9 @@ class StopApplication
     public function handle(Application $application)
     {
         $server = $application->destination->server;
+        if (!$server->isFunctional()) {
+            return 'Server is not functional';
+        }
         if ($server->isSwarm()) {
             instant_remote_process(["docker stack rm {$application->uuid}" ], $server);
         } else {

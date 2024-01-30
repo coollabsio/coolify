@@ -22,6 +22,7 @@ use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Cache;
@@ -106,6 +107,12 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
+    }
+    if ($error instanceof UniqueConstraintViolationException) {
+        if (isset($livewire)) {
+            return $livewire->dispatch('error', "A resource with the same name already exists.");
+        }
+        return "A resource with the same name already exists.";
     }
 
     if ($error instanceof Throwable) {

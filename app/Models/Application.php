@@ -39,6 +39,7 @@ class Application extends BaseModel
             ]);
         });
         static::deleting(function ($application) {
+            $application->update(['fqdn' => null]);
             $application->settings()->delete();
             $storages = $application->persistentStorages()->get();
             $server = data_get($application, 'destination.server');
@@ -52,8 +53,6 @@ class Application extends BaseModel
             $application->environment_variables_preview()->delete();
         });
     }
-    // Build packs / deployment types
-
 
     public function servers(): Collection
     {
