@@ -12,7 +12,7 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-                @if ($private_key->id > 0)
+                @if (data_get($private_key, 'id') > 0)
                     <x-forms.button isError isModal modalId="deletePrivateKey">
                         Delete
                     </x-forms.button>
@@ -36,7 +36,7 @@
                         Hide
                     </div>
                 </div>
-                @if ($private_key->is_git_related)
+                @if (data_get($private_key, 'is_git_related'))
                     <div class="w-48">
                         <x-forms.checkbox id="private_key.is_git_related" disabled label="Is used by a Git App?" />
                     </div>
