@@ -45,6 +45,11 @@ class ResourceOperations extends Component
                 'destination_id' => $new_destination->id,
             ]);
             $new_resource->save();
+            if ($new_resource->destination->server->proxyType() === 'TRAEFIK_V2') {
+                $customLabels = str(implode("|", generateLabelsApplication($new_resource)))->replace("|", "\n");
+                $new_resource->custom_labels = base64_encode($customLabels);
+                $new_resource->save();
+            }
             $environmentVaribles = $this->resource->environment_variables()->get();
             foreach ($environmentVaribles as $environmentVarible) {
                 $newEnvironmentVariable = $environmentVarible->replicate()->fill([
