@@ -73,7 +73,7 @@ class All extends Component
                 $found->value = $variable;
                 if (str($found->value)->startsWith('{{') && str($found->value)->endsWith('}}')) {
                     $type = str($found->value)->after("{{")->before(".")->value;
-                    if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                         $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
                         return;
                     }
@@ -86,7 +86,7 @@ class All extends Component
                 $environment->value = $variable;
                 if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
                     $type = str($environment->value)->after("{{")->before(".")->value;
-                    if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                         $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
                         return;
                     }

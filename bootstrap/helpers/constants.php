@@ -34,3 +34,5 @@ const SUPPORTED_OS = [
     'centos fedora rhel ol rocky',
     'sles opensuse-leap opensuse-tumbleweed'
 ];
+
+const SHARED_VARIABLE_TYPES = ['team', 'project', 'environment'];

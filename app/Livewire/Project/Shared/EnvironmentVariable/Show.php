@@ -83,7 +83,7 @@ class Show extends Component
             }
             if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
                 $type = str($this->env->value)->after("{{")->before(".")->value;
-                if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                     $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
                     return;
                 }

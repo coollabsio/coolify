@@ -34,7 +34,7 @@ class Add extends Component
         $this->validate();
         if (str($this->value)->startsWith('{{') && str($this->value)->endsWith('}}')) {
             $type = str($this->value)->after("{{")->before(".")->value;
-            if (!collect(['team', 'project', 'environment'])->contains($type)) {
+            if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
                 return;
             }

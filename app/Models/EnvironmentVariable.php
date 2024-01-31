@@ -100,7 +100,7 @@ class EnvironmentVariable extends Model
             $variable = Str::after($environment_variable, "{$type}.");
             $variable = Str::before($variable, '}}');
             $variable = Str::of($variable)->trim()->value;
-            if (!collect(['team', 'project', 'environment'])->contains($type)) {
+            if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
                 return $variable;
             }
             if ($type === 'environment') {
