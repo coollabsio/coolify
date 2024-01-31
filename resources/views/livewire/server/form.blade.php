@@ -1,15 +1,13 @@
 <div>
-    <x-modal yesOrNo modalId="changeLocalhost" modalTitle="Change Localhost" action="submit">
-        <x-slot:modalBody>
-            <p>You could lost a lot of functionalities if you change the server details of the server where Coolify is
-                running on.<br>Please think again.</p>
-        </x-slot:modalBody>
-    </x-modal>
     <form wire:submit='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
             @if ($server->id === 0)
-                <x-forms.button isModal modalId="changeLocalhost">Save</x-forms.button>
+                <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
+                    You could lost a lot of functionalities if you change the server details of the server where Coolify
+                    is
+                    running on.<br>Please think again.
+                </x-new-modal>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
             @endif

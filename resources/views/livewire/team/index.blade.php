@@ -28,11 +28,6 @@
         </div>
     @endif
     <div>
-        <x-modal yesOrNo modalId="deleteTeam" modalTitle="Delete Team">
-            <x-slot:modalBody>
-                <p>This team be deleted. It is not reversible. <br>Please think again.</p>
-            </x-slot:modalBody>
-        </x-modal>
         <h2>Danger Zone</h2>
         <div class="pb-4">Woah. I hope you know what are you doing.</div>
         <h4 class="pb-4">Delete Team</h4>
@@ -45,9 +40,9 @@
         @else
             @if (currentTeam()->isEmpty())
                 <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>
-                <x-forms.button isError isModal modalId="deleteTeam">
-                    Delete
-                </x-forms.button>
+                <x-new-modal isErrorButton buttonTitle="Delete">
+                    This team be deleted. It is not reversible. <br>Please think again.
+                </x-new-modal>
             @else
                 <div>
                     <div class="pb-4">You need to delete the following resources to be able to delete the team:</div>

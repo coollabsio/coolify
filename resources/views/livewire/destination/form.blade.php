@@ -1,9 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="deleteDestination" modalTitle="Delete Destination">
-        <x-slot:modalBody>
-            <p>This destination will be deleted. It is not reversible. <br>Please think again.</p>
-        </x-slot:modalBody>
-    </x-modal>
     <form class="flex flex-col">
         <div class="flex items-center gap-2">
             <h1>Destination</h1>
@@ -11,9 +6,9 @@
                 Save
             </x-forms.button>
             @if ($destination->network !== 'coolify')
-                <x-forms.button isError isModal modalId="deleteDestination">
-                    Delete
-                </x-forms.button>
+                <x-new-modal isErrorButton buttonTitle="Delete Destination">
+                    This destination will be deleted. It is not reversible. <br>Please think again.
+                </x-new-modal>
             @endif
         </div>
 

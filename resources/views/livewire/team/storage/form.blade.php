@@ -1,10 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="deleteS3Storage" modalTitle="Delete S3 Storage">
-        <x-slot:modalBody>
-            <p>This storage will be deleted. It is not reversible. Your data won't be touched!<br>Please think again..
-            </p>
-        </x-slot:modalBody>
-    </x-modal>
     <form class="flex flex-col gap-2 pb-6" wire:submit='submit'>
         <div class="flex items-start gap-2">
             <div class="pb-4">
@@ -22,9 +16,9 @@
             <x-forms.button wire:click="test_s3_connection">
                 Validate Connection
             </x-forms.button>
-            <x-forms.button isError isModal modalId="deleteS3Storage">
-                Delete
-            </x-forms.button>
+            <x-new-modal isErrorButton buttonTitle="Delete">
+                This storage will be deleted. It is not reversible. Your data won't be touched!<br>Please think again.
+            </x-new-modal>
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="storage.name" />

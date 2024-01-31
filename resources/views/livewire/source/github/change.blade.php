@@ -1,9 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="deleteSource" modalTitle="Delete Source">
-        <x-slot:modalBody>
-            <p>This source will be deleted. It is not reversible. <br>Please think again.</p>
-        </x-slot:modalBody>
-    </x-modal>
     @if (data_get($github_app, 'app_id'))
         <form wire:submit='submit'>
             <div class="flex items-center gap-2">
@@ -18,9 +13,9 @@
                             </x-forms.button>
                         </a>
                     @endif
-                    <x-forms.button isError isModal modalId="deleteSource">
-                        Delete
-                    </x-forms.button>
+                    <x-new-modal isErrorButton buttonTitle="Delete">
+                        This source will be deleted. It is not reversible. <br>Please think again.
+                    </x-new-modal>
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
@@ -77,9 +72,9 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-forms.button isError isModal modalId="deleteSource">
-                    Delete
-                </x-forms.button>
+                <x-new-modal isErrorButton buttonTitle="Delete">
+                    This source will be deleted. It is not reversible. <br>Please think again.
+                </x-new-modal>
             </div>
         </div>
         <div class="mb-10 rounded alert alert-warning">

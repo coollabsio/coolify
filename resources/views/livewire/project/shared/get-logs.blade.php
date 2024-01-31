@@ -13,7 +13,7 @@
         <x-forms.input label="Only Show Number of Lines" placeholder="1000" required id="numberOfLines"></x-forms.input>
         <x-forms.button type="submit">Refresh</x-forms.button>
     </form>
-    <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'container w-full py-4 mx-auto'">
+    <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'w-full py-4 mx-auto'">
         <div class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
             :class="fullscreen ? '' : 'max-h-[40rem] border border-solid rounded'">
             <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4" x-on:click="makeFullscreen"><svg
@@ -33,8 +33,8 @@
                         stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                 </svg></button>
 
-            <button title="Fullscreen" x-show="!fullscreen" class="absolute top-2 right-8"
-                x-on:click="makeFullscreen"><svg class="fixed icon" viewBox="0 0 24 24"
+            <button title="Fullscreen" x-show="!fullscreen" class="absolute top-2 right-2"
+                x-on:click="makeFullscreen"><svg class=" icon" viewBox="0 0 24 24"
                     xmlns="http://www.w3.org/2000/svg">
                     <g fill="none">
                         <path

@@ -1,11 +1,6 @@
 <div>
     <x-security.navbar />
     <div x-data="{ showPrivateKey: false }">
-        <x-modal yesOrNo modalId="deletePrivateKey" modalTitle="Delete Private Key">
-            <x-slot:modalBody>
-                <p>This private key will be deleted. It is not reversible. <br>Please think again.</p>
-            </x-slot:modalBody>
-        </x-modal>
         <form class="flex flex-col gap-2" wire:submit='changePrivateKey'>
             <div class="flex items-end gap-2">
                 <h2>Private Key</h2>
@@ -13,9 +8,9 @@
                     Save
                 </x-forms.button>
                 @if (data_get($private_key, 'id') > 0)
-                    <x-forms.button isError isModal modalId="deletePrivateKey">
-                        Delete
-                    </x-forms.button>
+                    <x-new-modal isErrorButton buttonTitle="Delete">
+                        This private key will be deleted. It is not reversible. <br>Please think again.
+                    </x-new-modal>
                 @endif
             </div>
             <x-forms.input id="private_key.name" label="Name" required />
