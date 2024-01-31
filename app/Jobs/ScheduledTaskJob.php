@@ -39,7 +39,7 @@ class ScheduledTaskJob implements ShouldQueue
         } else if ($application = $task->application()->first()) {
             $this->resource = $application;
         } else {
-            throw new \Exception('ScheduledTaskJob failed: No resource found.');
+            throw new \RuntimeException('ScheduledTaskJob failed: No resource found.');
         }
         $this->team = Team::find($task->team_id);
     }
