@@ -937,7 +937,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                            if ($command->value() === 'FQDN' || $command->value() === 'URL') {
+                            if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                                 if (Str::lower($forService) === $serviceName) {
                                     $fqdn = generateFqdn($resource->server, $containerName);
                                 } else {
@@ -1357,7 +1357,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                        if ($command->value() === 'FQDN' || $command->value() === 'URL') {
+                        if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
                             if (Str::lower($forService) === $serviceName) {
                                 $fqdn = generateFqdn($server, $containerName);
                             } else {
