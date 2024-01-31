@@ -24,7 +24,8 @@ class Danger extends Component
     public function delete()
     {
         try {
-            DeleteResourceJob::dispatchSync($this->resource);
+            $this->resource->delete();
+            DeleteResourceJob::dispatch($this->resource);
             return redirect()->route('project.resource.index', [
                 'project_uuid' => $this->projectUuid,
                 'environment_name' => $this->environmentName

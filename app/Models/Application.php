@@ -6,11 +6,9 @@ use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
-use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
@@ -39,6 +37,7 @@ class Application extends BaseModel
             ]);
         });
         static::deleting(function ($application) {
+            $application->update(['fqdn' => null]);
             $application->settings()->delete();
             $storages = $application->persistentStorages()->get();
             $server = data_get($application, 'destination.server');
@@ -52,64 +51,6 @@ class Application extends BaseModel
             $application->environment_variables_preview()->delete();
         });
     }
-    // Build packs / deployment types
-
-
-    public function servers(): Collection
-    {
-        $mainServer = data_get($this, 'destination.server');
-        $additionalDestinations = data_get($this, 'additional_destinations', null);
-        $additionalServers = collect([]);
-        if ($this->isMultipleServerDeployment()) {
-            ray('asd');
-            if (str($additionalDestinations)->isNotEmpty()) {
-                $additionalDestinations = str($additionalDestinations)->explode(',');
-                foreach ($additionalDestinations as $destinationId) {
-                    $destination = StandaloneDocker::find($destinationId)->whereNot('id', $mainServer->id)->first();
-                    $server = data_get($destination, 'server');
-                    $additionalServers->push($server);
-                }
-            }
-        }
-        return collect([$mainServer])->merge($additionalServers);
-    }
-
-    public function generateImageNames(string $commit, int $pullRequestId)
-    {
-        if ($this->dockerfile) {
-            if ($this->docker_registry_image_name) {
-                $buildImageName = Str::lower("{$this->docker_registry_image_name}:build");
-                $productionImageName = Str::lower("{$this->docker_registry_image_name}:latest");
-            } else {
-                $buildImageName = Str::lower("{$this->uuid}:build");
-                $productionImageName = Str::lower("{$this->uuid}:latest");
-            }
-        } else if ($this->build_pack === 'dockerimage') {
-            $productionImageName = Str::lower("{$this->docker_registry_image_name}:{$this->docker_registry_image_tag}");
-        } else if ($pullRequestId === 0) {
-            $dockerImageTag = str($commit)->substr(0, 128);
-            if ($this->docker_registry_image_name) {
-                $buildImageName = Str::lower("{$this->docker_registry_image_name}:{$dockerImageTag}-build");
-                $productionImageName = Str::lower("{$this->docker_registry_image_name}:{$dockerImageTag}");
-            } else {
-                $buildImageName = Str::lower("{$this->uuid}:{$dockerImageTag}-build");
-                $productionImageName = Str::lower("{$this->uuid}:{$dockerImageTag}");
-            }
-        } else if ($pullRequestId !== 0) {
-            if ($this->docker_registry_image_name) {
-                $buildImageName = Str::lower("{$this->docker_registry_image_name}:pr-{$pullRequestId}-build");
-                $productionImageName = Str::lower("{$this->docker_registry_image_name}:pr-{$pullRequestId}");
-            } else {
-                $buildImageName = Str::lower("{$this->uuid}:pr-{$pullRequestId}-build");
-                $productionImageName = Str::lower("{$this->uuid}:pr-{$pullRequestId}");
-            }
-        }
-        return [
-            'buildImageName' => $buildImageName,
-            'productionImageName' => $productionImageName,
-        ];
-    }
-    // End of build packs / deployment types
 
     public function is_github_based(): bool
     {
@@ -465,31 +406,6 @@ class Application extends BaseModel
             return true;
         }
     }
-    public function isMultipleServerDeployment()
-    {
-        return false;
-        if (data_get($this, 'additional_destinations') && data_get($this, 'docker_registry_image_name')) {
-            return true;
-        }
-        return false;
-    }
-    public function healthCheckUrl()
-    {
-        if ($this->dockerfile || $this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-            return null;
-        }
-        if (!$this->health_check_port) {
-            $health_check_port = $this->ports_exposes_array[0];
-        } else {
-            $health_check_port = $this->health_check_port;
-        }
-        if ($this->health_check_path) {
-            $full_healthcheck_url = "{$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}{$this->health_check_path}";
-        } else {
-            $full_healthcheck_url = "{$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}/";
-        }
-        return $full_healthcheck_url;
-    }
     function customRepository()
     {
         preg_match('/(?<=:)\d+(?=\/)/', $this->git_repository, $matches);
@@ -511,296 +427,7 @@ class Application extends BaseModel
     {
         return "/artifacts/{$uuid}";
     }
-    function generateHealthCheckCommands()
-    {
-        if ($this->dockerfile || $this->build_pack === 'dockerfile' || $this->build_pack === 'dockerimage') {
-            // TODO: disabled HC because there are several ways to hc a simple docker image, hard to figure out a good way. Like some docker images (pocketbase) does not have curl.
-            return 'exit 0';
-        }
-        if (!$this->health_check_port) {
-            $health_check_port = $this->ports_exposes_array[0];
-        } else {
-            $health_check_port = $this->health_check_port;
-        }
-        if ($this->health_check_path) {
-            $this->full_healthcheck_url = "{$this->health_check_method}: {$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}{$this->health_check_path}";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->health_check_method} -f {$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}{$this->health_check_path} > /dev/null"
-            ];
-        } else {
-            $this->full_healthcheck_url = "{$this->health_check_method}: {$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}/";
-            $generated_healthchecks_commands = [
-                "curl -s -X {$this->health_check_method} -f {$this->health_check_scheme}://{$this->health_check_host}:{$health_check_port}/"
-            ];
-        }
-        return implode(' ', $generated_healthchecks_commands);
-    }
-    function generateLocalPersistentVolumes(int $pullRequestId)
-    {
-        $persistentStorages = [];
-        $volumeNames = [];
-        foreach ($this->persistentStorages as $persistentStorage) {
-            $volume_name = $persistentStorage->host_path ?? $persistentStorage->name;
-            if ($pullRequestId !== 0) {
-                $volume_name = $volume_name . '-pr-' . $pullRequestId;
-            }
-            $persistentStorages[] = $volume_name . ':' . $persistentStorage->mount_path;
-
-            if ($persistentStorage->host_path) {
-                continue;
-            }
-
-            $name = $persistentStorage->name;
-
-            if ($pullRequestId !== 0) {
-                $name = $name . '-pr-' . $pullRequestId;
-            }
-
-            $volumeNames[$name] = [
-                'name' => $name,
-                'external' => false,
-            ];
-        }
-
-        return [
-            'persistentStorages' => $persistentStorages,
-            'volumeNames' => $volumeNames,
-        ];
-    }
-    public function generateEnvironmentVariables($ports)
-    {
-        $environmentVariables = collect();
-        // ray('Generate Environment Variables')->green();
-        if ($this->pull_request_id === 0) {
-            // ray($this->runtime_environment_variables)->green();
-            foreach ($this->runtime_environment_variables as $env) {
-                $environmentVariables->push("$env->key=$env->value");
-            }
-            foreach ($this->nixpacks_environment_variables as $env) {
-                $environmentVariables->push("$env->key=$env->value");
-            }
-        } else {
-            // ray($this->runtime_environment_variables_preview)->green();
-            foreach ($this->runtime_environment_variables_preview as $env) {
-                $environmentVariables->push("$env->key=$env->value");
-            }
-            foreach ($this->nixpacks_environment_variables_preview as $env) {
-                $environmentVariables->push("$env->key=$env->value");
-            }
-        }
-        // Add PORT if not exists, use the first port as default
-        if ($environmentVariables->filter(fn ($env) => Str::of($env)->contains('PORT'))->isEmpty()) {
-            $environmentVariables->push("PORT={$ports[0]}");
-        }
-        return $environmentVariables->all();
-    }
-    function generateDockerComposeFile(Server $server, ApplicationDeploymentQueue $deployment, string $workdir)
-    {
-        $pullRequestId = $deployment->pull_request_id;
-        $ports = $this->settings->is_static ? [80] : $this->ports_exposes_array;
-        $container_name = generateApplicationContainerName($this, $this->pull_request_id);
-        $commit = str($deployment->getOutput('git_commit_sha'))->before("\t");
-
-        [
-            'productionImageName' => $productionImageName
-        ] = $this->generateImageNames($commit, $pullRequestId);
-
-        [
-            'persistentStorages' => $persistentStorages,
-            'volumeNames' => $volumeNames
-        ] = $this->generateLocalPersistentVolumes($pullRequestId);
-
-        $environmentVariables = $this->generateEnvironmentVariables($ports);
-
-        if (data_get($this, 'custom_labels')) {
-            $labels = collect(str($this->custom_labels)->explode(','));
-            $labels = $labels->filter(function ($value, $key) {
-                return !Str::startsWith($value, 'coolify.');
-            });
-            $this->custom_labels = $labels->implode(',');
-            $this->save();
-        } else {
-            $labels = collect(generateLabelsApplication($this, $this->preview));
-        }
-        if ($this->pull_request_id !== 0) {
-            $labels = collect(generateLabelsApplication($this, $this->preview));
-        }
-        $labels = $labels->merge(defaultLabels($this->id, $this->uuid, $this->pull_request_id))->toArray();
-        $docker_compose = [
-            'version' => '3.8',
-            'services' => [
-                $container_name => [
-                    'image' => $productionImageName,
-                    'container_name' => $container_name,
-                    'restart' => RESTART_MODE,
-                    'environment' => $environmentVariables,
-                    'expose' => $ports,
-                    'networks' => [
-                        $this->destination->network,
-                    ],
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            $this->generateHealthCheckCommands()
-                        ],
-                        'interval' => $this->health_check_interval . 's',
-                        'timeout' => $this->health_check_timeout . 's',
-                        'retries' => $this->health_check_retries,
-                        'start_period' => $this->health_check_start_period . 's'
-                    ],
-                    'mem_limit' => $this->limits_memory,
-                    'memswap_limit' => $this->limits_memory_swap,
-                    'mem_swappiness' => $this->limits_memory_swappiness,
-                    'mem_reservation' => $this->limits_memory_reservation,
-                    'cpus' => (float) $this->limits_cpus,
-                    'cpu_shares' => $this->limits_cpu_shares,
-                ]
-            ],
-            'networks' => [
-                $this->destination->network => [
-                    'external' => true,
-                    'name' => $this->destination->network,
-                    'attachable' => true
-                ]
-            ]
-        ];
-        if (!is_null($this->limits_cpuset)) {
-            data_set($docker_compose, "services.{$container_name}.cpuset", $this->limits_cpuset);
-        }
-        if ($server->isSwarm()) {
-            data_forget($docker_compose, 'services.' . $container_name . '.container_name');
-            data_forget($docker_compose, 'services.' . $container_name . '.expose');
-            data_forget($docker_compose, 'services.' . $container_name . '.restart');
-
-            data_forget($docker_compose, 'services.' . $container_name . '.mem_limit');
-            data_forget($docker_compose, 'services.' . $container_name . '.memswap_limit');
-            data_forget($docker_compose, 'services.' . $container_name . '.mem_swappiness');
-            data_forget($docker_compose, 'services.' . $container_name . '.mem_reservation');
-            data_forget($docker_compose, 'services.' . $container_name . '.cpus');
-            data_forget($docker_compose, 'services.' . $container_name . '.cpuset');
-            data_forget($docker_compose, 'services.' . $container_name . '.cpu_shares');
-
-            $docker_compose['services'][$container_name]['deploy'] = [
-                'placement' => [
-                    'constraints' => [
-                        'node.role == worker'
-                    ]
-                ],
-                'mode' => 'replicated',
-                'replicas' => 1,
-                'update_config' => [
-                    'order' => 'start-first'
-                ],
-                'rollback_config' => [
-                    'order' => 'start-first'
-                ],
-                'labels' => $labels,
-                'resources' => [
-                    'limits' => [
-                        'cpus' => $this->limits_cpus,
-                        'memory' => $this->limits_memory,
-                    ],
-                    'reservations' => [
-                        'cpus' => $this->limits_cpus,
-                        'memory' => $this->limits_memory,
-                    ]
-                ]
-            ];
-        } else {
-            $docker_compose['services'][$container_name]['labels'] = $labels;
-        }
-        if ($server->isLogDrainEnabled() && $this->isLogDrainEnabled()) {
-            $docker_compose['services'][$container_name]['logging'] = [
-                'driver' => 'fluentd',
-                'options' => [
-                    'fluentd-address' => "tcp://127.0.0.1:24224",
-                    'fluentd-async' => "true",
-                    'fluentd-sub-second-precision' => "true",
-                ]
-            ];
-        }
-        if ($this->settings->is_gpu_enabled) {
-            $docker_compose['services'][$container_name]['deploy']['resources']['reservations']['devices'] = [
-                [
-                    'driver' => data_get($this, 'settings.gpu_driver', 'nvidia'),
-                    'capabilities' => ['gpu'],
-                    'options' => data_get($this, 'settings.gpu_options', [])
-                ]
-            ];
-            if (data_get($this, 'settings.gpu_count')) {
-                $count = data_get($this, 'settings.gpu_count');
-                if ($count === 'all') {
-                    $docker_compose['services'][$container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = $count;
-                } else {
-                    $docker_compose['services'][$container_name]['deploy']['resources']['reservations']['devices'][0]['count'] = (int) $count;
-                }
-            } else if (data_get($this, 'settings.gpu_device_ids')) {
-                $docker_compose['services'][$container_name]['deploy']['resources']['reservations']['devices'][0]['ids'] = data_get($this, 'settings.gpu_device_ids');
-            }
-        }
-        if ($this->isHealthcheckDisabled()) {
-            data_forget($docker_compose, 'services.' . $container_name . '.healthcheck');
-        }
-        if (count($this->ports_mappings_array) > 0 && $this->pull_request_id === 0) {
-            $docker_compose['services'][$container_name]['ports'] = $this->ports_mappings_array;
-        }
-        if (count($persistentStorages) > 0) {
-            $docker_compose['services'][$container_name]['volumes'] = $persistentStorages;
-        }
-        if (count($volumeNames) > 0) {
-            $docker_compose['volumes'] = $volumeNames;
-        }
-
-        $docker_compose['services'][$this->uuid] = $docker_compose['services'][$container_name];
-
-        data_forget($docker_compose, 'services.' . $container_name);
-
-        $docker_compose = Yaml::dump($docker_compose, 10);
-        $docker_compose_base64 = base64_encode($docker_compose);
-        $server->executeRemoteCommand(
-            commands: collect([])->push([
-                'command' => executeInDocker($deployment->deployment_uuid, "echo '{$docker_compose_base64}' | base64 -d > {$workdir}/docker-compose.yml"),
-                'hidden' => true,
-                'ignoreErrors' => true
-            ]),
-            loggingModel: $deployment
-        );
-    }
-    function rollingUpdateApplication(Server $server, ApplicationDeploymentQueue $deployment, string $workdir)
-    {
-        $pullRequestId = $deployment->pull_request_id;
-        $containerName = generateApplicationContainerName($this, $pullRequestId);
-        // if (count($this->ports_mappings_array) > 0) {
-        // $deployment->addLogEntry('Application has ports mapped to the host system, rolling update is not supported.');
-        $containers = getCurrentApplicationContainerStatus($server, $this->id, $pullRequestId);
-        // if ($pullRequestId === 0) {
-        //     $containers = $containers->filter(function ($container) use ($containerName) {
-        //         return data_get($container, 'Names') !== $containerName;
-        //     });
-        // }
-        $containers->each(function ($container) use ($server, $deployment) {
-            $removingContainerName = data_get($container, 'Names');
-            $server->executeRemoteCommand(
-                commands: collect([])->push([
-                    'command' => "docker rm -f $removingContainerName",
-                    'hidden' => true,
-                    'ignoreErrors' => true
-                ]),
-                loggingModel: $deployment
-            );
-        });
-        // }
-        $server->executeRemoteCommand(
-            commands: collect([])->push([
-                'command' => executeInDocker($deployment->deployment_uuid, "docker compose --project-directory {$workdir} up --build -d"),
-                'hidden' => true,
-                'ignoreErrors' => true
-            ]),
-            loggingModel: $deployment
-        );
-        $deployment->addLogEntry("New container started.");
-    }
-    function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
+       function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
         if ($this->git_commit_sha !== 'HEAD') {
@@ -978,34 +605,6 @@ class Application extends BaseModel
             ];
         }
     }
-    public function prepareHelperImage(string $deploymentUuid)
-    {
-        $basedir = $this->generateBaseDir($deploymentUuid);
-        $helperImage = config('coolify.helper_image');
-        $server = data_get($this, 'destination.server');
-        $network = data_get($this, 'destination.network');
-
-        $serverUserHomeDir = instant_remote_process(["echo \$HOME"], $server);
-        $dockerConfigFileExists = instant_remote_process(["test -f {$serverUserHomeDir}/.docker/config.json && echo 'OK' || echo 'NOK'"], $server);
-
-        $commands = collect([]);
-        if ($dockerConfigFileExists === 'OK') {
-            $commands->push([
-                "command" => "docker run -d --network $network --name $deploymentUuid --rm -v {$serverUserHomeDir}/.docker/config.json:/root/.docker/config.json:ro -v /var/run/docker.sock:/var/run/docker.sock $helperImage",
-                "hidden" => true,
-            ]);
-        } else {
-            $commands->push([
-                "command" => "docker run -d --network {$network} --name {$deploymentUuid} --rm -v /var/run/docker.sock:/var/run/docker.sock {$helperImage}",
-                "hidden" => true,
-            ]);
-        }
-        $commands->push([
-            "command" => executeInDocker($deploymentUuid, "mkdir -p {$basedir}"),
-            "hidden" => true,
-        ]);
-        return $commands;
-    }
     function parseCompose(int $pull_request_id = 0)
     {
         if ($this->docker_compose_raw) {
@@ -1115,5 +714,13 @@ class Application extends BaseModel
         $this->custom_labels = base64_encode($customLabels);
         $this->save();
         return $customLabels;
+    }
+    public function fqdns(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => is_null($this->fqdn)
+                ? []
+                : explode(',', $this->fqdn),
+        );
     }
 }

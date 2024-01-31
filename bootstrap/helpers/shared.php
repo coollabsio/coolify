@@ -22,6 +22,7 @@ use App\Notifications\Channels\EmailChannel;
 use App\Notifications\Channels\TelegramChannel;
 use App\Notifications\Internal\GeneralNotification;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Mail\Message;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\Cache;
@@ -106,6 +107,12 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
             return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
+    }
+    if ($error instanceof UniqueConstraintViolationException) {
+        if (isset($livewire)) {
+            return $livewire->dispatch('error', "A resource with the same name already exists.");
+        }
+        return "A resource with the same name already exists.";
     }
 
     if ($error instanceof Throwable) {
@@ -1659,4 +1666,34 @@ function ip_match($ip, $cidrs, &$match = null)
         }
     }
     return false;
+}
+function check_fqdn_usage(ServiceApplication|Application $own_resource)
+{
+    $domains = collect($own_resource->fqdns)->map(function ($domain) {
+        return Url::fromString($domain)->getHost();
+    });
+    $apps = Application::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            $naked_domain = Url::fromString($domain)->getHost();
+            if ($domains->contains($naked_domain)) {
+                if ($app->uuid !== $own_resource->uuid ) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                }
+            }
+        }
+    }
+    $apps = ServiceApplication::all();
+    foreach ($apps as $app) {
+        $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
+        foreach ($list_of_domains as $domain) {
+            $naked_domain = Url::fromString($domain)->getHost();
+            if ($domains->contains($naked_domain)) {
+                if ($app->uuid !== $own_resource->uuid) {
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                }
+            }
+        }
+    }
 }

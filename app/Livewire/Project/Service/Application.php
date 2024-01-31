@@ -53,6 +53,7 @@ class Application extends Component
     public function submit()
     {
         try {
+            check_fqdn_usage($this->application);
             $this->validate();
             $this->application->save();
             updateCompose($this->application);

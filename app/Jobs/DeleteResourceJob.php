@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\DeleteService;
+use App\Actions\Service\StopService;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneMariadb;
@@ -30,41 +31,22 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         try {
-            $server = $this->resource->destination->server;
-            $this->resource->delete();
-            if (!$server->isFunctional()) {
-                if ($this->resource->type() === 'service') {
-                    ray('dispatching delete service');
-                    DeleteService::dispatch($this->resource);
-                } else {
-                    $this->resource->forceDelete();
-                }
-                return 'Server is not functional';
-            }
+            $this->resource->forceDelete();
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource);
                     break;
                 case 'standalone-postgresql':
-                    StopDatabase::run($this->resource);
-                    break;
                 case 'standalone-redis':
-                    StopDatabase::run($this->resource);
-                    break;
                 case 'standalone-mongodb':
-                    StopDatabase::run($this->resource);
-                    break;
                 case 'standalone-mysql':
-                    StopDatabase::run($this->resource);
-                    break;
                 case 'standalone-mariadb':
                     StopDatabase::run($this->resource);
                     break;
-            }
-            if ($this->resource->type() === 'service') {
-                DeleteService::dispatch($this->resource);
-            } else {
-                $this->resource->forceDelete();
+                case 'service':
+                    StopService::run($this->resource);
+                    DeleteService::run($this->resource);
+                    break;
             }
         } catch (\Throwable $e) {
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());

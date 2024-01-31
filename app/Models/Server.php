@@ -2,16 +2,12 @@
 
 namespace App\Models;
 
-use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Process;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -335,20 +331,6 @@ class Server extends BaseModel
         if ($this->proxyType() === ProxyTypes::NONE->value || $this->settings->is_build_server) {
             return false;
         }
-        // foreach ($this->applications() as $application) {
-        //     if (data_get($application, 'fqdn')) {
-        //         $shouldRun = true;
-        //         break;
-        //     }
-        // }
-        // ray($this->services()->get());
-
-        // if ($this->id === 0) {
-        //     $settings = InstanceSettings::get();
-        //     if (data_get($settings, 'fqdn')) {
-        //         $shouldRun = true;
-        //     }
-        // }
         return true;
     }
     public function isFunctional()
@@ -482,154 +464,5 @@ class Server extends BaseModel
         } else {
             return instant_remote_process(["docker network create coolify --attachable >/dev/null 2>&1 || true"], $this, false);
         }
-    }
-    public function executeRemoteCommand(Collection $commands, ?ApplicationDeploymentQueue $loggingModel = null)
-    {
-        static::$batch_counter++;
-        foreach ($commands as $command) {
-            $realCommand = data_get($command, 'command');
-            if (is_null($realCommand)) {
-                throw new \RuntimeException('Command is not set');
-            }
-            $hidden = data_get($command, 'hidden', false);
-            $ignoreErrors = data_get($command, 'ignoreErrors', false);
-            $customOutputType = data_get($command, 'customOutputType');
-            $name = data_get($command, 'name');
-            $remoteCommand = generateSshCommand($this, $realCommand);
-
-            $process = Process::timeout(3600)->idleTimeout(3600)->start($remoteCommand, function (string $type, string $output) use ($realCommand, $hidden, $customOutputType, $loggingModel, $name) {
-                $output = str($output)->trim();
-                if ($output->startsWith('╔')) {
-                    $output = "\n" . $output;
-                }
-                $newLogEntry = [
-                    'command' => remove_iip($realCommand),
-                    'output' => remove_iip($output),
-                    'type' => $customOutputType ?? $type === 'err' ? 'stderr' : 'stdout',
-                    'timestamp' => Carbon::now('UTC'),
-                    'hidden' => $hidden,
-                    'batch' => static::$batch_counter,
-                ];
-                if ($loggingModel) {
-                    if (!$loggingModel->logs) {
-                        $newLogEntry['order'] = 1;
-                    } else {
-                        $previousLogs = json_decode($loggingModel->logs, associative: true, flags: JSON_THROW_ON_ERROR);
-                        $newLogEntry['order'] = count($previousLogs) + 1;
-                    }
-                    if ($name) {
-                        $newLogEntry['name'] = $name;
-                    }
-
-                    $previousLogs[] = $newLogEntry;
-                    $loggingModel->logs = json_encode($previousLogs, flags: JSON_THROW_ON_ERROR);
-                    $loggingModel->save();
-                }
-            });
-            if ($loggingModel) {
-                $loggingModel->update([
-                    'current_process_id' => $process->id(),
-                ]);
-            }
-            $processResult = $process->wait();
-            if ($processResult->exitCode() !== 0) {
-                if (!$ignoreErrors) {
-                    if ($loggingModel) {
-                        $status = ApplicationDeploymentStatus::FAILED->value;
-                        $loggingModel->status = $status;
-                        $loggingModel->save();
-                    }
-                    throw new \RuntimeException($processResult->errorOutput());
-                }
-            }
-        }
-    }
-    public function stopApplicationRelatedRunningContainers(string $applicationId, string $containerName)
-    {
-        $containers = getCurrentApplicationContainerStatus($this, $applicationId, 0);
-        $containers = $containers->filter(function ($container) use ($containerName) {
-            return data_get($container, 'Names') !== $containerName;
-        });
-        $containers->each(function ($container) {
-            $removableContainer = data_get($container, 'Names');
-            $this->server->executeRemoteCommand(
-                commands: collect([
-                    'command' => "docker rm -f $removableContainer >/dev/null 2>&1",
-                    'hidden' => true,
-                    'ignoreErrors' => true
-                ]),
-                loggingModel: $this->deploymentQueueEntry
-            );
-        });
-    }
-    public function getHostIPMappings($network)
-    {
-        $addHosts = null;
-        $allContainers = instant_remote_process(["docker network inspect {$network} -f '{{json .Containers}}' "], $this);
-        if (!is_null($allContainers)) {
-            $allContainers = format_docker_command_output_to_json($allContainers);
-            $ips = collect([]);
-            if (count($allContainers) > 0) {
-                $allContainers = $allContainers[0];
-                foreach ($allContainers as $container) {
-                    $containerName = data_get($container, 'Name');
-                    if ($containerName === 'coolify-proxy') {
-                        continue;
-                    }
-                    $containerIp = data_get($container, 'IPv4Address');
-                    if ($containerName && $containerIp) {
-                        $containerIp = str($containerIp)->before('/');
-                        $ips->put($containerName, $containerIp->value());
-                    }
-                }
-            }
-            $addHosts = $ips->map(function ($ip, $name) {
-                return "--add-host $name:$ip";
-            })->implode(' ');
-        }
-        return $addHosts;
-    }
-    public function checkIfDockerImageExists(string $imageName, ApplicationDeploymentQueue $deployment)
-    {
-        $this->executeRemoteCommand(
-            commands: collect([
-                [
-                    "name" => "local_image_found",
-                    "command" => "docker images -q {$imageName} 2>/dev/null",
-                    "hidden" => true,
-                ]
-            ]),
-            loggingModel: $deployment
-        );
-        if (str($deployment->getOutput('local_image_found'))->isEmpty()) {
-            $this->executeRemoteCommand(
-                commands: collect([
-                    [
-                        "command" => "docker pull {$imageName} 2>/dev/null",
-                        "ignoreErrors" => true,
-                        "hidden" => true
-                    ],
-                    [
-                        "name" => "local_image_found",
-                        "command" => "docker images -q {$imageName} 2>/dev/null",
-                        "hidden" => true,
-                    ]
-                ]),
-                loggingModel: $deployment
-            );
-        }
-    }
-    public function createWorkDirForDeployment(string $workdir, ApplicationDeploymentQueue $deployment)
-    {
-        $this->executeRemoteCommand(
-            commands: collect([
-                [
-                    "command" => executeInDocker($deployment->deployment_uuid, "mkdir -p {$workdir}"),
-                    "ignoreErrors" => true,
-                    "hidden" => true
-                ],
-            ]),
-            loggingModel: $deployment
-        );
     }
 }

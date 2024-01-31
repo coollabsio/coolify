@@ -348,9 +348,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         ],
                     );
                 }
-                $this->application_deployment_queue->addLogEntry("Image pushed to docker registry.'");
+                $this->application_deployment_queue->addLogEntry("Image pushed to docker registry.");
             } catch (Exception $e) {
-                $this->application_deployment_queue->addLogEntry("Failed to push image to docker registry. Please check debug logs for more information.'");
+                $this->application_deployment_queue->addLogEntry("Failed to push image to docker registry. Please check debug logs for more information.");
                 if ($forceFail) {
                     throw $e;
                 }
@@ -488,10 +488,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         }
-        $this->server->executeRemoteCommand(
-            commands: $this->application->prepareHelperImage($this->deployment_uuid),
-            loggingModel: $this->application_deployment_queue
-        );
+        ray('asddf');
+        $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
         $this->generate_image_names();
