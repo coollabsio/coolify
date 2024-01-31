@@ -3,6 +3,7 @@
         <div class="flex items-end gap-2">
             <h1>Environment: {{ data_get($environment, 'name') }}</h1>
             <x-forms.button type="submit">Save</x-forms.button>
+            <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex items-center">

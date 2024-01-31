@@ -7,7 +7,6 @@
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
                     Clone
                 </a>
-                <livewire:project.delete-environment :environment_id="$environment->id" />
             @else
                 <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
                     class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
@@ -17,6 +16,7 @@
                     Clone
                 </a>
             @endif
+            <livewire:project.delete-environment :disabled="!$environment->isEmpty()" :environment_id="$environment->id" />
         </div>
         <nav class="flex pt-2 pb-10">
             <ol class="flex items-center">

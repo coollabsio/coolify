@@ -5,6 +5,7 @@
         <div class="flex items-end gap-2">
             <h2>General</h2>
             <x-forms.button type="submit">Save</x-forms.button>
+            <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="project.name" />
@@ -23,7 +24,8 @@
                 Add</button>
         </x-slide-over>
     </div>
-    <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span class="text-warning">@{{project.VARIABLENAME}}</span><x-helper
+    <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span
+            class="text-warning">@{{ project.VARIABLENAME }}</span><x-helper
             helper="More info <a class='text-white underline' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
     </div>
     <div class="flex flex-col gap-2">

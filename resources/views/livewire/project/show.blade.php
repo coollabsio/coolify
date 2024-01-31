@@ -3,9 +3,7 @@
         <h1>Environments</h1>
         <x-forms.button class="btn" onclick="newEnvironment.showModal()">+ Add</x-forms.button>
         <livewire:project.add-environment :project="$project" />
-        @if ($project->applications->count() === 0)
-            <livewire:project.delete-project :project_id="$project->id" />
-        @endif
+        <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
     </div>
     <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}</div>
     <div class="grid gap-2 lg:grid-cols-2">
