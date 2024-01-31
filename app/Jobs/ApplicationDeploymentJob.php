@@ -488,7 +488,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch}.");
         }
-        ray('asddf');
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->clone_repository();
