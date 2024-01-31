@@ -32,6 +32,13 @@ class Add extends Component
     public function submit()
     {
         $this->validate();
+        if (str($this->value)->startsWith('{{') && str($this->value)->endsWith('}}')) {
+            $type = str($this->value)->after("{{")->before(".")->value;
+            if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                return;
+            }
+        }
         $this->dispatch('saveKey', [
             'key' => $this->key,
             'value' => $this->value,

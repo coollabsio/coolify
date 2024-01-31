@@ -50,7 +50,8 @@ class Show extends Component
             $this->isLocked = true;
         }
     }
-    public function serialize() {
+    public function serialize()
+    {
         data_forget($this->env, 'real_value');
         if ($this->env->getMorphClass() === 'App\Models\SharedEnvironmentVariable') {
             data_forget($this->env, 'is_build_time');
@@ -80,11 +81,18 @@ class Show extends Component
             } else {
                 $this->validate();
             }
+            if (str($this->env->value)->startsWith('{{') && str($this->env->value)->endsWith('}}')) {
+                $type = str($this->env->value)->after("{{")->before(".")->value;
+                if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                    $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                    return;
+                }
+            }
             $this->serialize();
             $this->env->save();
             $this->dispatch('success', 'Environment variable updated successfully.');
             $this->dispatch('refreshEnvs');
-        } catch(\Exception $e) {
+        } catch (\Exception $e) {
             return handleError($e);
         }
     }

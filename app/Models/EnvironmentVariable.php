@@ -100,6 +100,9 @@ class EnvironmentVariable extends Model
             $variable = Str::after($environment_variable, "{$type}.");
             $variable = Str::before($variable, '}}');
             $variable = Str::of($variable)->trim()->value;
+            if (!collect(['team', 'project', 'environment'])->contains($type)) {
+                return $variable;
+            }
             if ($type === 'environment') {
                 $id = $resource->environment->id;
             } else if ($type === 'project') {
