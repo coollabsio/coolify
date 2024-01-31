@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Application\StopApplication;
 use App\Actions\Database\StopDatabase;
 use App\Actions\Service\DeleteService;
+use App\Actions\Service\StopService;
 use App\Models\Application;
 use App\Models\Service;
 use App\Models\StandaloneMariadb;
@@ -30,33 +31,21 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         try {
+            $this->resource->forceDelete();
             switch ($this->resource->type()) {
                 case 'application':
                     StopApplication::run($this->resource);
-                    $this->resource->forceDelete();
                     break;
                 case 'standalone-postgresql':
-                    StopDatabase::run($this->resource);
-                    $this->resource->forceDelete();
-                    break;
                 case 'standalone-redis':
-                    StopDatabase::run($this->resource);
-                    $this->resource->forceDelete();
-                    break;
                 case 'standalone-mongodb':
-                    StopDatabase::run($this->resource);
-                    $this->resource->forceDelete();
-                    break;
                 case 'standalone-mysql':
-                    StopDatabase::run($this->resource);
-                    $this->resource->forceDelete();
-                    break;
                 case 'standalone-mariadb':
                     StopDatabase::run($this->resource);
-                    $this->resource->forceDelete();
                     break;
                 case 'service':
-                    DeleteService::dispatch($this->resource);
+                    StopService::run($this->resource);
+                    DeleteService::run($this->resource);
                     break;
             }
         } catch (\Throwable $e) {

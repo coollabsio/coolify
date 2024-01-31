@@ -10,6 +10,10 @@ class StopService
     use AsAction;
     public function handle(Service $service)
     {
+        $server = $service->destination->server;
+        if (!$server->isFunctional()) {
+            return 'Server is not functional';
+        }
         ray('Stopping service: ' . $service->name);
         $applications = $service->applications()->get();
         foreach ($applications as $application) {

@@ -13,7 +13,6 @@ class DeleteService
         try {
             $server = data_get($service, 'server');
             if ($server->isFunctional()) {
-                StopService::run($service);
                 $storagesToDelete = collect([]);
 
                 $service->environment_variables()->delete();
@@ -46,7 +45,6 @@ class DeleteService
             foreach ($service->databases()->get() as $database) {
                 $database->forceDelete();
             }
-            $service->forceDelete();
         }
     }
 }
