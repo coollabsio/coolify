@@ -143,7 +143,7 @@
     "filebrowser": {
         "documentation": "https:\/\/filebrowser.org\/configuration",
         "slogan": "FileBrowser is a self-hosted, web-based file manager and file explorer with a user-friendly interface. It allows you to manage and organize your files and directories directly from your web browser.",
-        "compose": "c2VydmljZXM6CiAgZmlsZWJyb3dzZXI6CiAgICBpbWFnZTogJ2ZpbGVicm93c2VyL2ZpbGVicm93c2VyOmxhdGVzdCcKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9GSUxFQlJPV1NFUgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgdm9sdW1lczoKICAgICAgLSAnZmlsZWJyb3dzZXItc3J2Oi9zcnYnCiAgICAgIC0gJ2ZpbGVicm93c2VyLWRhdGFiYXNlOi9kYXRhYmFzZS9maWxlYnJvd3Nlci5kYicKICAgICAgLSAnZmlsZWJyb3dzZXItY29uZmlnOi9jb25maWcvc2V0dGluZ3MuanNvbicKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MCcKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiAxNQo=",
+        "compose": "c2VydmljZXM6CiAgZmlsZWJyb3dzZXI6CiAgICBpbWFnZTogJ2ZpbGVicm93c2VyL2ZpbGVicm93c2VyOnM2JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0ZJTEVCUk9XU0VSCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICB2b2x1bWVzOgogICAgICAtICdmaWxlYnJvd3Nlci1zcnY6L3NydicKICAgICAgLSAnZmlsZWJyb3dzZXItZGF0YWJhc2U6L2RhdGFiYXNlL2ZpbGVicm93c2VyLmRiJwogICAgICAtICdmaWxlYnJvd3Nlci1jb25maWc6L2NvbmZpZy9zZXR0aW5ncy5qc29uJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
         "tags": [
             "file-management",
             "storage-access",
