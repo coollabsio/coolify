@@ -11,6 +11,7 @@ class Show extends Component
     use AuthorizesRequests;
     public ?Server $server = null;
     public $parameters = [];
+    protected $listeners = ['proxyStatusUpdated' => '$refresh'];
     public function mount()
     {
         $this->parameters = get_route_parameters();
@@ -19,14 +20,13 @@ class Show extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
     }
     public function submit()
     {
-        $this->dispatch('serverRefresh',false);
+        $this->dispatch('serverRefresh', false);
     }
     public function render()
     {
