@@ -41,7 +41,7 @@ class Index extends Component
             return $application;
         });
         $this->postgresqls = $environment->postgresqls->sortBy('name');
-        $this->postgresqls =  $this->postgresqls->map(function ($postgresql) {
+        $this->postgresqls = $this->postgresqls->map(function ($postgresql) {
             if (data_get($postgresql, 'environment.project.uuid')) {
                 $postgresql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($postgresql, 'environment.project.uuid'),
