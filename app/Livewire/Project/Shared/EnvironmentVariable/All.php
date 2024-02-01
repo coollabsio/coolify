@@ -71,12 +71,26 @@ class All extends Component
                     continue;
                 }
                 $found->value = $variable;
+                if (str($found->value)->startsWith('{{') && str($found->value)->endsWith('}}')) {
+                    $type = str($found->value)->after("{{")->before(".")->value;
+                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                        $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                        return;
+                    }
+                }
                 $found->save();
                 continue;
             } else {
                 $environment = new EnvironmentVariable();
                 $environment->key = $key;
                 $environment->value = $variable;
+                if (str($environment->value)->startsWith('{{') && str($environment->value)->endsWith('}}')) {
+                    $type = str($environment->value)->after("{{")->before(".")->value;
+                    if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                        $this->dispatch('error', 'Invalid  shared variable type.', "Valid types are: team, project, environment.");
+                        return;
+                    }
+                }
                 $environment->is_build_time = false;
                 $environment->is_preview = $isPreview ? true : false;
                 switch ($this->resource->type()) {

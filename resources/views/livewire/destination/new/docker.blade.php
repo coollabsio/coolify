@@ -14,7 +14,7 @@
         </x-forms.select>
         {{-- <x-forms.checkbox type="checkbox" id="is_swarm" label="Is it a Swarm network?" /> --}}
         <x-forms.button type="submit">
-            Save Destination
+            Continue
         </x-forms.button>
     </form>
 </div>

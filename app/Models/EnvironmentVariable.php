@@ -91,7 +91,7 @@ class EnvironmentVariable extends Model
     }
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null): string|null
     {
-        if (!$environment_variable) {
+        if (!$environment_variable || !$resource) {
             return null;
         }
         $environment_variable = trim($environment_variable);
@@ -100,6 +100,9 @@ class EnvironmentVariable extends Model
             $variable = Str::after($environment_variable, "{$type}.");
             $variable = Str::before($variable, '}}');
             $variable = Str::of($variable)->trim()->value;
+            if (!collect(SHARED_VARIABLE_TYPES)->contains($type)) {
+                return $variable;
+            }
             if ($type === 'environment') {
                 $id = $resource->environment->id;
             } else if ($type === 'project') {

@@ -33,9 +33,9 @@ class Form extends Component
     {
         try {
             $this->storage->testConnection(shouldSave: true);
-            return $this->dispatch('success', 'Connection is working. Tested with "ListObjectsV2" action.');
+            return $this->dispatch('success', 'Connection is working.', 'Tested with "ListObjectsV2" action.');
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
         }
     }
 

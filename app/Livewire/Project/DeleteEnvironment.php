@@ -9,6 +9,7 @@ class DeleteEnvironment extends Component
 {
     public array $parameters;
     public int $environment_id;
+    public bool $disabled = false;
 
     public function mount()
     {

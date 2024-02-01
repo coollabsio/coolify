@@ -8,7 +8,7 @@ use Livewire\Component;
 
 class Configuration extends Component
 {
-    public Service $service;
+    public ?Service $service = null;
     public $applications;
     public $databases;
     public array $parameters;

@@ -17,8 +17,8 @@ class Danger extends Component
     {
         $this->modalId = new Cuid2(7);
         $parameters = get_route_parameters();
-        $this->projectUuid = $parameters['project_uuid'];
-        $this->environmentName = $parameters['environment_name'];
+        $this->projectUuid = data_get($parameters, 'project_uuid');
+        $this->environmentName = data_get($parameters, 'environment_name');
     }
 
     public function delete()

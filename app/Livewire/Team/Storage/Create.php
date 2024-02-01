@@ -67,7 +67,8 @@ class Create extends Component
             $this->storage->save();
             return redirect()->route('team.storage.show', $this->storage->uuid);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            $this->dispatch('error', 'Failed to create storage.', $e->getMessage());
+            // return handleError($e, $this);
         }
     }
 }

@@ -1,10 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Environment Variable">
-        <x-slot:modalBody>
-            <p>Are you sure you want to delete this environment variable <span
-                    class="font-bold text-warning">({{ $env->key }})</span>?</p>
-        </x-slot:modalBody>
-    </x-modal>
     <form wire:submit='submit'
         class="flex flex-col gap-2 p-4 m-2 border lg:items-center border-coolgray-300 lg:m-0 lg:p-0 lg:border-0 lg:flex-row">
         @if ($isLocked)
@@ -38,9 +32,10 @@
         @endif
         <div class="flex gap-2">
             @if ($isLocked)
-                <x-forms.button isError isModal modalId="{{ $modalId }}">
-                    Delete
-                </x-forms.button>
+                <x-new-modal isErrorButton buttonTitle="Delete">
+                    You will delete environment variable <span
+                        class="font-bold text-warning">{{ $env->key }}</span>.
+                </x-new-modal>
             @else
                 @if ($isDisabled)
                     <x-forms.button disabled type="submit">
@@ -49,9 +44,10 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-forms.button disabled isError isModal modalId="{{ $modalId }}">
-                        Delete
-                    </x-forms.button>
+                    <x-new-modal isErrorButton buttonTitle="Delete">
+                        You will delete environment variable <span
+                            class="font-bold text-warning">{{ $env->key }}</span>.
+                    </x-new-modal>
                 @else
                     <x-forms.button type="submit">
                         Update
@@ -59,9 +55,10 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-forms.button isError isModal modalId="{{ $modalId }}">
-                        Delete
-                    </x-forms.button>
+                    <x-new-modal isErrorButton buttonTitle="Delete">
+                        You will delete environment variable <span
+                            class="font-bold text-warning">{{ $env->key }}</span>.
+                    </x-new-modal>
                 @endif
             @endif
         </div>

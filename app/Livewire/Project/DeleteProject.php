@@ -9,6 +9,7 @@ class DeleteProject extends Component
 {
     public array $parameters;
     public int $project_id;
+    public bool $disabled = false;
 
     public function mount()
     {

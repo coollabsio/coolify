@@ -27,7 +27,7 @@ class StartProxy
             $server->save();
             if ($server->isSwarm()) {
                 $commands = $commands->merge([
-                    "mkdir -p $proxy_path && cd $proxy_path",
+                    "mkdir -p $proxy_path/dynamic && cd $proxy_path",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Starting coolify-proxy.'",
                     "cd $proxy_path && docker stack deploy -c docker-compose.yml coolify-proxy",
@@ -35,7 +35,7 @@ class StartProxy
                 ]);
             } else {
                 $commands = $commands->merge([
-                    "mkdir -p $proxy_path && cd $proxy_path",
+                    "mkdir -p $proxy_path/dynamic && cd $proxy_path",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Pulling docker image.'",
                     'docker compose pull',

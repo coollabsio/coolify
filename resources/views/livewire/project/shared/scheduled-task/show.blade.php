@@ -1,11 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="{{ $modalId }}" modalTitle="Delete Scheduled Task">
-        <x-slot:modalBody>
-            <p>Are you sure you want to delete this scheduled task <span
-                    class="font-bold text-warning">({{ $task->name }})</span>?</p>
-        </x-slot:modalBody>
-    </x-modal>
-
     <h1>Scheduled Task</h1>
     @if ($type === 'application')
         <livewire:project.application.heading :application="$resource" />
@@ -20,11 +13,9 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-
-                <x-forms.button isError isModal modalId="{{ $modalId }}">
-                    Delete
-                </x-forms.button>
-
+                <x-new-modal isErrorButton buttonTitle="Delete Scheduled Task">
+                    You will delete scheduled task <span class="font-bold text-warning">{{ $task->name }}</span>.
+                </x-new-modal>
             </div>
         </div>
         <div class="flex w-full gap-2">

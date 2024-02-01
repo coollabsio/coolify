@@ -4,7 +4,7 @@
 
 services:
   filebrowser:
-    image: filebrowser/filebrowser:latest
+    image: filebrowser/filebrowser:s6
     environment:
       - SERVICE_FQDN_FILEBROWSER
       - PUID=1000

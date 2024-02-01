@@ -1,9 +1,4 @@
 <div>
-    <x-modal yesOrNo modalId="deleteServer" modalTitle="Delete Server">
-        <x-slot:modalBody>
-            <p>This server will be deleted. It is not reversible. <br>Please think again..</p>
-        </x-slot:modalBody>
-    </x-modal>
     @if ($server->id !== 0)
         <h2 class="pt-4">Danger Zone</h2>
         <div class="">Woah. I hope you know what are you doing.</div>
@@ -12,13 +7,13 @@
             back!
         </div>
         @if ($server->definedResources()->count() > 0)
-            <x-forms.button disabled isError isModal modalId="deleteServer">
-                Delete
-            </x-forms.button>
+            <x-new-modal disabled isErrorButton buttonTitle="Delete">
+                This server will be deleted. It is not reversible. <br>Please think again.
+            </x-new-modal>
         @else
-            <x-forms.button isError isModal modalId="deleteServer">
-                Delete
-            </x-forms.button>
+            <x-new-modal isErrorButton buttonTitle="Delete">
+                This server will be deleted. It is not reversible. <br>Please think again.
+            </x-new-modal>
         @endif
         <div class="flex flex-col">
             @forelse ($server->definedResources() as $resource)
@@ -26,7 +21,7 @@
                     <h3 class="pt-4">Resources</h3>
                 @endif
                 @if ($resource->link())
-                    <a  class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
+                    <a class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
                         <div class="w-64">{{ str($resource->type())->headline() }}</div>
                         <div>{{ $resource->name }}</div>
                     </a>
@@ -46,7 +41,7 @@
                     <h3 class="pt-4">Resources</h3>
                 @endif
                 @if ($resource->link())
-                    <a  class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
+                    <a class="flex gap-2 p-1 hover:bg-coolgray-100 hover:no-underline" href="{{ $resource->link() }}">
                         <div class="w-64">{{ str($resource->type())->headline() }}</div>
                         <div>{{ $resource->name }}</div>
                     </a>
