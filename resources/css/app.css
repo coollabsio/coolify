@@ -76,7 +76,7 @@ a {
 }
 
 .box-without-bg {
-    @apply flex p-2 transition-colors min-h-full hover:text-white hover:no-underline min-h-[4rem];
+    @apply flex p-2 transition-colors hover:text-white hover:no-underline min-h-[4rem];
 }
 
 .description {

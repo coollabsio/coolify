@@ -46,24 +46,34 @@
     @else
         <div x-data="searchComponent()">
             <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
-            <div class="grid gap-2 pt-4 lg:grid-cols-2">
+            <div class="grid gap-4 pt-4 lg:grid-cols-4">
                 <template x-for="item in filteredApplications" :key="item.id">
-                    <a class="relative box group" :href="item.hrefLink">
-                        <div class="flex flex-col mx-6">
-                            <div class="pb-2 font-bold text-white" x-text="item.name"></div>
-                            <div class="description" x-text="item.description"></div>
-                            <div class="description" x-text="item.fqdn"></div>
+                    <span class="relative">
+                        <a class="h-24 box group" :href="item.hrefLink">
+                            <div class="flex flex-col mx-6">
+                                <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                <div class="description" x-text="item.description"></div>
+                                <div class="description" x-text="item.fqdn"></div>
+                            </div>
+                            <template x-if="item.status.startsWith('running')">
+                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                            </template>
+                            <template x-if="item.status.startsWith('exited')">
+                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                            </template>
+                            <template x-if="item.status.startsWith('restarting')">
+                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                            </template>
+                        </a>
+                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                            <template x-for="tag in item.tags">
+                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                    @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
+                            </template>
+                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                                @click.prevent="goto(item)">Add tag</div>
                         </div>
-                        <template x-if="item.status.startsWith('running')">
-                            <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                        </template>
-                        <template x-if="item.status.startsWith('exited')">
-                            <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                        </template>
-                        <template x-if="item.status.startsWith('restarting')">
-                            <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                        </template>
-                    </a>
+                    </span>
                 </template>
                 <template x-for="item in filteredPostgresqls" :key="item.id">
                     <a class="relative box group" :href="item.hrefLink">
@@ -184,6 +194,13 @@
             mysqls: @js($mysqls),
             mariadbs: @js($mariadbs),
             services: @js($services),
+            gotoTag(tag) {
+                window.location.href = '/tags/' + tag;
+            },
+            goto(item) {
+                const hrefLink = item.hrefLink;
+                window.location.href = `${hrefLink}#tags`;
+            },
             get filteredApplications() {
                 if (this.search === '') {
                     return this.applications;

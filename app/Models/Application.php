@@ -211,6 +211,10 @@ class Application extends BaseModel
                 : explode(',', $this->ports_exposes)
         );
     }
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
     public function team()
     {
         return data_get($this, 'environment.project.team');

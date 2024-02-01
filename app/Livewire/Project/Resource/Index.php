@@ -29,7 +29,7 @@ class Index extends Component
         }
         $this->project = $project;
         $this->environment = $environment;
-        $this->applications = $environment->applications->sortBy('name');
+        $this->applications = $environment->applications->load(['tags'])->sortBy('name');
         $this->applications = $this->applications->map(function ($application) {
             if (data_get($application, 'environment.project.uuid')) {
                 $application->hrefLink = route('project.application.configuration', [
