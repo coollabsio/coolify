@@ -1670,15 +1670,21 @@ function ip_match($ip, $cidrs, &$match = null)
 function check_fqdn_usage(ServiceApplication|Application $own_resource)
 {
     $domains = collect($own_resource->fqdns)->map(function ($domain) {
-        return Url::fromString($domain)->getHost();
+        if (str($domain)->endsWith('/')) {
+            $domain = str($domain)->beforeLast('/');
+        }
+        return str($domain)->replace('http://', '')->replace('https://', '');
     });
     $apps = Application::all();
     foreach ($apps as $app) {
         $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
         foreach ($list_of_domains as $domain) {
-            $naked_domain = Url::fromString($domain)->getHost();
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->replace('http://', '')->replace('https://', '')->value();
             if ($domains->contains($naked_domain)) {
-                if ($app->uuid !== $own_resource->uuid ) {
+                if ($app->uuid !== $own_resource->uuid) {
                     throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
                 }
             }
@@ -1688,7 +1694,10 @@ function check_fqdn_usage(ServiceApplication|Application $own_resource)
     foreach ($apps as $app) {
         $list_of_domains = collect(explode(',', $app->fqdn))->filter(fn ($fqdn) => $fqdn !== '');
         foreach ($list_of_domains as $domain) {
-            $naked_domain = Url::fromString($domain)->getHost();
+            if (str($domain)->endsWith('/')) {
+                $domain = str($domain)->beforeLast('/');
+            }
+            $naked_domain = str($domain)->replace('http://', '')->replace('https://', '')->value();
             if ($domains->contains($naked_domain)) {
                 if ($app->uuid !== $own_resource->uuid) {
                     throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
