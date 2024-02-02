@@ -110,7 +110,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
     if ($error instanceof UniqueConstraintViolationException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Duplicate entry found.","Please use a different name.");
+            return $livewire->dispatch('error', "Duplicate entry found.", "Please use a different name.");
         }
         return "Duplicate entry found. Please use a different name.";
     }
@@ -485,8 +485,8 @@ function generatTagDeployWebhook($tag_name)
 {
     $baseUrl = base_url();
     $api = Url::fromString($baseUrl) . '/api/v1';
-    $endpoint = "/deploy/tag/$tag_name";
-    $url = $api . $endpoint . "?force=false";
+    $endpoint = "/deploy?tag=$tag_name";
+    $url = $api . $endpoint;
     return $url;
 }
 function generateDeployWebhook($resource)

@@ -9,11 +9,33 @@ class Tags extends Component
 {
     public $resource = null;
     public ?string $new_tag = null;
+    public $tags = [];
     protected $listeners = [
         'refresh' => '$refresh',
     ];
+    protected $rules = [
+        'resource.tags.*.name' => 'required|string|min:2',
+        'new_tag' => 'required|string|min:2'
+    ];
+    protected $validationAttributes = [
+        'new_tag' => 'tag'
+    ];
     public function mount()
     {
+        $this->tags = Tag::ownedByCurrentTeam()->get();
+    }
+    public function addTag(string $id, string $name)
+    {
+        try {
+            if ($this->resource->tags()->where('id', $id)->exists()) {
+                $this->dispatch('error', 'Duplicate tags.', "Tag <span class='text-warning'>$name</span> already added.");
+                return;
+            }
+            $this->resource->tags()->syncWithoutDetaching($id);
+            $this->refresh();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
     public function deleteTag($id, $name)
     {
@@ -41,6 +63,10 @@ class Tags extends Component
             ]);
             $tags = str($this->new_tag)->trim()->explode(' ');
             foreach ($tags as $tag) {
+                if ($this->resource->tags()->where('name', $tag)->exists()) {
+                    $this->dispatch('error', 'Duplicate tags.', "Tag <span class='text-warning'>$tag</span> already added.");
+                    continue;
+                }
                 $found = Tag::where(['name' => $tag, 'team_id' => currentTeam()->id])->first();
                 if (!$found) {
                     $found = Tag::create([

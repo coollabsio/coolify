@@ -45,6 +45,7 @@ class DeleteService
             foreach ($service->databases()->get() as $database) {
                 $database->forceDelete();
             }
+            $service->tags()->detach();
         }
     }
 }

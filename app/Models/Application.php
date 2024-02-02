@@ -49,6 +49,7 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
+            $application->tags()->detach();
         });
     }
 

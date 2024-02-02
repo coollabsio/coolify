@@ -102,41 +102,40 @@
 </div>
 
 <div class="flex items-center gap-2">
-    <h3 class="py-4">Deployments </h3>
+    <h3 class="py-4">Deployments</h3>
     @if (count($deployments_per_server) > 0)
         <x-loading />
     @endif
 </div>
-{{-- <div wire:poll.4000ms="get_deployments" class="grid grid-cols-1 gap-2 lg:grid-cols-3"> --}}
-<div class="grid grid-cols-1">
+<div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
     @forelse ($deployments_per_server as $server_name => $deployments)
-    <h4 class="py-4">{{ $server_name }}</h4>
-    <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-        @foreach ($deployments as $deployment)
-            <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                'border-white' => data_get($deployment, 'status') === 'queued',
-                'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-            ])>
-                <div class="flex flex-col mx-6">
-                    <div class="font-bold text-white">
-                        {{ data_get($deployment, 'application_name') }}
-                    </div>
-                    @if (data_get($deployment, 'pull_request_id') !== 0)
-                        <div class="description">
-                            PR #{{ data_get($deployment, 'pull_request_id') }}
+        <h4 class="py-4">{{ $server_name }}</h4>
+        <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
+            @foreach ($deployments as $deployment)
+                <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                    'gap-2 cursor-pointer box group border-l-2 border-dotted',
+                    'border-coolgray-500' => data_get($deployment, 'status') === 'queued',
+                    'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                ])>
+                    <div class="flex flex-col mx-6">
+                        <div class="font-bold text-white">
+                            {{ data_get($deployment, 'application_name') }}
                         </div>
-                    @endif
-                    <div class="description">
-                        {{ str(data_get($deployment, 'status'))->headline() }}
+                        @if (data_get($deployment, 'pull_request_id') !== 0)
+                            <div class="description">
+                                PR #{{ data_get($deployment, 'pull_request_id') }}
+                            </div>
+                        @endif
+                        <div class="description">
+                            {{ str(data_get($deployment, 'status'))->headline() }}
+                        </div>
                     </div>
-                </div>
-                <div class="flex-1"></div>
-            </a>
-        @endforeach
+                    <div class="flex-1"></div>
+                </a>
+            @endforeach
         </div>
     @empty
-        <div>No queued / in progress deployments</div>
+        <div>No deployments running.</div>
     @endforelse
 </div>
 <script>
