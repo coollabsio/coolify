@@ -14,6 +14,10 @@ button[isError] {
     @apply bg-red-600 hover:bg-red-700;
 }
 
+button[isHighlighted] {
+    @apply bg-coollabs hover:bg-coollabs-100;
+}
+
 .scrollbar {
     @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
 }
@@ -76,7 +80,7 @@ a {
 }
 
 .box-without-bg {
-    @apply flex p-2 transition-colors min-h-full hover:text-white hover:no-underline min-h-[4rem];
+    @apply flex p-2 transition-colors hover:text-white hover:no-underline min-h-[4rem];
 }
 
 .description {

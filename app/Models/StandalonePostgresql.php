@@ -40,7 +40,13 @@ class StandalonePostgresql extends BaseModel
             $database->scheduledBackups()->delete();
             $database->persistentStorages()->delete();
             $database->environment_variables()->delete();
+            $database->tags()->detach();
         });
+    }
+
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
     }
     public function link()
     {

@@ -63,6 +63,9 @@
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
+            <a :class="activeTab === 'tags' && 'text-white'"
+                @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
+            </a>
             <a :class="activeTab === 'danger' && 'text-white'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
@@ -111,6 +114,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'resource-operations'">
                 <livewire:project.shared.resource-operations :resource="$application" />
+            </div>
+            <div x-cloak x-show="activeTab === 'tags'">
+                <livewire:project.shared.tags :resource="$application" />
             </div>
             <div x-cloak x-show="activeTab === 'danger'">
                 <livewire:project.shared.danger :resource="$application" />

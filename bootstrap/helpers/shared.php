@@ -110,9 +110,9 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
     if ($error instanceof UniqueConstraintViolationException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "A resource with the same name already exists.");
+            return $livewire->dispatch('error', "Duplicate entry found.", "Please use a different name.");
         }
-        return "A resource with the same name already exists.";
+        return "Duplicate entry found. Please use a different name.";
     }
 
     if ($error instanceof Throwable) {
@@ -481,7 +481,14 @@ function queryResourcesByUuid(string $uuid)
     if ($mariadb) return $mariadb;
     return $resource;
 }
-
+function generatTagDeployWebhook($tag_name)
+{
+    $baseUrl = base_url();
+    $api = Url::fromString($baseUrl) . '/api/v1';
+    $endpoint = "/deploy?tag=$tag_name";
+    $url = $api . $endpoint;
+    return $url;
+}
 function generateDeployWebhook($resource)
 {
     $baseUrl = base_url();

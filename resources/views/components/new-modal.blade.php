@@ -46,9 +46,16 @@
                         type="button">Cancel
                     </x-forms.button>
                     <div class="flex-1"></div>
-                    <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
-                        wire:click.prevent='{{ $action }}'>Continue
-                    </x-forms.button>
+                    @if ($isErrorButton)
+                        <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
+                            wire:click.prevent='{{ $action }}'>Continue
+                        </x-forms.button>
+                    @else
+                        <x-forms.button @click="modalOpen=false" class="w-24" isHighlighted type="button"
+                            wire:click.prevent='{{ $action }}'>Continue
+                        </x-forms.button>
+                    @endif
+
                 </div>
             </div>
         </div>

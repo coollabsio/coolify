@@ -20,6 +20,10 @@ class Service extends BaseModel
     {
         return data_get($this, 'environment.project.team');
     }
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
+    }
     public function extraFields()
     {
         $fields = collect([]);

@@ -5,13 +5,14 @@
     </div>
     <div class="flex items-end gap-2">
         <x-forms.input required id="newProjectName" label="New Project Name" />
-        <x-forms.button type="submit">Clone</x-forms.button>
+        <x-forms.button isHighlighted type="submit">Clone</x-forms.button>
     </div>
     <h3 class="pt-4 pb-2">Servers</h3>
+    <div>Choose the server and network to clone the resources to.</div>
     <div class="flex flex-col gap-4">
         @foreach ($servers->sortBy('id') as $server)
-            <div class="p-4 border border-coolgray-500">
-                <h3>{{ $server->name }}</h3>
+            <div class="p-4">
+                <h4>{{ $server->name }}</h4>
                 <h5>{{ $server->description }}</h5>
                 <div class="pt-4 pb-2">Docker Networks</div>
                 <div class="grid grid-cols-1 gap-2 pb-4 lg:grid-cols-4">
@@ -28,7 +29,8 @@
     </div>
 
     <h3 class="pt-4 pb-2">Resources</h3>
-    <div class="grid grid-cols-1 gap-2 p-4 border border-coolgray-500">
+    <div>These will be cloned to the new project</div>
+    <div class="grid grid-cols-1 gap-2 p-4 ">
         @foreach ($environment->applications->sortBy('name') as $application)
             <div>
                 <div class="flex flex-col">

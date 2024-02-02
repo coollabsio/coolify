@@ -49,6 +49,7 @@ class Application extends BaseModel
             $application->persistentStorages()->delete();
             $application->environment_variables()->delete();
             $application->environment_variables_preview()->delete();
+            $application->tags()->detach();
         });
     }
 
@@ -210,6 +211,10 @@ class Application extends BaseModel
                 ? []
                 : explode(',', $this->ports_exposes)
         );
+    }
+    public function tags()
+    {
+        return $this->morphToMany(Tag::class, 'taggable');
     }
     public function team()
     {

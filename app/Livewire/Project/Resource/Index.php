@@ -29,7 +29,7 @@ class Index extends Component
         }
         $this->project = $project;
         $this->environment = $environment;
-        $this->applications = $environment->applications->sortBy('name');
+        $this->applications = $environment->applications->load(['tags']);
         $this->applications = $this->applications->map(function ($application) {
             if (data_get($application, 'environment.project.uuid')) {
                 $application->hrefLink = route('project.application.configuration', [
@@ -40,8 +40,9 @@ class Index extends Component
             }
             return $application;
         });
-        $this->postgresqls = $environment->postgresqls->sortBy('name');
-        $this->postgresqls =  $this->postgresqls->map(function ($postgresql) {
+        ray($this->applications);
+        $this->postgresqls = $environment->postgresqls->load(['tags'])->sortBy('name');
+        $this->postgresqls = $this->postgresqls->map(function ($postgresql) {
             if (data_get($postgresql, 'environment.project.uuid')) {
                 $postgresql->hrefLink = route('project.database.configuration', [
                     'project_uuid' => data_get($postgresql, 'environment.project.uuid'),
@@ -51,7 +52,7 @@ class Index extends Component
             }
             return $postgresql;
         });
-        $this->redis = $environment->redis->sortBy('name');
+        $this->redis = $environment->redis->load(['tags'])->sortBy('name');
         $this->redis = $this->redis->map(function ($redis) {
             if (data_get($redis, 'environment.project.uuid')) {
                 $redis->hrefLink = route('project.database.configuration', [
@@ -62,7 +63,7 @@ class Index extends Component
             }
             return $redis;
         });
-        $this->mongodbs = $environment->mongodbs->sortBy('name');
+        $this->mongodbs = $environment->mongodbs->load(['tags'])->sortBy('name');
         $this->mongodbs = $this->mongodbs->map(function ($mongodb) {
             if (data_get($mongodb, 'environment.project.uuid')) {
                 $mongodb->hrefLink = route('project.database.configuration', [
@@ -73,7 +74,7 @@ class Index extends Component
             }
             return $mongodb;
         });
-        $this->mysqls = $environment->mysqls->sortBy('name');
+        $this->mysqls = $environment->mysqls->load(['tags'])->sortBy('name');
         $this->mysqls = $this->mysqls->map(function ($mysql) {
             if (data_get($mysql, 'environment.project.uuid')) {
                 $mysql->hrefLink = route('project.database.configuration', [
@@ -84,7 +85,7 @@ class Index extends Component
             }
             return $mysql;
         });
-        $this->mariadbs = $environment->mariadbs->sortBy('name');
+        $this->mariadbs = $environment->mariadbs->load(['tags'])->sortBy('name');
         $this->mariadbs = $this->mariadbs->map(function ($mariadb) {
             if (data_get($mariadb, 'environment.project.uuid')) {
                 $mariadb->hrefLink = route('project.database.configuration', [
@@ -95,7 +96,7 @@ class Index extends Component
             }
             return $mariadb;
         });
-        $this->services = $environment->services->sortBy('name');
+        $this->services = $environment->services->load(['tags'])->sortBy('name');
         $this->services = $this->services->map(function ($service) {
             if (data_get($service, 'environment.project.uuid')) {
                 $service->hrefLink = route('project.service.configuration', [

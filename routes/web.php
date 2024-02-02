@@ -67,6 +67,10 @@ use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
+
+use App\Livewire\Tags\Index as TagsIndex;
+use App\Livewire\Tags\Show as TagsShow;
+
 use App\Livewire\TeamSharedVariablesIndex;
 use App\Livewire\Waitlist\Index as WaitlistIndex;
 
@@ -106,7 +110,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/settings/license', SettingsLicense::class)->name('settings.license');
 
     Route::get('/profile', ProfileIndex::class)->name('profile');
-
+    Route::prefix('tags')->group(function () {
+        Route::get('/', TagsIndex::class)->name('tags.index');
+        Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
+    });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/new', TeamCreate::class)->name('team.create');
