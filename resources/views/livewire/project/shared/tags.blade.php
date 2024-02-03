@@ -24,7 +24,7 @@
     </form>
     @if ($tags->count() > 0)
         <h3 class="pt-4">Already defined tags</h3>
-        <div>Click to quickly add</div>
+        <div>Click to quickly add one.</div>
         <div class="flex gap-2 pt-4">
             @foreach ($tags as $tag)
                 <x-forms.button wire:click="addTag('{{ $tag->id }}','{{ $tag->name }}')">

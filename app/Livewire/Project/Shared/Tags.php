@@ -54,6 +54,7 @@ class Tags extends Component
     public function refresh()
     {
         $this->resource->load(['tags']);
+        $this->tags = Tag::ownedByCurrentTeam()->get();
         $this->new_tag = null;
     }
     public function submit()
