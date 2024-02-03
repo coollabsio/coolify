@@ -14,11 +14,19 @@
                 All resources will be redeployed.
             </x-new-modal>
         </div>
-        <div class="grid gap-2 pt-4 lg:grid-cols-4">
-            @foreach ($resources as $resource)
-                <a href="{{ $resource->link() }}" class="flex flex-col box group">
-                    <span class="font-bold text-white">{{ $resource->name }}</span>
-                    <span class="description">{{ $resource->description }}</span>
+        <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
+            @foreach ($applications as $application)
+                <a href="{{ $application->link() }}" class="flex flex-col box group">
+                    <span class="font-bold text-white">{{ $application->project()->name }}/{{$application->environment->name}}</span>
+                    <span class="text-white ">{{ $application->name }}</span>
+                    <span class="description">{{ $application->description }}</span>
+                </a>
+            @endforeach
+            @foreach ($services as $service)
+                <a href="{{ $service->link() }}" class="flex flex-col box group">
+                    <span class="font-bold text-white">{{ $service->project()->name }}/{{$service->environment->name}}</span>
+                    <span class="text-white ">{{ $service->name }}</span>
+                    <span class="description">{{ $service->description }}</span>
                 </a>
             @endforeach
         </div>

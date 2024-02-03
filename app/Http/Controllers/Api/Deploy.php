@@ -73,12 +73,17 @@ class Deploy extends Controller
                 $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $resources = $found_tag->resources()->get();
-            if ($resources->count() === 0) {
+            $applications = $found_tag->applications();
+            $services = $found_tag->services();
+            if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
                 continue;
             }
-            foreach ($resources as $resource) {
+            foreach ($applications as $resource) {
+                $return_message = $this->deploy_resource($resource, $force);
+                $message = $message->merge($return_message);
+            }
+            foreach ($services as $resource) {
                 $return_message = $this->deploy_resource($resource, $force);
                 $message = $message->merge($return_message);
             }

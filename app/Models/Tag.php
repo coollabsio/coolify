@@ -24,9 +24,8 @@ class Tag extends BaseModel
     {
         return $this->morphedByMany(Application::class, 'taggable');
     }
-
-    public function resources() {
-        return $this->applications();
+    public function services()
+    {
+        return $this->morphedByMany(Service::class, 'taggable');
     }
-
 }

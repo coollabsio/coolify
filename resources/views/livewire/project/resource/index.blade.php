@@ -46,7 +46,7 @@
     @else
         <div x-data="searchComponent()">
             <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
-            <div class="grid gap-4 pt-4 lg:grid-cols-4">
+            <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.id">
                     <span class="relative">
                         <a class="h-24 box group" :href="item.hrefLink">

@@ -16,6 +16,10 @@ class Service extends BaseModel
     {
         return 'service';
     }
+    public function project()
+    {
+        return data_get($this, 'environment.project');
+    }
     public function team()
     {
         return data_get($this, 'environment.project.team');

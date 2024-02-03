@@ -37,12 +37,13 @@ class Tags extends Component
             return handleError($e, $this);
         }
     }
-    public function deleteTag($id, $name)
+    public function deleteTag(string $id)
     {
         try {
-            $found_more_tags = Tag::where(['name' => $name, 'team_id' => currentTeam()->id])->first();
             $this->resource->tags()->detach($id);
-            if ($found_more_tags->resources()->get()->count() == 0) {
+
+            $found_more_tags = Tag::where(['id' => $id, 'team_id' => currentTeam()->id])->first();
+            if ($found_more_tags->applications()->count() == 0 && $found_more_tags->services()->count() == 0){
                 $found_more_tags->delete();
             }
             $this->refresh();
