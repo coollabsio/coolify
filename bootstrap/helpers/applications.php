@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
@@ -29,6 +30,9 @@ function queue_application_deployment(Application $application, string $deployme
     ]);
 
     if (next_queuable($server_id, $application_id)) {
+        $deployment->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $deployment->id,
         ));
@@ -40,6 +44,9 @@ function queue_next_deployment(Application $application)
     $server_id = $application->destination->server_id;
     $next_found = ApplicationDeploymentQueue::where('server_id', $server_id)->where('status', 'queued')->get()->sortBy('created_at')->first();
     if ($next_found) {
+        $next_found->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
         dispatch(new ApplicationDeploymentJob(
             application_deployment_queue_id: $next_found->id,
         ));
