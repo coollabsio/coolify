@@ -824,8 +824,12 @@ Route::post('/payments/stripe/events', function () {
                 if (!$team) {
                     throw new Exception('No team found for subscription: ' . $subscription->id);
                 }
-                SubscriptionInvoiceFailedJob::dispatch($team);
-                send_internal_notification('Invoice payment failed: ' . $subscription->team->id);
+                if (!$subscription->stripe_invoice_paid) {
+                    SubscriptionInvoiceFailedJob::dispatch($team);
+                    send_internal_notification('Invoice payment failed: ' . $subscription->team->id);
+                } else {
+                    send_internal_notification('Invoice payment failed but already paid: ' . $subscription->team->id);
+                }
                 break;
             case 'payment_intent.payment_failed':
                 $customerId = data_get($data, 'customer');
