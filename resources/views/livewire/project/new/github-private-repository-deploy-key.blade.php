@@ -8,7 +8,7 @@
                 <li class="step">Select a Repository, Branch & Save</li>
             </ul>
             <div class="flex flex-col justify-center gap-2 text-left xl:flex-row">
-                @foreach ($private_keys as $key)
+                @forelse ($private_keys as $key)
                     @if ($private_key_id == $key->id)
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                             wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
@@ -32,7 +32,16 @@
                             </div>
                         </div>
                     @endif
-                @endforeach
+                @empty
+                    <div class="flex flex-col items-center justify-center gap-2">
+                        <div class="text-neutral-500">
+                            No private keys found.
+                        </div>
+                        <a href="{{ route('security.private-key.index') }}">
+                            <x-forms.button>Create a new private key</x-forms.button>
+                        </a>
+                    </div>
+                @endforelse
             </div>
         @endif
         @if ($current_step === 'repository')

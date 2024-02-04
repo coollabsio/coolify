@@ -9,6 +9,7 @@ use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Spatie\Url\Url;
 use Illuminate\Support\Str;
@@ -18,7 +19,7 @@ class GithubPrivateRepositoryDeployKey extends Component
     public $current_step = 'private_keys';
     public $parameters;
     public $query;
-    public $private_keys;
+    public $private_keys =[];
     public int $private_key_id;
 
     public int $port = 3000;
@@ -32,6 +33,11 @@ class GithubPrivateRepositoryDeployKey extends Component
 
     public $build_pack = 'nixpacks';
     public bool $show_is_static = true;
+
+    private object $repository_url_parsed;
+    private GithubApp|GitlabApp|string $git_source = 'other';
+    private ?string $git_host = null;
+    private string $git_repository;
 
     protected $rules = [
         'repository_url' => 'required',
@@ -49,10 +55,7 @@ class GithubPrivateRepositoryDeployKey extends Component
         'publish_directory' => 'Publish directory',
         'build_pack' => 'Build pack',
     ];
-    private object $repository_url_parsed;
-    private GithubApp|GitlabApp|string $git_source = 'other';
-    private ?string $git_host = null;
-    private string $git_repository;
+
 
     public function mount()
     {
