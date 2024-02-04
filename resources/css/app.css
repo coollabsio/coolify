@@ -76,7 +76,7 @@ a {
 }
 
 .box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] bg-coolgray-100 hover:bg-coollabs-100 hover:text-white hover:no-underline min-w-[24rem];
+    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] bg-coolgray-100 hover:bg-coollabs-100 hover:text-white hover:no-underline;
 }
 
 .box-without-bg {
