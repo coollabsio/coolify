@@ -166,10 +166,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle(): void
     {
-        $this->application_deployment_queue->update([
-            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-        ]);
-
         // Generate custom host<->ip mapping
         $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
         if (!is_null($allContainers)) {

@@ -11,10 +11,15 @@
                 <div>
                     <div class="grid grid-cols-1 gap-2 pb-4 lg:grid-cols-4">
                         @foreach ($server->destinations() as $destination)
-                            <div class="flex flex-col gap-2 box" wire:click="cloneTo('{{ data_get($destination, 'id') }}')">
-                                <div class="font-bold text-white">{{ $server->name }}</div>
-                                <div>{{ $destination->name }}</div>
-                            </div>
+                            <x-new-modal action="cloneTo({{ data_get($destination, 'id') }})">
+                                <x:slot name="content">
+                                    <div class="flex flex-col gap-2 box">
+                                        <div class="font-bold text-white">{{ $server->name }}</div>
+                                        <div>{{ $destination->name }}</div>
+                                    </div>
+                                </x:slot>
+                                <div>You are about to clone this resource.</div>
+                            </x-new-modal>
                         @endforeach
                     </div>
                 </div>
@@ -32,10 +37,15 @@
             @forelse ($projects as $project)
                 <div class="flex flex-row flex-wrap gap-2">
                     @foreach ($project->environments as $environment)
-                        <div class="flex flex-col gap-2 box" wire:click="moveTo('{{ data_get($environment, 'id') }}')">
-                            <div class="font-bold text-white">{{ $project->name }}</div>
-                            <div><span class="text-warning">{{ $environment->name }}</span> environment</div>
-                        </div>
+                    <x-new-modal action="moveTo({{ data_get($environment, 'id') }})">
+                        <x:slot name="content">
+                            <div class="flex flex-col gap-2 box">
+                                <div class="font-bold text-white">{{ $project->name }}</div>
+                                <div><span class="text-warning">{{ $environment->name }}</span> environment</div>
+                            </div>
+                        </x:slot>
+                        <div>You are about to move this resource.</div>
+                    </x-new-modal>
                     @endforeach
                 </div>
             @empty

@@ -4,15 +4,22 @@
     'isErrorButton' => false,
     'disabled' => false,
     'action' => 'delete',
+    'content' => null,
 ])
 <div x-data="{ modalOpen: false }" @keydown.escape.window="modalOpen = false" :class="{ 'z-40': modalOpen }"
     class="relative w-auto h-auto">
-    @if ($disabled)
-        <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
-    @elseif ($isErrorButton)
-        <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+    @if ($content)
+        <div @click="modalOpen=true">
+            {{ $content }}
+        </div>
     @else
-        <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+        @if ($disabled)
+            <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
+        @elseif ($isErrorButton)
+            <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+        @else
+            <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+        @endif
     @endif
     <template x-teleport="body">
         <div x-show="modalOpen" class="fixed top-0 left-0 z-[99] flex items-center justify-center w-screen h-screen"
@@ -30,13 +37,13 @@
                 class="relative w-full py-6 border rounded shadow-lg bg-coolgray-100 px-7 border-coolgray-300 sm:max-w-lg">
                 <div class="flex items-center justify-between pb-3">
                     <h3 class="text-2xl font-bold">{{ $title }}</h3>
-                    <button @click="modalOpen=false"
+                    {{-- <button @click="modalOpen=false"
                         class="absolute top-0 right-0 flex items-center justify-center w-8 h-8 mt-5 mr-5 text-white rounded-full hover:bg-coolgray-300">
                         <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                         </svg>
-                    </button>
+                    </button> --}}
                 </div>
                 <div class="relative w-auto pb-8">
                     {{ $slot }}
@@ -48,14 +55,13 @@
                     <div class="flex-1"></div>
                     @if ($isErrorButton)
                         <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
-                            wire:click.prevent='{{ $action }}'>Continue
+                            wire:click.prevent="{{ $action }}">Continue
                         </x-forms.button>
                     @else
                         <x-forms.button @click="modalOpen=false" class="w-24" isHighlighted type="button"
-                            wire:click.prevent='{{ $action }}'>Continue
+                            wire:click.prevent="{{ $action }}">Continue
                         </x-forms.button>
                     @endif
-
                 </div>
             </div>
         </div>

@@ -12,7 +12,7 @@
         <x-navbar-subscription />
     @endif
 
-    <main class="main max-w-screen-2xl">
+    <main class="mx-auto main max-w-screen-2xl">
         {{ $slot }}
     </main>
 @endsection

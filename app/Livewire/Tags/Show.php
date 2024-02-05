@@ -9,15 +9,30 @@ use Livewire\Component;
 
 class Show extends Component
 {
+    public $tags;
     public Tag $tag;
-    public $resources;
+    public $applications;
+    public $services;
     public $webhook = null;
     public $deployments_per_tag_per_server = [];
 
+    public function mount()
+    {
+        $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
+        $tag = $this->tags->where('name', request()->tag_name)->first();
+        if (!$tag) {
+            return redirect()->route('tags.index');
+        }
+        $this->webhook = generatTagDeployWebhook($tag->name);
+        $this->applications = $tag->applications()->get();
+        $this->services = $tag->services()->get();
+        $this->tag = $tag;
+        $this->get_deployments();
+    }
     public function get_deployments()
     {
         try {
-            $resource_ids = $this->resources->pluck('id');
+            $resource_ids = $this->applications->pluck('id');
             $this->deployments_per_tag_per_server = ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->whereIn('application_id', $resource_ids)->get([
                 "id",
                 "application_id",
@@ -35,7 +50,11 @@ class Show extends Component
     public function redeploy_all()
     {
         try {
-            $this->resources->each(function ($resource) {
+            $this->applications->each(function ($resource) {
+                $deploy = new Deploy();
+                $deploy->deploy_resource($resource);
+            });
+            $this->services->each(function ($resource) {
                 $deploy = new Deploy();
                 $deploy->deploy_resource($resource);
             });
@@ -44,17 +63,7 @@ class Show extends Component
             return handleError($e, $this);
         }
     }
-    public function mount()
-    {
-        $tag = Tag::ownedByCurrentTeam()->where('name', request()->tag_name)->first();
-        if (!$tag) {
-            return redirect()->route('tags.index');
-        }
-        $this->webhook = generatTagDeployWebhook($tag->name);
-        $this->resources = $tag->resources()->get();
-        $this->tag = $tag;
-        $this->get_deployments();
-    }
+
     public function render()
     {
         return view('livewire.tags.show');
