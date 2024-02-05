@@ -7,8 +7,6 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Server;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Process;
-use Illuminate\Support\Str;
 use Livewire\Component;
 
 class DeploymentNavbar extends Component
@@ -37,7 +35,15 @@ class DeploymentNavbar extends Component
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
         $this->dispatch('refreshQueue');
     }
-
+    public function force_start()
+    {
+        try {
+            force_start_deployment($this->application_deployment_queue);
+        } catch (\Throwable $e) {
+            ray($e);
+            return handleError($e, $this);
+        }
+    }
     public function cancel()
     {
         try {
@@ -67,7 +73,6 @@ class DeploymentNavbar extends Component
                 'current_process_id' => null,
                 'status' => ApplicationDeploymentStatus::CANCELLED_BY_USER->value,
             ]);
-            // queue_next_deployment($this->application);
         }
     }
 }

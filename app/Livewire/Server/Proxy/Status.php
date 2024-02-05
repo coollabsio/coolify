@@ -12,10 +12,8 @@ class Status extends Component
     public Server $server;
     public bool $polling = false;
     public int $numberOfPolls = 0;
-
     protected $listeners = ['proxyStatusUpdated', 'startProxyPolling'];
-    public function mount() {
-    }
+
     public function startProxyPolling()
     {
         $this->checkProxy();

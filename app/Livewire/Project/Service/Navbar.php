@@ -57,7 +57,7 @@ class Navbar extends Component
         }
         $this->service->parse();
         $activity = StartService::run($this->service);
-        $this->dispatch('newMonitorActivity', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id);
     }
     public function stop(bool $forceCleanup = false)
     {
@@ -82,6 +82,6 @@ class Navbar extends Component
         StopService::run($this->service);
         $this->service->parse();
         $activity = StartService::run($this->service);
-        $this->dispatch('newMonitorActivity', $activity->id);
+        $this->dispatch('activityMonitor', $activity->id);
     }
 }

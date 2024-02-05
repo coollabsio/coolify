@@ -1,15 +1,5 @@
 @extends('layouts.base')
 @section('body')
-    <x-modal noSubmit modalId="installDocker">
-        <x-slot:modalBody>
-            <livewire:activity-monitor header="Docker Installation Logs" />
-        </x-slot:modalBody>
-        <x-slot:modalSubmit>
-            <x-forms.button onclick="installDocker.close()" type="submit">
-                Close
-            </x-forms.button>
-        </x-slot:modalSubmit>
-    </x-modal>
     @if (isSubscriptionActive() || isDev())
         <div title="Send us feedback or get help!" class="fixed top-0 right-0 p-2 px-4 pt-4 mt-auto text-xs">
             <button class="flex items-center justify-center gap-2" wire:click="help" onclick="help.showModal()">

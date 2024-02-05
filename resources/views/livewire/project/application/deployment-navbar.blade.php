@@ -5,8 +5,12 @@
     @else
         <x-forms.button wire:click.prevent="show_debug">Show Debug Logs</x-forms.button>
     @endif
+    @if (data_get($application_deployment_queue, 'status') === 'queued')
+        <x-forms.button wire:click.prevent="force_start">Force Start</x-forms.button>
+    @endif
     @if (data_get($application_deployment_queue, 'status') === 'in_progress' ||
             data_get($application_deployment_queue, 'status') === 'queued')
-        <x-forms.button isError wire:click.prevent="cancel">Cancel Deployment</x-forms.button>
+        <x-forms.button isError wire:click.prevent="cancel">Cancel</x-forms.button>
     @endif
+
 </div>

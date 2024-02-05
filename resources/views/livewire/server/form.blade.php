@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col">
+    <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
             @if ($server->id === 0)
@@ -18,10 +18,17 @@
             Server is reachable and validated.
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
-            <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
-                wire:click.prevent='validateServer' isHighlighted>
-                Validate Server & Install Docker Engine
-            </x-forms.button>
+            <x-slide-over closeWithX fullScreen>
+                <x-slot:title>Configuring Server</x-slot:title>
+                <x-slot:content>
+                    <livewire:server.validate-and-install :server="$server" />
+                </x-slot:content>
+                <x-forms.button @click="slideOverOpen=true"
+                    class="w-full mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"
+                    wire:click.prevent='validateServer' isHighlighted>
+                    Validate Server & Install Docker Engine
+                </x-forms.button>
+            </x-slide-over>
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id === 0)
             <x-forms.button class="mt-8 mb-4 font-bold box-without-bg bg-coollabs hover:bg-coollabs-100"

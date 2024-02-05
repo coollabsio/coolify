@@ -5,7 +5,7 @@ namespace App\Livewire\Project\Service;
 use App\Models\ServiceApplication;
 use Livewire\Component;
 
-class Application extends Component
+class ServiceApplicationView extends Component
 {
     public ServiceApplication $application;
     public $parameters;
@@ -20,7 +20,7 @@ class Application extends Component
     ];
     public function render()
     {
-        return view('livewire.project.service.application');
+        return view('livewire.project.service.service-application-view');
     }
     public function instantSave()
     {

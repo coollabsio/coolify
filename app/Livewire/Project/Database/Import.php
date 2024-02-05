@@ -129,7 +129,7 @@ class Import extends Component
 
             if (!empty($this->importCommands)) {
                 $activity = remote_process($this->importCommands, $this->server, ignore_errors: true);
-                $this->dispatch('newMonitorActivity', $activity->id);
+                $this->dispatch('activityMonitor', $activity->id);
             }
         } catch (\Throwable $e) {
             $this->validated = false;

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Notifications\Server\Revived;
@@ -410,6 +411,11 @@ class Server extends BaseModel
         }
 
         return true;
+    }
+    public function installDocker()
+    {
+        $activity = InstallDocker::run($this);
+        return $activity;
     }
     public function validateDockerEngine($throwError = false)
     {

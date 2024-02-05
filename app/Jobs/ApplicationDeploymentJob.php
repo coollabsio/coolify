@@ -122,7 +122,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($source) {
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
-        $this->destination = $this->application->destination->getMorphClass()::where('id', $this->application->destination->id)->first();
+        $this->server = Server::find($this->application_deployment_queue->server_id);
+        $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
         $this->basedir = $this->application->generateBaseDir($this->deployment_uuid);
@@ -561,12 +562,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->generate_build_env_variables();
         $this->add_build_env_variables_to_dockerfile();
         $this->build_image();
-        // if ($this->application->additional_destinations) {
-        //     $this->push_to_docker_registry();
-        //     $this->deploy_to_additional_destinations();
-        // } else {
         $this->rolling_update();
-        // }
     }
     private function deploy_nixpacks_buildpack()
     {
@@ -791,7 +787,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_to_additional_destinations()
     {
+        if (str($this->application->additional_destinations)->isEmpty()) {
+            return;
+        }
         $destination_ids = collect(str($this->application->additional_destinations)->explode(','));
+        if ($this->server->isSwarm()) {
+            $this->application_deployment_queue->addLogEntry("Additional destinations are not supported in swarm mode.");
+            return;
+        }
+        if ($destination_ids->contains($this->destination->id)) {
+            ray('Same destination found in additional destinations. Skipping.');
+            return;
+        }
         foreach ($destination_ids as $destination_id) {
             $destination = StandaloneDocker::find($destination_id);
             $server = $destination->server;
@@ -799,11 +806,21 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->application_deployment_queue->addLogEntry("Skipping deployment to {$server->name}. Not in the same team?!");
                 continue;
             }
-            $this->server = $server;
-            $this->application_deployment_queue->addLogEntry("Deploying to {$this->server->name}.");
-            $this->prepare_builder_image();
-            $this->generate_image_names();
-            $this->rolling_update();
+            // ray('Deploying to additional destination: ', $server->name);
+            $deployment_uuid = new Cuid2();
+            queue_application_deployment(
+                deployment_uuid: $deployment_uuid,
+                application: $this->application,
+                server: $server,
+                destination: $destination,
+                no_questions_asked: true,
+            );
+            $this->application_deployment_queue->addLogEntry("Deploying to additional server: {$server->name}. Click here to see the deployment status: " . route('project.application.deployment.show', [
+                'project_uuid' => data_get($this->application, 'environment.project.uuid'),
+                'application_uuid' => data_get($this->application, 'uuid'),
+                'deployment_uuid' => $deployment_uuid,
+                'environment_name' => data_get($this->application, 'environment.name'),
+            ]));
         }
     }
     private function set_base_dir()
@@ -1507,11 +1524,13 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'status' => $status,
             ]);
         }
-        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
-        }
         if ($status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
+            return;
+        }
+        if ($status === ApplicationDeploymentStatus::FINISHED->value) {
+            // $this->deploy_to_additional_destinations();
+            $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }
 

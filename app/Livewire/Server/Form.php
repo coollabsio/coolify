@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Server;
 
-use App\Actions\Server\InstallDocker;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -14,7 +13,8 @@ class Form extends Component
     public ?string $wildcard_domain = null;
     public int $cleanup_after_percentage;
     public bool $dockerInstallationStarted = false;
-    protected $listeners = ['serverRefresh'];
+
+    protected $listeners = ['serverInstalled'];
 
     protected $rules = [
         'server.name' => 'required',
@@ -49,9 +49,10 @@ class Form extends Component
         $this->wildcard_domain = $this->server->settings->wildcard_domain;
         $this->cleanup_after_percentage = $this->server->settings->cleanup_after_percentage;
     }
-    public function serverRefresh($install = true)
+    public function serverInstalled()
     {
-        $this->validateServer($install);
+        $this->server->refresh();
+        $this->server->settings->refresh();
     }
     public function instantSave()
     {
@@ -64,13 +65,6 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
-    public function installDocker()
-    {
-        $this->dispatch('installDocker');
-        $this->dockerInstallationStarted = true;
-        $activity = InstallDocker::run($this->server);
-        $this->dispatch('newMonitorActivity', $activity->id);
-    }
     public function checkLocalhostConnection()
     {
         $uptime = $this->server->validateConnection();
@@ -80,48 +74,13 @@ class Form extends Component
             $this->server->settings->is_usable = true;
             $this->server->settings->save();
         } else {
-            $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
+            $this->dispatch('error', 'Server is not reachable.', 'Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
             return;
         }
     }
     public function validateServer($install = true)
     {
-        try {
-            $uptime = $this->server->validateConnection();
-            if (!$uptime) {
-                $install &&  $this->dispatch('error', 'Server is not reachable.<br>Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.');
-                return;
-            }
-            $supported_os_type = $this->server->validateOS();
-            if (!$supported_os_type) {
-                $install && $this->dispatch('error', 'Server OS type is not supported for automated installation. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.');
-                return;
-            }
-            $dockerInstalled = $this->server->validateDockerEngine();
-            if ($dockerInstalled) {
-                $install && $this->dispatch('success', 'Docker Engine is installed.<br> Checking version.');
-            } else {
-                $install && $this->installDocker();
-                return;
-            }
-            $dockerVersion = $this->server->validateDockerEngineVersion();
-            if ($dockerVersion) {
-                $install && $this->dispatch('success', 'Docker Engine version is 22+.');
-            } else {
-                $install && $this->installDocker();
-                return;
-            }
-            if ($this->server->isSwarm()) {
-                $swarmInstalled = $this->server->validateDockerSwarm();
-                if ($swarmInstalled) {
-                    $install && $this->dispatch('success', 'Docker Swarm is initiated.');
-                }
-            }
-        } catch (\Throwable $e) {
-            return handleError($e, $this);
-        } finally {
-            $this->dispatch('proxyStatusUpdated');
-        }
+        $this->dispatch('validateServer', $install);
     }
 
     public function submit()
