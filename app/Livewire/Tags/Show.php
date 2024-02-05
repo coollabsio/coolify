@@ -9,6 +9,7 @@ use Livewire\Component;
 
 class Show extends Component
 {
+    public $tags;
     public Tag $tag;
     public $applications;
     public $services;
@@ -17,7 +18,8 @@ class Show extends Component
 
     public function mount()
     {
-        $tag = Tag::ownedByCurrentTeam()->where('name', request()->tag_name)->first();
+        $this->tags = Tag::ownedByCurrentTeam()->get()->unique('name')->sortBy('name');
+        $tag = $this->tags->where('name', request()->tag_name)->first();
         if (!$tag) {
             return redirect()->route('tags.index');
         }
