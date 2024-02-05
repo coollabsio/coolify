@@ -43,6 +43,7 @@ class InstallDocker
                 "echo 'Restarting Docker Engine...'",
                 "ls -l /tmp"
             ]);
+            return remote_process($command, $server);
         } else {
             if ($supported_os_type->contains('debian')) {
                 $command = $command->merge([
@@ -89,7 +90,6 @@ class InstallDocker
                     "echo 'Done!'",
                 ]);
             }
-
             return remote_process($command, $server);
         }
     }

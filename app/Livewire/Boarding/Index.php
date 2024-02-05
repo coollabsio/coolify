@@ -12,6 +12,7 @@ use Livewire\Component;
 
 class Index extends Component
 {
+    protected $listeners = ['serverInstalled' => 'validateServer'];
     public string $currentState = 'welcome';
 
     public ?string $selectedServerType = null;
@@ -93,7 +94,11 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
             return $this->validateServer('localhost');
         } elseif ($this->selectedServerType === 'remote') {
-            $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            if (isDev()) {
+                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->get();
+            } else {
+                $this->privateKeys = PrivateKey::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
+            }
             if ($this->privateKeys->count() > 0) {
                 $this->selectedExistingPrivateKey = $this->privateKeys->first()->id;
             }
@@ -190,6 +195,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->addInitialNetwork();
         $this->validateServer();
     }
+    public function installServer()
+    {
+        $this->dispatch('validateServer', true);
+    }
     public function validateServer()
     {
         try {
@@ -228,7 +237,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->dockerInstallationStarted = true;
             $activity = InstallDocker::run($this->createdServer);
             $this->dispatch('installDocker');
-            $this->dispatch('newMonitorActivity', $activity->id);
+            $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             $this->dockerInstallationStarted = false;
             return handleError(error: $e, livewire: $this);

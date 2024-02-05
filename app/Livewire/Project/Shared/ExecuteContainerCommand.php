@@ -115,7 +115,7 @@ class ExecuteContainerCommand extends Component
                 $exec = "docker exec {$this->container} {$cmd}";
             }
             $activity = remote_process([$exec], $this->server, ignore_errors: true);
-            $this->dispatch('newMonitorActivity', $activity->id);
+            $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

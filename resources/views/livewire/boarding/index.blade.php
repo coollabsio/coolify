@@ -5,7 +5,8 @@
             <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
             <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
             <div class="flex justify-center ">
-                <x-forms.button class="justify-center box" wire:click="$set('currentState','explanation')">Get Started
+                <x-forms.button class="justify-center w-64 box" wire:click="$set('currentState','explanation')">Get
+                    Started
                 </x-forms.button>
             </div>
         @endif
@@ -31,7 +32,7 @@
                         Telegram, Email, etc.) when something goes wrong, or an action needed from your side.</p>
                 </x-slot:explanation>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="explanation">Next
+                    <x-forms.button class="justify-center w-64 box" wire:click="explanation">Next
                     </x-forms.button>
                 </x-slot:actions>
             </x-boarding-step>
@@ -43,11 +44,11 @@
                     or on a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:target="setServerType('localhost')"
+                    <x-forms.button class="justify-center w-64 box" wire:target="setServerType('localhost')"
                         wire:click="setServerType('localhost')">Localhost
                     </x-forms.button>
 
-                    <x-forms.button class="justify-center box" wire:target="setServerType('remote')"
+                    <x-forms.button class="justify-center w-64 box " wire:target="setServerType('remote')"
                         wire:click="setServerType('remote')">Remote Server
                     </x-forms.button>
                     @if (!$serverReachable)
@@ -57,9 +58,10 @@
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <br />
-                        Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
+                        Check this <a target="_blank" class="underline"
+                            href="https://coolify.io/docs/server/openssh">documentation</a> for further help.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                        <x-forms.button class="box" wire:target="setServerType('localhost')"
+                        <x-forms.button class="w-64 box" wire:target="setServerType('localhost')"
                             wire:click="setServerType('localhost')">Check again
                         </x-forms.button>
                     @endif
@@ -83,10 +85,10 @@
                     Do you have your own SSH Private Key?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('own')"
+                    <x-forms.button class="justify-center w-64 box" wire:target="setPrivateKey('own')"
                         wire:click="setPrivateKey('own')">Yes
                     </x-forms.button>
-                    <x-forms.button class="justify-center box" wire:target="setPrivateKey('create')"
+                    <x-forms.button class="justify-center w-64 box" wire:target="setPrivateKey('create')"
                         wire:click="setPrivateKey('create')">No (create one for me)
                     </x-forms.button>
                     @if (count($privateKeys) > 0)
@@ -119,7 +121,7 @@
                     There are already servers available for your Team. Do you want to use one of them?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="createNewServer">No (create one for me)
+                    <x-forms.button class="justify-center w-64 box" wire:click="createNewServer">No (create one for me)
                     </x-forms.button>
                     <div>
                         <form wire:submit='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
@@ -139,7 +141,7 @@
                         'root' or skip the boarding process and add a new private key manually to Coolify and to the
                         server.
                         <x-forms.input readonly id="serverPublicKey"></x-forms.input>
-                        <x-forms.button class="box" wire:target="validateServer" wire:click="validateServer">Check
+                        <x-forms.button class="w-64 box" wire:target="validateServer" wire:click="validateServer">Check
                             again
                         </x-forms.button>
                     @endif
@@ -231,12 +233,16 @@
                     Could not find Docker Engine on your server. Do you want me to install it for you?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="installDocker">
-                        Let's do it!</x-forms.button>
-                    @if ($dockerInstallationStarted)
-                        <x-forms.button class="justify-center box" wire:click="dockerInstalledOrSkipped">
-                            Validate Server & Continue</x-forms.button>
-                    @endif
+                    <x-slide-over closeWithX fullScreen>
+                        <x-slot:title>Configuring Server</x-slot:title>
+                        <x-slot:content>
+                            <livewire:server.validate-and-install :server="$this->createdServer" />
+                        </x-slot:content>
+                        <x-forms.button @click="slideOverOpen=true" class="font-bold box w-96"
+                            wire:click.prevent='installServer' isHighlighted>
+                            Let's do it!
+                        </x-forms.button>
+                    </x-slide-over>
                 </x-slot:actions>
                 <x-slot:explanation>
                     <p>This will install the latest Docker Engine on your server, configure a few things to be able
@@ -246,7 +252,6 @@
                             documentation</a>.</p>
                 </x-slot:explanation>
             </x-boarding-step>
-
         @endif
     </div>
     <div>
@@ -289,7 +294,7 @@
                     @endif
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center box" wire:click="createNewProject">Let's create a new
+                    <x-forms.button class="justify-center w-64 box" wire:click="createNewProject">Let's create a new
                         one!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
@@ -322,7 +327,7 @@
                     I will redirect you to the new resource page, where you can create your first resource.
                 </x-slot:question>
                 <x-slot:actions>
-                    <div class="items-center justify-center box" wire:click="showNewResource">Let's do
+                    <div class="items-center justify-center w-64 box" wire:click="showNewResource">Let's do
                         it!</div>
                 </x-slot:actions>
                 <x-slot:explanation>

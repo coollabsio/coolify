@@ -170,6 +170,7 @@
                     }
                 })
                 window.Livewire.on('installDocker', () => {
+                    console.log('Installing Docker...');
                     installDocker.showModal();
                 })
             });

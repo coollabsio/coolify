@@ -11,7 +11,7 @@ class Show extends Component
     use AuthorizesRequests;
     public ?Server $server = null;
     public $parameters = [];
-    protected $listeners = ['proxyStatusUpdated' => '$refresh'];
+    protected $listeners = ['serverInstalled' => '$refresh'];
     public function mount()
     {
         $this->parameters = get_route_parameters();

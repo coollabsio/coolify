@@ -2,12 +2,11 @@
 
 namespace App\Livewire;
 
-use App\Enums\ProcessStatus;
 use App\Models\User;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
 
-class ActivityMonitor extends Component
+class NewActivityMonitor extends Component
 {
     public ?string $header = null;
     public $activityId;
@@ -15,7 +14,7 @@ class ActivityMonitor extends Component
     public $isPollingActive = false;
 
     protected $activity;
-    protected $listeners = ['activityMonitor' => 'newMonitorActivity'];
+    protected $listeners = ['newActivityMonitor' => 'newMonitorActivity'];
 
     public function newMonitorActivity($activityId, $eventToDispatch = 'activityFinished')
     {
@@ -44,30 +43,21 @@ class ActivityMonitor extends Component
             //     // $this->setStatus(ProcessStatus::ERROR);
             // }
             $this->isPollingActive = false;
-            if ($exit_code === 0) {
-                if ($this->eventToDispatch !== null) {
-                    if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
-                        $causer_id = data_get($this->activity, 'causer_id');
-                        $user = User::find($causer_id);
-                        if ($user) {
-                            foreach($user->teams as $team) {
-                                $teamId = $team->id;
-                                $this->eventToDispatch::dispatch($teamId);
-                            }
+            if ($this->eventToDispatch !== null) {
+                if (str($this->eventToDispatch)->startsWith('App\\Events\\')) {
+                    $causer_id = data_get($this->activity, 'causer_id');
+                    $user = User::find($causer_id);
+                    if ($user) {
+                        foreach ($user->teams as $team) {
+                            $teamId = $team->id;
+                            $this->eventToDispatch::dispatch($teamId);
                         }
-                        return;
                     }
-                    $this->dispatch($this->eventToDispatch);
+                    return;
                 }
+                $this->dispatch($this->eventToDispatch);
+                ray('Dispatched event: ' . $this->eventToDispatch);
             }
         }
     }
-
-    // protected function setStatus($status)
-    // {
-    //     $this->activity->properties = $this->activity->properties->merge([
-    //         'status' => $status,
-    //     ]);
-    //     $this->activity->save();
-    // }
 }

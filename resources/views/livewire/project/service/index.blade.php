@@ -28,7 +28,7 @@
         <div class="w-full pl-8">
             @isset($serviceApplication)
                 <div x-cloak x-show="activeTab === 'general'" class="h-full">
-                    <livewire:project.service.application :application="$serviceApplication" />
+                    <livewire:project.service.service-application-view :application="$serviceApplication" />
                 </div>
                 <div x-cloak x-show="activeTab === 'storages'">
                     <div class="flex items-center gap-2">

@@ -258,7 +258,8 @@
                 <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>
-                        <a class="font-bold text-white hover:no-underline" href="{{ config('coolify.contact') }}">Contact
+                        <a class="font-bold text-white hover:no-underline"
+                            href="{{ config('coolify.contact') }}">Contact
                             Us</a>
                     </x-forms.button>
                 </div>
