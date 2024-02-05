@@ -117,7 +117,8 @@ class StartRedis
         $this->commands[] = "echo 'Pulling {$database->image} image.'";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml pull";
         $this->commands[] = "docker compose -f $this->configuration_dir/docker-compose.yml up -d";
-        $this->commands[] = "echo '{$database->name} started.'";
+        $database_name = addslashes($database->name);
+        $this->commands[] = "echo '{$database_name} started.'";
         return remote_process($this->commands, $database->destination->server, callEventOnFinish: 'DatabaseStatusChanged');
     }
 
