@@ -40,21 +40,21 @@ function queue_application_deployment(Application $application, string $deployme
         'git_type' => $git_type
     ]);
 
-    // if ($no_questions_asked) {
-    //     $deployment->update([
-    //         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-    //     ]);
-    //     dispatch(new ApplicationDeploymentJob(
-    //         application_deployment_queue_id: $deployment->id,
-    //     ));
-    // } else if (next_queuable($server_id, $application_id)) {
-    //     $deployment->update([
-    //         'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
-    //     ]);
-    //     dispatch(new ApplicationDeploymentJob(
-    //         application_deployment_queue_id: $deployment->id,
-    //     ));
-    // }
+    if ($no_questions_asked) {
+        $deployment->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+        dispatch(new ApplicationDeploymentJob(
+            application_deployment_queue_id: $deployment->id,
+        ));
+    } else if (next_queuable($server_id, $application_id)) {
+        $deployment->update([
+            'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
+        ]);
+        dispatch(new ApplicationDeploymentJob(
+            application_deployment_queue_id: $deployment->id,
+        ));
+    }
 }
 function force_start_deployment(ApplicationDeploymentQueue $deployment)
 {
