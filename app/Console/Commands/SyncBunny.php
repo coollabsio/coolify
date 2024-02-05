@@ -48,7 +48,7 @@ class SyncBunny extends Command
 
         $versions = "versions.json";
 
-        PendingRequest::macro('storage', function ($fileName) use($that) {
+        PendingRequest::macro('storage', function ($fileName) use ($that) {
             $headers = [
                 'AccessKey' => env('BUNNY_STORAGE_API_KEY'),
                 'Accept' => 'application/json',
@@ -76,23 +76,26 @@ class SyncBunny extends Command
             }
             if ($only_template) {
                 $this->info('About to sync service-templates.json to BunnyCDN.');
-            }
-            if ($only_version) {
-                $this->info('About to sync versions.json to BunnyCDN.');
-            }
-            $confirmed = confirm('Are you sure you want to sync?');
-            if (!$confirmed) {
-                return;
-            }
-            if ($only_template) {
+                $confirmed = confirm("Are you sure you want to sync?");
+                if (!$confirmed) {
+                    return;
+                }
                 Http::pool(fn (Pool $pool) => [
                     $pool->storage(fileName: "$parent_dir/templates/$service_template")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$service_template"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$service_template"),
                 ]);
                 $this->info('Service template uploaded & purged...');
                 return;
-            }
-            if ($only_version) {
+            } else if ($only_version) {
+                $this->info('About to sync versions.json to BunnyCDN.');
+                $file = file_get_contents("$parent_dir/$versions");
+                $json = json_decode($file, true);
+                $actual_version = data_get($json, 'coolify.v4.version');
+
+                $confirmed = confirm("Are you sure you want to sync to {$actual_version}?");
+                if (!$confirmed) {
+                    return;
+                }
                 Http::pool(fn (Pool $pool) => [
                     $pool->storage(fileName: "$parent_dir/$versions")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$versions"),
                     $pool->purge("$bunny_cdn/$bunny_cdn_path/$versions"),
@@ -100,6 +103,7 @@ class SyncBunny extends Command
                 $this->info('versions.json uploaded & purged...');
                 return;
             }
+
 
             Http::pool(fn (Pool $pool) => [
                 $pool->storage(fileName: "$parent_dir/$compose_file")->put("/$bunny_cdn_storage_name/$bunny_cdn_path/$compose_file"),
