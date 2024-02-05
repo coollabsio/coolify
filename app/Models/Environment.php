@@ -13,6 +13,8 @@ class Environment extends Model
         return $this->applications()->count() == 0 &&
             $this->redis()->count() == 0 &&
             $this->postgresqls()->count() == 0 &&
+            $this->mysqls()->count() == 0 &&
+            $this->mariadbs()->count() == 0 &&
             $this->mongodbs()->count() == 0 &&
             $this->services()->count() == 0;
     }
