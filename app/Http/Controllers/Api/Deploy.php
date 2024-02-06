@@ -73,8 +73,8 @@ class Deploy extends Controller
                 $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $applications = $found_tag->applications();
-            $services = $found_tag->services();
+            $applications = $found_tag->applications()->get();
+            $services = $found_tag->services()->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
                 continue;
