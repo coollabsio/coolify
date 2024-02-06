@@ -73,8 +73,8 @@ class Deploy extends Controller
                 $message->push("Tag {$tag} not found.");
                 continue;
             }
-            $applications = $found_tag->applications();
-            $services = $found_tag->services();
+            $applications = $found_tag->applications()->get();
+            $services = $found_tag->services()->get();
             if ($applications->count() === 0 && $services->count() === 0) {
                 $message->push("No resources found for tag {$tag}.");
                 continue;
@@ -97,7 +97,10 @@ class Deploy extends Controller
     public function deploy_resource($resource, bool $force = false): Collection
     {
         $message = collect([]);
-        $type = $resource->getMorphClass();
+        if (gettype($resource) !== 'object') {
+            return $message->push("Resource ($resource) not found.");
+        }
+        $type = $resource?->getMorphClass();
         if ($type === 'App\Models\Application') {
             queue_application_deployment(
                 application: $resource,
