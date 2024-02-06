@@ -6,6 +6,6 @@
         <x-forms.textarea rows="10" id="description" label="Description"
             placeholder="Please provide as much information as possible."></x-forms.textarea>
         <div></div>
-        <x-forms.button class="w-full mt-4" type="submit" onclick="help.close()">Send Email</x-forms.button>
+        <x-forms.button class="w-full mt-4" type="submit" onclick="help.close()">Send</x-forms.button>
     </form>
 </div>

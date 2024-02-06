@@ -12,6 +12,7 @@ use App\Models\Tag;
 use App\Models\User;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Visus\Cuid2\Cuid2;
 
@@ -34,6 +35,16 @@ if (isDev()) {
 Route::get('/health', function () {
     return 'OK';
 });
+Route::post('/feedback', function (Request $request) {
+    $content = $request->input('content');
+    $webhook_url = config('coolify.feedback_discord_webhook');
+    if ($webhook_url) {
+        Http::post($webhook_url, [
+            'content' => $content
+        ]);
+    }
+    return response()->json(['message' => 'Feedback sent.'], 200);
+});
 // Route::group([
 //     'middleware' => $middlewares,
 //     'prefix' => 'v1'
@@ -53,6 +64,8 @@ Route::group([
     'prefix' => 'v1'
 ], function () {
     Route::get('/deploy', [Deploy::class, 'deploy']);
+
+
 });
 
 Route::middleware(['throttle:5'])->group(function () {

@@ -104,7 +104,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', "Too many requests.","Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
@@ -298,10 +298,8 @@ function validate_cron_expression($expression_to_validate): bool
 function send_internal_notification(string $message): void
 {
     try {
-        $baseUrl = config('app.name');
         $team = Team::find(0);
-        $team?->notify(new GeneralNotification("👀 {$baseUrl}: " . $message));
-        ray("👀 {$baseUrl}: " . $message);
+        $team?->notify(new GeneralNotification($message));
     } catch (\Throwable $e) {
         ray($e->getMessage());
     }
