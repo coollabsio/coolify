@@ -50,13 +50,14 @@ class Show extends Component
     public function redeploy_all()
     {
         try {
-            $this->applications->each(function ($resource) {
+            $message = collect([]);
+            $this->applications->each(function ($resource) use ($message) {
                 $deploy = new Deploy();
-                $deploy->deploy_resource($resource);
+                $message->push($deploy->deploy_resource($resource));
             });
-            $this->services->each(function ($resource) {
+            $this->services->each(function ($resource) use ($message) {
                 $deploy = new Deploy();
-                $deploy->deploy_resource($resource);
+                $message->push($deploy->deploy_resource($resource));
             });
             $this->dispatch('success', 'Mass deployment started.');
         } catch (\Exception $e) {
