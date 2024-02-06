@@ -15,7 +15,6 @@ class Application extends BaseModel
 {
     use SoftDeletes;
     protected $guarded = [];
-
     protected static function booted()
     {
         static::saving(function ($application) {
@@ -53,6 +52,16 @@ class Application extends BaseModel
         });
     }
 
+    public function additional_servers()
+    {
+        return $this->belongsToMany(Server::class, 'additional_destinations')
+            ->withPivot('standalone_docker_id');
+    }
+    public function additional_networks()
+    {
+        return $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')
+            ->withPivot('server_id');
+    }
     public function is_github_based(): bool
     {
         if (data_get($this, 'source')) {
@@ -216,7 +225,8 @@ class Application extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
-    public function project() {
+    public function project()
+    {
         return data_get($this, 'environment.project');
     }
     public function team()
@@ -435,7 +445,7 @@ class Application extends BaseModel
     {
         return "/artifacts/{$uuid}";
     }
-       function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
+    function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
         if ($this->git_commit_sha !== 'HEAD') {

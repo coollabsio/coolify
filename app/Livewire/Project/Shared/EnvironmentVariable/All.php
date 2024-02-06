@@ -171,7 +171,7 @@ class All extends Component
             }
             $environment->save();
             $this->refreshEnvs();
-            $this->dispatch('success', 'Environment variable added successfully.');
+            $this->dispatch('success', 'Environment variable added.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

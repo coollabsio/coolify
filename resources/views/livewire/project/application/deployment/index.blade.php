@@ -77,6 +77,11 @@
                             Manual
                         </div>
                     @endif
+                    @if (data_get($deployment, 'server_name'))
+                        <div class="flex gap-1">
+                            Server: {{ data_get($deployment, 'server_name') }}
+                        </div>
+                    @endif
                 </div>
 
                 <div class="flex flex-col" x-data="elapsedTime('{{ $deployment->deployment_uuid }}', '{{ $deployment->status }}', '{{ $deployment->created_at }}', '{{ $deployment->updated_at }}')">

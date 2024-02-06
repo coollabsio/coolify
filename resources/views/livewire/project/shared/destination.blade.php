@@ -1,38 +1,48 @@
 <div>
     <h2>Server</h2>
     <div class="">Server related configurations.</div>
-    <h3 class="pt-4">Destination Server & Network</h3>
-    <div class="py-4">
-        <a class="box"
+    <div class="grid grid-cols-2 gap-4 py-4">
+        {{-- <a class="box"
             href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}">On
             server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>
-            in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network.</a>
+            in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network</a>
+        @if (count($additional_destinations) > 0)
+            @foreach ($additional_destinations as $destination)
+                <a class="box"
+                    href="{{ route('server.show', ['server_uuid' => data_get($destination, 'server.uuid')]) }}">On server
+                    <span class="px-1 text-warning">{{ data_get($destination, 'server.name') }}</span> in <span
+                        class="px-1 text-warning"> {{ data_get($destination, 'network') }} </span> network</a>
+            @endforeach
+        @endif --}}
+        <div class="box"
+            wire:click="removeServer('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">
+            On
+            server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>
+            in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network</div>
+        @if (count($resource->additional_networks) > 0)
+            @foreach ($resource->additional_networks as $destination)
+                <div class="box"
+                    wire:click="removeServer('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">
+                    On
+                    server
+                    <span class="px-1 text-warning">{{ data_get($destination, 'server.name') }}</span> in <span
+                        class="px-1 text-warning"> {{ data_get($destination, 'network') }} </span> network
+                </div>
+            @endforeach
+        @endif
     </div>
-    {{-- Additional Destinations:
-    {{$resource->additional_destinations}} --}}
-    {{-- @if (count($servers) > 0)
-        <div>
-            <h3>Additional Servers</h3>
-            @foreach ($servers as $server)
-                <form wire:submit='submit' class="p-2 border border-coolgray-400">
-                    <h4>{{ $server->name }}</h4>
-                    <div class="text-sm text-coolgray-600">{{ $server->description }}</div>
-                    <x-forms.checkbox id="additionalServers.{{ $loop->index }}.enabled" label="Enabled">
-                    </x-forms.checkbox>
-                    <x-forms.select label="Destination" id="additionalServers.{{ $loop->index }}.destination" required>
-                        @foreach ($server->destinations() as $destination)
-                            @if ($loop->first)
-                                <option selected value="{{ $destination->uuid }}">{{ $destination->name }}</option>
-                                <option value="{{ $destination->uuid }}">{{ $destination->name }}</option>
-                            @else
-                                <option value="{{ $destination->uuid }}">{{ $destination->name }}</option>
-                                <option value="{{ $destination->uuid }}">{{ $destination->name }}</option>
-                            @endif
-                        @endforeach
-                    </x-forms.select>
-                    <x-forms.button type="submit">Save</x-forms.button>
-                </form>
+    <h4>Attach to a Server</h4>
+    @if (count($networks) > 0)
+        <div class="grid grid-cols-2 gap-4">
+            @foreach ($networks as $network)
+                <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
+                    class="box">
+                    {{ data_get($network, 'server.name') }}
+                    {{ $network->name }}
+                </div>
             @endforeach
         </div>
-    @endif --}}
+    @else
+        <div class="text-neutral-500">No additional servers available to attach.</div>
+    @endif
 </div>

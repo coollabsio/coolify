@@ -24,7 +24,6 @@ return new class extends Migration
             $table->string('taggable_type');
             $table->foreign('tag_id')->references('id')->on('tags')->onDelete('cascade');
             $table->unique(['tag_id', 'taggable_id', 'taggable_type'], 'taggable_unique'); // Composite unique index
-
         });
     }
 
