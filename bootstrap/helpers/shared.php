@@ -104,7 +104,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', "Too many requests.","Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
