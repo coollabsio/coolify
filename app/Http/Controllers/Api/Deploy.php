@@ -97,7 +97,7 @@ class Deploy extends Controller
     public function deploy_resource($resource, bool $force = false): Collection
     {
         $message = collect([]);
-        $type = $resource->getMorphClass();
+        $type = $resource?->getMorphClass();
         if ($type === 'App\Models\Application') {
             queue_application_deployment(
                 application: $resource,
