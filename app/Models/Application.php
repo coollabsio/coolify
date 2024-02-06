@@ -15,6 +15,9 @@ class Application extends BaseModel
 {
     use SoftDeletes;
     protected $guarded = [];
+    // protected $casts = [
+    //     'complex_status' => 'json',
+    // ];
     protected static function booted()
     {
         static::saving(function ($application) {

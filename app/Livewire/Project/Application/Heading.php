@@ -29,14 +29,19 @@ class Heading extends Component
 
     public function check_status($showNotification = false)
     {
-        if ($this->application->destination->server->isFunctional()) {
-            dispatch(new ContainerStatusJob($this->application->destination->server));
-            $this->application->refresh();
-            $this->application->previews->each(function ($preview) {
-                $preview->refresh();
-            });
-        } else {
-            dispatch(new ServerStatusJob($this->application->destination->server));
+        $all_servers = collect([]);
+        $all_servers = $all_servers->push($this->application->destination->server);
+        $all_servers = $all_servers->merge($this->application->additional_servers);
+        foreach ($all_servers as $server) {
+            if ($server->isFunctional()) {
+                dispatch(new ContainerStatusJob($server));
+                $this->application->refresh();
+                $this->application->previews->each(function ($preview) {
+                    $preview->refresh();
+                });
+            } else {
+                dispatch(new ServerStatusJob($this->application->destination->server));
+            }
         }
         if ($showNotification) $this->dispatch('success', "Application status updated.");
     }

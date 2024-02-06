@@ -126,7 +126,16 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             $foundApplications[] = $application->id;
                             $statusFromDb = $application->status;
                             if ($statusFromDb !== $containerStatus) {
+                                // if ($application->additional_networks->count() > 0) {
+                                // }
+                                //     if (!str($containerStatus)->contains('running')) {
+                                //         $application->update(['status' => 'degraded']);
+                                //     } else {
+                                //         $application->update(['status' => $containerStatus]);
+                                //     }
+                                // } else {
                                 $application->update(['status' => $containerStatus]);
+                                // }
                             }
                         } else {
                             //Notify user that this container should not be there.
@@ -160,10 +169,9 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             // Notify user that this container should not be there.
                         }
                     }
-                    if (data_get($container,'Name') === '/coolify-db') {
+                    if (data_get($container, 'Name') === '/coolify-db') {
                         $foundDatabases[] = 0;
                     }
-
                 }
                 $serviceLabelId = data_get($labels, 'coolify.serviceId');
                 if ($serviceLabelId) {
