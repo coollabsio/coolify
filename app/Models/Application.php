@@ -215,6 +215,26 @@ class Application extends BaseModel
 
         );
     }
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if ($this->additional_networks->count() === 0) {
+                    return $value;
+                } else {
+                    return 'complex';
+                }
+
+            },
+            get: function ($value) {
+                if ($this->additional_networks->count() === 0) {
+                    return $value;
+                } else {
+                    return 'complex';
+                }
+            },
+        );
+    }
 
     public function portsExposesArray(): Attribute
     {

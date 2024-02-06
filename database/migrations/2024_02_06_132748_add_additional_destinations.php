@@ -20,7 +20,6 @@ return new class extends Migration
         });
         Schema::table('applications', function (Blueprint $table) {
             $table->dropColumn('additional_destinations');
-            $table->text('complex_status')->nullable();
         });
     }
 
@@ -32,7 +31,6 @@ return new class extends Migration
         Schema::dropIfExists('additional_destinations');
         Schema::table('applications', function (Blueprint $table) {
             $table->string('additional_destinations')->nullable()->after('destination');
-            $table->dropColumn('complex_status');
         });
     }
 };
