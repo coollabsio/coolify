@@ -764,7 +764,6 @@ Route::post('/payments/stripe/events', function () {
         ]);
         $type = data_get($event, 'type');
         $data = data_get($event, 'data.object');
-        ray('Event: ' . $type);
         switch ($type) {
             case 'checkout.session.completed':
                 $clientReferenceId = data_get($data, 'client_reference_id');
@@ -779,7 +778,8 @@ Route::post('/payments/stripe/events', function () {
                 $team = Team::find($teamId);
                 $found = $team->members->where('id', $userId)->first();
                 if (!$found->isAdmin()) {
-                    throw new Exception("User {$userId} is not an admin or owner of team {$team->id}.");
+                    send_internal_notification("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
+                    throw new Exception("User {$userId} is not an admin or owner of team {$team->id}, customerid: {$customerId}, subscriptionid: {$subscriptionId}.");
                 }
                 $subscription = Subscription::where('team_id', $teamId)->first();
                 if ($subscription) {
@@ -819,25 +819,35 @@ Route::post('/payments/stripe/events', function () {
                 break;
             case 'invoice.payment_failed':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    send_internal_notification('invoice.payment_failed failed but no subscription found in Coolify for customer: ' . $customerId);
+                    return response('No subscription found in Coolify.');
+                }
                 $team = data_get($subscription, 'team');
                 if (!$team) {
-                    throw new Exception('No team found for subscription: ' . $subscription->id);
+                    send_internal_notification('invoice.payment_failed failed but no team found in Coolify for customer: ' . $customerId);
+                    return response('No team found in Coolify.');
                 }
                 if (!$subscription->stripe_invoice_paid) {
                     SubscriptionInvoiceFailedJob::dispatch($team);
-                    send_internal_notification('Invoice payment failed: ' . $subscription->team->id);
+                    send_internal_notification('Invoice payment failed: ' . $customerId);
                 } else {
-                    send_internal_notification('Invoice payment failed but already paid: ' . $subscription->team->id);
+                    send_internal_notification('Invoice payment failed but already paid: ' . $customerId);
                 }
                 break;
             case 'payment_intent.payment_failed':
                 $customerId = data_get($data, 'customer');
-                $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
-                $subscription->update([
-                    'stripe_invoice_paid' => false,
-                ]);
-                send_internal_notification('Subscription payment failed: ' . $subscription->team->id);
+                $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                if (!$subscription) {
+                    send_internal_notification('payment_intent.payment_failed, no subscription found in Coolify for customer: ' . $customerId);
+                    return response('No subscription found in Coolify.');
+                }
+                if ($subscription->stripe_invoice_paid) {
+                    send_internal_notification('payment_intent.payment_failed but invoice is active for customer: ' . $customerId);
+                    return;
+                }
+                send_internal_notification('Subscription payment failed for customer: ' . $customerId);
                 break;
             case 'customer.subscription.updated':
                 $customerId = data_get($data, 'customer');
@@ -868,7 +878,7 @@ Route::post('/payments/stripe/events', function () {
                     $subscription->update([
                         'stripe_invoice_paid' => false,
                     ]);
-                    send_internal_notification('Subscription paused or incomplete for team: ' . $subscription->team->id);
+                    send_internal_notification('Subscription paused or incomplete for customer: ' . $customerId);
                 }
 
                 // Trial ended but subscribed, reactive servers
@@ -878,7 +888,7 @@ Route::post('/payments/stripe/events', function () {
                 }
 
                 if ($feedback) {
-                    $reason = "Cancellation feedback for {$subscription->team->id}: '" . $feedback . "'";
+                    $reason = "Cancellation feedback for {$customerId}: '" . $feedback . "'";
                     if ($comment) {
                         $reason .= ' with comment: \'' . $comment . "'";
                     }
@@ -888,7 +898,7 @@ Route::post('/payments/stripe/events', function () {
                     if ($cancelAtPeriodEnd) {
                         // send_internal_notification('Subscription cancelled at period end for team: ' . $subscription->team->id);
                     } else {
-                        send_internal_notification('Subscription resumed for team: ' . $subscription->team->id);
+                        send_internal_notification('customer.subscription.updated for customer: ' . $customerId);
                     }
                 }
                 break;
@@ -905,9 +915,10 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => false,
                     'stripe_trial_already_ended' => true,
                 ]);
-                // send_internal_notification('Subscription cancelled: ' . $subscription->team->id);
+                send_internal_notification('customer.subscription.deleted for customer: ' . $customerId);
                 break;
             case 'customer.subscription.trial_will_end':
+                // Not used for now
                 $customerId = data_get($data, 'customer');
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 $team = data_get($subscription, 'team');
@@ -929,7 +940,7 @@ Route::post('/payments/stripe/events', function () {
                     'stripe_invoice_paid' => false,
                 ]);
                 SubscriptionTrialEndedJob::dispatch($team);
-                send_internal_notification('Subscription paused for team: ' . $subscription->team->id);
+                send_internal_notification('Subscription paused for customer: ' . $customerId);
                 break;
             default:
                 // Unhandled event type
