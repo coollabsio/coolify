@@ -27,8 +27,8 @@
                 <a :class="activeTab === 'source' && 'text-white'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
             @endif
-            <a :class="activeTab === 'server' && 'text-white'"
-                @click.prevent="activeTab = 'server'; window.location.hash = 'server'" href="#">Server
+            <a :class="activeTab === 'servers' && 'text-white'"
+                @click.prevent="activeTab = 'servers'; window.location.hash = 'servers'" href="#">Servers
             </a>
 
             <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
@@ -88,7 +88,7 @@
                     <livewire:project.application.source :application="$application" />
                 </div>
             @endif
-            <div x-cloak x-show="activeTab === 'server'">
+            <div x-cloak x-show="activeTab === 'servers'">
                 <livewire:project.shared.destination :resource="$application" :servers="$servers" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">

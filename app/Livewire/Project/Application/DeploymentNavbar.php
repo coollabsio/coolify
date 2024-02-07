@@ -48,6 +48,8 @@ class DeploymentNavbar extends Component
     {
         try {
             $kill_command = "docker rm -f {$this->application_deployment_queue->deployment_uuid}";
+            $server_id = $this->application_deployment_queue->server_id ?? $this->application->destination->server_id;
+            $server = Server::find($server_id);
             if ($this->application_deployment_queue->logs) {
                 $previous_logs = json_decode($this->application_deployment_queue->logs, associative: true, flags: JSON_THROW_ON_ERROR);
 
@@ -63,8 +65,8 @@ class DeploymentNavbar extends Component
                 $this->application_deployment_queue->update([
                     'logs' => json_encode($previous_logs, flags: JSON_THROW_ON_ERROR),
                 ]);
-                instant_remote_process([$kill_command], $this->server);
             }
+            instant_remote_process([$kill_command], $server);
         } catch (\Throwable $e) {
             ray($e);
             return handleError($e, $this);

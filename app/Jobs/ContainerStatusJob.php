@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Database\StartDatabaseProxy;
 use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
+use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
 use App\Notifications\Container\ContainerRestarted;
@@ -42,6 +43,19 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
+        $applications = $this->server->applications();
+        foreach ($applications as $application) {
+            if ($application->additional_servers->count() > 0) {
+                $is_main_server = $application->destination->server->id === $this->server->id;
+                if ($is_main_server) {
+                    ComplexStatusCheck::run($application);
+                    $applications = $applications->filter(function ($value, $key) use ($application) {
+                        return $value->id !== $application->id;
+                    });
+                }
+            }
+        }
+
         if (!$this->server->isFunctional()) {
             return 'Server is not ready.';
         };
@@ -83,7 +97,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     });
                 }
             }
-            $applications = $this->server->applications();
             $databases = $this->server->databases();
             $services = $this->server->services()->get();
             $previews = $this->server->previews();
@@ -126,16 +139,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                             $foundApplications[] = $application->id;
                             $statusFromDb = $application->status;
                             if ($statusFromDb !== $containerStatus) {
-                                // if ($application->additional_networks->count() > 0) {
-                                // }
-                                //     if (!str($containerStatus)->contains('running')) {
-                                //         $application->update(['status' => 'degraded']);
-                                //     } else {
-                                //         $application->update(['status' => $containerStatus]);
-                                //     }
-                                // } else {
                                 $application->update(['status' => $containerStatus]);
-                                // }
                             }
                         } else {
                             //Notify user that this container should not be there.
@@ -217,7 +221,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             }
             $exitedServices = $exitedServices->unique('id');
             foreach ($exitedServices as $exitedService) {
-                if ($exitedService->status === 'exited') {
+                if (str($exitedService->status)->startsWith('exited')) {
                     continue;
                 }
                 $name = data_get($exitedService, 'name');
@@ -239,7 +243,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $notRunningApplications = $applications->pluck('id')->diff($foundApplications);
             foreach ($notRunningApplications as $applicationId) {
                 $application = $applications->where('id', $applicationId)->first();
-                if ($application->status === 'exited') {
+                if (str($application->status)->startsWith('exited')) {
                     continue;
                 }
                 $application->update(['status' => 'exited']);
@@ -264,7 +268,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $notRunningApplicationPreviews = $previews->pluck('id')->diff($foundApplicationPreviews);
             foreach ($notRunningApplicationPreviews as $previewId) {
                 $preview = $previews->where('id', $previewId)->first();
-                if ($preview->status === 'exited') {
+                if (str($preview->status)->startsWith('exited')) {
                     continue;
                 }
                 $preview->update(['status' => 'exited']);
@@ -289,7 +293,7 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
             $notRunningDatabases = $databases->pluck('id')->diff($foundDatabases);
             foreach ($notRunningDatabases as $database) {
                 $database = $databases->where('id', $database)->first();
-                if ($database->status === 'exited') {
+                if (str($database->status)->startsWith('exited')) {
                     continue;
                 }
                 $database->update(['status' => 'exited']);

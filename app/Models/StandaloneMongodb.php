@@ -46,7 +46,41 @@ class StandaloneMongodb extends BaseModel
             $database->tags()->detach();
         });
     }
-
+    public function realStatus()
+    {
+       return $this->getRawOriginal('status');
+    }
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } else if (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+                return "$status:$health";
+            },
+            get: function ($value) {
+                if (str($value)->contains('(')) {
+                    $status = str($value)->before('(')->trim()->value();
+                    $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                } else if (str($value)->contains(':')) {
+                    $status = str($value)->before(':')->trim()->value();
+                    $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                } else {
+                    $status = $value;
+                    $health = 'unhealthy';
+                }
+                return "$status:$health";
+            },
+        );
+    }
     public function tags()
     {
         return $this->morphToMany(Tag::class, 'taggable');

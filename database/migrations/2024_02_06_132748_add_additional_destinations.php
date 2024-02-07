@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('application_id')->constrained()->onDelete('cascade');
             $table->foreignId('server_id')->constrained()->onDelete('cascade');
+            $table->string('status')->default('exited');
             $table->foreignId('standalone_docker_id')->constrained()->onDelete('cascade');
             $table->timestamps();
         });

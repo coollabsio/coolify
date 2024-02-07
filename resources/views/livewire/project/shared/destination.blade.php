@@ -1,48 +1,66 @@
 <div>
-    <h2>Server</h2>
+    <h2>Servers</h2>
     <div class="">Server related configurations.</div>
-    <div class="grid grid-cols-2 gap-4 py-4">
-        {{-- <a class="box"
-            href="{{ route('server.show', ['server_uuid' => data_get($resource, 'destination.server.uuid')]) }}">On
-            server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>
-            in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network</a>
-        @if (count($additional_destinations) > 0)
-            @foreach ($additional_destinations as $destination)
-                <a class="box"
-                    href="{{ route('server.show', ['server_uuid' => data_get($destination, 'server.uuid')]) }}">On server
-                    <span class="px-1 text-warning">{{ data_get($destination, 'server.name') }}</span> in <span
-                        class="px-1 text-warning"> {{ data_get($destination, 'network') }} </span> network</a>
-            @endforeach
-        @endif --}}
-        <div class="box"
-            wire:click="removeServer('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">
-            On
-            server <span class="px-1 text-warning">{{ data_get($resource, 'destination.server.name') }}</span>
-            in <span class="px-1 text-warning"> {{ data_get($resource, 'destination.network') }} </span> network</div>
-        @if (count($resource->additional_networks) > 0)
+    <div class="grid grid-cols-1 gap-4 py-4">
+        <div class="flex gap-2">
+            <div class="relative box w-96">
+                @if (str($resource->realStatus())->startsWith('running'))
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge badge-xs">
+                    </div>
+                @elseif (str($resource->realStatus())->startsWith('exited'))
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-error -top-1 -left-1 badge badge-xs">
+                    </div>
+                @endif
+                <div>
+                    {{ data_get($resource, 'destination.server.name') }}/{{ data_get($resource, 'destination.network') }}
+                </div>
+            </div>
+            @if ($resource?->additional_networks?->count() > 0)
+                <x-forms.button
+                    wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">Redeploy</x-forms.button>
+            @endif
+        </div>
+        @if ($resource?->additional_networks?->count() > 0)
             @foreach ($resource->additional_networks as $destination)
-                <div class="box"
-                    wire:click="removeServer('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">
-                    On
-                    server
-                    <span class="px-1 text-warning">{{ data_get($destination, 'server.name') }}</span> in <span
-                        class="px-1 text-warning"> {{ data_get($destination, 'network') }} </span> network
+                <div class="flex gap-2">
+                    <div class="relative box w-96">
+                        @if (str(data_get($destination, 'pivot.status'))->startsWith('running'))
+                            <div title="{{ data_get($destination, 'pivot.status') }}"
+                                class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                        @elseif (str(data_get($destination, 'pivot.status'))->startsWith('exited'))
+                            <div title="{{ data_get($destination, 'pivot.status') }}"
+                                class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                        @endif
+                        <div>
+                            {{ data_get($destination, 'server.name') }}/{{ data_get($destination, 'network') }}
+                        </div>
+                    </div>
+                    <x-forms.button
+                        wire:click="redeploy('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">Redeploy</x-forms.button>
+                    <x-new-modal
+                        action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
+                        isErrorButton buttonTitle="Remove Server">
+                        This will stop the running application in this server and remove it as a deployment
+                        destination.<br><br>Please think again.
+                    </x-new-modal>
                 </div>
             @endforeach
         @endif
     </div>
-    <h4>Attach to a Server</h4>
-    @if (count($networks) > 0)
-        <div class="grid grid-cols-2 gap-4">
-            @foreach ($networks as $network)
-                <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                    class="box">
-                    {{ data_get($network, 'server.name') }}
-                    {{ $network->name }}
-                </div>
-            @endforeach
-        </div>
-    @else
-        <div class="text-neutral-500">No additional servers available to attach.</div>
+    @if ($resource->getMorphClass() === 'App\Models\Application')
+        @if (count($networks) > 0)
+            <h4 class="pb-4">Choose another server</h4>
+            <div class="grid grid-cols-1 gap-4 ">
+                @foreach ($networks as $network)
+                    <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
+                        class="box w-96">
+                        {{ data_get($network, 'server.name') }}
+                        {{ $network->name }}
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <div class="text-neutral-500">No additional servers available to attach.</div>
+        @endif
     @endif
 </div>
