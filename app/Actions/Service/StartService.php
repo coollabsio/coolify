@@ -21,7 +21,7 @@ class StartService
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
         $commands[] = "echo 'Creating Docker network.'";
         $commands[] = "docker network inspect $service->uuid >/dev/null 2>&1 || docker network create --attachable $service->uuid >/dev/null 2>&1 || true";
-        $commands[] = "echo Starting service $service_name on $server_name.";
+        $commands[] = "echo Starting service.";
         $commands[] = "echo 'Pulling images.'";
         $commands[] = "docker compose pull";
         $commands[] = "echo 'Starting containers.'";
