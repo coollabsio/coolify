@@ -243,9 +243,11 @@ class General extends Component
                     return str($domain)->trim()->lower();
                 });
                 $domains = $domains->unique();
-                foreach ($domains as $domain) {
-                    if (!validate_dns_entry($domain, $this->application->destination->server)) {
-                        $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.","Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='text-white underline' href='https://coolify.io/docs/dns-settings'>documentation</a> for further help.");
+                if ($this->application->additional_servers->count() === 0) {
+                    foreach ($domains as $domain) {
+                        if (!validate_dns_entry($domain, $this->application->destination->server)) {
+                            $showToaster && $this->dispatch('error', "Validating DNS ($domain) failed.","Make sure you have added the DNS records correctly.<br><br>Check this <a target='_blank' class='text-white underline' href='https://coolify.io/docs/dns-settings'>documentation</a> for further help.");
+                        }
                     }
                 }
                 check_fqdn_usage($this->application);

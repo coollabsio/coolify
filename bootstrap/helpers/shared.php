@@ -104,7 +104,7 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Too many requests.","Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', "Too many requests.", "Please try again in {$error->secondsUntilAvailable} seconds.");
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
@@ -1690,7 +1690,7 @@ function check_fqdn_usage(ServiceApplication|Application $own_resource)
             $naked_domain = str($domain)->replace('http://', '')->replace('https://', '')->value();
             if ($domains->contains($naked_domain)) {
                 if ($app->uuid !== $own_resource->uuid) {
-                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource.");
+                    throw new \RuntimeException("Domain $naked_domain is already in use by another resource:<br> {$app->name}.");
                 }
             }
         }

@@ -6,6 +6,7 @@ use App\Models\ApplicationDeploymentQueue;
 use App\Models\Project;
 use App\Models\Server;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Artisan;
 use Livewire\Component;
 
 class Dashboard extends Component
@@ -18,6 +19,12 @@ class Dashboard extends Component
         $this->servers = Server::ownedByCurrentTeam()->get();
         $this->projects = Project::ownedByCurrentTeam()->get();
         $this->get_deployments();
+    }
+    public function cleanup_queue()
+    {
+        Artisan::queue('app:init', [
+            '--cleanup-deployments' => 'true'
+        ]);
     }
     public function get_deployments()
     {

@@ -15,7 +15,6 @@ class Application extends BaseModel
 {
     use SoftDeletes;
     protected $guarded = [];
-
     protected static function booted()
     {
         static::saving(function ($application) {
@@ -53,6 +52,16 @@ class Application extends BaseModel
         });
     }
 
+    public function additional_servers()
+    {
+        return $this->belongsToMany(Server::class, 'additional_destinations')
+            ->withPivot('standalone_docker_id', 'status');
+    }
+    public function additional_networks()
+    {
+        return $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')
+            ->withPivot('server_id', 'status');
+    }
     public function is_github_based(): bool
     {
         if (data_get($this, 'source')) {
@@ -203,6 +212,79 @@ class Application extends BaseModel
 
         );
     }
+    public function realStatus()
+    {
+       return $this->getRawOriginal('status');
+    }
+    public function status(): Attribute
+    {
+        return Attribute::make(
+            set: function ($value) {
+                if ($this->additional_servers->count() === 0) {
+                    if (str($value)->contains('(')) {
+                        $status = str($value)->before('(')->trim()->value();
+                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                    } else if (str($value)->contains(':')) {
+                        $status = str($value)->before(':')->trim()->value();
+                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                    } else {
+                        $status = $value;
+                        $health = 'unhealthy';
+                    }
+                    return "$status:$health";
+                } else {
+                    if (str($value)->contains('(')) {
+                        $status = str($value)->before('(')->trim()->value();
+                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                    } else if (str($value)->contains(':')) {
+                        $status = str($value)->before(':')->trim()->value();
+                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                    } else {
+                        $status = $value;
+                        $health = 'unhealthy';
+                    }
+                    return "$status:$health";
+                }
+            },
+            get: function ($value) {
+                if ($this->additional_servers->count() === 0) {
+                    //running (healthy)
+                    if (str($value)->contains('(')) {
+                        $status = str($value)->before('(')->trim()->value();
+                        $health = str($value)->after('(')->before(')')->trim()->value() ?? 'unhealthy';
+                    } else if (str($value)->contains(':')) {
+                        $status = str($value)->before(':')->trim()->value();
+                        $health = str($value)->after(':')->trim()->value() ?? 'unhealthy';
+                    } else {
+                        $status = $value;
+                        $health = 'unhealthy';
+                    }
+                    return "$status:$health";
+                } else {
+                    $complex_status = null;
+                    $complex_health = null;
+                    $complex_status = $main_server_status = str($value)->before(':')->value();
+                    $complex_health = $main_server_health = str($value)->after(':')->value() ?? 'unhealthy';
+                    $additional_servers_status = $this->additional_servers->pluck('pivot.status');
+                    foreach ($additional_servers_status as $status) {
+                        $server_status = str($status)->before(':')->value();
+                        $server_health = str($status)->after(':')->value() ?? 'unhealthy';
+                        if ($server_status !== 'running') {
+                            if ($main_server_status !== $server_status) {
+                                $complex_status = 'degraded';
+                            }
+                        }
+                        if ($server_health !== 'healthy') {
+                            if ($main_server_health !== $server_health) {
+                                $complex_health = 'unhealthy';
+                            }
+                        }
+                    }
+                    return "$complex_status:$complex_health";
+                }
+            },
+        );
+    }
 
     public function portsExposesArray(): Attribute
     {
@@ -216,7 +298,8 @@ class Application extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
-    public function project() {
+    public function project()
+    {
         return data_get($this, 'environment.project');
     }
     public function team()
@@ -435,7 +518,7 @@ class Application extends BaseModel
     {
         return "/artifacts/{$uuid}";
     }
-       function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
+    function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
         if ($this->git_commit_sha !== 'HEAD') {

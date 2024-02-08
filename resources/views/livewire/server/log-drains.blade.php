@@ -15,7 +15,9 @@
                         <x-forms.input type="password" required id="server.settings.logdrain_newrelic_license_key"
                             label="License Key" />
                         <x-forms.input required id="server.settings.logdrain_newrelic_base_uri"
-                            placeholder="https://log-api.eu.newrelic.com/log/v1" label="Endpoint (EU / US)" />
+                            placeholder="https://log-api.eu.newrelic.com/log/v1"
+                            helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
+                            label="Endpoint" />
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 pt-6">

@@ -97,7 +97,7 @@
                             <x-forms.input id="application.docker_registry_image_tag" label="Docker Image Tag" />
                         @endif
                     @else
-                        @if ($application->destination->server->isSwarm())
+                        @if ($application->destination->server->isSwarm() || $application->additional_servers->count() > 0)
                             <x-forms.input id="application.docker_registry_image_name" required label="Docker Image" />
                             <x-forms.input id="application.docker_registry_image_tag"
                                 helper="If set, it will tag the built image with this tag too. <br><br>Example: If you set it to 'latest', it will push the image with the commit sha tag + with the latest tag."

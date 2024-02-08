@@ -27,7 +27,7 @@
             @if (!$application->destination->server->isSwarm())
                 <x-applications.advanced :application="$application" />
             @endif
-            @if ($application->status !== 'exited')
+            @if (!str($application->status)->startsWith('exited'))
                 @if (!$application->destination->server->isSwarm())
                     <button title="With rolling update if possible" wire:click='deploy'
                         class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">

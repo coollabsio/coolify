@@ -4,6 +4,7 @@ namespace App\Console;
 
 use App\Jobs\CheckLogDrainContainerJob;
 use App\Jobs\CleanupInstanceStuffsJob;
+use App\Jobs\ComplexContainerStatusJob;
 use App\Jobs\DatabaseBackupJob;
 use App\Jobs\ScheduledTaskJob;
 use App\Jobs\InstanceAutoUpdateJob;
@@ -91,7 +92,6 @@ class Kernel extends ConsoleKernel
     {
         $scheduled_backups = ScheduledDatabaseBackup::all();
         if ($scheduled_backups->isEmpty()) {
-            ray('no scheduled backups');
             return;
         }
         foreach ($scheduled_backups as $scheduled_backup) {
@@ -117,7 +117,6 @@ class Kernel extends ConsoleKernel
     {
         $scheduled_tasks = ScheduledTask::all();
         if ($scheduled_tasks->isEmpty()) {
-            ray('no scheduled tasks');
             return;
         }
         foreach ($scheduled_tasks as $scheduled_task) {

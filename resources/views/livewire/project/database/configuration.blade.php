@@ -21,10 +21,10 @@
                 @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                 href="#">Environment
                 Variables</a>
-            <a :class="activeTab === 'server' && 'text-white'"
-                @click.prevent="activeTab = 'server';
-                window.location.hash = 'server'"
-                href="#">Server
+            <a :class="activeTab === 'servers' && 'text-white'"
+                @click.prevent="activeTab = 'servers';
+                window.location.hash = 'servers'"
+                href="#">Servers
             </a>
             <a :class="activeTab === 'storages' && 'text-white'"
                 @click.prevent="activeTab = 'storages';
@@ -74,7 +74,7 @@
             <div x-cloak x-show="activeTab === 'environment-variables'">
                 <livewire:project.shared.environment-variable.all :resource="$database" />
             </div>
-            <div x-cloak x-show="activeTab === 'server'">
+            <div x-cloak x-show="activeTab === 'servers'">
                 <livewire:project.shared.destination :resource="$database" />
             </div>
             <div x-cloak x-show="activeTab === 'storages'">

@@ -61,7 +61,10 @@
                             <template x-if="item.status.startsWith('exited')">
                                 <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
                             </template>
-                            <template x-if="item.status.startsWith('restarting')">
+                            <template x-if="item.status.startsWith('restarting')" >
+                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
+                            </template>
+                            <template x-if="item.status.startsWith('degraded')">
                                 <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
                             </template>
                         </a>

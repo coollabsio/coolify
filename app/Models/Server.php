@@ -9,6 +9,7 @@ use App\Notifications\Server\Revived;
 use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Support\Facades\DB;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -248,9 +249,17 @@ class Server extends BaseModel
     }
     public function applications()
     {
-        return $this->destinations()->map(function ($standaloneDocker) {
+        $applications = $this->destinations()->map(function ($standaloneDocker) {
             return $standaloneDocker->applications;
         })->flatten();
+        $additionalApplicationIds = DB::table('additional_destinations')->where('server_id', $this->id)->get('application_id');
+        $additionalApplicationIds = collect($additionalApplicationIds)->map(function ($item) {
+            return $item->application_id;
+        });
+        Application::whereIn('id', $additionalApplicationIds)->get()->each(function ($application) use ($applications) {
+            $applications->push($application);
+        });
+        return $applications;
     }
     public function dockerComposeBasedApplications()
     {
@@ -300,7 +309,8 @@ class Server extends BaseModel
     {
         $standalone_docker = $this->hasMany(StandaloneDocker::class)->get();
         $swarm_docker = $this->hasMany(SwarmDocker::class)->get();
-        return $standalone_docker->concat($swarm_docker);
+        $asd = $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')->withPivot('server_id')->get();
+        return $standalone_docker->concat($swarm_docker)->concat($asd);
     }
 
     public function standaloneDockers()
