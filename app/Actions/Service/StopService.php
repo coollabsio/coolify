@@ -11,7 +11,6 @@ class StopService
     public function handle(Service $service)
     {
         try {
-            throw new \Exception('Not implemented');
             $server = $service->destination->server;
             if (!$server->isFunctional()) {
                 return 'Server is not functional';
