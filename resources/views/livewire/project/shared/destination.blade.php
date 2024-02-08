@@ -3,7 +3,7 @@
     <div class="">Server related configurations.</div>
     <div class="grid grid-cols-1 gap-4 py-4">
         <div class="flex gap-2">
-            <div class="relative flex flex-col box w-96">
+            <div class="relative flex flex-col text-white cursor-default box-without-bg bg-coolgray-100 w-96">
                 <div class="font-bold">Main Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
                     <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge badge-xs">
@@ -55,7 +55,7 @@
             @endforeach
         @endif
     </div>
-    @if ($resource->getMorphClass() === 'App\Models\Application')
+    {{-- @if ($resource->getMorphClass() === 'App\Models\Application')
         @if (count($networks) > 0)
             <h4>Choose another server</h4>
             <div class="pb-4 description">(experimental) </div>
@@ -71,5 +71,5 @@
         @else
             <div class="text-neutral-500">No additional servers available to attach.</div>
         @endif
-    @endif
+    @endif --}}
 </div>
