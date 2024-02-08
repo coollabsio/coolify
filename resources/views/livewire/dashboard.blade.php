@@ -29,7 +29,7 @@
     @endif
     @foreach ($projects as $project)
         <div class="gap-2 border border-transparent cursor-pointer box group">
-            @if (data_get($project, 'environments.0.name'))
+            @if (data_get($project, 'environments')->count() === 1)
                 <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                     href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                     <div class="font-bold text-white">{{ $project->name }}</div>
