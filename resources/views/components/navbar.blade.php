@@ -139,26 +139,19 @@
                             </a>
                         </li>
                     @endif
-                    <li title="Logout" class="hover:bg-coolgray-200">
-                        <form action="/logout" method="POST" class=" hover:bg-transparent">
-                            @csrf
-                            <button type="submit" class="rounded-none hover:text-white hover:bg-transparent">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
-                                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path d="M13 12v.01" />
-                                    <path d="M3 21h18" />
-                                    <path d="M5 21v-16a2 2 0 0 1 2 -2h7.5m2.5 10.5v7.5" />
-                                    <path d="M14 7h7m-3 -3l3 3l-3 3" />
-                                </svg>
-                            </button>
-                            Logout
-                        </form>
-                    </li>
+
                 </ul>
             </details>
-
+            @if (isCloud())
+                <li title="Admin">
+                    <a class="hover:bg-transparent" href="/admin">
+                        <svg class="text-pink-600 icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor"
+                                d="M177.62 159.6a52 52 0 0 1-34 34a12.2 12.2 0 0 1-3.6.55a12 12 0 0 1-3.6-23.45a28 28 0 0 0 18.32-18.32a12 12 0 0 1 22.9 7.2ZM220 144a92 92 0 0 1-184 0c0-28.81 11.27-58.18 33.48-87.28a12 12 0 0 1 17.9-1.33l19.69 19.11L127 19.89a12 12 0 0 1 18.94-5.12C168.2 33.25 220 82.85 220 144m-24 0c0-41.71-30.61-78.39-52.52-99.29l-20.21 55.4a12 12 0 0 1-19.63 4.5L80.71 82.36C67 103.38 60 124.06 60 144a68 68 0 0 0 136 0" />
+                        </svg>
+                    </a>
+                </li>
+            @endif
             <div class="flex-1"></div>
             @if (isInstanceAdmin() && !isCloud())
                 @persist('upgrade')
@@ -178,7 +171,7 @@
                 </a>
             </li>
 
-            <li title="Send us feedback or get help!" class="pb-6 hover:bg-transparent">
+            <li title="Send us feedback or get help!" class="hover:bg-transparent">
                 <div class="justify-center" wire:click="help" onclick="help.showModal()">
                     <svg class="icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                         <path fill="currentColor"
@@ -186,7 +179,16 @@
                     </svg>
                 </div>
             </li>
-
+            <form action="/logout" method="POST" class="hover:bg-transparent">
+            <li title="Logout" class="mb-6 hover:transparent">
+                    @csrf
+                    <button type="submit" class="rounded-none hover:text-white hover:bg-transparent">
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z"/>
+                        </svg>
+                    </button>
+                </li>
+            </form>
         </ul>
     </nav>
 @endauth

@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MagicController;
+
+use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Dev\Compose as Compose;
 
 use App\Livewire\Dashboard;
@@ -76,6 +78,9 @@ use App\Livewire\Waitlist\Index as WaitlistIndex;
 
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
+}
+if (isCloud()) {
+    Route::get('/admin', AdminIndex::class)->name('admin.index');
 }
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');

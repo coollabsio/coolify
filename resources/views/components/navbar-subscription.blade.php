@@ -27,21 +27,17 @@
             <li title="Send us feedback or get help!" class="fixed top-0 right-0 p-2 px-4 pt-4 mt-auto text-xs">
                 <div class="justify-center" wire:click="help" onclick="help.showModal()">
                     <svg class="icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor" d="M140 180a12 12 0 1 1-12-12a12 12 0 0 1 12 12M128 72c-22.06 0-40 16.15-40 36v4a8 8 0 0 0 16 0v-4c0-11 10.77-20 24-20s24 9 24 20s-10.77 20-24 20a8 8 0 0 0-8 8v8a8 8 0 0 0 16 0v-.72c18.24-3.35 32-17.9 32-35.28c0-19.85-17.94-36-40-36m104 56A104 104 0 1 1 128 24a104.11 104.11 0 0 1 104 104m-16 0a88 88 0 1 0-88 88a88.1 88.1 0 0 0 88-88"/>
+                        <path fill="currentColor"
+                            d="M140 180a12 12 0 1 1-12-12a12 12 0 0 1 12 12M128 72c-22.06 0-40 16.15-40 36v4a8 8 0 0 0 16 0v-4c0-11 10.77-20 24-20s24 9 24 20s-10.77 20-24 20a8 8 0 0 0-8 8v8a8 8 0 0 0 16 0v-.72c18.24-3.35 32-17.9 32-35.28c0-19.85-17.94-36-40-36m104 56A104 104 0 1 1 128 24a104.11 104.11 0 0 1 104 104m-16 0a88 88 0 1 0-88 88a88.1 88.1 0 0 0 88-88" />
                     </svg>
                 </div>
             </li>
             <li class="pb-6" title="Logout">
-                <form action="/logout" method="POST" class=" hover:bg-transparent">
+                <form action="/logout" method="POST" class="hover:bg-transparent">
                     @csrf
                     <button class="flex items-center gap-2 rounded-none hover:text-white hover:bg-transparent">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" stroke-width="1.5"
-                            stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                            <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                            <path d="M13 12v.01" />
-                            <path d="M3 21h18" />
-                            <path d="M5 21v-16a2 2 0 0 1 2 -2h7.5m2.5 10.5v7.5" />
-                            <path d="M14 7h7m-3 -3l3 3l-3 3" />
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z"/>
                         </svg>
                     </button>
                 </form>
