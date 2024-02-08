@@ -124,6 +124,7 @@ class Init extends Command
         try {
             $halted_deployments = ApplicationDeploymentQueue::where('status', '==', ApplicationDeploymentStatus::IN_PROGRESS)->where('status', '==', ApplicationDeploymentStatus::QUEUED)->get();
             foreach ($halted_deployments as $deployment) {
+                echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
             }
