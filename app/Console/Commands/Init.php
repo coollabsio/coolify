@@ -20,9 +20,9 @@ class Init extends Command
     public function handle()
     {
         $this->alive();
-        $init = $this->option('init');
-        if ($init) {
-            echo "Running init cleanups.\n";
+        $full_cleanup = $this->option('full-cleanup');
+        if ($full_cleanup) {
+            echo "Running init cleanupsg.\n";
 
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
