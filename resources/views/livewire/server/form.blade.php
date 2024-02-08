@@ -42,7 +42,7 @@
                 <x-forms.input id="server.description" label="Description" />
                 @if (!$server->settings->is_swarm_worker && !$server->settings->is_build_server)
                     <x-forms.input placeholder="https://example.com" id="wildcard_domain" label="Wildcard Domain"
-                        helper="Wildcard domain for your applications. If you set this, you will get a random generated domain for your new applications.<br><span class='font-bold text-white'>Example:</span><br>In case you set:<span class='text-helper'>https://example.com</span> your applications will get:<br> <span class='text-helper'>https://randomId.example.com</span>" />
+                        helper='A wildcard domain allows you to receive a randomly generated domain for your new applications. <br><br>For instance, if you set "https://example.com" as your wildcard domain, your applications will receive domains like "https://randomId.example.com".' />
                 @endif
 
             </div>
@@ -61,7 +61,7 @@
                             label="Use it as a build server?" />
                     @else
                         <x-forms.checkbox instantSave
-                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
+                            helper="If you are using Cloudflare Tunnels, enable this. It will proxy all SSH requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install or set up Cloudflare (cloudflared) on your server.</span>"
                             id="server.settings.is_cloudflare_tunnel" label="Cloudflare Tunnel" />
                         @if ($server->isSwarm())
                             <div class="pt-6"> Swarm support is experimental. </div>
@@ -93,9 +93,11 @@
             <h3 class="py-4">Settings</h3>
             <div class="flex gap-2">
                 <x-forms.input id="cleanup_after_percentage" label="Disk cleanup threshold (%)" required
-                    helper="Disk cleanup job will be executed if disk usage is more than this number." />
+                    helper="The disk cleanup task will run when the disk usage exceeds this threshold." />
                 <x-forms.input id="server.settings.concurrent_builds" label="Number of concurrent builds" required
-                    helper="You can define how many concurrent builds processes / deployments should run at the same time." />
+                    helper="You can specify the number of simultaneous build processes/deployments that should run concurrently." />
+                <x-forms.input id="server.settings.dynamic_timeout" label="Deployment timeout (seconds)" required
+                    helper="You can define the maximum duration for a deployment to run before timing it out." />
             </div>
         @endif
     </form>

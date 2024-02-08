@@ -28,6 +28,7 @@ class Form extends Component
         'server.settings.is_swarm_worker' => 'required|boolean',
         'server.settings.is_build_server' => 'required|boolean',
         'server.settings.concurrent_builds' => 'required|integer|min:1',
+        'server.settings.dynamic_timeout' => 'required|integer|min:1',
         'wildcard_domain' => 'nullable|url',
     ];
     protected $validationAttributes = [
@@ -42,6 +43,8 @@ class Form extends Component
         'server.settings.is_swarm_worker' => 'Swarm Worker',
         'server.settings.is_build_server' => 'Build Server',
         'server.settings.concurrent_builds' => 'Concurrent Builds',
+        'server.settings.dynamic_timeout' => 'Dynamic Timeout',
+
     ];
 
     public function mount()

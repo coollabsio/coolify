@@ -123,6 +123,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->source = $source->getMorphClass()::where('id', $this->application->source->id)->first();
         }
         $this->server = Server::find($this->application_deployment_queue->server_id);
+        $this->timeout = $this->server->settings->dynamic_timeout;
         $this->destination = $this->server->destinations()->where('id', $this->application_deployment_queue->destination_id)->first();
         $this->server = $this->mainServer = $this->destination->server;
         $this->serverUser = $this->server->user;
@@ -535,7 +536,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function push_to_docker_registry()
     {
-        $forceFail = false;
+        $forceFail = true;
         if (str($this->application->docker_registry_image_name)->isEmpty()) {
             ray('empty docker_registry_image_name');
             return;
