@@ -14,39 +14,41 @@ use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--cleanup}';
+    protected $signature = 'app:init {--full-cleanup}';
     protected $description = 'Cleanup instance related stuffs';
 
     public function handle()
     {
         $this->alive();
-        $cleanup = $this->option('cleanup');
-        if ($cleanup) {
-            echo "Running cleanups...\n";
-            $this->call('cleanup:stucked-resources');
+        $init = $this->option('init');
+        if ($init) {
+            echo "Running init cleanups.\n";
+
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
-
-            // $this->cleanup_ssh();
-        }
-        $this->cleanup_in_progress_application_deployments();
-        $this->cleanup_stucked_helper_containers();
-
-        try {
-            setup_dynamic_configuration();
-        } catch (\Throwable $e) {
-            echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
-        }
-
-        $settings = InstanceSettings::get();
-        if (!is_null(env('AUTOUPDATE', null))) {
-            if (env('AUTOUPDATE') == true) {
-                $settings->update(['is_auto_update_enabled' => true]);
-            } else {
-                $settings->update(['is_auto_update_enabled' => false]);
+            $this->cleanup_in_progress_application_deployments();
+            $this->cleanup_stucked_helper_containers();
+            $this->call('cleanup:queue');
+            $this->call('cleanup:stucked-resources');
+            try {
+                setup_dynamic_configuration();
+            } catch (\Throwable $e) {
+                echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }
+
+            $settings = InstanceSettings::get();
+            if (!is_null(env('AUTOUPDATE', null))) {
+                if (env('AUTOUPDATE') == true) {
+                    $settings->update(['is_auto_update_enabled' => true]);
+                } else {
+                    $settings->update(['is_auto_update_enabled' => false]);
+                }
+            }
+            return;
         }
-        $this->call('cleanup:queue');
+        echo "Running cleanups.\n";
+        $this->cleanup_stucked_helper_containers();
+        $this->call('cleanup:stucked-resources');
     }
     private function restore_coolify_db_backup()
     {
@@ -129,5 +131,4 @@ class Init extends Command
             echo "Error: {$e->getMessage()}\n";
         }
     }
-
 }
