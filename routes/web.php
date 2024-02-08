@@ -79,9 +79,7 @@ use App\Livewire\Waitlist\Index as WaitlistIndex;
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
-if (isCloud()) {
-    Route::get('/admin', AdminIndex::class)->name('admin.index');
-}
+Route::get('/admin', AdminIndex::class)->name('admin.index');
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
 Route::get('/api/v1/test/realtime', [Controller::class, 'realtime_test'])->middleware('auth');

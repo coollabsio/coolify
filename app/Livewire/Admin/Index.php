@@ -11,7 +11,10 @@ class Index extends Component
     public $users = [];
     public function mount()
     {
-        if (auth()->user()->id !== 0) {
+        if (!isCloud()) {
+            return redirect()->route('dashboard');
+        }
+        if (!isInstanceAdmin() && session('adminToken') === null) {
             return redirect()->route('dashboard');
         }
         $this->users = User::whereHas('teams', function ($query) {
