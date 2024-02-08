@@ -11,7 +11,7 @@ class Index extends Component
     public $users = [];
     public function mount()
     {
-        if (!isInstanceAdmin()) {
+        if (auth()->user()->id !== 0) {
             return redirect()->route('dashboard');
         }
         $this->users = User::whereHas('teams', function ($query) {
