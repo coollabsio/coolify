@@ -28,8 +28,6 @@ class Init extends Command
             return;
         }
         if ($full_cleanup) {
-            echo "Running init cleanupsg.\n";
-
             // Required for falsely deleted coolify db
             $this->restore_coolify_db_backup();
             $this->cleanup_in_progress_application_deployments();
@@ -52,7 +50,6 @@ class Init extends Command
             }
             return;
         }
-        echo "Running cleanups.\n";
         $this->cleanup_stucked_helper_containers();
         $this->call('cleanup:stucked-resources');
     }

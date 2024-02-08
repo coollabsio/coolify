@@ -20,7 +20,8 @@ class CleanupStuckedResources extends Command
 
     public function handle()
     {
-        echo "Running cleanup stucked...\n";
+        ray('Running cleanup stucked resources.');
+        echo "Running cleanup stucked resources.\n";
         $this->cleanup_stucked_resources();
     }
     private function cleanup_stucked_resources()
@@ -113,18 +114,18 @@ class CleanupStuckedResources extends Command
             $applications = Application::all();
             foreach ($applications as $application) {
                 if (!data_get($application, 'environment')) {
-                    echo 'Application without environment: ' . $application->name . ' soft deleting\n';
-                    $application->delete();
+                    echo 'Application without environment: ' . $application->name . '\n';
+                    $application->forceDelete();
                     continue;
                 }
                 if (!$application->destination()) {
-                    echo 'Application without destination: ' . $application->name . ' soft deleting\n';
-                    $application->delete();
+                    echo 'Application without destination: ' . $application->name . '\n';
+                    $application->forceDelete();
                     continue;
                 }
                 if (!data_get($application, 'destination.server')) {
-                    echo 'Application without server: ' . $application->name . ' soft deleting\n';
-                    $application->delete();
+                    echo 'Application without server: ' . $application->name . '\n';
+                    $application->forceDelete();
                     continue;
                 }
             }
@@ -135,18 +136,18 @@ class CleanupStuckedResources extends Command
             $postgresqls = StandalonePostgresql::all()->where('id', '!=', 0);
             foreach ($postgresqls as $postgresql) {
                 if (!data_get($postgresql, 'environment')) {
-                    echo 'Postgresql without environment: ' . $postgresql->name . ' soft deleting\n';
-                    $postgresql->delete();
+                    echo 'Postgresql without environment: ' . $postgresql->name . '\n';
+                    $postgresql->forceDelete();
                     continue;
                 }
                 if (!$postgresql->destination()) {
-                    echo 'Postgresql without destination: ' . $postgresql->name . ' soft deleting\n';
-                    $postgresql->delete();
+                    echo 'Postgresql without destination: ' . $postgresql->name . '\n';
+                    $postgresql->forceDelete();
                     continue;
                 }
                 if (!data_get($postgresql, 'destination.server')) {
-                    echo 'Postgresql without server: ' . $postgresql->name . ' soft deleting\n';
-                    $postgresql->delete();
+                    echo 'Postgresql without server: ' . $postgresql->name . '\n';
+                    $postgresql->forceDelete();
                     continue;
                 }
             }
@@ -157,18 +158,18 @@ class CleanupStuckedResources extends Command
             $redis = StandaloneRedis::all();
             foreach ($redis as $redis) {
                 if (!data_get($redis, 'environment')) {
-                    echo 'Redis without environment: ' . $redis->name . ' soft deleting\n';
-                    $redis->delete();
+                    echo 'Redis without environment: ' . $redis->name . '\n';
+                    $redis->forceDelete();
                     continue;
                 }
                 if (!$redis->destination()) {
-                    echo 'Redis without destination: ' . $redis->name . ' soft deleting\n';
-                    $redis->delete();
+                    echo 'Redis without destination: ' . $redis->name . '\n';
+                    $redis->forceDelete();
                     continue;
                 }
                 if (!data_get($redis, 'destination.server')) {
-                    echo 'Redis without server: ' . $redis->name . ' soft deleting\n';
-                    $redis->delete();
+                    echo 'Redis without server: ' . $redis->name . '\n';
+                    $redis->forceDelete();
                     continue;
                 }
             }
@@ -180,18 +181,18 @@ class CleanupStuckedResources extends Command
             $mongodbs = StandaloneMongodb::all();
             foreach ($mongodbs as $mongodb) {
                 if (!data_get($mongodb, 'environment')) {
-                    echo 'Mongodb without environment: ' . $mongodb->name . ' soft deleting\n';
-                    $mongodb->delete();
+                    echo 'Mongodb without environment: ' . $mongodb->name . '\n';
+                    $mongodb->forceDelete();
                     continue;
                 }
                 if (!$mongodb->destination()) {
-                    echo 'Mongodb without destination: ' . $mongodb->name . ' soft deleting\n';
-                    $mongodb->delete();
+                    echo 'Mongodb without destination: ' . $mongodb->name . '\n';
+                    $mongodb->forceDelete();
                     continue;
                 }
                 if (!data_get($mongodb, 'destination.server')) {
-                    echo 'Mongodb without server:  ' . $mongodb->name . ' soft deleting\n';
-                    $mongodb->delete();
+                    echo 'Mongodb without server:  ' . $mongodb->name . '\n';
+                    $mongodb->forceDelete();
                     continue;
                 }
             }
@@ -203,18 +204,18 @@ class CleanupStuckedResources extends Command
             $mysqls = StandaloneMysql::all();
             foreach ($mysqls as $mysql) {
                 if (!data_get($mysql, 'environment')) {
-                    echo 'Mysql without environment: ' . $mysql->name . ' soft deleting\n';
-                    $mysql->delete();
+                    echo 'Mysql without environment: ' . $mysql->name . '\n';
+                    $mysql->forceDelete();
                     continue;
                 }
                 if (!$mysql->destination()) {
-                    echo 'Mysql without destination: ' . $mysql->name . ' soft deleting\n';
-                    $mysql->delete();
+                    echo 'Mysql without destination: ' . $mysql->name . '\n';
+                    $mysql->forceDelete();
                     continue;
                 }
                 if (!data_get($mysql, 'destination.server')) {
-                    echo 'Mysql without server: ' . $mysql->name . ' soft deleting\n';
-                    $mysql->delete();
+                    echo 'Mysql without server: ' . $mysql->name . '\n';
+                    $mysql->forceDelete();
                     continue;
                 }
             }
@@ -226,18 +227,18 @@ class CleanupStuckedResources extends Command
             $mariadbs = StandaloneMariadb::all();
             foreach ($mariadbs as $mariadb) {
                 if (!data_get($mariadb, 'environment')) {
-                    echo 'Mariadb without environment: ' . $mariadb->name . ' soft deleting\n';
-                    $mariadb->delete();
+                    echo 'Mariadb without environment: ' . $mariadb->name . '\n';
+                    $mariadb->forceDelete();
                     continue;
                 }
                 if (!$mariadb->destination()) {
-                    echo 'Mariadb without destination: ' . $mariadb->name . ' soft deleting\n';
-                    $mariadb->delete();
+                    echo 'Mariadb without destination: ' . $mariadb->name . '\n';
+                    $mariadb->forceDelete();
                     continue;
                 }
                 if (!data_get($mariadb, 'destination.server')) {
-                    echo 'Mariadb without server: ' . $mariadb->name . ' soft deleting\n';
-                    $mariadb->delete();
+                    echo 'Mariadb without server: ' . $mariadb->name . '\n';
+                    $mariadb->forceDelete();
                     continue;
                 }
             }
@@ -249,18 +250,18 @@ class CleanupStuckedResources extends Command
             $services = Service::all();
             foreach ($services as $service) {
                 if (!data_get($service, 'environment')) {
-                    echo 'Service without environment: ' . $service->name . ' soft deleting\n';
-                    $service->delete();
+                    echo 'Service without environment: ' . $service->name . '\n';
+                    $service->forceDelete();
                     continue;
                 }
                 if (!$service->destination()) {
-                    echo 'Service without destination: ' . $service->name . ' soft deleting\n';
-                    $service->delete();
+                    echo 'Service without destination: ' . $service->name . '\n';
+                    $service->forceDelete();
                     continue;
                 }
                 if (!data_get($service, 'server')) {
-                    echo 'Service without server: ' . $service->name . ' soft deleting\n';
-                    $service->delete();
+                    echo 'Service without server: ' . $service->name . '\n';
+                    $service->forceDelete();
                     continue;
                 }
             }
@@ -271,8 +272,8 @@ class CleanupStuckedResources extends Command
             $serviceApplications = ServiceApplication::all();
             foreach ($serviceApplications as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceApplication without service: ' . $service->name . ' soft deleting\n';
-                    $service->delete();
+                    echo 'ServiceApplication without service: ' . $service->name . '\n';
+                    $service->forceDelete();
                     continue;
                 }
             }
@@ -283,8 +284,8 @@ class CleanupStuckedResources extends Command
             $serviceDatabases = ServiceDatabase::all();
             foreach ($serviceDatabases as $service) {
                 if (!data_get($service, 'service')) {
-                    echo 'ServiceDatabase without service: ' . $service->name . ' soft deleting\n';
-                    $service->delete();
+                    echo 'ServiceDatabase without service: ' . $service->name . '\n';
+                    $service->forceDelete();
                     continue;
                 }
             }

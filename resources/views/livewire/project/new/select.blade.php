@@ -1,5 +1,5 @@
 <div x-data x-init="$wire.loadServers">
-    <div class="flex gap-2 ">
+    <div class="flex gap-4 ">
         <h1>New Resource</h1>
         <div class="w-96">
             <x-forms.select wire:model="selectedEnvironment">
@@ -10,7 +10,7 @@
         </div>
     </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-2 pt-10">
+    <div class="flex flex-col gap-4 pt-10">
         @if ($current_step === 'type')
             <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
@@ -18,7 +18,7 @@
                 <li class="step">Select a Destination</li>
             </ul>
             <h2>Applications</h2>
-            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('public')">
                     <div class="flex flex-col mx-6">
                         <div class="font-bold text-white group-hover:text-white">
@@ -50,7 +50,7 @@
                     </div>
                 </div>
             </div>
-            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <div class="box group" wire:click="setType('dockerfile')">
                     <div class="flex flex-col mx-6">
                         <div class="font-bold text-white group-hover:text-white">
@@ -83,7 +83,7 @@
                 </div>
             </div>
             <h2 class="py-4">Databases</h2>
-            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-5">
                 <div class="box group" wire:click="setType('postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="font-bold text-white group-hover:text-white">
@@ -151,14 +151,14 @@
                     </div>
                 </div> --}}
             </div>
-            <div class="flex items-center gap-2" wire:init='loadServices'>
+            <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click='loadServices'>Reload Services List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
                     wire:model.live.debounce.200ms="search" placeholder="Search...">
             </div>
-            <div class="grid justify-start grid-cols-1 gap-2 text-left xl:grid-cols-3">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-5">
                 @if ($loadingServices)
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
@@ -211,7 +211,7 @@
                         label="Include Swarm Clusters" />
                 </div>
             @endif --}}
-            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
+            <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @forelse($servers as $server)
                     <div class="box group" wire:click="setServer({{ $server }})">
                         <div class="flex flex-col mx-6">
@@ -244,7 +244,7 @@
                 <li class="step step-secondary">Select a Destination</li>
             </ul>
 
-            <div class="flex flex-col justify-center gap-2 text-left xl:flex-row xl:flex-wrap">
+            <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @if ($server->isSwarm())
                     @foreach ($swarmDockers as $swarmDocker)
                         <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
@@ -279,7 +279,7 @@
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')
-            <form wire:submit='addExistingPostgresql' class="flex items-end gap-2">
+            <form wire:submit='addExistingPostgresql' class="flex items-end gap-4">
                 <x-forms.input placeholder="postgres://username:password@database:5432" label="Database URL"
                     id="existingPostgresqlUrl" />
                 <x-forms.button type="submit">Add Database</x-forms.button>

@@ -19,6 +19,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Artisan;
 
 class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
 {
@@ -49,8 +50,11 @@ class DeleteResourceJob implements ShouldQueue, ShouldBeEncrypted
                     break;
             }
         } catch (\Throwable $e) {
+            ray($e->getMessage());
             send_internal_notification('ContainerStoppingJob failed with: ' . $e->getMessage());
             throw $e;
+        } finally {
+            Artisan::queue('cleanup:stucked-resources');
         }
     }
 }
