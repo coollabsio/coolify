@@ -142,7 +142,7 @@
 
                 </ul>
             </details>
-            {{-- @if (isCloud() && isInstanceAdmin())
+            @if (isCloud() && isInstanceAdmin())
                 <li title="Admin">
                     <a class="hover:bg-transparent" href="/admin">
                         <svg class="text-pink-600 icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
@@ -151,7 +151,7 @@
                         </svg>
                     </a>
                 </li>
-            @endif --}}
+            @endif
             <div class="flex-1"></div>
             @if (isInstanceAdmin() && !isCloud())
                 @persist('upgrade')
