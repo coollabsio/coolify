@@ -66,6 +66,8 @@ class General extends Component
         'application.docker_compose_custom_build_command' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.custom_docker_run_options' => 'nullable',
+        'application.pre_deployment_command' => 'nullable',
+        'application.pre_deployment_command_container' => 'nullable',
         'application.post_deployment_command' => 'nullable',
         'application.post_deployment_command_container' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
