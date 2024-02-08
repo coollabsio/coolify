@@ -106,6 +106,7 @@
     @if (count($deployments_per_server) > 0)
         <x-loading />
     @endif
+    <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
 </div>
 <div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
     @forelse ($deployments_per_server as $server_name => $deployments)

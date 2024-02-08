@@ -14,13 +14,19 @@ use Illuminate\Support\Facades\Http;
 
 class Init extends Command
 {
-    protected $signature = 'app:init {--full-cleanup}';
+    protected $signature = 'app:init {--full-cleanup} {--cleanup-deployments}';
     protected $description = 'Cleanup instance related stuffs';
 
     public function handle()
     {
         $this->alive();
         $full_cleanup = $this->option('full-cleanup');
+        $cleanup_deployments = $this->option('cleanup-deployments');
+        if ($cleanup_deployments) {
+            echo "Running cleanup deployments.\n";
+            $this->cleanup_in_progress_application_deployments();
+            return;
+        }
         if ($full_cleanup) {
             echo "Running init cleanupsg.\n";
 
@@ -122,8 +128,9 @@ class Init extends Command
         // Cleanup any failed deployments
 
         try {
-            $halted_deployments = ApplicationDeploymentQueue::where('status', '==', ApplicationDeploymentStatus::IN_PROGRESS)->where('status', '==', ApplicationDeploymentStatus::QUEUED)->get();
-            foreach ($halted_deployments as $deployment) {
+            $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
+            foreach ($queued_inprogress_deployments as $deployment) {
+                ray($deployment->id, $deployment->status);
                 echo "Cleaning up deployment: {$deployment->id}\n";
                 $deployment->status = ApplicationDeploymentStatus::FAILED->value;
                 $deployment->save();
