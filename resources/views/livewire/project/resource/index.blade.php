@@ -48,7 +48,7 @@
             <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="pb-2 font-bold text-white" x-text="item.name"></div>
@@ -79,7 +79,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredPostgresqls" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
@@ -106,7 +106,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredRedis" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
@@ -134,7 +134,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredMongodbs" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
@@ -161,7 +161,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredMysqls" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
@@ -188,7 +188,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredMariadbs" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
@@ -215,7 +215,7 @@
                     </span>
                 </template>
                 <template x-for="item in filteredServices" :key="item.id">
-                    <span class="relative">
+                    <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
                                 <div class="font-bold text-white" x-text="item.name"></div>
