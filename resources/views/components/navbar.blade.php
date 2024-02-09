@@ -120,7 +120,7 @@
                                 <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
                                 <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
                             </svg>
-                            Teams
+                            Teams @if(isCloud())/ Subscription @endif
                         </a>
                     </li>
                     @if (isInstanceAdmin())
