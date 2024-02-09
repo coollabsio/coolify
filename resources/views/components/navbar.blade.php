@@ -51,7 +51,7 @@
                     </button>
                 </div>
                 <div x-show="open" x-cloak
-                    class="absolute left-0 z-10 w-56 mx-4 mt-2 origin-top-right rounded shadow-lg bg-coolgray-200 ring-1 ring-black ring-opacity-5 focus:outline-none"
+                    class="absolute left-0 z-10 w-56 mx-4 mt-2 origin-top-right rounded shadow-lg bg-coolgray-100 ring-1 ring-black ring-opacity-5 focus:outline-none"
                     role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
                     <div class="py-1" role="none">
                         <li title="Tags" class="border-transparent hover:bg-coolgray-200 ">
