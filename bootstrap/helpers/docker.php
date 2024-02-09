@@ -349,18 +349,8 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     foreach ($matches as $match) {
         $option = $match[1];
         $value = isset($match[2]) && $match[2] !== '' ? $match[2] : true;
-        if ($list_options->contains($option)) {
-            $value = explode(',', $value);
-        }
-        if (array_key_exists($option, $options)) {
-            if (is_array($options[$option])) {
-                $options[$option][] = $value;
-            } else {
-                $options[$option] = [$options[$option], $value];
-            }
-        } else {
-            $options[$option] = $value;
-        }
+        $options[$option][] = $value;
+        $options[$option] = array_unique($options[$option]);
     }
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
@@ -370,7 +360,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         }
         if ($option === '--ulimit') {
             $ulimits = collect([]);
-            collect($value)->map(function ($ulimit) use ($ulimits){
+            collect($value)->map(function ($ulimit) use ($ulimits) {
                 $ulimit = explode('=', $ulimit);
                 $type = $ulimit[0];
                 $limits = explode(':', $ulimit[1]);
@@ -381,7 +371,6 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
                         'soft' => $soft_limit,
                         'hard' => $hard_limit
                     ]);
-
                 } else {
                     $soft_limit = $ulimit[1];
                     $ulimits->put($type, [
