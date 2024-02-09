@@ -40,105 +40,125 @@
                     </svg>
                 </a>
             </li>
-
-            <details x-data="{ open: false }" class="dropdown dropdown-right" x-bind:open="open">
-                <summary class="bg-transparent border-none btn hover:bg-transparent no-animation"
-                    x-on:click.prevent="open = !open" x-on:click.away="open = false"> <svg class="icon"
-                        viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor"
-                            d="M224 128a8 8 0 0 1-8 8h-80v80a8 8 0 0 1-16 0v-80H40a8 8 0 0 1 0-16h80V40a8 8 0 0 1 16 0v80h80a8 8 0 0 1 8 8" />
-                    </svg></summary>
-                <ul tabindex="0" class="w-64 p-2 border border-coolgray-200 dropdown-content menu bg-coolgray-100 ">
-                    <li title="Tags" class="border-transparent hover:bg-coolgray-200 ">
-                        <a class=" hover:bg-transparent hover:no-underline" href="{{ route('tags.index') }}">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2">
-                                    <path
-                                        d="M3 8v4.172a2 2 0 0 0 .586 1.414l5.71 5.71a2.41 2.41 0 0 0 3.408 0l3.592-3.592a2.41 2.41 0 0 0 0-3.408l-5.71-5.71A2 2 0 0 0 9.172 6H5a2 2 0 0 0-2 2" />
-                                    <path d="m18 19l1.592-1.592a4.82 4.82 0 0 0 0-6.816L15 6m-8 4h-.01" />
-                                </g>
-                            </svg>
-                            Tags
-                        </a>
-                    </li>
-                    <li title="Command Center" class="hover:bg-coolgray-200">
-                        <a class="hover:bg-transparent hover:no-underline" href="{{ route('command-center') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg"
-                                class="{{ request()->is('command-center') ? ' icon' : 'icon' }}" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M5 7l5 5l-5 5" />
-                                <path d="M12 19l7 0" />
-                            </svg>
-                            Command Center
-                        </a>
-                    </li>
-                    <li title="Source" class="hover:bg-coolgray-200">
-                        <a class="hover:bg-transparent hover:no-underline" href="{{ route('source.all') }}">
-                            <svg class="icon" viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
-                                <path fill="currentColor"
-                                    d="m6.793 1.207l.353.354l-.353-.354ZM1.207 6.793l-.353-.354l.353.354Zm0 1.414l.354-.353l-.354.353Zm5.586 5.586l-.354.353l.354-.353Zm1.414 0l-.353-.354l.353.354Zm5.586-5.586l.353.354l-.353-.354Zm0-1.414l-.354.353l.354-.353ZM8.207 1.207l.354-.353l-.354.353ZM6.44.854L.854 6.439l.707.707l5.585-5.585L6.44.854ZM.854 8.56l5.585 5.585l.707-.707l-5.585-5.585l-.707.707Zm7.707 5.585l5.585-5.585l-.707-.707l-5.585 5.585l.707.707Zm5.585-7.707L8.561.854l-.707.707l5.585 5.585l.707-.707Zm0 2.122a1.5 1.5 0 0 0 0-2.122l-.707.707a.5.5 0 0 1 0 .708l.707.707ZM6.44 14.146a1.5 1.5 0 0 0 2.122 0l-.707-.707a.5.5 0 0 1-.708 0l-.707.707ZM.854 6.44a1.5 1.5 0 0 0 0 2.122l.707-.707a.5.5 0 0 1 0-.708L.854 6.44Zm6.292-4.878a.5.5 0 0 1 .708 0L8.56.854a1.5 1.5 0 0 0-2.122 0l.707.707Zm-2 1.293l1 1l.708-.708l-1-1l-.708.708ZM7.5 5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 6V5Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 4.5H8ZM7.5 4a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 3v1Zm0-1A1.5 1.5 0 0 0 6 4.5h1a.5.5 0 0 1 .5-.5V3Zm.646 2.854l1.5 1.5l.707-.708l-1.5-1.5l-.707.708ZM10.5 8a.5.5 0 0 1-.5-.5H9A1.5 1.5 0 0 0 10.5 9V8Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 12 7.5h-1Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 10.5 6v1Zm0-1A1.5 1.5 0 0 0 9 7.5h1a.5.5 0 0 1 .5-.5V6ZM7 5.5v4h1v-4H7Zm.5 5.5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 12v-1Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 10.5H8Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 9v1Zm0-1A1.5 1.5 0 0 0 6 10.5h1a.5.5 0 0 1 .5-.5V9Z" />
-                            </svg>
-                            Sources
-                        </a>
-                    </li>
-                    <li title="Security" class="hover:bg-coolgray-200">
-                        <a class="hover:bg-transparent hover:no-underline" href="{{ route('security.private-key.index') }}">
-                            <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="m16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1-4.069 0l-.301-.301l-6.558 6.558a2 2 0 0 1-1.239.578L5.172 21H4a1 1 0 0 1-.993-.883L3 20v-1.172a2 2 0 0 1 .467-1.284l.119-.13L4 17h2v-2h2v-2l2.144-2.144l-.301-.301a2.877 2.877 0 0 1 0-4.069l2.643-2.643a2.877 2.877 0 0 1 4.069 0zM15 9h.01" />
-                            </svg>
-                            Security
-                        </a>
-                    </li>
-                    <li title="Profile" class="hover:bg-coolgray-200">
-                        <a class="hover:bg-transparent hover:no-underline" href="{{ route('profile') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-                                <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
-                                <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
-                            </svg>
-                            Profile
-                        </a>
-                    </li>
-                    <li title="Teams" class="hover:bg-coolgray-200">
-                        <a class="hover:bg-transparent hover:no-underline" href="{{ route('team.index') }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                                <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
-                                <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                                <path d="M17 10h2a2 2 0 0 1 2 2v1" />
-                                <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-                                <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
-                            </svg>
-                            Teams @if(isCloud())/ Subscription @endif
-                        </a>
-                    </li>
-                    @if (isInstanceAdmin())
-                        <li title="Settings" class="hover:bg-coolgray-200">
-                            <a class="hover:bg-transparent hover:no-underline" href="/settings">
+            <div class="inline-block text-left " x-data="{ open: false }">
+                <div>
+                    <button x-on:click.prevent="open = !open" x-on:click.away="open = false" type="button"
+                        class="py-4 mx-4" id="menu-button" aria-expanded="true" aria-haspopup="true">
+                        <svg class="icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor"
+                                d="M224 128a8 8 0 0 1-8 8h-80v80a8 8 0 0 1-16 0v-80H40a8 8 0 0 1 0-16h80V40a8 8 0 0 1 16 0v80h80a8 8 0 0 1 8 8" />
+                        </svg>
+                    </button>
+                </div>
+                <div x-show="open" x-cloak
+                    class="absolute left-0 z-10 w-56 mx-4 mt-2 origin-top-right rounded shadow-lg bg-coolgray-200 ring-1 ring-black ring-opacity-5 focus:outline-none"
+                    role="menu" aria-orientation="vertical" aria-labelledby="menu-button" tabindex="-1">
+                    <div class="py-1" role="none">
+                        <li title="Tags" class="border-transparent hover:bg-coolgray-200 ">
+                            <a class=" hover:bg-transparent hover:no-underline" href="{{ route('tags.index') }}">
+                                <svg class="{{ request()->is('tags*') ? 'text-warning icon' : 'icon' }}"viewBox="0 0 24 24"
+                                    xmlns="http://www.w3.org/2000/svg">
+                                    <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                        stroke-width="2">
+                                        <path
+                                            d="M3 8v4.172a2 2 0 0 0 .586 1.414l5.71 5.71a2.41 2.41 0 0 0 3.408 0l3.592-3.592a2.41 2.41 0 0 0 0-3.408l-5.71-5.71A2 2 0 0 0 9.172 6H5a2 2 0 0 0-2 2" />
+                                        <path d="m18 19l1.592-1.592a4.82 4.82 0 0 0 0-6.816L15 6m-8 4h-.01" />
+                                    </g>
+                                </svg>
+                                Tags
+                            </a>
+                        </li>
+                        <li title="Command Center" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('command-center') }}">
                                 <svg xmlns="http://www.w3.org/2000/svg"
-                                    class="{{ request()->is('settings*') ? 'text-warning icon' : 'icon' }}"
+                                    class="{{ request()->is('command-center*') ? 'text-warning icon' : 'icon' }}"
                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                     stroke-linecap="round" stroke-linejoin="round">
                                     <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-                                    <path
-                                        d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
-                                    <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                                    <path d="M5 7l5 5l-5 5" />
+                                    <path d="M12 19l7 0" />
                                 </svg>
-                                Settings
+                                Command Center
                             </a>
                         </li>
-                    @endif
+                        <li title="Source" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('source.all') }}">
+                                <svg class="{{ request()->is('source*') ? 'text-warning icon' : 'icon' }}"
+                                    viewBox="0 0 15 15" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="currentColor"
+                                        d="m6.793 1.207l.353.354l-.353-.354ZM1.207 6.793l-.353-.354l.353.354Zm0 1.414l.354-.353l-.354.353Zm5.586 5.586l-.354.353l.354-.353Zm1.414 0l-.353-.354l.353.354Zm5.586-5.586l.353.354l-.353-.354Zm0-1.414l-.354.353l.354-.353ZM8.207 1.207l.354-.353l-.354.353ZM6.44.854L.854 6.439l.707.707l5.585-5.585L6.44.854ZM.854 8.56l5.585 5.585l.707-.707l-5.585-5.585l-.707.707Zm7.707 5.585l5.585-5.585l-.707-.707l-5.585 5.585l.707.707Zm5.585-7.707L8.561.854l-.707.707l5.585 5.585l.707-.707Zm0 2.122a1.5 1.5 0 0 0 0-2.122l-.707.707a.5.5 0 0 1 0 .708l.707.707ZM6.44 14.146a1.5 1.5 0 0 0 2.122 0l-.707-.707a.5.5 0 0 1-.708 0l-.707.707ZM.854 6.44a1.5 1.5 0 0 0 0 2.122l.707-.707a.5.5 0 0 1 0-.708L.854 6.44Zm6.292-4.878a.5.5 0 0 1 .708 0L8.56.854a1.5 1.5 0 0 0-2.122 0l.707.707Zm-2 1.293l1 1l.708-.708l-1-1l-.708.708ZM7.5 5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 6V5Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 4.5H8ZM7.5 4a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 3v1Zm0-1A1.5 1.5 0 0 0 6 4.5h1a.5.5 0 0 1 .5-.5V3Zm.646 2.854l1.5 1.5l.707-.708l-1.5-1.5l-.707.708ZM10.5 8a.5.5 0 0 1-.5-.5H9A1.5 1.5 0 0 0 10.5 9V8Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 12 7.5h-1Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 10.5 6v1Zm0-1A1.5 1.5 0 0 0 9 7.5h1a.5.5 0 0 1 .5-.5V6ZM7 5.5v4h1v-4H7Zm.5 5.5a.5.5 0 0 1-.5-.5H6A1.5 1.5 0 0 0 7.5 12v-1Zm.5-.5a.5.5 0 0 1-.5.5v1A1.5 1.5 0 0 0 9 10.5H8Zm-.5-.5a.5.5 0 0 1 .5.5h1A1.5 1.5 0 0 0 7.5 9v1Zm0-1A1.5 1.5 0 0 0 6 10.5h1a.5.5 0 0 1 .5-.5V9Z" />
+                                </svg>
+                                Sources
+                            </a>
+                        </li>
+                        <li title="Security" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline"
+                                href="{{ route('security.private-key.index') }}">
+                                <svg class="{{ request()->is('security*') ? 'text-warning icon' : 'icon' }}"
+                                    viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                        stroke-linejoin="round" stroke-width="2"
+                                        d="m16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1-4.069 0l-.301-.301l-6.558 6.558a2 2 0 0 1-1.239.578L5.172 21H4a1 1 0 0 1-.993-.883L3 20v-1.172a2 2 0 0 1 .467-1.284l.119-.13L4 17h2v-2h2v-2l2.144-2.144l-.301-.301a2.877 2.877 0 0 1 0-4.069l2.643-2.643a2.877 2.877 0 0 1 4.069 0zM15 9h.01" />
+                                </svg>
+                                Security
+                            </a>
+                        </li>
+                        <li title="Profile" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('profile') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                    class="{{ request()->is('profile*') ? 'text-warning icon' : 'icon' }}"
+                                    viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+                                    <path d="M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+                                    <path d="M6.168 18.849a4 4 0 0 1 3.832 -2.849h4a4 4 0 0 1 3.834 2.855" />
+                                </svg>
+                                Profile
+                            </a>
+                        </li>
+                        <li title="Teams" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('team.index') }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                                    class="{{ request()->is('team*') ? 'text-warning icon' : 'icon' }}"
+                                    stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                    <path d="M10 13a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                    <path d="M8 21v-1a2 2 0 0 1 2 -2h4a2 2 0 0 1 2 2v1" />
+                                    <path d="M15 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                    <path d="M17 10h2a2 2 0 0 1 2 2v1" />
+                                    <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
+                                    <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
+                                </svg>
+                                Teams @if (isCloud())
+                                    / Subscription
+                                @endif
+                            </a>
+                        </li>
+                        @if (isInstanceAdmin())
+                            <li title="Settings" class="hover:bg-coolgray-200">
+                                <a class="hover:bg-transparent hover:no-underline" href="/settings">
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                        class="{{ request()->is('settings*') ? 'text-warning icon' : 'icon' }}"
+                                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
+                                        stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+                                        <path
+                                            d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" />
+                                        <path d="M9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
+                                    </svg>
+                                    Settings
+                                </a>
+                            </li>
+                        @endif
+
+                    </div>
+                </div>
+            </div>
+            <details class="dropdown dropdown-right" x-bind:open="open">
+                <summary class="bg-transparent border-none btn hover:bg-transparent no-animation"> </summary>
+                <ul tabindex="0" class="w-64 p-2 border border-coolgray-200 dropdown-content menu bg-coolgray-100 ">
 
                 </ul>
             </details>
@@ -180,11 +200,12 @@
                 </div>
             </li>
             <form action="/logout" method="POST" class="hover:bg-transparent">
-            <li title="Logout" class="mb-6 hover:transparent">
+                <li title="Logout" class="mb-6 hover:transparent">
                     @csrf
                     <button type="submit" class="rounded-none hover:text-white hover:bg-transparent">
                         <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor" d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z"/>
+                            <path fill="currentColor"
+                                d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2a9.985 9.985 0 0 1 8 4h-2.71a8 8 0 1 0 .001 12h2.71A9.985 9.985 0 0 1 12 22m7-6v-3h-8v-2h8V8l5 4z" />
                         </svg>
                     </button>
                 </li>
