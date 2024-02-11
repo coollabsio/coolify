@@ -198,7 +198,7 @@ Files:
             }
             $restart_command = [
                 "echo 'Stopping old Fluent Bit'",
-                "cd $config_path && docker rm -f coolify-log-drain || true",
+                "cd $config_path && docker compose down --remove-orphans || true",
                 "echo 'Starting Fluent Bit'",
                 "cd $config_path && docker compose up -d --remove-orphans",
             ];
