@@ -12,12 +12,21 @@
                 </div>
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" required id="server.settings.logdrain_newrelic_license_key"
-                            label="License Key" />
-                        <x-forms.input required id="server.settings.logdrain_newrelic_base_uri"
-                            placeholder="https://log-api.eu.newrelic.com/log/v1"
-                            helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
-                            label="Endpoint" />
+                        @if ($server->isLogDrainEnabled())
+                            <x-forms.input disabled type="password" required
+                                id="server.settings.logdrain_newrelic_license_key" label="License Key" />
+                            <x-forms.input disabled required id="server.settings.logdrain_newrelic_base_uri"
+                                placeholder="https://log-api.eu.newrelic.com/log/v1"
+                                helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
+                                label="Endpoint" />
+                        @else
+                            <x-forms.input type="password" required id="server.settings.logdrain_newrelic_license_key"
+                                label="License Key" />
+                            <x-forms.input required id="server.settings.logdrain_newrelic_base_uri"
+                                placeholder="https://log-api.eu.newrelic.com/log/v1"
+                                helper="For EU use: https://log-api.eu.newrelic.com/log/v1<br>For US use: https://log-api.newrelic.com/log/v1"
+                                label="Endpoint" />
+                        @endif
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 pt-6">
@@ -35,9 +44,17 @@
             <form wire:submit='submit("axiom")' class="flex flex-col">
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        <x-forms.input type="password" required id="server.settings.logdrain_axiom_api_key"
-                            label="API Key" />
-                        <x-forms.input required id="server.settings.logdrain_axiom_dataset_name" label="Dataset Name" />
+                        @if ($server->isLogDrainEnabled())
+                            <x-forms.input disabled type="password" required id="server.settings.logdrain_axiom_api_key"
+                                label="API Key" />
+                            <x-forms.input disabled required id="server.settings.logdrain_axiom_dataset_name"
+                                label="Dataset Name" />
+                        @else
+                            <x-forms.input type="password" required id="server.settings.logdrain_axiom_api_key"
+                                label="API Key" />
+                            <x-forms.input required id="server.settings.logdrain_axiom_dataset_name"
+                                label="Dataset Name" />
+                        @endif
                     </div>
                 </div>
                 <div class="flex justify-end gap-4 pt-6">
@@ -71,10 +88,18 @@
             </div>
             <form wire:submit='submit("custom")' class="flex flex-col">
                 <div class="flex flex-col gap-4">
-                    <x-forms.textarea rows="6" required id="server.settings.logdrain_custom_config"
-                        label="Custom FluentBit Configuration" />
-                    <x-forms.textarea id="server.settings.logdrain_custom_config_parser"
-                        label="Custom Parser Configuration" />
+                    @if ($server->isLogDrainEnabled())
+                        <x-forms.textarea disabled rows="6" required id="server.settings.logdrain_custom_config"
+                            label="Custom FluentBit Configuration" />
+                        <x-forms.textarea disabled id="server.settings.logdrain_custom_config_parser"
+                            label="Custom Parser Configuration" />
+                    @else
+                        <x-forms.textarea rows="6" required id="server.settings.logdrain_custom_config"
+                            label="Custom FluentBit Configuration" />
+                        <x-forms.textarea id="server.settings.logdrain_custom_config_parser"
+                            label="Custom Parser Configuration" />
+                    @endif
+
                 </div>
                 <div class="flex justify-end gap-4 pt-6">
                     <x-forms.button type="submit">
