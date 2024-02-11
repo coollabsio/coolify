@@ -1,5 +1,9 @@
 <div>
     <livewire:project.application.preview.form :application="$application" />
+    @if (count($application->additional_servers) > 0)
+        <div class="pb-4">Previews will be deployed on <span
+                class="text-warning">{{ $application->destination->server->name }}</span>.</div>
+    @endif
     <div>
         @if ($application->is_github_based())
             <div class="flex items-center gap-2">
