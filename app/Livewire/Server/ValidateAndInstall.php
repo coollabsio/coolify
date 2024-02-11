@@ -14,6 +14,7 @@ class ValidateAndInstall extends Component
     public $uptime = null;
     public $supported_os_type = null;
     public $docker_installed = null;
+    public $docker_compose_installed = null;
     public $docker_version = null;
     public $error = null;
 
@@ -67,9 +68,9 @@ class ValidateAndInstall extends Component
     public function validateDockerEngine()
     {
         $this->docker_installed = $this->server->validateDockerEngine();
-        if (!$this->docker_installed) {
+        $this->docker_compose_installed = $this->server->validateDockerCompose();
+        if (!$this->docker_installed || !$this->docker_compose_installed) {
             if ($this->install) {
-                ray($this->number_of_tries, $this->max_tries);
                 if ($this->number_of_tries == $this->max_tries) {
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     return;
