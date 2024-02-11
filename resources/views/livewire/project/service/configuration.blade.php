@@ -76,7 +76,7 @@
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
-                                        href="{{ route('project.service.index', [...$parameters, 'service_name' => $application->name]) }}">
+                                        href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $application->uuid]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                             stroke-linecap="round" stroke-linejoin="round">
@@ -122,7 +122,7 @@
                                 </div>
                                 <div class="flex items-center px-4">
                                     <a class="flex flex-col flex-1 group-hover:text-white hover:no-underline"
-                                        href="{{ route('project.service.index', [...$parameters, 'service_name' => $database->name]) }}">
+                                        href="{{ route('project.service.index', [...$parameters, 'stack_service_uuid' => $database->uuid]) }}">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning"
                                             viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
                                             stroke-linecap="round" stroke-linejoin="round">

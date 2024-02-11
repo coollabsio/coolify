@@ -163,7 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
-        Route::get('/{service_name}', ServiceIndex::class)->name('project.service.index');
+        Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });
