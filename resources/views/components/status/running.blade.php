@@ -7,7 +7,7 @@
     <div class="pl-2 pr-1 text-xs font-bold tracking-wider text-success">
         {{ str($status)->before(':')->headline() }}
     </div>
-    @if (!str($status)->startsWith('Proxy'))
+    @if (!str($status)->startsWith('Proxy') && !str($status)->contains('('))
         <div class="text-xs text-success">({{ str($status)->after(':') }})</div>
     @endif
 </div>
