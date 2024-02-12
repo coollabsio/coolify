@@ -51,7 +51,7 @@
                 </x-forms.button>
             </div>
         @else
-            <button onclick="checkProxy()"
+            <button x-on:click="$wire.dispatch('checkProxy')"
                 class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-warning" viewBox="0 0 24 24"
                     stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
@@ -64,9 +64,6 @@
         @endif
     @endif
     <script>
-        function checkProxy() {
-            window.Livewire.dispatch('checkProxy')
-        }
         Livewire.on('proxyChecked', () => {
             startProxy.showModal();
             window.Livewire.dispatch('startProxy');

@@ -27,12 +27,12 @@ class Index extends Component
             $this->parameters = get_route_parameters();
             $this->query = request()->query();
             $this->service = Service::whereUuid($this->parameters['service_uuid'])->firstOrFail();
-            $service = $this->service->applications()->whereName($this->parameters['service_name'])->first();
+            $service = $this->service->applications()->whereUuid($this->parameters['stack_service_uuid'])->first();
             if ($service) {
                 $this->serviceApplication = $service;
                 $this->serviceApplication->getFilesFromServer();
             } else {
-                $this->serviceDatabase = $this->service->databases()->whereName($this->parameters['service_name'])->first();
+                $this->serviceDatabase = $this->service->databases()->whereUuid($this->parameters['stack_service_uuid'])->first();
                 $this->serviceDatabase->getFilesFromServer();
             }
             $this->s3s = currentTeam()->s3s;

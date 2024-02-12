@@ -618,6 +618,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
         } else {
             $this->dockerImageTag = str($this->commit)->substr(0, 128);
+            if ($this->application->docker_registry_image_tag) {
+                $this->dockerImageTag = $this->application->docker_registry_image_tag;
+            }
             if ($this->application->docker_registry_image_name) {
                 $this->build_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}-build");
                 $this->production_image_name = Str::lower("{$this->application->docker_registry_image_name}:{$this->dockerImageTag}");

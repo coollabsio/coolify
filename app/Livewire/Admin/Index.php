@@ -11,6 +11,9 @@ class Index extends Component
     public $users = [];
     public function mount()
     {
+        if (!isCloud()) {
+            return redirect()->route('dashboard');
+        }
         if (auth()->user()->id !== 0 && session('adminToken') === null) {
             return redirect()->route('dashboard');
         }

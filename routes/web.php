@@ -79,9 +79,7 @@ use App\Livewire\Waitlist\Index as WaitlistIndex;
 if (isDev()) {
     Route::get('/dev/compose', Compose::class)->name('dev.compose');
 }
-if (isCloud()) {
-    Route::get('/admin', AdminIndex::class)->name('admin.index');
-}
+Route::get('/admin', AdminIndex::class)->name('admin.index');
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
 Route::get('/api/v1/test/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
@@ -165,7 +163,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('project/{project_uuid}/{environment_name}/service/{service_uuid}')->group(function () {
         Route::get('/', ServiceConfiguration::class)->name('project.service.configuration');
-        Route::get('/{service_name}', ServiceIndex::class)->name('project.service.index');
+        Route::get('/{stack_service_uuid}', ServiceIndex::class)->name('project.service.index');
         Route::get('/command', ExecuteContainerCommand::class)->name('project.service.command');
         Route::get('/tasks/{task_uuid}', ScheduledTaskShow::class)->name('project.service.scheduled-tasks');
     });

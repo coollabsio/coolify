@@ -1,4 +1,4 @@
-@props(['closeWithX' => 'false', 'fullScreen' => 'false'])
+@props(['closeWithX' => false, 'fullScreen' => false])
 <div x-data="{
     slideOverOpen: false
 }" class="relative w-auto h-auto">
@@ -19,7 +19,7 @@
                             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
                             @class([
                                 'max-w-md w-screen' => !$fullScreen,
-                                'max-w-7xl w-screen' => $fullScreen,
+                                'max-w-4xl w-screen' => $fullScreen,
                             ])>
                             <div
                                 class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-base-100 border-neutral-800">

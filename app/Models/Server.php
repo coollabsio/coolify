@@ -443,6 +443,21 @@ class Server extends BaseModel
         $this->validateCoolifyNetwork(isSwarm: false, isBuildServer: $this->settings->is_build_server);
         return true;
     }
+    public function validateDockerCompose($throwError = false)
+    {
+        $dockerCompose = instant_remote_process(["docker compose version"], $this, false);
+        if (is_null($dockerCompose)) {
+            $this->settings->is_usable = false;
+            $this->settings->save();
+            if ($throwError) {
+                throw new \Exception('Server is not usable. Docker Compose is not installed.');
+            }
+            return false;
+        }
+        $this->settings->is_usable = true;
+        $this->settings->save();
+        return true;
+    }
     public function validateDockerSwarm()
     {
         $swarmStatus = instant_remote_process(["docker info|grep -i swarm"], $this, false);

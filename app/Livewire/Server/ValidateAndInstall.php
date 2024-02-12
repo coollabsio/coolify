@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 
@@ -14,18 +15,23 @@ class ValidateAndInstall extends Component
     public $uptime = null;
     public $supported_os_type = null;
     public $docker_installed = null;
+    public $docker_compose_installed = null;
     public $docker_version = null;
+    public $proxy_started = false;
     public $error = null;
 
     protected $listeners = ['validateServer' => 'init', 'validateDockerEngine', 'validateServerNow' => 'validateServer'];
 
     public function init(bool $install = true)
     {
+
         $this->install = $install;
         $this->uptime = null;
         $this->supported_os_type = null;
         $this->docker_installed = null;
         $this->docker_version = null;
+        $this->docker_compose_installed = null;
+        $this->proxy_started = null;
         $this->error = null;
         $this->number_of_tries = 0;
         $this->dispatch('validateServerNow');
@@ -42,6 +48,11 @@ class ValidateAndInstall extends Component
                 $swarmInstalled = $this->server->validateDockerSwarm();
                 if ($swarmInstalled) {
                     $this->dispatch('success', 'Docker Swarm is initiated.');
+                }
+            } else {
+                $proxy = StartProxy::run($this->server);
+                if ($proxy) {
+                    $this->proxy_started = true;
                 }
             }
         } catch (\Throwable $e) {
@@ -67,9 +78,9 @@ class ValidateAndInstall extends Component
     public function validateDockerEngine()
     {
         $this->docker_installed = $this->server->validateDockerEngine();
-        if (!$this->docker_installed) {
+        $this->docker_compose_installed = $this->server->validateDockerCompose();
+        if (!$this->docker_installed || !$this->docker_compose_installed) {
             if ($this->install) {
-                ray($this->number_of_tries, $this->max_tries);
                 if ($this->number_of_tries == $this->max_tries) {
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     return;

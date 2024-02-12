@@ -55,21 +55,25 @@
             @endforeach
         @endif
     </div>
-    {{-- @if ($resource->getMorphClass() === 'App\Models\Application')
+    @if ($resource->getMorphClass() === 'App\Models\Application')
         @if (count($networks) > 0)
             <h4>Choose another server</h4>
             <div class="pb-4 description">(experimental) </div>
-            <div class="grid grid-cols-1 gap-4 ">
+            <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                        class="box w-96">
-                        {{ data_get($network, 'server.name') }}
-                        {{ $network->name }}
+                        class="relative flex flex-col text-white cursor-default box w-96">
+                        <div>
+                            Server: {{ data_get($network, 'server.name') }}
+                        </div>
+                        <div>
+                            Network: {{ data_get($network, 'name') }}
+                        </div>
                     </div>
                 @endforeach
             </div>
         @else
             <div class="text-neutral-500">No additional servers available to attach.</div>
         @endif
-    @endif --}}
+    @endif
 </div>

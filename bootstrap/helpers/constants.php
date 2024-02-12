@@ -13,6 +13,11 @@ const VALID_CRON_STRINGS = [
 const RESTART_MODE = 'unless-stopped';
 
 const DATABASE_DOCKER_IMAGES = [
+    'bitnami/mariadb',
+    'bitnami/mongodb',
+    'bitnami/mysql',
+    'bitnami/postgresql',
+    'bitnami/redis',
     'mysql',
     'mariadb',
     'postgres',

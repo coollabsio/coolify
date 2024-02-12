@@ -1,5 +1,9 @@
 <div>
     <livewire:project.application.preview.form :application="$application" />
+    @if (count($application->additional_servers) > 0)
+        <div class="pb-4">Previews will be deployed on <span
+                class="text-warning">{{ $application->destination->server->name }}</span>.</div>
+    @endif
     <div>
         @if ($application->is_github_based())
             <div class="flex items-center gap-2">
@@ -51,7 +55,7 @@
     </div>
     @if ($application->previews->count() > 0)
         <div class="pb-4">Previews</div>
-        <div class="flex gap-6 ">
+        <div class="flex flex-wrap gap-6">
             @foreach ($application->previews as $preview)
                 <div class="flex flex-col p-4 bg-coolgray-200">
                     <div class="flex gap-2">PR #{{ data_get($preview, 'pull_request_id') }} |

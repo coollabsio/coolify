@@ -19,7 +19,7 @@
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
             <x-slide-over closeWithX fullScreen>
-                <x-slot:title>Configuring Server</x-slot:title>
+                <x-slot:title>Validating & Configuring</x-slot:title>
                 <x-slot:content>
                     <livewire:server.validate-and-install :server="$server" />
                 </x-slot:content>
