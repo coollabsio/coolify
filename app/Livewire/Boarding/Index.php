@@ -3,6 +3,7 @@
 namespace App\Livewire\Boarding;
 
 use App\Actions\Server\InstallDocker;
+use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
@@ -121,15 +122,16 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
-        $this->validateServer();
+        $this->installServer();
     }
     public function getProxyType()
     {
-        $proxyTypeSet = $this->createdServer->proxy->type;
-        if (!$proxyTypeSet) {
-            $this->currentState = 'select-proxy';
-            return;
-        }
+        $this->selectProxy(ProxyTypes::TRAEFIK_V2->value);
+        // $proxyTypeSet = $this->createdServer->proxy->type;
+        // if (!$proxyTypeSet) {
+        //     $this->currentState = 'select-proxy';
+        //     return;
+        // }
         $this->getProjects();
     }
     public function selectExistingPrivateKey()
@@ -193,7 +195,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->createdServer->addInitialNetwork();
-        $this->validateServer();
+        $this->currentState = 'validate-server';
     }
     public function installServer()
     {
@@ -219,7 +221,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
-                $this->currentState = 'install-docker';
+                $this->currentState = 'validate-server';
                 throw new \Exception('Docker not found or old version is installed.');
             }
             $this->createdServer->settings()->update([
@@ -227,27 +229,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             ]);
             $this->getProxyType();
         } catch (\Throwable $e) {
-            // $this->dockerInstallationStarted = false;
             return handleError(error: $e, livewire: $this);
         }
     }
-    public function installDocker()
-    {
-        try {
-            $this->dockerInstallationStarted = true;
-            $activity = InstallDocker::run($this->createdServer);
-            $this->dispatch('installDocker');
-            $this->dispatch('activityMonitor', $activity->id);
-        } catch (\Throwable $e) {
-            $this->dockerInstallationStarted = false;
-            return handleError(error: $e, livewire: $this);
-        }
-    }
-    public function dockerInstalledOrSkipped()
-    {
-        $this->validateServer();
-    }
-    public function selectProxy(string|null $proxyType = null)
+    public function selectProxy(?string $proxyType = null)
     {
         if (!$proxyType) {
             return $this->getProjects();

@@ -121,18 +121,24 @@
                     There are already servers available for your Team. Do you want to use one of them?
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center w-64 box" wire:click="createNewServer">No (create one for me)
-                    </x-forms.button>
-                    <div>
-                        <form wire:submit='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
-                            <x-forms.select label="Existing servers" class="w-96" id='selectedExistingServer'>
-                                @foreach ($servers as $server)
-                                    <option wire:key="{{ $loop->index }}" value="{{ $server->id }}">
-                                        {{ $server->name }}</option>
-                                @endforeach
-                            </x-forms.select>
-                            <x-forms.button type="submit">Use this Server</x-forms.button>
-                        </form>
+                    <div class="flex flex-col gap-4">
+                        <div>
+                            <x-forms.button class="justify-center w-64 box" wire:click="createNewServer">No (create one
+                                for
+                                me)
+                            </x-forms.button>
+                        </div>
+                        <div>
+                            <form wire:submit='selectExistingServer' class="flex flex-col w-full gap-4 lg:w-96">
+                                <x-forms.select label="Existing servers" class="w-96" id='selectedExistingServer'>
+                                    @foreach ($servers as $server)
+                                        <option wire:key="{{ $loop->index }}" value="{{ $server->id }}">
+                                            {{ $server->name }}</option>
+                                    @endforeach
+                                </x-forms.select>
+                                <x-forms.button type="submit">Use this Server</x-forms.button>
+                            </form>
+                        </div>
                     </div>
                     @if (!$serverReachable)
                         This server is not reachable with the following public key.
@@ -216,7 +222,7 @@
                                 helper="If you are using Cloudflare Tunnels, enable this. It will proxy all ssh requests to your server through Cloudflare.<br><span class='text-warning'>Coolify does not install/setup Cloudflare (cloudflared) on your server.</span>"
                                 id="isCloudflareTunnel" label="Cloudflare Tunnel" />
                         </div>
-                        <x-forms.button type="submit">Check Connection</x-forms.button>
+                        <x-forms.button type="submit">Continue</x-forms.button>
                     </form>
                 </x-slot:actions>
                 <x-slot:explanation>
@@ -227,14 +233,15 @@
         @endif
     </div>
     <div>
-        @if ($currentState === 'install-docker')
-            <x-boarding-step title="Install Docker">
+        @if ($currentState === 'validate-server')
+            <x-boarding-step title="Validate & Configure Server">
                 <x-slot:question>
-                    Could not find Docker Engine on your server. Do you want me to install it for you?
+                    I need to validate your server (connection, Docker Engine, etc) and configure if something is
+                    missing for me. Are you okay with this?
                 </x-slot:question>
                 <x-slot:actions>
                     <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Configuring Server</x-slot:title>
+                        <x-slot:title>Validating & Configuring</x-slot:title>
                         <x-slot:content>
                             <livewire:server.validate-and-install :server="$this->createdServer" />
                         </x-slot:content>
@@ -254,7 +261,7 @@
             </x-boarding-step>
         @endif
     </div>
-    <div>
+    {{-- <div>
         @if ($currentState === 'select-proxy')
             <x-boarding-step title="Select a Proxy">
                 <x-slot:question>
@@ -281,7 +288,7 @@
                 </x-slot:explanation>
             </x-boarding-step>
         @endif
-    </div>
+    </div> --}}
     <div>
         @if ($currentState === 'create-project')
             <x-boarding-step title="Project">

@@ -213,9 +213,9 @@
             @endif --}}
             <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @forelse($servers as $server)
-                    <div class="box group" wire:click="setServer({{ $server }})">
+                    <div class="w-64 box group" wire:click="setServer({{ $server }})">
                         <div class="flex flex-col mx-6">
-                            <div class="group-hover:text-white">
+                            <div class="font-bold group-hover:text-white">
                                 {{ $server->name }}
                             </div>
                             <div class="text-xs group-hover:text-white">
@@ -263,13 +263,13 @@
                                     Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
                                 </div>
                                 <div class="text-xs group-hover:text-white">
-                                    network: {{ $standaloneDocker->network }}</div>
+                                    Network: {{ $standaloneDocker->network }}</div>
                             </div>
                         </div>
                     @endforeach
                 @endif
                 <a href="{{ route('destination.new', ['server_id' => $server_id]) }}"
-                    class="items-center justify-center pb-10 text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
+                    class="items-center justify-center text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
                     <div class="flex flex-col mx-6 ">
                         <div class="font-bold text-white">
                             + Add New

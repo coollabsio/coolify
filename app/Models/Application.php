@@ -200,9 +200,6 @@ class Application extends BaseModel
             set: fn ($value) => $value === "" ? null : $value,
         );
     }
-
-    // Normal Deployments
-
     public function portsMappingsArray(): Attribute
     {
         return Attribute::make(
@@ -214,7 +211,7 @@ class Application extends BaseModel
     }
     public function realStatus()
     {
-       return $this->getRawOriginal('status');
+        return $this->getRawOriginal('status');
     }
     public function status(): Attribute
     {
