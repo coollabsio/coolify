@@ -861,7 +861,11 @@ Route::post('/payments/stripe/events', function () {
                 $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
                 if (!$subscription) {
                     Sleep::for(5)->seconds();
-                    $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
+                    $subscription = Subscription::where('stripe_customer_id', $customerId)->first();
+                }
+                if (!$subscription) {
+                    send_internal_notification('No subscription found for: ' . $customerId);
+                    return response("No subscription found", 400);
                 }
                 $trialEndedAlready = data_get($subscription, 'stripe_trial_already_ended');
                 $cancelAtPeriodEnd = data_get($data, 'cancel_at_period_end');
