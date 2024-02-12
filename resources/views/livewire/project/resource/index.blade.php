@@ -51,22 +51,24 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                                 <div class="description" x-text="item.fqdn"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')" >
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('degraded')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -82,18 +84,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -109,19 +116,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -137,18 +148,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -164,18 +180,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -191,18 +212,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('restarting')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
@@ -218,18 +244,23 @@
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold text-white" x-text="item.name"></div>
+                                <div class="flex gap-2">
+                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <template x-if="item.status.startsWith('running')">
+                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('exited')">
+                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('restarting')">
+                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                    </template>
+                                    <template x-if="item.status.startsWith('degraded')">
+                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                    </template>
+                                </div>
                                 <div class="description" x-text="item.description"></div>
                             </div>
-                            <template x-if="item.status.startsWith('running')">
-                                <div class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('exited')">
-                                <div class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
-                            </template>
-                            <template x-if="item.status.startsWith('degraded')">
-                                <div class="absolute bg-warning -top-1 -left-1 badge badge-xs"></div>
-                            </template>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
                             <template x-for="tag in item.tags">
