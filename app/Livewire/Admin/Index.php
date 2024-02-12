@@ -14,7 +14,7 @@ class Index extends Component
         if (!isCloud()) {
             return redirect()->route('dashboard');
         }
-        if (!isInstanceAdmin() && session('adminToken') === null) {
+        if (auth()->user()->id !== 0 && session('adminToken') === null) {
             return redirect()->route('dashboard');
         }
         $this->users = User::whereHas('teams', function ($query) {
