@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Application;
+use App\Models\ScheduledTask;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
@@ -107,6 +108,17 @@ class CleanupStuckedResources extends Command
             }
         } catch (\Throwable $e) {
             echo "Error in cleaning stuck serviceapp: {$e->getMessage()}\n";
+        }
+        try {
+            $scheduled_tasks = ScheduledTask::all();
+            foreach ($scheduled_tasks as $scheduled_task) {
+                if (!$scheduled_task->service && !$scheduled_task->application) {
+                    echo "Deleting stuck scheduledtask: {$scheduled_task->name}\n";
+                    $scheduled_task->delete();
+                }
+            }
+        } catch (\Throwable $e) {
+            echo "Error in cleaning stuck scheduledtasks: {$e->getMessage()}\n";
         }
 
         // Cleanup any resources that are not attached to any environment or destination or server

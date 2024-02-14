@@ -4,7 +4,7 @@
 
 services:
   directus:
-    image: directus/directus:10.7
+    image: directus/directus:10
     volumes:
       - directus-uploads:/directus/uploads
       - directus-extensions:/directus/extensions

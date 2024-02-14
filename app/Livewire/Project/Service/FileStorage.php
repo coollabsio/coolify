@@ -41,7 +41,7 @@ class FileStorage extends Component
                 $this->fileStorage->content = null;
             }
             $this->fileStorage->save();
-            $this->fileStorage->saveStorageOnServer($this->service);
+            $this->fileStorage->saveStorageOnServer();
             $this->dispatch('success', 'File updated successfully.');
         } catch (\Throwable $e) {
             $this->fileStorage->setRawAttributes($original);
