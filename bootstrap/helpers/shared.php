@@ -527,28 +527,32 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
+                $hasNetworkMode = data_get($service, 'network_mode');
 
-                // Collect/create/update networks
-                if ($serviceNetworks->count() > 0) {
-                    foreach ($serviceNetworks as $networkName => $networkDetails) {
-                        $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
-                            return $value == $networkName || $key == $networkName;
-                        });
-                        if (!$networkExists) {
-                            $topLevelNetworks->put($networkDetails, null);
+                 // Only add 'networks' key if 'network_mode' is absent
+                if (!$hasNetworkMode) {
+                    // Collect/create/update networks
+                    if ($serviceNetworks->count() > 0) {
+                        foreach ($serviceNetworks as $networkName => $networkDetails) {
+                            $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
+                                return $value == $networkName || $key == $networkName;
+                            });
+                            if (!$networkExists) {
+                                $topLevelNetworks->put($networkDetails, null);
+                            }
                         }
                     }
-                }
 
-                $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
-                    return $value == $definedNetwork;
-                });
-                if (!$definedNetworkExists) {
-                    foreach ($definedNetwork as $network) {
-                        $topLevelNetworks->put($network,  [
-                            'name' => $network,
-                            'external' => true
-                        ]);
+                    $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
+                        return $value == $definedNetwork;
+                    });
+                    if (!$definedNetworkExists) {
+                        foreach ($definedNetwork as $network) {
+                            $topLevelNetworks->put($network,  [
+                                'name' => $network,
+                                'external' => true
+                            ]);
+                        }
                     }
                 }
 
