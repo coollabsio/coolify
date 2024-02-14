@@ -120,8 +120,8 @@ class Kernel extends ConsoleKernel
             return;
         }
         foreach ($scheduled_tasks as $scheduled_task) {
-            $service = $scheduled_task->service()->first();
-            $application = $scheduled_task->application()->first();
+            $service = $scheduled_task->service;
+            $application = $scheduled_task->application;
 
             if (!$application && !$service) {
                 ray('application/service attached to scheduled task does not exist');

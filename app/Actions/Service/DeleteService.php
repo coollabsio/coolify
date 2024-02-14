@@ -45,6 +45,9 @@ class DeleteService
             foreach ($service->databases()->get() as $database) {
                 $database->forceDelete();
             }
+            foreach ($service->scheduled_tasks as $task) {
+                $task->delete();
+            }
             $service->tags()->detach();
         }
     }
