@@ -12,8 +12,9 @@ services:
       - TZ=Etc/UTC
     volumes:
       - 'syncthing-config:/config'
+      - 'syncthing-data1:/data1'
+      - 'syncthing-data2:/data2'
     ports:
-      - '8384:8384'
       - '22000:22000/tcp'
       - '22000:22000/udp'
       - '21027:21027/udp'

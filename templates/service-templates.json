@@ -492,6 +492,16 @@
             "tool"
         ]
     },
+    "syncthing": {
+        "documentation": "https:\/\/syncthing.net\/",
+        "slogan": "Syncthing is a continuous file synchronization program. It synchronizes files between two or more computers in real time, safely protected from prying eyes. Your data is your data alone and you deserve to choose where it is stored, whether it is shared with some third party, and how it\u2019s transmitted over the internet.",
+        "compose": "c2VydmljZXM6CiAgc3luY3RoaW5nOgogICAgaW1hZ2U6ICdsc2NyLmlvL2xpbnV4c2VydmVyL3N5bmN0aGluZzpsYXRlc3QnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU1lOQ1RISU5HCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXRjL1VUQwogICAgdm9sdW1lczoKICAgICAgLSAnc3luY3RoaW5nLWNvbmZpZzovY29uZmlnJwogICAgICAtICdzeW5jdGhpbmctZGF0YTE6L2RhdGExJwogICAgICAtICdzeW5jdGhpbmctZGF0YTI6L2RhdGEyJwogICAgcG9ydHM6CiAgICAgIC0gJzIyMDAwOjIyMDAwL3RjcCcKICAgICAgLSAnMjIwMDA6MjIwMDAvdWRwJwogICAgICAtICcyMTAyNzoyMTAyNy91ZHAnCg==",
+        "tags": [
+            "filestorage",
+            "data",
+            "synchronization"
+        ]
+    },
     "trigger-with-external-database": {
         "documentation": "https:\/\/trigger.dev\/docs\/documentation\/guides\/self-hosting",
         "slogan": "The open source Background Jobs framework for TypeScript",
