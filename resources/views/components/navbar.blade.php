@@ -166,12 +166,6 @@
                     </div>
                 </div>
             </div>
-            <details class="dropdown dropdown-right" x-bind:open="open">
-                <summary class="bg-transparent border-none btn hover:bg-transparent no-animation"> </summary>
-                <ul tabindex="0" class="w-64 p-2 border border-coolgray-200 dropdown-content menu bg-coolgray-100 ">
-
-                </ul>
-            </details>
             @if (isCloud() && isInstanceAdmin())
                 <li title="Admin">
                     <a class="hover:bg-transparent" href="/admin">
