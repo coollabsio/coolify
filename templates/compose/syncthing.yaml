@@ -1,0 +1,20 @@
+# documentation: https://syncthing.net/
+# slogan: Syncthing is a continuous file synchronization program. It synchronizes files between two or more computers in real time, safely protected from prying eyes. Your data is your data alone and you deserve to choose where it is stored, whether it is shared with some third party, and how it’s transmitted over the internet.
+# tags: filestorage, data, synchronization
+
+services:
+  syncthing:
+    image: 'lscr.io/linuxserver/syncthing:latest'
+    environment:
+      - SERVICE_FQDN_SYNCTHING
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+    volumes:
+      - 'syncthing-config:/config'
+      - 'syncthing-data1:/data1'
+      - 'syncthing-data2:/data2'
+    ports:
+      - '22000:22000/tcp'
+      - '22000:22000/udp'
+      - '21027:21027/udp'

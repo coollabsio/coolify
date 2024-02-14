@@ -10,12 +10,19 @@ class LocalFileVolume extends BaseModel
     use HasFactory;
     protected $guarded = [];
 
+    protected static function booted()
+    {
+        static::created(function (LocalFileVolume $fileVolume) {
+            $fileVolume->saveStorageOnServer($fileVolume->service);
+        });
+    }
     public function service()
     {
         return $this->morphTo('resource');
     }
     public function saveStorageOnServer(ServiceApplication|ServiceDatabase $service)
     {
+        ray('saveStorageOnServer');
         $workdir = $service->service->workdir();
         $server = $service->service->server;
         $commands = collect([
@@ -39,7 +46,7 @@ class LocalFileVolume extends BaseModel
         if (!$fileVolume->is_directory && $isDir == 'NOK') {
             $content = base64_encode($content);
             $commands->push("echo '$content' | base64 -d > $path");
-         } else if ($isDir == 'NOK' && $fileVolume->is_directory) {
+        } else if ($isDir == 'NOK' && $fileVolume->is_directory) {
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");
         }
         ray($commands->toArray());

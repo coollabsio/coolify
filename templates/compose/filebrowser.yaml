@@ -4,15 +4,20 @@
 
 services:
   filebrowser:
-    image: filebrowser/filebrowser:s6
+    image: filebrowser/filebrowser:latest
     environment:
       - SERVICE_FQDN_FILEBROWSER
-      - PUID=1000
-      - PGID=1000
     volumes:
-      - filebrowser-srv:/srv
-      - filebrowser-database:/database/filebrowser.db
-      - filebrowser-config:/config/settings.json
+      - type: bind
+        source: ./srv
+        target: /srv
+        isDirectory: true
+      - ./database.db:/database.db
+      - type: bind
+        source: ./filebrowser.json
+        target: /.filebrowser.json
+        read_only: true
+        content: "{}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 2s
