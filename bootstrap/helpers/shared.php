@@ -125,6 +125,9 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
 
     if (isset($livewire)) {
+        if (str($message)->length() > 20) {
+            return $livewire->dispatch('error', 'Error occured', $message);
+        }
         return $livewire->dispatch('error', $message);
     }
     throw new Exception($message);
@@ -527,10 +530,10 @@ function getTopLevelNetworks(Service|Application $resource)
             $definedNetwork = collect([$resource->uuid]);
             $services = collect($services)->map(function ($service, $_) use ($topLevelNetworks, $definedNetwork) {
                 $serviceNetworks = collect(data_get($service, 'networks', []));
-                $hasNetworkMode = data_get($service, 'network_mode');
+                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
 
-                 // Only add 'networks' key if 'network_mode' is absent
-                if (!$hasNetworkMode) {
+                // Only add 'networks' key if 'network_mode' is not 'host'
+                if (!$hasHostNetworkMode) {
                     // Collect/create/update networks
                     if ($serviceNetworks->count() > 0) {
                         foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -632,6 +635,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceNetworks = collect(data_get($service, 'networks', []));
                 $serviceVariables = collect(data_get($service, 'environment', []));
                 $serviceLabels = collect(data_get($service, 'labels', []));
+                $hasHostNetworkMode = data_get($service, 'network_mode') === 'host' ? true : false;
                 if ($serviceLabels->count() > 0) {
                     $removedLabels = collect([]);
                     $serviceLabels = $serviceLabels->filter(function ($serviceLabel, $serviceLabelName) use ($removedLabels) {
@@ -702,7 +706,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                     $savedService->image = $image;
                     $savedService->save();
                 }
-
                 // Collect/create/update networks
                 if ($serviceNetworks->count() > 0) {
                     foreach ($serviceNetworks as $networkName => $networkDetails) {
@@ -733,37 +736,39 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $savedService->ports = $collectedPorts->implode(',');
                 $savedService->save();
 
-                // Add Coolify specific networks
-                $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
-                    return $value == $definedNetwork;
-                });
-                if (!$definedNetworkExists) {
-                    foreach ($definedNetwork as $network) {
-                        $topLevelNetworks->put($network,  [
-                            'name' => $network,
-                            'external' => true
-                        ]);
+                if (!$hasHostNetworkMode) {
+                    // Add Coolify specific networks
+                    $definedNetworkExists = $topLevelNetworks->contains(function ($value, $_) use ($definedNetwork) {
+                        return $value == $definedNetwork;
+                    });
+                    if (!$definedNetworkExists) {
+                        foreach ($definedNetwork as $network) {
+                            $topLevelNetworks->put($network,  [
+                                'name' => $network,
+                                'external' => true
+                            ]);
+                        }
                     }
-                }
-                $networks = collect();
-                foreach ($serviceNetworks as $key => $serviceNetwork) {
-                    if (gettype($serviceNetwork) === 'string') {
-                        // networks:
-                        //  - appwrite
-                        $networks->put($serviceNetwork, null);
-                    } else if (gettype($serviceNetwork) === 'array') {
-                        // networks:
-                        //   default:
-                        //     ipv4_address: 192.168.203.254
-                        // $networks->put($serviceNetwork, null);
-                        ray($key);
-                        $networks->put($key, $serviceNetwork);
+                    $networks = collect();
+                    foreach ($serviceNetworks as $key => $serviceNetwork) {
+                        if (gettype($serviceNetwork) === 'string') {
+                            // networks:
+                            //  - appwrite
+                            $networks->put($serviceNetwork, null);
+                        } else if (gettype($serviceNetwork) === 'array') {
+                            // networks:
+                            //   default:
+                            //     ipv4_address: 192.168.203.254
+                            // $networks->put($serviceNetwork, null);
+                            ray($key);
+                            $networks->put($key, $serviceNetwork);
+                        }
                     }
+                    foreach ($definedNetwork as $key => $network) {
+                        $networks->put($network, null);
+                    }
+                    data_set($service, 'networks', $networks->toArray());
                 }
-                foreach ($definedNetwork as $key => $network) {
-                    $networks->put($network, null);
-                }
-                data_set($service, 'networks', $networks->toArray());
 
                 // Collect/create/update volumes
                 if ($serviceVolumes->count() > 0) {
