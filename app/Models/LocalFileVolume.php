@@ -22,7 +22,6 @@ class LocalFileVolume extends BaseModel
     }
     public function saveStorageOnServer(ServiceApplication|ServiceDatabase $service)
     {
-        ray('saveStorageOnServer');
         $workdir = $service->service->workdir();
         $server = $service->service->server;
         $commands = collect([
