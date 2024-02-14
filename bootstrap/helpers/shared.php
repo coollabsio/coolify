@@ -782,14 +782,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $source = data_get_str($volume, 'source');
                             $target = data_get_str($volume, 'target');
                             $content = data_get($volume, 'content');
-                            $isDirectory = (bool) data_get($volume, 'isDirectory', false);
+                            $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
                             $foundConfig = $savedService->fileStorages()->whereMountPath($target)->first();
                             if ($foundConfig) {
                                 $contentNotNull = data_get($foundConfig, 'content');
                                 if ($contentNotNull) {
                                     $content = $contentNotNull;
                                 }
-                                $isDirectory = (bool) data_get($foundConfig, 'is_directory');
+                                $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
                             }
                         }
                         if ($type->value() === 'bind') {
@@ -1054,6 +1054,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 data_set($service, 'container_name', $containerName);
                 data_forget($service, 'volumes.*.content');
                 data_forget($service, 'volumes.*.isDirectory');
+                data_forget($service, 'volumes.*.is_directory');
+
                 // Remove unnecessary variables from service.environment
                 // $withoutServiceEnvs = collect([]);
                 // collect(data_get($service, 'environment'))->each(function ($value, $key) use ($withoutServiceEnvs) {
