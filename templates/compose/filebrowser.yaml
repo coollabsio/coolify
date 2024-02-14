@@ -13,7 +13,11 @@ services:
         target: /srv
         isDirectory: true
       - ./database.db:/database.db
-      - ./filebrowser.json:/.filebrowser.json
+      - type: bind
+        source: ./filebrowser.json
+        target: /.filebrowser.json
+        read_only: true
+        content: "{}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:80"]
       interval: 2s
