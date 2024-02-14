@@ -1,6 +1,6 @@
 <?php
 
-it('ConvertCapAdd', function () {
+test('ConvertCapAdd', function () {
     $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN';
     $output = convert_docker_run_to_compose($input);
     expect($output)->toBe([
@@ -8,7 +8,7 @@ it('ConvertCapAdd', function () {
     ])->ray();
 });
 
-it('ConvertPrivilegedAndInit', function () {
+test('ConvertPrivilegedAndInit', function () {
     $input = '---privileged --init';
     $output = convert_docker_run_to_compose($input);
     expect($output)->toBe([
@@ -17,7 +17,7 @@ it('ConvertPrivilegedAndInit', function () {
     ])->ray();
 });
 
-it('ConvertUlimit', function () {
+test('ConvertUlimit', function () {
     $input = '--ulimit nofile=262144:262144';
     $output = convert_docker_run_to_compose($input);
     expect($output)->toBe([

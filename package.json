@@ -11,16 +11,16 @@
         "axios": "1.6.7",
         "laravel-echo": "1.15.3",
         "laravel-vite-plugin": "0.8.1",
-        "postcss": "8.4.33",
+        "postcss": "8.4.35",
         "pusher-js": "8.4.0-rc2",
         "tailwindcss": "3.4.1",
         "vite": "4.5.2",
-        "vue": "3.4.15"
+        "vue": "3.4.19"
     },
     "dependencies": {
         "@tailwindcss/typography": "0.5.10",
         "alpinejs": "3.13.5",
-        "daisyui": "4.4.19",
+        "daisyui": "4.7.2",
         "ioredis": "5.3.2",
         "tailwindcss-scrollbar": "0.1.0"
     }
