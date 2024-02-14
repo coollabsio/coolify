@@ -340,17 +340,22 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--cap-drop' => 'cap_drop',
         '--security-opt' => 'security_opt',
         '--sysctl' => 'sysctls',
-        '--device' => 'devices',
         '--ulimit' => 'ulimits',
+        '--device' => 'devices',
         '--init' => 'init',
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];
-        $value = isset($match[2]) && $match[2] !== '' ? $match[2] : true;
-        $options[$option][] = $value;
-        $options[$option] = array_unique($options[$option]);
+        if (isset($match[2]) && $match[2] !== '') {
+            $value = $match[2];
+            $options[$option][] = $value;
+            $options[$option] = array_unique($options[$option]);
+        } else {
+            $value = true;
+            $options[$option] = $value;
+        }
     }
     $options = collect($options);
     // Easily get mappings from https://github.com/composerize/composerize/blob/master/packages/composerize/src/mappings.js
