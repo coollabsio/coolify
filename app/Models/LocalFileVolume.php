@@ -10,12 +10,19 @@ class LocalFileVolume extends BaseModel
     use HasFactory;
     protected $guarded = [];
 
+    protected static function booted()
+    {
+        static::created(function (LocalFileVolume $fileVolume) {
+            $fileVolume->saveStorageOnServer($fileVolume->service);
+        });
+    }
     public function service()
     {
         return $this->morphTo('resource');
     }
     public function saveStorageOnServer(ServiceApplication|ServiceDatabase $service)
     {
+        ray('saveStorageOnServer');
         $workdir = $service->service->workdir();
         $server = $service->service->server;
         $commands = collect([
