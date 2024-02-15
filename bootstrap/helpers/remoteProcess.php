@@ -228,56 +228,6 @@ function refresh_server_connection(?PrivateKey $private_key = null)
     }
 }
 
-// function validateServer(Server $server, bool $throwError = false)
-// {
-//     try {
-//         $uptime = instant_remote_process(['uptime'], $server, $throwError);
-//         if (!$uptime) {
-//             $server->settings->is_reachable = false;
-//             $server->team->notify(new Unreachable($server));
-//             $server->unreachable_notification_sent = true;
-//             $server->save();
-//             return [
-//                 "uptime" => null,
-//                 "dockerVersion" => null,
-//             ];
-//         }
-//         $server->settings->is_reachable = true;
-//         instant_remote_process(["docker ps"], $server, $throwError);
-//         $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $server, $throwError);
-//         if (!$dockerVersion) {
-//             $dockerVersion = null;
-//             return [
-//                 "uptime" => $uptime,
-//                 "dockerVersion" => null,
-//             ];
-//         }
-//         $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
-//         if (is_null($dockerVersion)) {
-//             $server->settings->is_usable = false;
-//         } else {
-//             $server->settings->is_usable = true;
-//             if (data_get($server, 'unreachable_notification_sent') === true) {
-//                 $server->team->notify(new Revived($server));
-//                 $server->unreachable_notification_sent = false;
-//                 $server->save();
-//             }
-//         }
-//         return [
-//             "uptime" => $uptime,
-//             "dockerVersion" => $dockerVersion,
-//         ];
-//     } catch (\Throwable $e) {
-//         $server->settings->is_reachable = false;
-//         $server->settings->is_usable = false;
-//         throw $e;
-//     } finally {
-//         if (data_get($server, 'settings')) {
-//             $server->settings->save();
-//         }
-//     }
-// }
-
 function checkRequiredCommands(Server $server)
 {
     $commands = collect(["jq", "jc"]);

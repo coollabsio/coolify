@@ -1,3 +1,3 @@
 <?php
 
-return '4.0.0-beta.218';
+return '4.0.0-beta.219';

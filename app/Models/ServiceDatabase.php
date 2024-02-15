@@ -21,6 +21,10 @@ class ServiceDatabase extends BaseModel
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
+    public function isGzipEnabled()
+    {
+        return true;
+    }
     public function type()
     {
         return 'service';

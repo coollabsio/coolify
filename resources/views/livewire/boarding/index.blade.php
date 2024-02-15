@@ -241,7 +241,7 @@
                 </x-slot:question>
                 <x-slot:actions>
                     <x-slide-over closeWithX fullScreen>
-                        <x-slot:title>Validating & Configuring</x-slot:title>
+                        <x-slot:title>Validate & configure</x-slot:title>
                         <x-slot:content>
                             <livewire:server.validate-and-install :server="$this->createdServer" />
                         </x-slot:content>

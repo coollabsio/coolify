@@ -45,8 +45,10 @@ class StackForm extends Component
         $this->service->docker_compose_raw = $raw;
         $this->submit();
     }
-    public function instantSave() {
+    public function instantSave()
+    {
         $this->service->save();
+        $this->dispatch('success', 'Service  settings saved successfully.');
     }
 
     public function submit()

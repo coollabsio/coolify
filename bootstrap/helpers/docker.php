@@ -7,7 +7,6 @@ use App\Models\ServiceApplication;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
-use Visus\Cuid2\Cuid2;
 
 function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
 {
@@ -213,7 +212,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -276,23 +275,35 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($path !== '/') {
                     $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $middlewares = "gzip,{$https_label}-stripprefix";
-                    if ($basic_auth  && $basic_auth_middleware) {
-                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    $middlewares = collect(["{$https_label}-stripprefix"]);
+                    if ($is_gzip_enabled) {
+                        $middlewares->push('gzip');
                     }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares = $middlewares . ',' . $redirect_middleware;
-                    }
-                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
-                } else {
-                    $middlewares = "gzip";
                     if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                        $middlewares->push($basic_auth_middleware);
                     }
                     if ($redirect && $redirect_middleware) {
-                        $middlewares = $middlewares . ',' . $redirect_middleware;
+                        $middlewares->push($redirect_middleware);
                     }
-                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                    if ($middlewares->isNotEmpty()) {
+                        $middlewares = $middlewares->join(',');
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                    }
+                } else {
+                    $middlewares = collect([]);
+                    if ($is_gzip_enabled) {
+                        $middlewares->push('gzip');
+                    }
+                    if ($basic_auth && $basic_auth_middleware) {
+                        $middlewares->push($basic_auth_middleware);
+                    }
+                    if ($redirect && $redirect_middleware) {
+                        $middlewares->push($redirect_middleware);
+                    }
+                    if ($middlewares->isNotEmpty()) {
+                        $middlewares = $middlewares->join(',');
+                        $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
+                    }
                 }
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
                 $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
@@ -317,23 +328,35 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($path !== '/') {
                     $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $middlewares = "gzip,{$http_label}-stripprefix";
-                    if ($basic_auth  && $basic_auth_middleware) {
-                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    $middlewares = collect(["{$http_label}-stripprefix"]);
+                    if ($is_gzip_enabled) {
+                        $middlewares->push('gzip');
                     }
-                    if ($redirect && $redirect_middleware) {
-                        $middlewares = $middlewares . ',' . $redirect_middleware;
-                    }
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
-                } else {
-                    $middlewares = "gzip";
                     if ($basic_auth && $basic_auth_middleware) {
-                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                        $middlewares->push($basic_auth_middleware);
                     }
                     if ($redirect && $redirect_middleware) {
-                        $middlewares = $middlewares . ',' . $redirect_middleware;
+                        $middlewares->push($redirect_middleware);
                     }
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
+                    if ($middlewares->isNotEmpty()) {
+                        $middlewares = $middlewares->join(',');
+                        $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
+                    }
+                } else {
+                    $middlewares = collect([]);
+                    if ($is_gzip_enabled) {
+                        $middlewares->push('gzip');
+                    }
+                    if ($basic_auth && $basic_auth_middleware) {
+                        $middlewares->push($basic_auth_middleware);
+                    }
+                    if ($redirect && $redirect_middleware) {
+                        $middlewares->push($redirect_middleware);
+                    }
+                    if ($middlewares->isNotEmpty()) {
+                        $middlewares = $middlewares->join(',');
+                        $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
+                    }
                 }
             }
         } catch (\Throwable $e) {
