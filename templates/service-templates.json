@@ -87,6 +87,16 @@
             "sql"
         ]
     },
+    "docker-registry": {
+        "documentation": "https:\/\/docs.docker.com\/registry\/",
+        "slogan": "The Docker Registry is a stateless, highly scalable server side application that stores and lets you distribute Docker images.",
+        "compose": "c2VydmljZXM6CiAgcmVnaXN0cnk6CiAgICBpbWFnZTogJ3JlZ2lzdHJ5OjInCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fUkVHSVNUUlkKICAgICAgLSBSRUdJU1RSWV9BVVRIPWh0cGFzc3dkCiAgICAgIC0gUkVHSVNUUllfQVVUSF9IVFBBU1NXRF9SRUFMTT1SZWdpc3RyeQogICAgICAtIFJFR0lTVFJZX0FVVEhfSFRQQVNTV0RfUEFUSD0vYXV0aC9yZWdpc3RyeS5wYXNzd29yZAogICAgICAtIFJFR0lTVFJZX1NUT1JBR0VfRklMRVNZU1RFTV9ST09URElSRUNUT1JZPS9kYXRhCiAgICB2b2x1bWVzOgogICAgICAtCiAgICAgICAgdHlwZTogYmluZAogICAgICAgIHNvdXJjZTogLi9hdXRoL3JlZ2lzdHJ5LnBhc3N3b3JkCiAgICAgICAgdGFyZ2V0OiAvYXV0aC9yZWdpc3RyeS5wYXNzd29yZAogICAgICAgIGlzRGlyZWN0b3J5OiBmYWxzZQogICAgICAgIGNvbnRlbnQ6ICd0ZXN0dXNlcjokMnkkMDUkL28ySnZtSTJiaEV4WEl0Nk9xeGE3ZWtZQjd2M3NjajF3RkVmNnRCc2xKdkpPTW9QUUwuR3knCiAgICAgIC0KICAgICAgICB0eXBlOiBiaW5kCiAgICAgICAgc291cmNlOiAuL2NvbmZpZy9jb25maWcueW1sCiAgICAgICAgdGFyZ2V0OiAvZXRjL2RvY2tlci9yZWdpc3RyeS9jb25maWcueW1sCiAgICAgICAgaXNEaXJlY3Rvcnk6IGZhbHNlCiAgICAgICAgY29udGVudDogInZlcnNpb246IDAuMVxubG9nOlxuICBmaWVsZHM6XG4gICAgc2VydmljZTogcmVnaXN0cnlcbnN0b3JhZ2U6XG4gIGNhY2hlOlxuICAgIGJsb2JkZXNjcmlwdG9yOiBpbm1lbW9yeVxuICBmaWxlc3lzdGVtOlxuICAgIHJvb3RkaXJlY3Rvcnk6IC92YXIvbGliL3JlZ2lzdHJ5XG5odHRwOlxuICBhZGRyOiA6NTAwMFxuICBoZWFkZXJzOlxuICAgIFgtQ29udGVudC1UeXBlLU9wdGlvbnM6IFtub3NuaWZmXVxuaGVhbHRoOlxuICBzdG9yYWdlZHJpdmVyOlxuICAgIGVuYWJsZWQ6IHRydWVcbiAgICBpbnRlcnZhbDogMTBzXG4gICAgdGhyZXNob2xkOiAzIgogICAgICAtCiAgICAgICAgdHlwZTogYmluZAogICAgICAgIHNvdXJjZTogLi9kYXRhCiAgICAgICAgdGFyZ2V0OiAvZGF0YQogICAgICAgIGlzRGlyZWN0b3J5OiB0cnVlCg==",
+        "tags": [
+            "registry",
+            "images",
+            "docker"
+        ]
+    },
     "dokuwiki": {
         "documentation": "https:\/\/www.dokuwiki.org\/faq",
         "slogan": "A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases with simplicity and flexibility.",
