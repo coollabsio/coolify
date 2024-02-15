@@ -329,6 +329,17 @@
             "meilisearch"
         ]
     },
+    "metabase": {
+        "documentation": "https:\/\/www.metabase.com\/docs\/latest\/installation-and-operation\/running-metabase-on-docker",
+        "slogan": "Fast analytics with the friendly UX and integrated tooling to let your company explore data on their own.",
+        "compose": "c2VydmljZXM6CiAgbWV0YWJhc2U6CiAgICBpbWFnZTogJ21ldGFiYXNlL21ldGFiYXNlOmxhdGVzdCcKICAgIHZvbHVtZXM6CiAgICAgIC0gJy9kZXYvdXJhbmRvbTovZGV2L3JhbmRvbTpybycKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9NRVRBQkFTRQogICAgICAtIE1CX0RCX1RZUEU9cG9zdGdyZXMKICAgICAgLSBNQl9EQl9IT1NUPXBvc3RncmVzcWwKICAgICAgLSBNQl9EQl9QT1JUPTU0MzIKICAgICAgLSAnTUJfREJfREJOQU1FPSR7UE9TVEdSRVNRTF9EQVRBQkFTRTotbWV0YWJhc2V9JwogICAgICAtIE1CX0RCX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFU1FMCiAgICAgIC0gTUJfREJfUEFTUz0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFU1FMCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ2N1cmwgLS1mYWlsIC1JIGh0dHA6Ly9sb2NhbGhvc3Q6MzAwMC9hcGkvaGVhbHRoIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAogIHBvc3RncmVzcWw6CiAgICBpbWFnZTogJ3Bvc3RncmVzOjE2LWFscGluZScKICAgIHZvbHVtZXM6CiAgICAgIC0gJ21ldGFiYXNlLXBvc3RncmVzcWwtZGF0YTovdmFyL2xpYi9wb3N0Z3Jlc3FsL2RhdGEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSAnUE9TVEdSRVNfVVNFUj0ke1NFUlZJQ0VfVVNFUl9QT1NUR1JFU1FMfScKICAgICAgLSAnUE9TVEdSRVNfUEFTU1dPUkQ9JHtTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTUUx9JwogICAgICAtICdQT1NUR1JFU19EQj0ke1BPU1RHUkVTUUxfREFUQUJBU0U6LW1ldGFiYXNlfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "tags": [
+            "analytics",
+            "bi",
+            "business",
+            "intelligence"
+        ]
+    },
     "metube": {
         "documentation": "https:\/\/github.com\/alexta69\/metube",
         "slogan": "A web GUI for youtube-dl with playlist support. It enables you to effortlessly download videos from YouTube and dozens of other sites.",

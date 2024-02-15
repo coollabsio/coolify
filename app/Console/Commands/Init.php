@@ -125,6 +125,9 @@ class Init extends Command
         // Cleanup any failed deployments
 
         try {
+            if (isCloud()) {
+                return;
+            }
             $queued_inprogress_deployments = ApplicationDeploymentQueue::whereIn('status', [ApplicationDeploymentStatus::IN_PROGRESS->value, ApplicationDeploymentStatus::QUEUED->value])->get();
             foreach ($queued_inprogress_deployments as $deployment) {
                 ray($deployment->id, $deployment->status);

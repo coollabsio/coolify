@@ -15,7 +15,11 @@
             @endif
             <x-forms.checkbox
                 helper="Your application will be available only on https if your domain starts with https://..."
-                instantSave id="application.settings.is_force_https_enabled" label="Force Https" />
+                instantSave id="is_force_https_enabled" label="Force Https" />
+            <x-forms.checkbox
+                helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold text-warning'>You will lose the rolling update feature!</span>"
+                instantSave id="application.settings.is_consistent_container_name_enabled"
+                label="Consistent Container Names" />
             <h4>Logs</h4>
             @if (!$application->settings->is_raw_compose_deployment_enabled)
                 <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
