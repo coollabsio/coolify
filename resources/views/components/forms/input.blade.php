@@ -22,7 +22,7 @@
                     </svg>
                 </div>
             @endif
-            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass . ' pl-10']) }}
+            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass]) }}
                 @required($required) @if ($id !== 'null') wire:model={{ $id }} @endif
                 wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
