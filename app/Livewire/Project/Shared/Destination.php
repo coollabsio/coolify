@@ -37,6 +37,9 @@ class Destination extends Component
         $this->networks = $this->networks->reject(function ($network) use ($all_networks) {
             return $all_networks->pluck('id')->contains($network->id);
         });
+        $this->networks = $this->networks->reject(function ($network) {
+            return $this->resource->destination->server->id == $network->server->id;
+        });
     }
     public function redeploy(int $network_id, int $server_id)
     {
