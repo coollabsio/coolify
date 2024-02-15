@@ -8,20 +8,25 @@ use Livewire\Component;
 class Advanced extends Component
 {
     public Application $application;
+    public bool $is_force_https_enabled;
     protected $rules = [
         'application.settings.is_git_submodules_enabled' => 'boolean|required',
         'application.settings.is_git_lfs_enabled' => 'boolean|required',
         'application.settings.is_preview_deployments_enabled' => 'boolean|required',
         'application.settings.is_auto_deploy_enabled' => 'boolean|required',
-        'application.settings.is_force_https_enabled' => 'boolean|required',
+        'is_force_https_enabled' => 'boolean|required',
         'application.settings.is_log_drain_enabled' => 'boolean|required',
         'application.settings.is_gpu_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
+        'application.settings.is_consistent_container_name_enabled' => 'boolean|required',
         'application.settings.gpu_driver' => 'string|required',
         'application.settings.gpu_count' => 'string|required',
         'application.settings.gpu_device_ids' => 'string|required',
         'application.settings.gpu_options' => 'string|required',
     ];
+    public function mount() {
+        $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+    }
     public function instantSave()
     {
         if ($this->application->isLogDrainEnabled()) {
@@ -31,7 +36,8 @@ class Advanced extends Component
                 return;
             }
         }
-        if ($this->application->settings->is_force_https_enabled) {
+        if ($this->application->settings->is_force_https_enabled !== $this->is_force_https_enabled) {
+            $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
             $this->dispatch('resetDefaultLabels', false);
         }
         $this->application->settings->save();

@@ -123,10 +123,14 @@ function getContainerStatus(Server $server, string $container_id, bool $all_data
 
 function generateApplicationContainerName(Application $application, $pull_request_id = 0)
 {
+    $consistent_container_name = $application->settings->is_consistent_container_name_enabled;
     $now = now()->format('Hisu');
     if ($pull_request_id !== 0 && $pull_request_id !== null) {
         return $application->uuid . '-pr-' . $pull_request_id;
     } else {
+        if ($consistent_container_name) {
+            return $application->uuid;
+        }
         return $application->uuid . '-' . $now;
     }
 }
@@ -209,15 +213,34 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
     $labels->push("traefik.http.middlewares.gzip.compress=true");
     $labels->push("traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https");
+
+    $basic_auth = false;
+    $basic_auth_middleware = null;
+
+    if ($serviceLabels) {
+        $basic_auth = $serviceLabels->contains(function ($value) {
+            return str_contains($value, 'basicauth');
+        });
+        if ($basic_auth) {
+            $basic_auth_middleware = $serviceLabels
+                ->map(function ($item) {
+                    if (preg_match('/traefik\.http\.middlewares\.(.*?)\.basicauth\.users/', $item, $matches)) {
+                        return $matches[1];
+                    }
+                })
+                ->filter()
+                ->first();
+        }
+    }
     foreach ($domains as $loop => $domain) {
         try {
-            $uuid = new Cuid2(7);
+            // $uuid = new Cuid2(7);
             $url = Url::fromString($domain);
             $host = $url->getHost();
             $path = $url->getPath();
@@ -239,11 +262,18 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($path !== '/') {
                     $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$https_label}-stripprefix,gzip");
+                    $middlewares = "gzip,{$https_label}-stripprefix";
+                    if ($basic_auth  && $basic_auth_middleware) {
+                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    }
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
                 } else {
-                    $labels->push("traefik.http.routers.{$https_label}.middlewares=gzip");
+                    $middlewares = "gzip";
+                    if ($basic_auth && $basic_auth_middleware) {
+                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    }
+                    $labels->push("traefik.http.routers.{$https_label}.middlewares={$middlewares}");
                 }
-
                 $labels->push("traefik.http.routers.{$https_label}.tls=true");
                 $labels->push("traefik.http.routers.{$https_label}.tls.certresolver=letsencrypt");
 
@@ -267,16 +297,23 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                 }
                 if ($path !== '/') {
                     $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$http_label}-stripprefix,gzip");
+                    $middlewares = "gzip,{$http_label}-stripprefix";
+                    if ($basic_auth  && $basic_auth_middleware) {
+                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    }
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
                 } else {
-                    $labels->push("traefik.http.routers.{$http_label}.middlewares=gzip");
+                    $middlewares = "gzip";
+                    if ($basic_auth && $basic_auth_middleware) {
+                        $middlewares = $middlewares . ',' . $basic_auth_middleware;
+                    }
+                    $labels->push("traefik.http.routers.{$http_label}.middlewares={$middlewares}");
                 }
             }
         } catch (\Throwable $e) {
             continue;
         }
     }
-
     return $labels->sort();
 }
 function generateLabelsApplication(Application $application, ?ApplicationPreview $preview = null): array

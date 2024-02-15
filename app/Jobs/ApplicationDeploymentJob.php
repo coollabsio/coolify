@@ -133,6 +133,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->is_debug_enabled = $this->application->settings->is_debug_enabled;
 
         $this->container_name = generateApplicationContainerName($this->application, $this->pull_request_id);
+        ray('New container name: ', $this->container_name);
+
         savePrivateKeyToFs($this->server);
         $this->saved_outputs = collect();
 
@@ -711,9 +713,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
-                $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
+                if (count($this->application->ports_mappings_array) > 0) {
+                    $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
+                }
+                if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
+                    $this->application_deployment_queue->addLogEntry("Consistent container name feature enabled, rolling update is not supported.");
+                }
                 $this->stop_running_container(force: true);
                 $this->start_by_compose_file();
             } else {
@@ -1199,13 +1206,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //     ];
         // }
 
-        $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-
-        data_forget($docker_compose, 'services.' . $this->container_name);
-
-        $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
-        if (count($custom_compose) > 0) {
-            $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
+        if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
+            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+            if (count($custom_compose) > 0) {
+                $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
+            }
+        } else {
+            $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+            data_forget($docker_compose, 'services.' . $this->container_name);
+            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+            if (count($custom_compose) > 0) {
+                $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
+            }
         }
 
         $this->docker_compose = Yaml::dump($docker_compose, 10);
@@ -1490,6 +1502,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                     [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
                 );
             });
+            if ($this->application->settings->is_consistent_container_name_enabled) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+                );
+            }
         } else {
             $this->application_deployment_queue->addLogEntry("New container is not healthy, rolling back to the old container.");
             $this->application_deployment_queue->update([
