@@ -163,6 +163,7 @@ class General extends Component
         }
         return $domain;
     }
+
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -202,6 +203,13 @@ class General extends Component
 
     public function updatedApplicationFqdn()
     {
+        $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->replaceStart(',', '')->trim();
+        $this->application->fqdn = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
+            return str($domain)->trim()->lower();
+        });
+        $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
+        $this->application->save();
         $this->resetDefaultLabels(false);
         // $this->dispatch('success', 'Labels reset to default!');
     }
@@ -228,11 +236,7 @@ class General extends Component
                 ]);
             }
             if (data_get($this->application, 'fqdn')) {
-                $this->application->fqdn = str($this->application->fqdn)->replaceEnd(',', '')->trim();
-                $domains = str($this->application->fqdn)->trim()->explode(',')->map(function ($domain) {
-                    return str($domain)->trim()->lower();
-                });
-                $domains = $domains->unique();
+                $domains = str($this->application->fqdn)->trim()->explode(',');
                 if ($this->application->additional_servers->count() === 0) {
                     foreach ($domains as $domain) {
                         if (!validate_dns_entry($domain, $this->application->destination->server)) {
@@ -243,7 +247,6 @@ class General extends Component
                 check_fqdn_usage($this->application);
                 $this->application->fqdn = $domains->implode(',');
             }
-
             if (data_get($this->application, 'custom_docker_run_options')) {
                 $this->application->custom_docker_run_options = str($this->application->custom_docker_run_options)->trim();
             }
