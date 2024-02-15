@@ -68,6 +68,9 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
+    public function revalidate() {
+        $this->validateServer();
+    }
     public function checkLocalhostConnection()
     {
         $uptime = $this->server->validateConnection();

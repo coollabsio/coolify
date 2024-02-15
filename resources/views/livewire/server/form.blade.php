@@ -10,12 +10,17 @@
                 </x-new-modal>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
+                <x-new-modal buttonTitle="Revalidate" title="Revalidate" action="revalidate">
+                    This will revalidate the server, install / update Docker Engine, Docker Compose and all related
+                    configuration. It will also restart Docker Engine, so your running containers will be unreachable
+                    for the time being.
+                </x-new-modal>
             @endif
         </div>
-        @if (!$server->isFunctional())
-            You can't use this server until it is validated.
-        @else
+        @if ($server->isFunctional())
             Server is reachable and validated.
+        @else
+            You can't use this server until it is validated.
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
             <x-slide-over closeWithX fullScreen>
