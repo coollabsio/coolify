@@ -2,7 +2,7 @@
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
-            @if ($server->id === 0)
+            @if ($server->id !== 0)
                 <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
                     You could lost a lot of functionalities if you change the server details of the server where Coolify
                     is
@@ -10,16 +10,25 @@
                 </x-new-modal>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
+                <x-slide-over closeWithX fullScreen>
+                    <x-slot:title>Validate & configure</x-slot:title>
+                    <x-slot:content>
+                        <livewire:server.validate-and-install :server="$server" ask />
+                    </x-slot:content>
+                    <x-forms.button @click="slideOverOpen=true" wire:click.prevent='validateServer' isHighlighted>
+                        Revalidate server
+                    </x-forms.button>
+                </x-slide-over>
             @endif
         </div>
-        @if (!$server->isFunctional())
-            You can't use this server until it is validated.
-        @else
+        @if ($server->isFunctional())
             Server is reachable and validated.
+        @else
+            You can't use this server until it is validated.
         @endif
         @if ((!$server->settings->is_reachable || !$server->settings->is_usable) && $server->id !== 0)
             <x-slide-over closeWithX fullScreen>
-                <x-slot:title>Validating & Configuring</x-slot:title>
+                <x-slot:title>Validate & configure</x-slot:title>
                 <x-slot:content>
                     <livewire:server.validate-and-install :server="$server" />
                 </x-slot:content>

@@ -206,7 +206,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         try {
             config()->set('coolify.mux_enabled', false);
 
-            instant_remote_process(['uptime'], $this->createdServer, true);
+            // EC2 does not have `uptime` command, lol
+            instant_remote_process(['ls /'], $this->createdServer, true);
 
             $this->createdServer->settings()->update([
                 'is_reachable' => true,

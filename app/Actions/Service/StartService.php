@@ -13,10 +13,6 @@ class StartService
     {
         ray('Starting service: ' . $service->name);
         $service->saveComposeConfigs();
-
-        $service_name = addslashes($service->name);
-        $server_name = addslashes($service->server->name);
-
         $commands[] = "cd " . $service->workdir();
         $commands[] = "echo 'Saved configuration files to {$service->workdir()}.'";
         $commands[] = "echo 'Creating Docker network.'";

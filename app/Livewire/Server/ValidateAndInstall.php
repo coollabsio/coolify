@@ -19,12 +19,12 @@ class ValidateAndInstall extends Component
     public $docker_version = null;
     public $proxy_started = false;
     public $error = null;
+    public bool $ask = false;
 
     protected $listeners = ['validateServer' => 'init', 'validateDockerEngine', 'validateServerNow' => 'validateServer'];
 
     public function init(bool $install = true)
     {
-
         $this->install = $install;
         $this->uptime = null;
         $this->supported_os_type = null;
@@ -34,9 +34,14 @@ class ValidateAndInstall extends Component
         $this->proxy_started = null;
         $this->error = null;
         $this->number_of_tries = 0;
-        $this->dispatch('validateServerNow');
+        if (!$this->ask) {
+            $this->dispatch('validateServerNow');
+        }
     }
-
+    public function startValidatingAfterAsking() {
+        $this->ask = false;
+        $this->init();
+    }
     public function validateServer()
     {
         try {
