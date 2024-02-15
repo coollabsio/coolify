@@ -13,8 +13,9 @@ class Form extends Component
     public ?string $wildcard_domain = null;
     public int $cleanup_after_percentage;
     public bool $dockerInstallationStarted = false;
+    public bool $revalidate = false;
 
-    protected $listeners = ['serverInstalled'];
+    protected $listeners = ['serverInstalled', 'revalidate' => '$refresh'];
 
     protected $rules = [
         'server.name' => 'required',
@@ -68,8 +69,9 @@ class Form extends Component
             return handleError($e, $this);
         }
     }
-    public function revalidate() {
-        $this->validateServer();
+    public function revalidate()
+    {
+        $this->revalidate = true;
     }
     public function checkLocalhostConnection()
     {
