@@ -400,7 +400,8 @@ class Server extends BaseModel
         if ($server->skipServer()) {
             return false;
         }
-        $uptime = instant_remote_process(['uptime'], $server, false);
+        // EC2 does not have `uptime` command, lol
+        $uptime = instant_remote_process(['ls'], $server, false);
         if (!$uptime) {
             $server->settings()->update([
                 'is_reachable' => false,
