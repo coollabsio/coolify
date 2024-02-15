@@ -403,7 +403,6 @@ class Server extends BaseModel
         // EC2 does not have `uptime` command, lol
 
         $uptime = instant_remote_process(['ls /'], $server, false);
-        ray($uptime);
         if (!$uptime) {
             $server->settings()->update([
                 'is_reachable' => false,
