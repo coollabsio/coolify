@@ -1,11 +1,15 @@
+@props(['status', 'showRefreshButton' => true])
 @if (str($status)->startsWith('running'))
     <x-status.running :status="$status" />
-@elseif(str($status)->startsWith('restarting') || str($status)->startsWith('starting') || str($status)->startsWith('degraded'))
+@elseif(str($status)->startsWith('restarting') ||
+        str($status)->startsWith('starting') ||
+        str($status)->startsWith('degraded'))
     <x-status.restarting :status="$status" />
 @else
-    <x-status.stopped :status="$status" />
+    <x-status.stopped :status="$status"/>
 @endif
-@if (!str($status)->contains('exited'))
+
+@if (!str($status)->contains('exited') && $showRefreshButton)
     <button title="Refresh Status" wire:click='check_status(true)' class="mx-1 hover:fill-white fill-warning">
         <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path

@@ -245,6 +245,8 @@ class Server extends BaseModel
             $mysqls = data_get($standaloneDocker, 'mysqls', collect([]));
             $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
+        })->filter(function ($item) {
+            return data_get($item,'name') === 'coolify-db';
         })->flatten();
     }
     public function applications()

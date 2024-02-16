@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Server as ApiServer;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Server;
@@ -61,12 +62,13 @@ use App\Livewire\Security\PrivateKey\Show as SecurityPrivateKeyShow;
 use App\Livewire\Server\Index as ServerIndex;
 use App\Livewire\Server\Create as ServerCreate;
 use App\Livewire\Server\Show as ServerShow;
+use App\Livewire\Server\Resources as ResourcesShow;
+
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
-
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
 
@@ -173,6 +175,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
+        Route::get('/resources', ResourcesShow::class)->name('server.resources');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');

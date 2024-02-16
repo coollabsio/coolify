@@ -16,7 +16,7 @@ class Services extends Component
         public Service $service,
         public string $complexStatus = 'exited',
     ) {
-        $this->complexStatus = serviceStatus($service);
+        $this->complexStatus = $service->status();
     }
 
     /**

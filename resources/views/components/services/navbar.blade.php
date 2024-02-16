@@ -5,7 +5,7 @@
     </a>
     <x-services.links />
     <div class="flex-1"></div>
-    @if (serviceStatus($service) === 'degraded')
+    @if ($service->status() === 'degraded')
         <button wire:click='deploy' onclick="startService.showModal()"
             class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -26,7 +26,7 @@
             Stop
         </button>
     @endif
-    @if (serviceStatus($service) === 'running')
+    @if ($service->status() === 'running')
         <button wire:click='restart' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                 <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
@@ -47,7 +47,7 @@
             Stop
         </button>
     @endif
-    @if (serviceStatus($service) === 'exited')
+    @if ($service->status() === 'exited')
         <button wire:click='stop(true)'
             class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 " viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">

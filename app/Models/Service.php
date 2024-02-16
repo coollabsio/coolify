@@ -28,6 +28,48 @@ class Service extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+    public function status() {
+        $foundRunning = false;
+        $isDegraded = false;
+        $foundRestaring = false;
+        $applications = $this->applications;
+        $databases = $this->databases;
+        foreach ($applications as $application) {
+            if ($application->exclude_from_status) {
+                continue;
+            }
+            if (Str::of($application->status)->startsWith('running')) {
+                $foundRunning = true;
+            } else if (Str::of($application->status)->startsWith('restarting')) {
+                $foundRestaring = true;
+            } else {
+                $isDegraded = true;
+            }
+        }
+        foreach ($databases as $database) {
+            if ($database->exclude_from_status) {
+                continue;
+            }
+            if (Str::of($database->status)->startsWith('running')) {
+                $foundRunning = true;
+            } else if (Str::of($database->status)->startsWith('restarting')) {
+                $foundRestaring = true;
+            } else {
+                $isDegraded = true;
+            }
+        }
+        if ($foundRestaring) {
+            return 'degraded';
+        }
+        if ($foundRunning && !$isDegraded) {
+            return 'running';
+        } else if ($foundRunning && $isDegraded) {
+            return 'degraded';
+        } else if (!$foundRunning && !$isDegraded) {
+            return 'exited';
+        }
+        return 'exited';
+    }
     public function extraFields()
     {
         $fields = collect([]);

@@ -21,49 +21,6 @@ function replaceVariables($variable)
     return $variable->replaceFirst('$', '')->replaceFirst('{', '')->replaceLast('}', '');
 }
 
-function serviceStatus(Service $service)
-{
-    $foundRunning = false;
-    $isDegraded = false;
-    $foundRestaring = false;
-    $applications = $service->applications;
-    $databases = $service->databases;
-    foreach ($applications as $application) {
-        if ($application->exclude_from_status) {
-            continue;
-        }
-        if (Str::of($application->status)->startsWith('running')) {
-            $foundRunning = true;
-        } else if (Str::of($application->status)->startsWith('restarting')) {
-            $foundRestaring = true;
-        } else {
-            $isDegraded = true;
-        }
-    }
-    foreach ($databases as $database) {
-        if ($database->exclude_from_status) {
-            continue;
-        }
-        if (Str::of($database->status)->startsWith('running')) {
-            $foundRunning = true;
-        } else if (Str::of($database->status)->startsWith('restarting')) {
-            $foundRestaring = true;
-        } else {
-            $isDegraded = true;
-        }
-    }
-    if ($foundRestaring) {
-        return 'degraded';
-    }
-    if ($foundRunning && !$isDegraded) {
-        return 'running';
-    } else if ($foundRunning && $isDegraded) {
-        return 'degraded';
-    } else if (!$foundRunning && !$isDegraded) {
-        return 'exited';
-    }
-    return 'exited';
-}
 function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneService, bool $isInit = false)
 {
     // TODO: make this async

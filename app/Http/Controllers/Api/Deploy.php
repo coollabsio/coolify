@@ -18,8 +18,7 @@ class Deploy extends Controller
 {
     public function deploy(Request $request)
     {
-        $token = auth()->user()->currentAccessToken();
-        $teamId = data_get($token, 'team_id');
+        $teamId = get_team_id_from_token();
         $uuids = $request->query->get('uuid');
         $tags = $request->query->get('tag');
         $force = $request->query->get('force') ?? false;
