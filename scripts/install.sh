@@ -131,7 +131,7 @@ if ! [ -x "$(command -v docker)" ]; then
         if [ -x "$(command -v docker)" ]; then
             echo "Docker installed successfully."
         else
-            echo "Failed to install Docker with Rancher script. Trying to install with AUR."
+            echo "Failed to install Docker with pacman. Try to install it manually."
             echo "Please visit https://wiki.archlinux.org/title/docker for more information."
             exit
         fi
@@ -146,7 +146,7 @@ if ! [ -x "$(command -v docker)" ]; then
                 echo "Docker installed successfully."
             else
                 echo "Docker installation failed with official script."
-                echo "Maybe your OS is not supported."
+                echo "Maybe your OS is not supported?"
                 echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
                 exit 1
             fi
