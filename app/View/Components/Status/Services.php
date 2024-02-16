@@ -15,6 +15,7 @@ class Services extends Component
     public function __construct(
         public Service $service,
         public string $complexStatus = 'exited',
+        public bool $showRefreshButton = true
     ) {
         $this->complexStatus = $service->status();
     }

@@ -11,7 +11,18 @@ class Resources extends Component
     use AuthorizesRequests;
     public ?Server $server = null;
     public $parameters = [];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:team.{$teamId},ApplicationStatusChanged" => 'refreshStatus',
+        ];
+    }
 
+    public function refreshStatus() {
+        $this->server->refresh();
+        $this->dispatch('success', 'Resource statuses refreshed.');
+    }
     public function mount() {
         $this->parameters = get_route_parameters();
         try {
