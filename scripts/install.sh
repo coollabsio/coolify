@@ -81,12 +81,20 @@ esac
 SSH_DETECTED=false
 if [ -x "$(command -v systemctl)" ]; then
     if systemctl status sshd >/dev/null 2>&1; then
-        echo "OpenSSH server is installed and running."
+        echo "OpenSSH server is installed."
+        SSH_DETECTED=true
+    fi
+    if systemctl status ssh >/dev/null 2>&1; then
+        echo "OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 elif [ -x "$(command -v service)" ]; then
     if service sshd status >/dev/null 2>&1; then
-        echo "OpenSSH server is installed and running."
+        echo "OpenSSH server is installed."
+        SSH_DETECTED=true
+    fi
+    if service ssh status >/dev/null 2>&1; then
+        echo "OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 fi
