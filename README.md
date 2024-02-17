@@ -10,6 +10,17 @@ No vendor lock-in, which means that all the configuration for your applications/
 
 For more information, take a look at our landing page [here](https://coolify.io).
 
+# Installation
+
+```bash
+curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
+```
+You can find the installation script source [here](./scripts/install.sh).
+
+# Support
+
+Contact us [here](https://coolify.io/docs/contact).
+
 # Donations
 To stay completely free, open-source, no feature behind paywall and evolve the project, we need your help. If you like Coolify, please consider donating to help us fund the future development of the project.
 
@@ -66,16 +77,6 @@ By subscribing to the cloud version, you get the Coolify server for the same pri
 - Better support
 - Less maintenance for you
 
-# Installation
-
-```bash
-curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash
-```
-You can find the installation script source [here](./scripts/install.sh).
-
-# Support
-
-Contact us [here](https://coolify.io/docs/contact).
 
 # Recognitions
 
