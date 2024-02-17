@@ -128,9 +128,9 @@ class InstallLogDrain
             if ($type !== 'custom') {
                 $parsers = base64_encode("
 [PARSER]
-Name        empty_line_skipper
-Format      regex
-Regex       /^(?!\s*$).+/
+    Name        empty_line_skipper
+    Format      regex
+    Regex       /^(?!\s*$).+/
 ");
             }
             $compose = base64_encode("
