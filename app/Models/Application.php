@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -212,7 +213,8 @@ class Application extends BaseModel
 
         );
     }
-    public function isExited() {
+    public function isExited()
+    {
         return (bool) str($this->status)->startsWith('exited');
     }
     public function realStatus()
@@ -521,17 +523,21 @@ class Application extends BaseModel
     {
         return "/artifacts/{$uuid}";
     }
-    function setGitImportSettings(string $deployment_uuid, string $git_clone_command)
+    function setGitImportSettings(string $deployment_uuid, string $git_clone_command, bool $public = false)
     {
         $baseDir = $this->generateBaseDir($deployment_uuid);
+
         if ($this->git_commit_sha !== 'HEAD') {
-            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git -c advice.detachedHead=false checkout {$this->git_commit_sha} >/dev/null 2>&1";
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git -c advice.detachedHead=false checkout {$this->git_commit_sha} >/dev/null 2>&1";
         }
         if ($this->settings->is_git_submodules_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git submodule update --init --recursive";
+            if ($public) {
+                $git_clone_command = "{$git_clone_command} && cd {$baseDir} && sed -i \"s#git@\(.*\):#https://\\1/#g\" {$baseDir}/.gitmodules || true";
+            }
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git submodule update --init --recursive";
         }
         if ($this->settings->is_git_lfs_enabled) {
-            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && git lfs pull";
+            $git_clone_command = "{$git_clone_command} && cd {$baseDir} && GIT_SSH_COMMAND=\"ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null\" git lfs pull";
         }
         return $git_clone_command;
     }
@@ -559,7 +565,7 @@ class Application extends BaseModel
                     $fullRepoUrl = "{$this->source->html_url}/{$customRepository}";
                     $git_clone_command = "{$git_clone_command} {$this->source->html_url}/{$customRepository} {$baseDir}";
                     if (!$only_checkout) {
-                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command);
+                        $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true);
                     }
                     if ($exec_in_docker) {
                         $commands->push(executeInDocker($deployment_uuid, $git_clone_command));
@@ -658,7 +664,7 @@ class Application extends BaseModel
         if ($this->deploymentType() === 'other') {
             $fullRepoUrl = $customRepository;
             $git_clone_command = "{$git_clone_command} {$customRepository} {$baseDir}";
-            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command);
+            $git_clone_command = $this->setGitImportSettings($deployment_uuid, $git_clone_command, public: true);
 
             if ($pull_request_id !== 0) {
                 if ($git_type === 'gitlab') {

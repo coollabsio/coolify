@@ -225,20 +225,23 @@ class Server extends BaseModel
         $services = $this->services();
         return $applications->concat($databases)->concat($services->get());
     }
-    public function stopUnmanaged($id) {
+    public function stopUnmanaged($id)
+    {
         return instant_remote_process(["docker stop -t 0 $id"], $this);
     }
-    public function restartUnmanaged($id) {
+    public function restartUnmanaged($id)
+    {
         return instant_remote_process(["docker restart $id"], $this);
     }
-    public function startUnmanaged($id) {
+    public function startUnmanaged($id)
+    {
         return instant_remote_process(["docker start $id"], $this);
     }
     public function loadUnmanagedContainers()
     {
         $containers = instant_remote_process(["docker ps -a  --format '{{json .}}' "], $this);
         $containers = format_docker_command_output_to_json($containers);
-        $containers = $containers->map(function ($container)  {
+        $containers = $containers->map(function ($container) {
             $labels = data_get($container, 'Labels');
             if (!str($labels)->contains("coolify.managed")) {
                 return $container;
@@ -269,7 +272,7 @@ class Server extends BaseModel
             $mariadbs = data_get($standaloneDocker, 'mariadbs', collect([]));
             return $postgresqls->concat($redis)->concat($mongodbs)->concat($mysqls)->concat($mariadbs);
         })->filter(function ($item) {
-            return data_get($item, 'name') === 'coolify-db';
+            return data_get($item, 'name') !== 'coolify-db';
         })->flatten();
     }
     public function applications()
