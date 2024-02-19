@@ -26,7 +26,6 @@ class Environment extends Model
     {
         return $this->hasMany(Application::class);
     }
-
     public function postgresqls()
     {
         return $this->hasMany(StandalonePostgresql::class);

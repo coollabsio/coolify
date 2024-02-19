@@ -212,6 +212,9 @@ class Application extends BaseModel
 
         );
     }
+    public function isExited() {
+        return (bool) str($this->status)->startsWith('exited');
+    }
     public function realStatus()
     {
         return $this->getRawOriginal('status');

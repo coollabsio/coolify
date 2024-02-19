@@ -82,6 +82,9 @@ class StandaloneMysql extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
+    public function project() {
+        return data_get($this, 'environment.project');
+    }
     public function team()
     {
         return data_get($this, 'environment.project.team');

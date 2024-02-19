@@ -2,7 +2,7 @@
     <form wire:submit.prevent='submit' class="flex flex-col">
         <div class="flex gap-2">
             <h2>General</h2>
-            @if ($server->id !== 0)
+            @if ($server->id === 0)
                 <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
                     You could lost a lot of functionalities if you change the server details of the server where Coolify
                     is

@@ -1022,11 +1022,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_nixpacks_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                if (!is_null($env->real_value)) {
+                    $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                }
             }
         } else {
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                if (!is_null($env->real_value)) {
+                    $this->env_nixpacks_args->push("--env {$env->key}={$env->real_value}");
+                }
             }
         }
 
@@ -1037,11 +1041,15 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->env_args = collect([]);
         if ($this->pull_request_id === 0) {
             foreach ($this->application->build_environment_variables as $env) {
-                $this->env_args->put($env->key, $env->real_value);
+                if (!is_null($env->real_value)) {
+                    $this->env_args->put($env->key, $env->real_value);
+                }
             }
         } else {
             foreach ($this->application->build_environment_variables_preview as $env) {
-                $this->env_args->put($env->key, $env->real_value);
+                if (!is_null($env->real_value)) {
+                    $this->env_args->put($env->key, $env->real_value);
+                }
             }
         }
         $this->env_args->put('SOURCE_COMMIT', $this->commit);

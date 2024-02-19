@@ -18,6 +18,12 @@
             ]) }}">
             <button>General</button>
         </a>
+        <a class="{{ request()->routeIs('server.resources') ? 'text-white' : '' }}"
+            href="{{ route('server.resources', [
+                'server_uuid' => data_get($parameters, 'server_uuid'),
+            ]) }}">
+            <button>Resources</button>
+        </a>
         <a class="{{ request()->routeIs('server.private-key') ? 'text-white' : '' }}"
             href="{{ route('server.private-key', [
                 'server_uuid' => data_get($parameters, 'server_uuid'),

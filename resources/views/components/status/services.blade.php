@@ -7,7 +7,7 @@
 @else
     <x-status.stopped :status="$complexStatus" />
 @endif
-@if (!str($complexStatus)->contains('exited'))
+@if (!str($complexStatus)->contains('exited') && $showRefreshButton)
     <button title="Refresh Status" wire:click='check_status(true)' class="mx-1 hover:fill-white fill-warning">
         <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path

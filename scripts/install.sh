@@ -11,7 +11,13 @@ DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
 OS_TYPE=$(grep -w "ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
-OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+
+if [ "$OS_TYPE" = "arch" ]; then
+    OS_VERSION="rolling"
+else
+    OS_VERSION=$(grep -w "VERSION_ID" /etc/os-release | cut -d "=" -f 2 | tr -d '"')
+fi
+
 LATEST_VERSION=$(curl --silent $CDN/versions.json | grep -i version | sed -n '2p' | xargs | awk '{print $2}' | tr -d ',')
 DATE=$(date +"%Y%m%d-%H%M%S")
 
@@ -21,11 +27,11 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
-*)
-    echo "This script only supports Debian, Redhat or Sles based operating systems for now."
-    exit
-    ;;
+    arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
 esac
 
 # Overwrite LATEST_VERSION if user pass a version number
@@ -48,33 +54,47 @@ echo -e "-------------"
 echo "Installing required packages..."
 
 case "$OS_TYPE" in
-ubuntu | debian | raspbian)
-    apt update -y >/dev/null 2>&1
-    apt install -y curl wget git jq >/dev/null 2>&1
-    ;;
-centos | fedora | rhel | ol | rocky)
-    dnf install -y curl wget git jq >/dev/null 2>&1
-    ;;
-sles | opensuse-leap | opensuse-tumbleweed)
-    zypper refresh >/dev/null 2>&1
-    zypper install -y curl wget git jq >/dev/null 2>&1
-    ;;
-*)
-    echo "This script only supports Debian, Redhat or Sles based operating systems for now."
-    exit
-    ;;
+    arch)
+        pacman -Sy >/dev/null 2>&1 || true
+        if ! pacman -Q curl wget git jq >/dev/null 2>&1; then
+            pacman -S --noconfirm curl wget git jq >/dev/null 2>&1 || true
+        fi
+        ;;
+    ubuntu | debian | raspbian)
+        apt update -y >/dev/null 2>&1
+            apt install -y curl wget git jq >/dev/null 2>&1
+        ;;
+    centos | fedora | rhel | ol | rocky)
+        dnf install -y curl wget git jq >/dev/null 2>&1
+        ;;
+    sles | opensuse-leap | opensuse-tumbleweed)
+        zypper refresh >/dev/null 2>&1
+        zypper install -y curl wget git jq >/dev/null 2>&1
+        ;;
+    *)
+        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+        exit
+        ;;
 esac
 
 # Detect OpenSSH server
 SSH_DETECTED=false
 if [ -x "$(command -v systemctl)" ]; then
     if systemctl status sshd >/dev/null 2>&1; then
-        echo "OpenSSH server is installed and running."
+        echo "OpenSSH server is installed."
+        SSH_DETECTED=true
+    fi
+    if systemctl status ssh >/dev/null 2>&1; then
+        echo "OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 elif [ -x "$(command -v service)" ]; then
     if service sshd status >/dev/null 2>&1; then
-        echo "OpenSSH server is installed and running."
+        echo "OpenSSH server is installed."
+        SSH_DETECTED=true
+    fi
+    if service ssh status >/dev/null 2>&1; then
+        echo "OpenSSH server is installed."
         SSH_DETECTED=true
     fi
 fi
@@ -105,22 +125,35 @@ fi
 
 if ! [ -x "$(command -v docker)" ]; then
     echo "Docker is not installed. Installing Docker."
-    curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-    if [ -x "$(command -v docker)" ]; then
-        echo "Docker installed successfully."
-    else
-        echo "Docker installation failed with Rancher script. Trying with official script."
-        curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+    if [ "$OS_TYPE" = "arch" ]; then
+        pacman -Sy docker docker-compose --noconfirm
+        systemctl enable docker.service
         if [ -x "$(command -v docker)" ]; then
             echo "Docker installed successfully."
         else
-            echo "Docker installation failed with official script."
-            echo "Maybe your OS is not supported."
-            echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-            exit 1
+            echo "Failed to install Docker with pacman. Try to install it manually."
+            echo "Please visit https://wiki.archlinux.org/title/docker for more information."
+            exit
+        fi
+    else
+        curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
+        if [ -x "$(command -v docker)" ]; then
+            echo "Docker installed successfully."
+        else
+            echo "Docker installation failed with Rancher script. Trying with official script."
+            curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+            if [ -x "$(command -v docker)" ]; then
+                echo "Docker installed successfully."
+            else
+                echo "Docker installation failed with official script."
+                echo "Maybe your OS is not supported?"
+                echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                exit 1
+            fi
         fi
     fi
 fi
+
 echo -e "-------------"
 echo -e "Check Docker Configuration..."
 mkdir -p /etc/docker
