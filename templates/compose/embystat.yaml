@@ -1,5 +1,5 @@
-# documentation: https://github.com/mregni/EmbyStat/wiki/docker
-# slogan: EmyStat is an open-source, self-hosted web analytics tool, designed to provide insight into website traffic and user behavior, of your local Emby deployment, all within your control.
+# documentation: https://github.com/mregni/EmbyStat
+# slogan: EmnyStat is a web analytics tool, designed to provide insight into website traffic and user behavior.
 # tags: media, server, movies, tv, music
 
 services:

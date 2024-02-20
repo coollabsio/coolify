@@ -16,6 +16,7 @@
                     <x-new-modal isErrorButton buttonTitle="Delete">
                         This source will be deleted. It is not reversible. <br>Please think again.
                     </x-new-modal>
+                    {{-- <x-forms.button wire:click.prevent="check">Check</x-forms.button> --}}
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>

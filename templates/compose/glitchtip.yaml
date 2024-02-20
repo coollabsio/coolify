@@ -1,6 +1,7 @@
 # documentation: https://glitchtip.com
 # slogan: GlitchTip is a self-hosted, open-source error tracking system.
 # tags: error, tracking, open-source, self-hosted, sentry
+# logo: svgs/glitchtip.png
 
 version: "3.8"
 services:

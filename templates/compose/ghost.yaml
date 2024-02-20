@@ -1,6 +1,7 @@
-# documentation: https://ghost.org/docs
-# slogan: Ghost is a popular open-source content management system (CMS) and blogging platform, known for its simplicity and focus on content creation.
+# documentation: https://ghost.org
+# slogan: Ghost is a content management system (CMS) and blogging platform.
 # tags: cms, blog, content, management, system
+# logo: svgs/ghost.svg
 
 services:
   ghost:

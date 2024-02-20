@@ -1,6 +1,7 @@
-# documentation: https://duplicati.readthedocs.io/en/latest/02-installation/
-# slogan: Duplicati is an open-source backup solution, allowing you to safeguard your data with ease through scheduled backups and encryption.
+# documentation: https://duplicati.readthedocs.io
+# slogan: Duplicati is a backup solution, allowing you to make scheduled backups with encryption.
 # tags: backup, encryption
+# logo: svgs/duplicati.webp
 
 services:
   duplicati:

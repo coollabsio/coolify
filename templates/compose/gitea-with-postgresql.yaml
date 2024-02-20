@@ -1,6 +1,7 @@
 # documentation: https://docs.gitea.com
-# slogan: Gitea (with PostgreSQL)vis a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
+# slogan: Gitea is a self-hosted, lightweight Git service, offering version control, collaboration, and code hosting.
 # tags: version control, collaboration, code, hosting, lightweight, postgresql
+# logo: svgs/gitea.svg
 
 services:
   gitea:

@@ -1,6 +1,7 @@
-# documentation: https://coder.com/docs/code-server/latest/guide
-# slogan: Code-Server is a self-hosted, web-based code editor that enables remote coding and collaboration from any device, anywhere.
+# documentation: https://coder.com/docs/code-server/latest
+# slogan: Code-Server is a web-based code editor that enables remote coding and collaboration from any device, anywhere.
 # tags: code, editor, remote, collaboration
+# logo: svgs/code-server.svg
 
 services:
   code-server:

@@ -4,6 +4,7 @@ namespace App\Livewire\Source\Github;
 
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
@@ -36,6 +37,40 @@ class Change extends Component
         'github_app.is_system_wide' => 'required|bool',
     ];
 
+    // public function check()
+    // {
+
+    // Need administration:read:write permission
+    // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
+
+
+    //     $github_access_token = generate_github_installation_token($this->github_app);
+    //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
+    //     $runners_by_repository = collect([]);
+    //     $repositories = $repositories->json()['repositories'];
+    //     foreach ($repositories as $repository) {
+    //         $runners_downloads = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/downloads");
+    //         $runners = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners");
+    //         $token = Http::withHeaders([
+    //             'Authorization' => "Bearer $github_access_token",
+    //             'Accept' => 'application/vnd.github+json'
+    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/registration-token");
+    //         $token = $token->json();
+    //         $remove_token = Http::withHeaders([
+    //             'Authorization' => "Bearer $github_access_token",
+    //             'Accept' => 'application/vnd.github+json'
+    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/remove-token");
+    //         $remove_token = $remove_token->json();
+    //         $runners_by_repository->put($repository['full_name'], [
+    //             'token' => $token,
+    //             'remove_token' => $remove_token,
+    //             'runners' => $runners->json(),
+    //             'runners_downloads' => $runners_downloads->json()
+    //         ]);
+    //     }
+
+    //     ray($runners_by_repository);
+    // }
     public function mount()
     {
         $github_app_uuid = request()->github_app_uuid;

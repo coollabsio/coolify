@@ -1,7 +1,8 @@
-# documentation: https://appwrite.io/docs
-# slogan: Appwrite is a self-hosted backend-as-a-service platform that simplifies the development of web and mobile applications by providing a range of features and APIs.
+# documentation: https://appwrite.io
+# slogan: Appwrite is  backend-as-a-service platform that simplifies the development of web and mobile applications.
 # env_file: appwrite.env
 # tags: backend-as-a-service, platform
+# logo: svgs/appwrite.svg
 
 
 x-logging: &x-logging

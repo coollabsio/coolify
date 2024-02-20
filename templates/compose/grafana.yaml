@@ -1,6 +1,7 @@
 # documentation: https://grafana.com/docs/grafana/latest/installation/docker/
 # slogan: Grafana is the open source analytics & monitoring solution for every database.
 # tags: grafana,analytics,monitoring,dashboard
+# logo: svgs/grafana.svg
 
 services:
   grafana:
