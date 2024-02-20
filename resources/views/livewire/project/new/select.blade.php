@@ -24,12 +24,22 @@
                     <x-slot:description>
                         You can deploy any kind of public repositories from the supported git providers.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/git.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('private-gh-app')">
                     <x-slot:title>Private Repository (with GitHub App)</x-slot>
                     <x-slot:description>
                         You can deploy public & private repositories through your GitHub Apps.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/github.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
 
                 <x-resource-view wire="setType('private-deploy-key')">
@@ -37,6 +47,11 @@
                     <x-slot:description>
                         You can deploy public & private repositories with a simple deploy key (SSH key).
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/git.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
@@ -45,18 +60,33 @@
                     <x-slot:description>
                         You can deploy a simple Dockerfile, without Git.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('docker-compose-empty')">
                     <x-slot:title>Based on a Docker Compose</x-slot>
                     <x-slot:description>
                         You can deploy complex application easily with Docker Compose, without Git.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('docker-image')">
                     <x-slot:title>Based on an existing Docker Image</x-slot>
                     <x-slot:description>
                         You can deploy an existing Docker Image from any Registry, without Git.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
             </div>
             <h2 class="py-4">Databases</h2>
@@ -64,37 +94,62 @@
                 <x-resource-view wire="setType('postgresql')">
                     <x-slot:title> New PostgreSQL</x-slot>
                     <x-slot:description>
-                        PostgreSQL is an open-source, object-relational database management system known for its
+                        PostgreSQL is an object-relational database known for its
                         robustness, advanced features, and strong standards compliance.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/postgres.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('redis')">
                     <x-slot:title> New Redis</x-slot>
                     <x-slot:description>
-                        Redis is an open-source, in-memory data structure store used as a database, cache, and message
-                        broker, known for its high performance, flexibility, and rich data structures.
+                        Redis is an open-source, in-memory data structure store, used as a database, cache, and message
+                        broker.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/redis.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mongodb')">
                     <x-slot:title> New MongoDB</x-slot>
                     <x-slot:description>
-                        MongoDB is a source-available, NoSQL database program that uses JSON-like documents with
-                        optional schemas, known for its flexibility and scalability.
+                        MongoDB is a source-available, NoSQL database that uses JSON-like documents with
+                        optional schemas.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mongodb.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mysql')">
-                    <x-slot:title> New MySQL</x-slot>
+                    <x-slot:title>New MySQL</x-slot>
                     <x-slot:description>
-                        MySQL is an open-source relational database management system known for its speed, reliability,
-                        and flexibility in managing and accessing data.
+                        MySQL is a relational database known for its speed, reliability, and
+                        flexibility.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mysql.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mariadb')">
                     <x-slot:title> New Mariadb</x-slot>
                     <x-slot:description>
-                        MariaDB is an open-source relational database management system that serves as a drop-in
+                        MariaDB is a relational database that serves as a drop-in
                         replacement for MySQL.
                     </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mariadb.svg') }}">
+                    </x-slot:logo>
                 </x-resource-view>
 
                 {{-- <div class="box group" wire="setType('existing-postgresql')">

@@ -1,6 +1,7 @@
 # documentation: https://github.com/phntxx/dashboard?tab=readme-ov-file#dashboard
-# slogan: A dashboard. Inspired by SUI, it offers simple customization through JSON-files and a handy search bar to help you browse the internet more efficiently.
+# slogan: A dashboard, inspired by SUI.
 # tags: dashboard, web, search, bookmarks
+# logo: svgs/unknown.svg
 
 services:
   dashboard:

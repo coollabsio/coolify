@@ -1,6 +1,7 @@
-# documentation: https://docs.n8n.io/hosting/
-# slogan: n8n is an extendable workflow automation tool which enables you to connect anything to everything via its open, fair-code model.
+# documentation: https://n8n.io
+# slogan: n8n is an extendable workflow automation tool.
 # tags: n8n,workflow,automation,open,source,low,code
+# logo: svgs/n8n.png
 
 services:
   n8n:

@@ -1,0 +1,15 @@
+<svg id="banner-dark" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="-50 0 600 512">
+    <defs>
+        <linearGradient id="linear-gradient" x1="110.25" y1="213.3" x2="496.14" y2="436.09" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#aa5cc3"/>
+            <stop offset="1" stop-color="#00a4dc"/>
+        </linearGradient>
+    </defs>
+    <title>banner-dark</title>
+    <g id="banner-dark">
+        <g id="banner-dark-icon">
+            <path id="inner-shape" d="M261.42,201.62c-20.44,0-86.24,119.29-76.2,139.43s142.48,19.92,152.4,0S281.86,201.63,261.42,201.62Z" fill="url(#linear-gradient)"/>
+            <path id="outer-shape" d="M261.42,23.3C199.83,23.3,1.57,382.73,31.8,443.43s429.34,60,459.24,0S323,23.3,261.42,23.3ZM411.9,390.76c-19.59,39.33-281.08,39.77-300.9,0S221.1,115.48,261.45,115.48,431.49,351.42,411.9,390.76Z" fill="url(#linear-gradient)"/>
+        </g>
+    </g>
+</svg>
