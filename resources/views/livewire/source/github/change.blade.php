@@ -16,7 +16,6 @@
                     <x-new-modal isErrorButton buttonTitle="Delete">
                         This source will be deleted. It is not reversible. <br>Please think again.
                     </x-new-modal>
-                    {{-- <x-forms.button wire:click.prevent="check">Check</x-forms.button> --}}
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
@@ -33,39 +32,53 @@
                     Install Repositories on GitHub
                 </a>
             @else
-                @if (!isCloud())
-                    <div class="w-48">
-                        <x-forms.checkbox label="System Wide?"
-                            helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                            instantSave id="github_app.is_system_wide" />
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.name" label="App Name" disabled />
+                        <x-forms.input id="github_app.organization" label="Organization" disabled
+                            placeholder="If empty, personal user will be used" />
                     </div>
-                @endif
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.name" label="App Name" disabled />
-                    <x-forms.input id="github_app.organization" label="Organization" disabled
-                        placeholder="If empty, personal user will be used" />
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-                    <x-forms.input id="github_app.api_url" label="API Url" disabled />
-                </div>
-                <div class="flex gap-2">
-                    @if ($github_app->html_url === 'https://github.com')
-                        <x-forms.input id="github_app.custom_user" label="User" disabled />
-                        <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-                    @else
-                        <x-forms.input id="github_app.custom_user" label="User" required />
-                        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                    @if (!isCloud())
+                        <div class="w-48">
+                            <x-forms.checkbox label="System Wide?"
+                                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                                instantSave id="github_app.is_system_wide" />
+                        </div>
                     @endif
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
-                    <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
-                    <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
-                    <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
+                        <x-forms.input id="github_app.api_url" label="API Url" disabled />
+                    </div>
+                    <div class="flex gap-2">
+                        @if ($github_app->html_url === 'https://github.com')
+                            <x-forms.input id="github_app.custom_user" label="User" disabled />
+                            <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
+                        @else
+                            <x-forms.input id="github_app.custom_user" label="User" required />
+                            <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                        @endif
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+                        <x-forms.input type="number" id="github_app.installation_id" label="Installation Id"
+                            disabled />
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
+                        <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
+                        <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                    </div>
+                    <div class="flex items-end gap-2 ">
+                        <h3 class="pt-4">Permissions</h3>
+                        <x-forms.button wire:click.prevent="checkPermissions">Check Permissions</x-forms.button>
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.contents" helper="read - mandatory." label="Content" readonly placeholder="N/A" />
+                        <x-forms.input id="github_app.metadata" helper="read - mandatory." label="Metadata" readonly placeholder="N/A" />
+                        <x-forms.input id="github_app.administration" helper="read:write access needed to setup servers as GitHub Runner." label="Administration" readonly
+                        placeholder="N/A" />
+                        <x-forms.input id="github_app.pull_requests" helper="write access needed to use deployment status update in previews." label="Pull Request" readonly placeholder="N/A" />
+                    </div>
                 </div>
             @endif
         </form>

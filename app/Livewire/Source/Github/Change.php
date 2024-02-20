@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Source\Github;
 
+use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
 use Illuminate\Support\Facades\Http;
@@ -35,8 +36,18 @@ class Change extends Component
         'github_app.client_secret' => 'required|string',
         'github_app.webhook_secret' => 'required|string',
         'github_app.is_system_wide' => 'required|bool',
+        'github_app.contents' => 'nullable|string',
+        'github_app.metadata' => 'nullable|string',
+        'github_app.pull_requests' => 'nullable|string',
+        'github_app.administration' => 'nullable|string',
     ];
 
+    public function checkPermissions()
+    {
+        GithubAppPermissionJob::dispatchSync($this->github_app);
+        $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+        $this->dispatch('success', 'Success', 'Github App permissions updated.');
+    }
     // public function check()
     // {
 
@@ -138,7 +149,7 @@ class Change extends Component
                 'github_app.is_system_wide' => 'required|bool',
             ]);
             $this->github_app->save();
-            $this->dispatch('success', 'Github App updated successfully.');
+            $this->dispatch('success', 'Success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -146,6 +157,13 @@ class Change extends Component
 
     public function instantSave()
     {
+        try {
+            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->github_app->save();
+            $this->dispatch('success', 'Success', 'Github App updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function delete()
