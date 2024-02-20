@@ -1,6 +1,7 @@
 # documentation: https://github.com/alexta69/metube
 # slogan: A web GUI for youtube-dl with playlist support. It enables you to effortlessly download videos from YouTube and dozens of other sites.
 # tags: youtube, download, videos, playlist
+# logo: svgs/unknown.svg
 
 services:
   metube:

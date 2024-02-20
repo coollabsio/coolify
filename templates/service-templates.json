@@ -390,7 +390,7 @@
             "videos",
             "playlist"
         ],
-        "logo": []
+        "logo": "svgs\/unknown.svg"
     },
     "minio": {
         "documentation": "https:\/\/min.io\/docs\/minio\/container\/index.html",
@@ -420,7 +420,7 @@
             "low",
             "code"
         ],
-        "logo": []
+        "logo": "svgs\/moodle.png"
     },
     "n8n-with-postgresql": {
         "documentation": "https:\/\/n8n.io",
@@ -463,7 +463,7 @@
             "filestorage",
             "data"
         ],
-        "logo": []
+        "logo": "svgs\/nextcloud.svg"
     },
     "nocodb": {
         "documentation": "https:\/\/docs.nocodb.com\/",
@@ -478,7 +478,7 @@
             "sqlite",
             "mariadb"
         ],
-        "logo": []
+        "logo": "svgs\/nocodb.svg"
     },
     "openblocks": {
         "documentation": "https:\/\/docs.openblocks.dev\/self-hosting",
@@ -494,10 +494,10 @@
             "low",
             "code"
         ],
-        "logo": []
+        "logo": "svgs\/openblocks.svg"
     },
     "pairdrop": {
-        "documentation": "https:\/\/github.com\/schlagmichdoch\/PairDrop",
+        "documentation": "https:\/\/pairdrop.net\/",
         "slogan": "Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.",
         "compose": "c2VydmljZXM6CiAgcGFpcmRyb3A6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcGFpcmRyb3A6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BBSVJEUk9QCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIERFQlVHX01PREU9ZmFsc2UKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
         "tags": [
@@ -506,7 +506,7 @@
             "collaboration",
             "teamwork"
         ],
-        "logo": []
+        "logo": "svgs\/unknown.svg"
     },
     "phpmyadmin": {
         "documentation": "https:\/\/docs.phpmyadmin.net\/en\/latest\/",
@@ -515,7 +515,7 @@
         "tags": [
             "database management"
         ],
-        "logo": []
+        "logo": "svgs\/phpmyadmin.svg"
     },
     "pocketbase": {
         "documentation": "https:\/\/pocketbase.io\/docs\/",
@@ -528,7 +528,7 @@
             "mobile",
             "api"
         ],
-        "logo": []
+        "logo": "svgs\/pocketbase.svg"
     },
     "snapdrop": {
         "documentation": "https:\/\/github.com\/RobinLinus\/snapdrop",
@@ -542,7 +542,7 @@
             "network",
             "internet"
         ],
-        "logo": []
+        "logo": "svgs\/unknown.svg"
     },
     "stirling-pdf": {
         "documentation": "https:\/\/github.com\/Stirling-Tools\/Stirling-PDF",
@@ -554,7 +554,7 @@
             "web",
             "tool"
         ],
-        "logo": []
+        "logo": "svgs\/stirling.png"
     },
     "syncthing": {
         "documentation": "https:\/\/syncthing.net\/",
@@ -580,7 +580,7 @@
             "cron",
             "scheduler"
         ],
-        "logo": []
+        "logo": "svgs\/trigger.png"
     },
     "trigger": {
         "documentation": "https:\/\/trigger.dev\/docs\/documentation\/guides\/self-hosting",
@@ -595,7 +595,7 @@
             "cron",
             "scheduler"
         ],
-        "logo": []
+        "logo": "svgs\/trigger.png"
     },
     "umami": {
         "documentation": "https:\/\/umami.is\/docs\/getting-started",
@@ -606,7 +606,7 @@
             "insights",
             "privacy"
         ],
-        "logo": []
+        "logo": "svgs\/umami.svg"
     },
     "uptime-kuma": {
         "documentation": "https:\/\/github.com\/louislam\/uptime-kuma\/wiki",
@@ -621,7 +621,7 @@
             "applications",
             "real-time"
         ],
-        "logo": []
+        "logo": "svgs\/uptime-kuma.svg"
     },
     "vaultwarden": {
         "documentation": "https:\/\/github.com\/dani-garcia\/vaultwarden\/wiki\/FAQs",
@@ -631,7 +631,7 @@
             "password manager",
             "security"
         ],
-        "logo": []
+        "logo": "svgs\/bitwarden.svg"
     },
     "weblate": {
         "documentation": "https:\/\/docs.weblate.org\/en\/latest\/admin\/install\/docker.html",
@@ -646,7 +646,7 @@
             "libre",
             "software"
         ],
-        "logo": []
+        "logo": "svgs\/weblate.webp"
     },
     "whoogle": {
         "documentation": "https:\/\/github.com\/benbusby\/whoogle-search#install",
@@ -656,7 +656,7 @@
             "privacy",
             "search engine"
         ],
-        "logo": []
+        "logo": "svgs\/unknown.svg"
     },
     "wordpress-with-mariadb": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
@@ -669,7 +669,7 @@
             "management",
             "mariadb"
         ],
-        "logo": []
+        "logo": "svgs\/wordpress.svg"
     },
     "wordpress-with-mysql": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
@@ -682,7 +682,7 @@
             "management",
             "mysql"
         ],
-        "logo": []
+        "logo": "svgs\/wordpress.svg"
     },
     "wordpress-without-database": {
         "documentation": "https:\/\/wordpress.org\/documentation\/",
@@ -694,6 +694,6 @@
             "content",
             "management"
         ],
-        "logo": []
+        "logo": "svgs\/wordpress.svg"
     }
 }

@@ -1,6 +1,7 @@
-# documentation: https://trigger.dev/docs/documentation/guides/self-hosting
+# documentation: https://trigger.dev
 # slogan: The open source Background Jobs framework for TypeScript
 # tags: trigger.dev, background jobs, typescript, trigger, jobs, cron, scheduler
+# logo: svgs/trigger.png
 
 services:
   trigger:

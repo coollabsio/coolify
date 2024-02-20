@@ -1,6 +1,7 @@
 # documentation: https://pocketbase.io/docs/
 # slogan: Open Source backend for your next SaaS and Mobile app in 1 file
 # tags: pocketbase,backend,saas,mobile,api
+# logo: svgs/pocketbase.svg
 
 services:
   pocketbase:
