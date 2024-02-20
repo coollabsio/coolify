@@ -17,6 +17,7 @@ class Change extends Component
 
     public ?bool $default_permissions = true;
     public ?bool $preview_deployment_permissions = true;
+    public ?bool $administration = false;
 
     public $parameters;
     public ?GithubApp $github_app;
