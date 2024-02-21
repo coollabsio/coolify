@@ -76,6 +76,8 @@ class ServicesGenerate extends Command
         $logo = collect(preg_grep('/^# logo:/', explode("\n", $content)))->values();
         if ($logo->count() > 0) {
             $logo = str($logo[0])->after('# logo:')->trim()->value();
+        } else {
+            $logo = 'svgs/unknown.svg';
         }
         $env_file = collect(preg_grep('/^# env_file:/', explode("\n", $content)))->values();
         if ($env_file->count() > 0) {

@@ -1,7 +1,6 @@
 # documentation: https://github.com/phntxx/dashboard?tab=readme-ov-file#dashboard
 # slogan: A dashboard, inspired by SUI.
 # tags: dashboard, web, search, bookmarks
-# logo: svgs/unknown.svg
 
 services:
   dashboard:

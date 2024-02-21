@@ -1,7 +1,6 @@
 # documentation: https://github.com/linuxserver/budge
 # slogan: Budge is a budgeting personal finance app.
 # tags: personal finance, budgeting, expense tracking
-# logo: svgs/unknown.svg
 
 services:
   budge:

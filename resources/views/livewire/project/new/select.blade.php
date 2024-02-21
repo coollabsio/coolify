@@ -26,7 +26,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/git.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -37,7 +37,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/github.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -49,7 +49,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/git.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -62,7 +62,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/docker.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -73,7 +73,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/docker.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -84,7 +84,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/docker.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -99,7 +99,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/postgres.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -111,7 +111,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/redis.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -123,7 +123,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/mongodb.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -135,7 +135,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/mysql.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -147,7 +147,7 @@
                     </x-slot>
                     <x-slot:logo>
                         <img class="w-[4.5rem]
-                            aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                             src="{{ asset('svgs/mariadb.svg') }}">
                     </x-slot:logo>
                 </x-resource-view>
@@ -195,7 +195,7 @@
                                 <x-slot:logo>
                                     @if (data_get($service, 'logo'))
                                         <img class="w-[4.5rem]
-                                        aspect-square h-[4.5rem] p-1 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                        aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                                             src="{{ asset(data_get($service, 'logo')) }}">
                                     @endif
                                 </x-slot:logo>

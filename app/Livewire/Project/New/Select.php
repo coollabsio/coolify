@@ -93,7 +93,6 @@ class Select extends Component
                 });;
                 $this->dispatch('success', 'Successfully loaded services.');
             }
-            ray($this->services);
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {
