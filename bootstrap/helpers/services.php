@@ -4,8 +4,8 @@ use App\Models\EnvironmentVariable;
 use App\Models\Service;
 use App\Models\ServiceApplication;
 use App\Models\ServiceDatabase;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Spatie\Url\Url;
 use Symfony\Component\Yaml\Yaml;
 
 function replaceRegex(?string $name = null)
@@ -95,12 +95,17 @@ function updateCompose($resource)
             // Update FQDN
             $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
             $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+            $fqdn = Url::fromString($resource->fqdn);
+            $fqdn = $fqdn->getScheme() . '://' . $fqdn->getHost();
             if ($generatedEnv) {
-                $generatedEnv->value = $resource->fqdn;
+                $generatedEnv->value = $fqdn;
                 $generatedEnv->save();
             }
             $variableName = "SERVICE_URL_" . Str::of($resource->name)->upper();
             $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
+            $url = Url::fromString($resource->fqdn);
+            $url = $url->getHost();
+            ray($url);
             if ($generatedEnv) {
                 $url = Str::of($resource->fqdn)->after('://');
                 $generatedEnv->value = $url;

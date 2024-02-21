@@ -974,13 +974,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'is_preview' => false,
                                     ]);
                                 }
-                                // if (!$isDatabase) {
-                                //     ray($savedService,$fqdn);
-                                //     if ($command->value() === 'FQDN' && is_null($savedService->fqdn)) {
-                                //         $savedService->fqdn = $fqdn;
-                                //         $savedService->save();
-                                //     }
-                                // }
+                                if (!$isDatabase) {
+                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
+                                        $savedService->fqdn = $fqdn;
+                                        $savedService->save();
+                                    }
+                                }
                             } else {
                                 $generatedValue = generateEnvValue($command);
                                 if (!$foundEnv) {
