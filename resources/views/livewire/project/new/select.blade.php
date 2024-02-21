@@ -10,7 +10,7 @@
         </div>
     </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-4 pt-10">
+    <div class="flex flex-col gap-4 pt-10 sm:px-20">
         @if ($current_step === 'type')
             <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
