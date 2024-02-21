@@ -974,12 +974,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         'is_preview' => false,
                                     ]);
                                 }
-                                if (!$isDatabase) {
-                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn)) {
-                                        $savedService->fqdn = $fqdn;
-                                        $savedService->save();
-                                    }
-                                }
+                                // if (!$isDatabase) {
+                                //     ray($savedService,$fqdn);
+                                //     if ($command->value() === 'FQDN' && is_null($savedService->fqdn)) {
+                                //         $savedService->fqdn = $fqdn;
+                                //         $savedService->save();
+                                //     }
+                                // }
                             } else {
                                 $generatedValue = generateEnvValue($command);
                                 if (!$foundEnv) {
@@ -1039,7 +1040,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled()));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled(), service_name: $serviceName));
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
@@ -1480,7 +1481,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 return $preview_fqdn;
                             });
                         }
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns,serviceLabels: $serviceLabels));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns, serviceLabels: $serviceLabels));
                     }
                 }
             }

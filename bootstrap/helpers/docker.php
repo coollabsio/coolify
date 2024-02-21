@@ -212,7 +212,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?string $service_name = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -264,6 +264,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
             }
             $http_label = "http-{$loop}-{$uuid}";
             $https_label = "https-{$loop}-{$uuid}";
+            if ($service_name) {
+                $http_label = "http-{$loop}-{$uuid}-{$service_name}";
+                $https_label = "https-{$loop}-{$uuid}-{$service_name}";
+            }
 
             if ($schema === 'https') {
                 // Set labels for https
