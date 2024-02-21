@@ -83,9 +83,9 @@
                             placeholder="N/A" />
                         <x-forms.input id="github_app.metadata" helper="read - mandatory." label="Metadata" readonly
                             placeholder="N/A" />
-                        <x-forms.input id="github_app.administration"
+                        {{-- <x-forms.input id="github_app.administration"
                             helper="read:write access needed to setup servers as GitHub Runner." label="Administration"
-                            readonly placeholder="N/A" />
+                            readonly placeholder="N/A" /> --}}
                         <x-forms.input id="github_app.pull_requests"
                             helper="write access needed to use deployment status update in previews."
                             label="Pull Request" readonly placeholder="N/A" />
@@ -144,8 +144,8 @@
                         helper="Contents: read<br>Metadata: read<br>Email: read" />
                     <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
                         helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
-                    <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
-                        helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" />
+                    {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
+                        helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
                 </div>
             </div>
         </div>
