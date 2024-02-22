@@ -15,6 +15,7 @@ class ResourceView extends Component
         public ?string $wire = null,
         public ?string $logo = null,
         public ?string $documentation = null,
+        public bool $upgrade = false,
     )
     {
 

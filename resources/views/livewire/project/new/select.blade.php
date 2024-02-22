@@ -175,15 +175,37 @@
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
                     @forelse ($services as $serviceName => $service)
-                        @if (data_get($service, 'disabled'))
-                            <button class="text-left cursor-not-allowed bg-coolgray-200/20 box-without-bg" disabled>
+                        @if (data_get($service, 'minversion') && version_compare(config('version'), data_get($service, 'minversion'), '<'))
+                        <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
+                            <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>
+                            <x-slot:description>
+                                @if (data_get($service, 'slogan'))
+                                    {{ data_get($service, 'slogan') }}
+                                @endif
+
+                            </x-slot>
+                            <x-slot:logo>
+                                @if (data_get($service, 'logo'))
+                                    <img class="w-[4.5rem]
+                                    aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                        src="{{ asset(data_get($service, 'logo')) }}">
+                                @endif
+                            </x-slot:logo>
+                            <x-slot:documentation>
+                                {{ data_get($service, 'documentation') }}
+                            </x-slot>
+                            <x-slot:upgrade>
+                                You need to upgrade Coolify to {{ data_get($service, 'minversion') }} to use this service.
+                            </x-slot>
+                        </x-resource-view>
+                            {{-- <button class="text-left cursor-not-allowed bg-coolgray-100 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
                                     <div class="font-bold">
                                         {{ Str::headline($serviceName) }}
                                     </div>
-                                    You need to upgrade to {{ data_get($service, 'minVersion') }} to use this service.
+                                    You need to upgrade to {{ data_get($service, 'minversion') }} to use this service.
                                 </div>
-                            </button>
+                            </button> --}}
                         @else
                             <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
                                 <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>

@@ -2,6 +2,7 @@
 # slogan: The single platform to analyze, test, observe, and deploy new features
 # tags: analytics, product, open-source, self-hosted, ab-testing, event-tracking
 # logo: svgs/posthog.svg
+# minversion: 4.0.0-beta.222
 
 services:
   db:

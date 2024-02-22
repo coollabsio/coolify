@@ -1,14 +1,21 @@
-<div class="h-20 transition-all duration-150 cursor-pointer box-without-bg bg-coolgray-100 group hover:border-coollabs"
-    wire:click={{ $wire }}>
+<div @class([
+    'h-20 transition-all duration-150  box-without-bg bg-coolgray-100 group border-l-2 border-transparent',
+    'hover:border-coollabs cursor-pointer' => !$upgrade,
+    'hover:border-red-500 cursor-not-allowed ' => $upgrade,
+]) @if (!$upgrade) wire:click={{ $wire }} @endif>
     <div class="flex items-center">
         {{ $logo }}
         <div class="flex flex-col pl-2 ">
             <div class="text-white text-md">
                 {{ $title }}
             </div>
-            <div class="hidden text-xs font-bold text-neutral-500 group-hover:flex">
-                {{ $description }}
-            </div>
+            @if($upgrade)
+                <div class="text-neutral-500">{{ $upgrade }}</div>
+            @else
+                <div class="hidden text-xs font-bold text-neutral-500 group-hover:flex">
+                    {{ $description }}
+                </div>
+            @endif
         </div>
     </div>
     @isset($documentation)
@@ -20,4 +27,5 @@
             </a>
         </div>
     @endisset
+
 </div>
