@@ -19,7 +19,7 @@
             </ul>
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
-                <x-resource-view wire="setType('private-gh-app')">
+                <x-resource-view wire="setType('public')">
                     <x-slot:title>Public Repository</x-slot>
                     <x-slot:description>
                         You can deploy any kind of public repositories from the supported git providers.
