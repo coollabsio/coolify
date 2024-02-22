@@ -4,6 +4,7 @@ namespace App\Livewire\Project\Shared;
 
 use App\Actions\Application\StopApplicationOneServer;
 use App\Events\ApplicationStatusChanged;
+use App\Jobs\ContainerStatusJob;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use Livewire\Component;
@@ -19,7 +20,6 @@ class Destination extends Component
         $teamId = auth()->user()->currentTeam()->id;
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
-            "loadData",
         ];
     }
     public function mount()
@@ -41,9 +41,17 @@ class Destination extends Component
         $this->networks = $this->networks->reject(function ($network) {
             return $this->resource->destination->server->id == $network->server->id;
         });
-        $this->networks = $this->networks->reject(function ($network) {
-            return $this->resource->additional_servers->pluck('id')->contains($network->server->id);
-        });
+        if ($this->resource?->additional_servers?->count() > 0) {
+            $this->networks = $this->networks->reject(function ($network) {
+                return $this->resource->additional_servers->pluck('id')->contains($network->server->id);
+            });
+        }
+    }
+    public function stop(int $server_id)
+    {
+        $server = Server::find($server_id);
+        StopApplicationOneServer::run($this->resource, $server);
+        $this->refreshServers();
     }
     public function redeploy(int $network_id, int $server_id)
     {
@@ -59,6 +67,7 @@ class Destination extends Component
             application: $this->resource,
             server: $server,
             destination: $destination,
+            only_this_server: true,
             no_questions_asked: true,
         );
         return redirect()->route('project.application.deployment.show', [
@@ -68,11 +77,28 @@ class Destination extends Component
             'environment_name' => data_get($this->resource, 'environment.name'),
         ]);
     }
+    public function promote(int $network_id, int $server_id)
+    {
+        $main_destination = $this->resource->destination;
+        $this->resource->update([
+            'destination_id' => $network_id,
+            'destination_type' => StandaloneDocker::class,
+        ]);
+        $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
+        $this->resource->additional_networks()->attach($main_destination->id, ['server_id' => $main_destination->server->id]);
+        $this->refreshServers();
+    }
+    public function refreshServers()
+    {
+        ContainerStatusJob::dispatchSync($this->resource->destination->server);
+        $this->loadData();
+        $this->dispatch('refresh');
+        ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
+    }
     public function addServer(int $network_id, int $server_id)
     {
         $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
-        $this->resource->load(['additional_networks']);
-        $this->dispatch('loadData');
+        $this->loadData();
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
     public function removeServer(int $network_id, int $server_id)
@@ -84,8 +110,7 @@ class Destination extends Component
         $server = Server::find($server_id);
         StopApplicationOneServer::run($this->resource, $server);
         $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
-        $this->resource->load(['additional_networks']);
-        $this->dispatch('loadData');
+        $this->loadData();
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
     }
 }

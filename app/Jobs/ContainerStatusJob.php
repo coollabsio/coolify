@@ -44,17 +44,19 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
     public function handle()
     {
         $applications = $this->server->applications();
+        $skip_these_applications = collect([]);
         foreach ($applications as $application) {
             if ($application->additional_servers->count() > 0) {
-                $is_main_server = $application->destination->server->id === $this->server->id;
-                if ($is_main_server) {
-                    ComplexStatusCheck::run($application);
-                    $applications = $applications->filter(function ($value, $key) use ($application) {
-                        return $value->id !== $application->id;
-                    });
-                }
+                $skip_these_applications->push($application);
+                ComplexStatusCheck::run($application);
+                $applications = $applications->filter(function ($value, $key) use ($application) {
+                    return $value->id !== $application->id;
+                });
             }
         }
+        $applications = $applications->filter(function ($value, $key) use ($skip_these_applications) {
+            return !$skip_these_applications->pluck('id')->contains($value->id);
+        });
 
         if (!$this->server->isFunctional()) {
             return 'Server is not ready.';

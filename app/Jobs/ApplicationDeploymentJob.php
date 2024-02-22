@@ -66,6 +66,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private Server $mainServer;
     private ?ApplicationPreview $preview = null;
     private ?string $git_type = null;
+    private bool $only_this_server = false;
 
     private string $container_name;
     private ?string $currently_running_container_name = null;
@@ -115,6 +116,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->commit = $this->application_deployment_queue->commit;
         $this->force_rebuild = $this->application_deployment_queue->force_rebuild;
         $this->restart_only = $this->application_deployment_queue->restart_only;
+        $this->only_this_server = $this->application_deployment_queue->only_this_server;
 
         $this->git_type = data_get($this->application_deployment_queue, 'git_type');
 
@@ -887,7 +889,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 destination: $destination,
                 no_questions_asked: true,
             );
-            $this->application_deployment_queue->addLogEntry("Deploying to additional server: {$server->name}. Click here to see the deployment status: " . route('project.application.deployment.show', [
+            $this->application_deployment_queue->addLogEntry("Deployment to {$server->name}. Logs: " . route('project.application.deployment.show', [
                 'project_uuid' => data_get($this->application, 'environment.project.uuid'),
                 'application_uuid' => data_get($this->application, 'uuid'),
                 'deployment_uuid' => $deployment_uuid,
@@ -1619,7 +1621,9 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             return;
         }
         if ($status === ApplicationDeploymentStatus::FINISHED->value) {
-            $this->deploy_to_additional_destinations();
+            if (!$this->only_this_server) {
+                $this->deploy_to_additional_destinations();
+            }
             $this->application->environment->project->team?->notify(new DeploymentSuccess($this->application, $this->deployment_uuid, $this->preview));
         }
     }

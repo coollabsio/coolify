@@ -51,12 +51,17 @@
                     @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <div @class([
-                                'font-mono whitespace-pre-line',
+                                'font-mono',
                                 'text-warning' => $line['hidden'],
                                 'text-red-500' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
-                                    @endif{{ $line['output'] }}@if ($line['hidden'])
+                                    @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))
+                                        @php
+                                            $line['output'] = preg_replace('/(https?:\/\/[^\s]+)/', '<a href="$1" target="_blank" class="underline text-neutral-400">$1</a>', $line['output']);
+                                        @endphp {!! $line['output'] !!}
+                                    @else
+                                        {{ $line['output'] }}
                                     @endif
                             </div>
                         @endforeach
