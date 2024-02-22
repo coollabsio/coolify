@@ -104,13 +104,13 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Error", "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', 'Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.');
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if ($error instanceof UniqueConstraintViolationException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Error", "Duplicate entry found. Please use a different name.");
+            return $livewire->dispatch('error', 'Duplicate entry found. Please use a different name.');
         }
         return "Duplicate entry found. Please use a different name.";
     }
@@ -125,9 +125,6 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
 
     if (isset($livewire)) {
-        if (str($message)->length() > 20) {
-            return $livewire->dispatch('error', 'Error', $message);
-        }
         return $livewire->dispatch('error', $message);
     }
     throw new Exception($message);
