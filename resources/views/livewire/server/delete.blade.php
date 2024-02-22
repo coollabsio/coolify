@@ -10,6 +10,7 @@
             <x-new-modal disabled isErrorButton buttonTitle="Delete">
                 This server will be deleted. It is not reversible. <br>Please think again.
             </x-new-modal>
+            <div>You need to delete all resources before deleting this server.</div>
         @else
             <x-new-modal isErrorButton buttonTitle="Delete">
                 This server will be deleted. It is not reversible. <br>Please think again.

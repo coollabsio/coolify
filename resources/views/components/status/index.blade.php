@@ -1,14 +1,13 @@
-@if (str($status)->startsWith('running'))
-    <x-status.running :status="$status" />
-@elseif(str($status)->startsWith('restarting') ||
-        str($status)->startsWith('starting') ||
-        str($status)->startsWith('degraded'))
-    <x-status.restarting :status="$status" />
+@if (str($resource->status)->startsWith('running'))
+    <x-status.running :status="$resource->status" />
+@elseif(str($resource->status)->startsWith('restarting') ||
+        str($resource->status)->startsWith('starting') ||
+        str($resource->status)->startsWith('degraded'))
+    <x-status.restarting :status="$resource->status" />
 @else
-    <x-status.stopped :status="$status" />
+    <x-status.stopped :status="$resource->status" />
 @endif
-
-@if (!str($status)->contains('exited') && $showRefreshButton)
+@if (!str($resource->status)->contains('exited') && $showRefreshButton)
     <button title="Refresh Status" wire:click='check_status(true)' class="mx-1 hover:fill-white fill-warning">
         <svg class="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path
