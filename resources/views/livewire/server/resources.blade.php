@@ -53,7 +53,7 @@
                                                         @if ($resource->type() === 'service')
                                                             <x-status.services :service="$resource" :showRefreshButton="false" />
                                                         @else
-                                                            <x-status.index :status="$resource->status" :showRefreshButton="false" />
+                                                            <x-status.index :resource="$resource" :showRefreshButton="false" />
                                                         @endif
                                                     </td>
                                                 </tr>

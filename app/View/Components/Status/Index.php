@@ -11,12 +11,11 @@ class Index extends Component
     /**
      * Create a new component instance.
      */
-    public $status = "exited:unhealthy";
+
     public function __construct(
         public $resource = null,
         public bool $showRefreshButton = true,
     ) {
-        $this->status = $resource->status;
     }
 
     /**
