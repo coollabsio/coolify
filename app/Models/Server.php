@@ -469,7 +469,7 @@ class Server extends BaseModel
             return false;
         }
         try {
-            $dockerRunning = instant_remote_process(["docker version"], $this);
+            instant_remote_process(["docker version"], $this);
         } catch (\Throwable $e) {
             $this->settings->is_usable = false;
             $this->settings->save();

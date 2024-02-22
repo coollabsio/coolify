@@ -11,7 +11,7 @@ class ValidateAndInstall extends Component
 {
     public Server $server;
     public int $number_of_tries = 0;
-    public int $max_tries = 2;
+    public int $max_tries = 1;
     public bool $install = true;
     public $uptime = null;
     public $supported_os_type = null;
@@ -99,7 +99,7 @@ class ValidateAndInstall extends Component
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     return;
                 } else {
-                    if ($this->number_of_tries == 0 ) {
+                    if ($this->number_of_tries == 0) {
                         $activity = $this->server->installDocker();
                         $this->number_of_tries++;
                         $this->dispatch('newActivityMonitor', $activity->id, 'init');
