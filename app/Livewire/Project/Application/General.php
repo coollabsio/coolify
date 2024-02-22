@@ -232,7 +232,6 @@ class General extends Component
             if (data_get($this->application, 'build_pack') === 'dockerimage') {
                 $this->validate([
                     'application.docker_registry_image_name' => 'required',
-                    'application.docker_registry_image_tag' => 'required',
                 ]);
             }
             if (data_get($this->application, 'fqdn')) {

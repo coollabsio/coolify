@@ -333,7 +333,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function deploy_dockerimage_buildpack()
     {
         $this->dockerImage = $this->application->docker_registry_image_name;
-        $this->dockerImageTag = $this->application->docker_registry_image_tag;
+        if (str($this->application->docker_registry_image_tag)->isEmpty()) {
+            $this->dockerImageTag = 'latest';
+        } else {
+            $this->dockerImageTag = $this->application->docker_registry_image_tag;
+        }
         ray("echo 'Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.'");
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->dockerImage}:{$this->dockerImageTag} to {$this->server->name}.");
         $this->generate_image_names();
