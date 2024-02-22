@@ -22,7 +22,9 @@ class DynamicConfigurations extends Component
         $files = collect(explode("\n", $files))->filter(fn ($file) => !empty($file));
         $files = $files->map(fn ($file) => trim($file));
         $files = $files->sort();
-        $files = $files->filter(fn ($file) => $file !== 'coolify.yaml')->prepend('coolify.yaml');
+        if ($files->contains('coolify.yaml')) {
+            $files = $files->filter(fn ($file) => $file !== 'coolify.yaml')->prepend('coolify.yaml');
+        }
         $contents = collect([]);
         foreach ($files as $file) {
             $without_extension = str_replace('.', '|', $file);

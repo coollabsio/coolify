@@ -62,6 +62,7 @@ class NewDynamicConfiguration extends Component
             instant_remote_process(["echo '{$base64_value}' | base64 -d > {$file}"], $this->server);
             $this->dispatch('loadDynamicConfigurations');
             $this->dispatch('dynamic-configuration-added');
+            $this->dispatch('success', 'Success', 'Dynamic configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

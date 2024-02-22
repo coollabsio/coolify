@@ -44,6 +44,8 @@
                                 @endif
                             </div>
                         @endforeach
+                    @else
+                        <div wire:loading.remove> No dynamic configurations found.</div>
                     @endif
                 </div>
 
