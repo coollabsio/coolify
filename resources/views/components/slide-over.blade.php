@@ -18,14 +18,14 @@
                             x-transition:leave="transform transition ease-in-out duration-100 sm:duration-300"
                             x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full"
                             @class([
-                                'max-w-md w-screen' => !$fullScreen,
+                                'max-w-xl w-screen' => !$fullScreen,
                                 'max-w-4xl w-screen' => $fullScreen,
                             ])>
                             <div
                                 class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-base-100 border-neutral-800">
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
-                                        <h2 class="text-3xl leading-6" id="slide-over-title">
+                                        <h2 class="text-2xl leading-6" id="slide-over-title">
                                             {{ $title }}</h2>
                                         <div class="flex items-center h-auto ml-3">
                                             <button class="icon" @click="slideOverOpen=false"

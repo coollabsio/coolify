@@ -67,6 +67,7 @@ use App\Livewire\Server\Resources as ResourcesShow;
 use App\Livewire\Server\Destination\Show as DestinationShow;
 use App\Livewire\Server\LogDrains;
 use App\Livewire\Server\PrivateKey\Show as PrivateKeyShow;
+use App\Livewire\Server\Proxy\DynamicConfigurations as ProxyDynamicConfigurations;
 use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Source\Github\Change as GitHubChange;
@@ -177,6 +178,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
         Route::get('/resources', ResourcesShow::class)->name('server.resources');
         Route::get('/proxy', ProxyShow::class)->name('server.proxy');
+        Route::get('/proxy/dynamic', ProxyDynamicConfigurations::class)->name('server.proxy.dynamic-confs');
         Route::get('/proxy/logs', ProxyLogs::class)->name('server.proxy.logs');
         Route::get('/private-key', PrivateKeyShow::class)->name('server.private-key');
         Route::get('/destinations', DestinationShow::class)->name('server.destinations');

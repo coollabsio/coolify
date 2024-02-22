@@ -47,7 +47,7 @@
             <div class="flex items-center">
                 <a class="mx-4 rounded group-hover:text-white hover:no-underline"
                     href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                    <span class="font-bold hover:text-warning">+ New Resource</span>
+                    <span class="font-bold hover:text-warning">+ Add Resource</span>
                 </a>
                 <a class="mx-4 rounded group-hover:text-white"
                     href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
