@@ -38,7 +38,7 @@ class Heading extends Component
     {
         dispatch_sync(new ContainerStatusJob($this->database->destination->server));
         $this->database->refresh();
-        if ($showNotification) $this->dispatch('success', 'Success', 'Database status updated.');
+        if ($showNotification) $this->dispatch('success', 'Database status updated.');
     }
 
     public function mount()

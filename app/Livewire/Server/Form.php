@@ -64,7 +64,7 @@ class Form extends Component
             refresh_server_connection($this->server->privateKey);
             $this->validateServer(false);
             $this->server->settings->save();
-            $this->dispatch('success', 'Server updated successfully.');
+            $this->dispatch('success', 'Server updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -113,6 +113,6 @@ class Form extends Component
         $this->server->settings->cleanup_after_percentage = $this->cleanup_after_percentage;
         $this->server->settings->save();
         $this->server->save();
-        $this->dispatch('success', 'Server updated successfully.');
+        $this->dispatch('success', 'Server updated.');
     }
 }

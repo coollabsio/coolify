@@ -146,7 +146,12 @@
                     }
                 })
                 window.Livewire.on('error', (message) => {
-                    if (message.length > 0) {
+                    if (message.length == 1) {
+                        window.toast('Error', {
+                            type: 'danger',
+                            description: message[0],
+                        })
+                    } else if (message.length == 2) {
                         window.toast(message[0], {
                             type: 'danger',
                             description: message[1],
@@ -162,7 +167,12 @@
                     }
                 })
                 window.Livewire.on('success', (message) => {
-                    if (message.length > 0) {
+                    if (message.length == 1) {
+                        window.toast('Success', {
+                            type: 'success',
+                            description: message[0],
+                        })
+                    } else if (message.length == 2) {
                         window.toast(message[0], {
                             type: 'success',
                             description: message[1],

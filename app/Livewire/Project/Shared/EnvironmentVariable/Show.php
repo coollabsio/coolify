@@ -90,7 +90,7 @@ class Show extends Component
             }
             $this->serialize();
             $this->env->save();
-            $this->dispatch('success', 'Environment variable updated successfully.');
+            $this->dispatch('success', 'Environment variable updated.');
             $this->dispatch('refreshEnvs');
         } catch (\Exception $e) {
             return handleError($e);

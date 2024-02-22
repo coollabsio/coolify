@@ -49,7 +49,7 @@ class Show extends Component
     {
         $this->validate();
         $this->task->save();
-        $this->dispatch('success', 'Scheduled task updated successfully.');
+        $this->dispatch('success', 'Scheduled task updated.');
         $this->dispatch('refreshTasks');
     }
 

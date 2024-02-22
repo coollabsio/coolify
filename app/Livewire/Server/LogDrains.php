@@ -60,7 +60,7 @@ class LogDrains extends Component
                 return;
             }
             $this->dispatch('serverRefresh');
-            $this->dispatch('success', 'Log drain service started successfully.');
+            $this->dispatch('success', 'Log drain service started.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -126,7 +126,7 @@ class LogDrains extends Component
                 ]);
             }
             $this->server->settings->save();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
             return true;
         } catch (\Throwable $e) {
             if ($type === 'newrelic') {

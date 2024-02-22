@@ -17,7 +17,7 @@ class DynamicConfigurationNavbar extends Component
         $proxy_path = get_proxy_path();
         $file = str_replace('|', '.', $fileName);
         instant_remote_process(["rm -f {$proxy_path}/dynamic/{$file}"], $server);
-        $this->dispatch('success', 'Success', 'File deleted.');
+        $this->dispatch('success', 'File deleted.');
         $this->dispatch('loadDynamicConfigurations');
         $this->dispatch('refresh');
     }

@@ -27,7 +27,7 @@ class Index extends Component
                 'name' => $this->name,
             ]);
 
-            $this->dispatch('success', 'Profile updated successfully.');
+            $this->dispatch('success', 'Profile updated');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

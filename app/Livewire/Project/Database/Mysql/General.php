@@ -60,7 +60,7 @@ class General extends Component
                 return;
             }
             $this->database->save();
-            $this->dispatch('success', 'Database updated successfully.');
+            $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -74,7 +74,7 @@ class General extends Component
             }
             $this->validate();
             $this->database->save();
-            $this->dispatch('success', 'Database updated successfully.');
+            $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }

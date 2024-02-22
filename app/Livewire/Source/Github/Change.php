@@ -47,7 +47,7 @@ class Change extends Component
     {
         GithubAppPermissionJob::dispatchSync($this->github_app);
         $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
-        $this->dispatch('success', 'Success', 'Github App permissions updated.');
+        $this->dispatch('success', 'Github App permissions updated.');
     }
     // public function check()
     // {
@@ -150,7 +150,7 @@ class Change extends Component
                 'github_app.is_system_wide' => 'required|bool',
             ]);
             $this->github_app->save();
-            $this->dispatch('success', 'Success', 'Github App updated.');
+            $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -161,7 +161,7 @@ class Change extends Component
         try {
             $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
             $this->github_app->save();
-            $this->dispatch('success', 'Success', 'Github App updated.');
+            $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

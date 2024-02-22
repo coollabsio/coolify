@@ -38,7 +38,7 @@ class ScheduledBackups extends Component
     public function delete($scheduled_backup_id): void
     {
         $this->database->scheduledBackups->find($scheduled_backup_id)->delete();
-        $this->dispatch('success', 'Scheduled backup deleted successfully.');
+        $this->dispatch('success', 'Scheduled backup deleted.');
         $this->refreshScheduledBackups();
     }
 

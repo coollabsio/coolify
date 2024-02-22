@@ -48,7 +48,7 @@ class StackForm extends Component
     public function instantSave()
     {
         $this->service->save();
-        $this->dispatch('success', 'Service  settings saved successfully.');
+        $this->dispatch('success', 'Service  settings saved.');
     }
 
     public function submit()
@@ -62,7 +62,7 @@ class StackForm extends Component
             $this->service->saveComposeConfigs();
             $this->dispatch('refreshStacks');
             $this->dispatch('refreshEnvs');
-            $this->dispatch('success', 'Service saved successfully.');
+            $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

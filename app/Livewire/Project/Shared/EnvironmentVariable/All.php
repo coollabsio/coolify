@@ -120,9 +120,9 @@ class All extends Component
             }
         }
         if ($isPreview) {
-            $this->dispatch('success', 'Preview environment variables updated successfully.');
+            $this->dispatch('success', 'Preview environment variables updated.');
         } else {
-            $this->dispatch('success', 'Environment variables updated successfully.');
+            $this->dispatch('success', 'Environment variables updated.');
         }
         $this->refreshEnvs();
     }

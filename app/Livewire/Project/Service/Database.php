@@ -77,7 +77,7 @@ class Database extends Component
             $this->validate();
             $this->database->save();
             updateCompose($this->database);
-            $this->dispatch('success', 'Database saved successfully.');
+            $this->dispatch('success', 'Database saved.');
         } catch (\Throwable $e) {
             ray($e);
         } finally {
