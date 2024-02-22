@@ -88,7 +88,7 @@ class Form extends Component
     }
     public function validateServer($install = true)
     {
-        $this->dispatch('validateServer', $install);
+        $this->dispatch('init', $install);
     }
 
     public function submit()

@@ -398,10 +398,10 @@ class Server extends BaseModel
             }
         });
         if ($supported->count() === 1) {
-            ray('supported');
+            // ray('supported');
             return str($supported->first());
         } else {
-            ray('not supported');
+            // ray('not supported');
             return false;
         }
     }
@@ -465,6 +465,16 @@ class Server extends BaseModel
             $this->settings->save();
             if ($throwError) {
                 throw new \Exception('Server is not usable. Docker Engine is not installed.');
+            }
+            return false;
+        }
+        try {
+            $dockerRunning = instant_remote_process(["docker version"], $this);
+        } catch (\Throwable $e) {
+            $this->settings->is_usable = false;
+            $this->settings->save();
+            if ($throwError) {
+                throw new \Exception('Server is not usable. Docker Engine is not running.');
             }
             return false;
         }
