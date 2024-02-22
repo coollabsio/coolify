@@ -71,10 +71,10 @@ class Select extends Component
     //     }
     // }
 
-    public function loadServices()
+    public function loadServices(bool $force = false)
     {
         try {
-            if (count($this->allServices) > 0) {
+            if (count($this->allServices) > 0 && !$force) {
                 if (!$this->search) {
                     $this->services = $this->allServices;
                     return;

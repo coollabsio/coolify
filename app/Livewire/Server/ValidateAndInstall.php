@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Server;
 
+use App\Actions\Proxy\CheckProxy;
 use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
@@ -21,7 +22,15 @@ class ValidateAndInstall extends Component
     public $error = null;
     public bool $ask = false;
 
-    protected $listeners = ['validateServer' => 'init', 'validateDockerEngine', 'validateServerNow' => 'validateServer'];
+    protected $listeners = [
+        'init',
+        'validateConnection',
+        'validateOS',
+        'validateDockerEngine',
+        'validateDockerVersion',
+        'startProxy',
+        'refresh' => '$refresh',
+    ];
 
     public function init(bool $install = true)
     {
@@ -35,31 +44,29 @@ class ValidateAndInstall extends Component
         $this->error = null;
         $this->number_of_tries = 0;
         if (!$this->ask) {
-            $this->dispatch('validateServerNow');
+            $this->dispatch('validateConnection');
         }
     }
-    public function startValidatingAfterAsking() {
+    public function startValidatingAfterAsking()
+    {
         $this->ask = false;
         $this->init();
     }
-    public function validateServer()
+    public function startProxy()
     {
         try {
-            $this->validateConnection();
-            $this->validateOS();
-            $this->validateDockerEngine();
-
-            if ($this->server->isSwarm()) {
-                $swarmInstalled = $this->server->validateDockerSwarm();
-                if ($swarmInstalled) {
-                    $this->dispatch('success', 'Docker Swarm is initiated.');
+            $shouldStart = CheckProxy::run($this->server);
+            if ($shouldStart) {
+                $proxy = StartProxy::run($this->server, false);
+                if ($proxy === 'OK') {
+                    $this->proxy_started = true;
+                } else {
+                    throw new \Exception("Proxy could not be started.");
                 }
             } else {
-                $proxy = StartProxy::run($this->server);
-                if ($proxy) {
-                    $this->proxy_started = true;
-                }
+                $this->proxy_started = true;
             }
+
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -71,6 +78,7 @@ class ValidateAndInstall extends Component
             $this->error = 'Server is not reachable. Please validate your configuration and connection.<br><br>Check this <a target="_blank" class="underline" href="https://coolify.io/docs/server/openssh">documentation</a> for further help.';
             return;
         }
+        $this->dispatch('validateOS');
     }
     public function validateOS()
     {
@@ -79,6 +87,7 @@ class ValidateAndInstall extends Component
             $this->error = 'Server OS type is not supported. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
             return;
         }
+        $this->dispatch('validateDockerEngine');
     }
     public function validateDockerEngine()
     {
@@ -90,29 +99,39 @@ class ValidateAndInstall extends Component
                     $this->error = 'Docker Engine could not be installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                     return;
                 } else {
-                    $activity = $this->server->installDocker();
-                    $this->number_of_tries++;
-                    $this->dispatch('newActivityMonitor', $activity->id, 'validateDockerEngine');
+                    if ($this->number_of_tries == 0) {
+                        $activity = $this->server->installDocker();
+                        $this->number_of_tries++;
+                        $this->dispatch('newActivityMonitor', $activity->id, 'init');
+                    }
                     return;
                 }
             } else {
                 $this->error = 'Docker Engine is not installed. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
                 return;
             }
-        } else {
-            $this->validateDockerVersion();
         }
+        $this->dispatch('validateDockerVersion');
     }
     public function validateDockerVersion()
     {
-        $this->docker_version = $this->server->validateDockerEngineVersion();
-        if ($this->docker_version) {
-            $this->dispatch('serverInstalled');
-            $this->dispatch('success', 'Server validated successfully.');
+        if ($this->server->isSwarm()) {
+            $swarmInstalled = $this->server->validateDockerSwarm();
+            if ($swarmInstalled) {
+                $this->dispatch('success', 'Docker Swarm is initiated.');
+            }
         } else {
-            $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
-            return;
+            $this->docker_version = $this->server->validateDockerEngineVersion();
+            if ($this->docker_version) {
+                $this->dispatch('serverInstalled');
+                $this->dispatch('success', 'Server validated.');
+            } else {
+                $this->error = 'Docker Engine version is not 22+. Please install Docker manually before continuing: <a target="_blank" class="underline" href="https://docs.docker.com/engine/install/#server">documentation</a>.';
+                return;
+            }
         }
+
+        $this->dispatch('startProxy');
     }
     public function render()
     {

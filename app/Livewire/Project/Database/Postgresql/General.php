@@ -66,7 +66,7 @@ class General extends Component
                 return;
             }
             $this->database->save();
-            $this->dispatch('success', 'Database updated successfully.');
+            $this->dispatch('success', 'Database updated.');
             $this->dispatch('success', 'You need to restart the service for the changes to take effect.');
         } catch (Exception $e) {
             return handleError($e, $this);
@@ -105,7 +105,7 @@ class General extends Component
         $this->database->init_scripts = filter($this->database->init_scripts, fn ($s) => $s['filename'] !== $script['filename']);
         $this->database->init_scripts = array_merge($this->database->init_scripts, [$script]);
         $this->database->save();
-        $this->dispatch('success', 'Init script saved successfully.');
+        $this->dispatch('success', 'Init script saved.');
     }
 
     public function delete_init_script($script)
@@ -116,7 +116,7 @@ class General extends Component
             $this->database->init_scripts = $collection->filter(fn ($s) => $s['filename'] !== $script['filename'])->toArray();
             $this->database->save();
             $this->refresh();
-            $this->dispatch('success', 'Init script deleted successfully.');
+            $this->dispatch('success', 'Init script deleted.');
             return;
         }
     }
@@ -148,7 +148,7 @@ class General extends Component
             ]
         ]);
         $this->database->save();
-        $this->dispatch('success', 'Init script added successfully.');
+        $this->dispatch('success', 'Init script added.');
         $this->new_content = '';
         $this->new_filename = '';
     }
@@ -161,7 +161,7 @@ class General extends Component
             }
             $this->validate();
             $this->database->save();
-            $this->dispatch('success', 'Database updated successfully.');
+            $this->dispatch('success', 'Database updated.');
         } catch (Exception $e) {
             return handleError($e, $this);
         }

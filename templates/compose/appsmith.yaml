@@ -1,6 +1,7 @@
-# documentation: https://docs.appsmith.com
-# slogan: Appsmith is an open-source, self-hosted application development platform that enables you to build powerful web applications with ease.
+# documentation: https://appsmith.com
+# slogan: Appsmith is low-code application platform for building internal tools.
 # tags: lowcode,nocode,no,low,platform
+# logo: svgs/appsmith.svg
 
 services:
   appsmith:
@@ -10,7 +11,7 @@ services:
       - APPSMITH_MAIL_ENABLED=false
       - APPSMITH_DISABLE_TELEMETRY=true
       - APPSMITH_DISABLE_INTERCOM=true
-      - APPSMITH_SENTRY_DSN=
+      - APPSMITH_SENTRY_DSN=  
       - APPSMITH_SMART_LOOK_ID=
     volumes:
       - stacks-data:/appsmith-stacks

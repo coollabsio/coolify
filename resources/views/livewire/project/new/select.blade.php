@@ -10,7 +10,7 @@
         </div>
     </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-4 pt-10">
+    <div class="flex flex-col gap-4 pt-10 sm:px-20">
         @if ($current_step === 'type')
             <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
@@ -19,128 +19,140 @@
             </ul>
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
-                <div class="box group" wire:click="setType('public')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Public Repository
-                        </div>
-                        <div class="description">
-                            You can deploy any kind of public repositories from the supported git providers.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('private-gh-app')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Private Repository (with GitHub App)
-                        </div>
-                        <div class="description">
-                            You can deploy public & private repositories through your GitHub Apps.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('private-deploy-key')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Private Repository (with deploy key)
-                        </div>
-                        <div class="description">
-                            You can deploy public & private repositories with a simple deploy key (SSH key).
-                        </div>
-                    </div>
-                </div>
+                <x-resource-view wire="setType('public')">
+                    <x-slot:title>Public Repository</x-slot>
+                    <x-slot:description>
+                        You can deploy any kind of public repositories from the supported git providers.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/git.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('private-gh-app')">
+                    <x-slot:title>Private Repository (with GitHub App)</x-slot>
+                    <x-slot:description>
+                        You can deploy public & private repositories through your GitHub Apps.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/github.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+
+                <x-resource-view wire="setType('private-deploy-key')">
+                    <x-slot:title> Private Repository (with deploy key)</x-slot>
+                    <x-slot:description>
+                        You can deploy public & private repositories with a simple deploy key (SSH key).
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/git.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
-                <div class="box group" wire:click="setType('dockerfile')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Based on a Dockerfile
-                        </div>
-                        <div class="description">
-                            You can deploy a simple Dockerfile, without Git.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('docker-compose-empty')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Based on a Docker Compose
-                        </div>
-                        <div class="description">
-                            You can deploy complex application easily with Docker Compose, without Git.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('docker-image')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            Based on an existing Docker Image
-                        </div>
-                        <div class="description">
-                            You can deploy an existing Docker Image from any Registry, without Git.
-                        </div>
-                    </div>
-                </div>
+                <x-resource-view wire="setType('dockerfile')">
+                    <x-slot:title>Based on a Dockerfile</x-slot>
+                    <x-slot:description>
+                        You can deploy a simple Dockerfile, without Git.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('docker-compose-empty')">
+                    <x-slot:title>Based on a Docker Compose</x-slot>
+                    <x-slot:description>
+                        You can deploy complex application easily with Docker Compose, without Git.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('docker-image')">
+                    <x-slot:title>Based on an existing Docker Image</x-slot>
+                    <x-slot:description>
+                        You can deploy an existing Docker Image from any Registry, without Git.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/docker.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
             </div>
             <h2 class="py-4">Databases</h2>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-5">
-                <div class="box group" wire:click="setType('postgresql')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            New PostgreSQL
-                        </div>
-                        <div class="description">
-                            PostgreSQL is an open-source, object-relational database management system known for its
-                            robustness, advanced features, and strong standards compliance.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('redis')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            New Redis
-                        </div>
-                        <div class="description">
-                            Redis is an open-source, in-memory data structure store used as a database, cache, and
-                            message broker, known for its high performance, flexibility, and rich data structures.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('mongodb')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            New MongoDB
-                        </div>
-                        <div class="description">
-                            MongoDB is a source-available, NoSQL database program that uses JSON-like documents with
-                            optional schemas, known for its flexibility, scalability, and wide range of application use
-                            cases.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('mysql')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            New MySQL
-                        </div>
-                        <div class="description">
-                            MySQL is an open-source relational database management system known for its speed,
-                            reliability, and flexibility in managing and accessing data.
-                        </div>
-                    </div>
-                </div>
-                <div class="box group" wire:click="setType('mariadb')">
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white group-hover:text-white">
-                            New Mariadb
-                        </div>
-                        <div class="description">
-                            MariaDB is an open-source relational database management system that serves as a drop-in
-                            replacement for MySQL, offering more robust, scalable, and reliable SQL server capabilities.
-                        </div>
-                    </div>
-                </div>
-                {{-- <div class="box group" wire:click="setType('existing-postgresql')">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+                <x-resource-view wire="setType('postgresql')">
+                    <x-slot:title> New PostgreSQL</x-slot>
+                    <x-slot:description>
+                        PostgreSQL is an object-relational database known for its
+                        robustness, advanced features, and strong standards compliance.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/postgres.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('redis')">
+                    <x-slot:title> New Redis</x-slot>
+                    <x-slot:description>
+                        Redis is an open-source, in-memory data structure store, used as a database, cache, and message
+                        broker.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/redis.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('mongodb')">
+                    <x-slot:title> New MongoDB</x-slot>
+                    <x-slot:description>
+                        MongoDB is a source-available, NoSQL database that uses JSON-like documents with
+                        optional schemas.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mongodb.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('mysql')">
+                    <x-slot:title>New MySQL</x-slot>
+                    <x-slot:description>
+                        MySQL is a relational database known for its speed, reliability, and
+                        flexibility.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mysql.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+                <x-resource-view wire="setType('mariadb')">
+                    <x-slot:title> New Mariadb</x-slot>
+                    <x-slot:description>
+                        MariaDB is a relational database that serves as a drop-in
+                        replacement for MySQL.
+                    </x-slot>
+                    <x-slot:logo>
+                        <img class="w-[4.5rem]
+                            aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                            src="{{ asset('svgs/mariadb.svg') }}">
+                    </x-slot:logo>
+                </x-resource-view>
+
+                {{-- <div class="box group" wire="setType('existing-postgresql')">
                     <div class="flex flex-col mx-6">
                         <div class="group-hover:text-white">
                             Backup Existing PostgreSQL
@@ -153,27 +165,67 @@
             </div>
             <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
-                <x-forms.button wire:click='loadServices'>Reload Services List</x-forms.button>
+                <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
                     wire:model.live.debounce.200ms="search" placeholder="Search...">
             </div>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-5">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 @if ($loadingServices)
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
                     @forelse ($services as $serviceName => $service)
-                        @if (data_get($service, 'disabled'))
-                            <button class="text-left cursor-not-allowed bg-coolgray-200/20 box-without-bg" disabled>
+                        @if (data_get($service, 'minversion') && version_compare(config('version'), data_get($service, 'minversion'), '<'))
+                        <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
+                            <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>
+                            <x-slot:description>
+                                @if (data_get($service, 'slogan'))
+                                    {{ data_get($service, 'slogan') }}
+                                @endif
+
+                            </x-slot>
+                            <x-slot:logo>
+                                @if (data_get($service, 'logo'))
+                                    <img class="w-[4.5rem]
+                                    aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                        src="{{ asset(data_get($service, 'logo')) }}">
+                                @endif
+                            </x-slot:logo>
+                            <x-slot:documentation>
+                                {{ data_get($service, 'documentation') }}
+                            </x-slot>
+                            <x-slot:upgrade>
+                                You need to upgrade Coolify to {{ data_get($service, 'minversion') }} to use this service.
+                            </x-slot>
+                        </x-resource-view>
+                            {{-- <button class="text-left cursor-not-allowed bg-coolgray-100 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
                                     <div class="font-bold">
                                         {{ Str::headline($serviceName) }}
                                     </div>
-                                    You need to upgrade to {{ data_get($service, 'minVersion') }} to use this service.
+                                    You need to upgrade to {{ data_get($service, 'minversion') }} to use this service.
                                 </div>
-                            </button>
+                            </button> --}}
                         @else
-                            <button class="text-left box group" wire:loading.attr="disabled"
+                            <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
+                                <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>
+                                <x-slot:description>
+                                    @if (data_get($service, 'slogan'))
+                                        {{ data_get($service, 'slogan') }}
+                                    @endif
+                                </x-slot>
+                                <x-slot:logo>
+                                    @if (data_get($service, 'logo'))
+                                        <img class="w-[4.5rem]
+                                        aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                            src="{{ asset(data_get($service, 'logo')) }}">
+                                    @endif
+                                </x-slot:logo>
+                                <x-slot:documentation>
+                                    {{ data_get($service, 'documentation') }}
+                                </x-slot>
+                            </x-resource-view>
+                            {{-- <button class="text-left box group" wire:loading.attr="disabled"
                                 wire:click="setType('one-click-service-{{ $serviceName }}')">
                                 <div class="flex flex-col mx-2">
                                     <div class="font-bold text-white group-hover:text-white">
@@ -185,10 +237,10 @@
                                         </div>
                                     @endif
                                 </div>
-                            </button>
+                            </button> --}}
                         @endif
                     @empty
-                        <div>No service found. Please try to reload the list!</div>
+                        <div class="w-96">No service found. Please try to reload the list!</div>
                     @endforelse
                 @endif
             </div>

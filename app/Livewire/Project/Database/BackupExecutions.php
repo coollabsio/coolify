@@ -33,7 +33,7 @@ class BackupExecutions extends Component
             delete_backup_locally($execution->filename, $execution->scheduledDatabaseBackup->database->destination->server);
         }
         $execution->delete();
-        $this->dispatch('success', 'Backup deleted successfully.');
+        $this->dispatch('success', 'Backup deleted.');
         $this->dispatch('refreshBackupExecutions');
     }
     public function download($exeuctionId)

@@ -10,15 +10,17 @@
                 </x-new-modal>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
-                <x-slide-over closeWithX fullScreen>
-                    <x-slot:title>Validate & configure</x-slot:title>
-                    <x-slot:content>
-                        <livewire:server.validate-and-install :server="$server" ask />
-                    </x-slot:content>
-                    <x-forms.button @click="slideOverOpen=true" wire:click.prevent='validateServer' isHighlighted>
-                        Revalidate server
-                    </x-forms.button>
-                </x-slide-over>
+                @if ($server->isFunctional())
+                    <x-slide-over closeWithX fullScreen>
+                        <x-slot:title>Validate & configure</x-slot:title>
+                        <x-slot:content>
+                            <livewire:server.validate-and-install :server="$server" ask />
+                        </x-slot:content>
+                        <x-forms.button @click="slideOverOpen=true" wire:click.prevent='validateServer' isHighlighted>
+                            Revalidate server
+                        </x-forms.button>
+                    </x-slide-over>
+                @endif
             @endif
         </div>
         @if ($server->isFunctional())

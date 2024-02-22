@@ -1,6 +1,7 @@
-# documentation: https://www.meilisearch.com/docs/learn/configuration/instance_options
-# slogan: MeiliSearch is a powerful, fast, open-source, easy to use and deploy search engine.
+# documentation: https://www.meilisearch.com
+# slogan: MeiliSearch is a powerful, fast, easy to use and deploy search engine.
 # tags: search,engine,fulltext,full,text,meilisearch
+# logo: svgs/meilisearch.svg
 
 services:
   meilisearch:

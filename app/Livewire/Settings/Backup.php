@@ -81,6 +81,6 @@ class Backup extends Component
     }
     public function submit()
     {
-        $this->dispatch('success', 'Backup updated successfully.');
+        $this->dispatch('success', 'Backup updated.');
     }
 }

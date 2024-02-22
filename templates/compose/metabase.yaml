@@ -1,6 +1,7 @@
-# documentation: https://www.metabase.com/docs/latest/installation-and-operation/running-metabase-on-docker
+# documentation: https://www.metabase.com
 # slogan: Fast analytics with the friendly UX and integrated tooling to let your company explore data on their own.
 # tags: analytics,bi,business,intelligence
+# logo: svgs/metabase.svg
 
 services:
   metabase:

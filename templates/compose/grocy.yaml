@@ -1,6 +1,7 @@
 # documentation: https://github.com/grocy/grocy
-# slogan: Grocy is a self-hosted, web-based household management and grocery list application, designed to simplify your household chores and grocery shopping.
+# slogan: Grocy is a web-based household management and grocery list application.
 # tags: groceries, household, management, grocery, shopping
+# logo: svgs/grocy.svg
 
 services:
   grocy:

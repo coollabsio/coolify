@@ -1,6 +1,7 @@
-# documentation: https://wordpress.org/documentation/
+# documentation: https://wordpress.org
 # slogan: WordPress with MariaDB. Wordpress is open source software you can use to create a beautiful website, blog, or app.
 # tags: cms, blog, content, management, mariadb
+# logo: svgs/wordpress.svg
 
 services:
    wordpress:

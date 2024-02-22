@@ -1,7 +1,7 @@
 <div class="pb-6">
     <div class="flex items-end gap-2">
         <h1>Team</h1>
-        <a  href="/team/new"><x-forms.button>+ New Team</x-forms.button></a>
+        <a  href="/team/new"><x-forms.button>+ Add Team</x-forms.button></a>
     </div>
     <nav class="flex pt-2 pb-10">
         <ol class="inline-flex items-center">

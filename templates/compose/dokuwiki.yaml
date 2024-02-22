@@ -1,6 +1,7 @@
-# documentation: https://www.dokuwiki.org/faq
-# slogan: A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases with simplicity and flexibility.
+# documentation: https://www.dokuwiki.org/
+# slogan: A lightweight and easy-to-use wiki platform for creating and managing documentation and knowledge bases.
 # tags: wiki, documentation, knowledge, base
+# logo: svgs/dokuwiki.png
 
 services:
   dokuwiki:

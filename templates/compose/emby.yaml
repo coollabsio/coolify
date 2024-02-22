@@ -1,6 +1,7 @@
 # documentation: https://emby.media/support/articles/Home.html
-# slogan: A media server software that allows you to organize, stream, and access your multimedia content effortlessly, making it easy to enjoy your favorite movies, TV shows, music, and more.
+# slogan: A media server software that allows you to organize, stream, and access your multimedia content effortlessly.
 # tags: media, server, movies, tv, music
+# logo: svgs/emby.png
 
 services:
   emby:

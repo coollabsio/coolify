@@ -1,6 +1,7 @@
-# documentation: https://jellyfin.org/docs/
-# slogan: Jellyfin is an open-source media server for hosting and streaming your media collection, providing an alternative to proprietary media platforms.
+# documentation: https://jellyfin.org
+# slogan: Jellyfin is a media server for hosting and streaming your media collection.
 # tags: media, server, movies, tv, music
+# logo: svgs/jellyfin.svg
 
 services:
   jellyfin:

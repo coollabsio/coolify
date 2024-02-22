@@ -57,6 +57,7 @@ class LocalFileVolume extends BaseModel
             if ($content) {
                 $content = base64_encode($content);
                 $commands->push("echo '$content' | base64 -d > $path");
+                $commands->push("chmod +x $path");
             }
         } else if ($isDir == 'NOK' && $fileVolume->is_directory) {
             $commands->push("mkdir -p $path > /dev/null 2>&1 || true");

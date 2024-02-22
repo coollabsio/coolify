@@ -41,7 +41,7 @@ class ServiceApplicationView extends Component
     {
         try {
             $this->application->delete();
-            $this->dispatch('success', 'Application deleted successfully.');
+            $this->dispatch('success', 'Application deleted.');
             return redirect()->route('project.service.configuration', $this->parameters);
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -58,7 +58,7 @@ class ServiceApplicationView extends Component
             $this->validate();
             $this->application->save();
             updateCompose($this->application);
-            $this->dispatch('success', 'Application saved successfully.');
+            $this->dispatch('success', 'Application saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

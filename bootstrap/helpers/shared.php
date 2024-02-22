@@ -104,13 +104,13 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     ray($error);
     if ($error instanceof TooManyRequestsException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Too many requests.", "Please try again in {$error->secondsUntilAvailable} seconds.");
+            return $livewire->dispatch('error', 'Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.');
         }
         return "Too many requests. Please try again in {$error->secondsUntilAvailable} seconds.";
     }
     if ($error instanceof UniqueConstraintViolationException) {
         if (isset($livewire)) {
-            return $livewire->dispatch('error', "Duplicate entry found.", "Please use a different name.");
+            return $livewire->dispatch('error', 'Duplicate entry found. Please use a different name.');
         }
         return "Duplicate entry found. Please use a different name.";
     }
@@ -125,9 +125,6 @@ function handleError(?Throwable $error = null, ?Livewire\Component $livewire = n
     }
 
     if (isset($livewire)) {
-        if (str($message)->length() > 20) {
-            return $livewire->dispatch('error', 'Error occured', $message);
-        }
         return $livewire->dispatch('error', $message);
     }
     throw new Exception($message);
@@ -975,7 +972,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     ]);
                                 }
                                 if (!$isDatabase) {
-                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn)) {
+                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
                                         $savedService->fqdn = $fqdn;
                                         $savedService->save();
                                     }
@@ -1039,7 +1036,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled()));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled(), service_name: $serviceName));
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
@@ -1480,7 +1477,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 return $preview_fqdn;
                             });
                         }
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns,serviceLabels: $serviceLabels));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns, serviceLabels: $serviceLabels));
                     }
                 }
             }

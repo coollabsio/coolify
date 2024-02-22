@@ -1,6 +1,7 @@
 # documentation: https://github.com/Stirling-Tools/Stirling-PDF
 # slogan: Stirling is a powerful web based PDF manipulation tool
 # tags: pdf, manipulation, web, tool
+# logo: svgs/stirling.png
 
 services:
   stirling-pdf:

@@ -12,5 +12,4 @@
             data_get($application_deployment_queue, 'status') === 'queued')
         <x-forms.button isError wire:click.prevent="cancel">Cancel</x-forms.button>
     @endif
-
 </div>

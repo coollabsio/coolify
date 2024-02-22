@@ -1,5 +1,5 @@
 # documentation: https://github.com/linuxserver/budge
-# slogan: BudgE is an open-source 'budgeting with envelopes' personal finance app, helping you manage your finances effectively.
+# slogan: Budge is a budgeting personal finance app.
 # tags: personal finance, budgeting, expense tracking
 
 services:

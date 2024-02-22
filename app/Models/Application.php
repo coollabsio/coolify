@@ -6,7 +6,6 @@ use App\Enums\ApplicationDeploymentStatus;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Collection;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -274,15 +273,11 @@ class Application extends BaseModel
                     foreach ($additional_servers_status as $status) {
                         $server_status = str($status)->before(':')->value();
                         $server_health = str($status)->after(':')->value() ?? 'unhealthy';
-                        if ($server_status !== 'running') {
-                            if ($main_server_status !== $server_status) {
-                                $complex_status = 'degraded';
-                            }
+                        if ($main_server_status !== $server_status) {
+                            $complex_status = 'degraded';
                         }
-                        if ($server_health !== 'healthy') {
-                            if ($main_server_health !== $server_health) {
-                                $complex_health = 'unhealthy';
-                            }
+                        if ($main_server_health !== $server_health) {
+                            $complex_health = 'unhealthy';
                         }
                     }
                     return "$complex_status:$complex_health";

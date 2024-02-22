@@ -1,6 +1,7 @@
-# documentation: https://docs.directus.io/self-hosted/quickstart.html
-# slogan: Directus is an open-source tool that wraps custom SQL databases with a dynamic API, and provides an intuitive admin app for managing its content.
+# documentation: https://directus.io
+# slogan: Directus wraps databases with a dynamic API, and provides an intuitive app for managing its content.
 # tags: directus, cms, database, sql
+# logo: svgs/directus.svg
 
 services:
   directus:

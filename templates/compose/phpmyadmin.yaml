@@ -1,6 +1,7 @@
-# documentation: https://docs.phpmyadmin.net/en/latest/
+# documentation: https://phpmyadmin.net
 # slogan: phpMyAdmin is a web-based database management tool for administering your MySQL and MariaDB databases through a user-friendly interface.
 # tags: database management
+# logo: svgs/phpmyadmin.svg
 
 services:
   phpmyadmin:

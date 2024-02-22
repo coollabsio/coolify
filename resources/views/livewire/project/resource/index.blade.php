@@ -67,7 +67,7 @@
                                     </template>
                                 </div>
                                 <div class="description" x-text="item.description"></div>
-                                <div class="description" x-text="item.fqdn"></div>
+                                <div class="description break-all" x-text="item.fqdn"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">

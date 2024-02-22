@@ -41,7 +41,7 @@
         @if ($resource->getMorphClass() == 'App\Models\Service')
             <x-status.services :service="$resource" />
         @else
-            <x-status.index :status="$resource->status" />
+            <x-status.index :resource="$resource" />
         @endif
     </ol>
 </nav>

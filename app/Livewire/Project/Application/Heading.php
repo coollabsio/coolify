@@ -33,15 +33,11 @@ class Heading extends Component
     {
         if ($this->application->destination->server->isFunctional()) {
             dispatch(new ContainerStatusJob($this->application->destination->server));
-            // $this->application->refresh();
-            // $this->application->previews->each(function ($preview) {
-            //     $preview->refresh();
-            // });
         } else {
             dispatch(new ServerStatusJob($this->application->destination->server));
         }
 
-        if ($showNotification) $this->dispatch('success', "Application status updated.");
+        if ($showNotification) $this->dispatch('success', "Success", "Application status updated.");
     }
 
     public function force_deploy_without_cache()

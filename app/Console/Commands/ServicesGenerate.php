@@ -73,6 +73,18 @@ class ServicesGenerate extends Command
         } else {
             $slogan = str($file)->headline()->value();
         }
+        $logo = collect(preg_grep('/^# logo:/', explode("\n", $content)))->values();
+        if ($logo->count() > 0) {
+            $logo = str($logo[0])->after('# logo:')->trim()->value();
+        } else {
+            $logo = 'svgs/unknown.svg';
+        }
+        $minversion = collect(preg_grep('/^# minversion:/', explode("\n", $content)))->values();
+        if ($minversion->count() > 0) {
+            $minversion = str($minversion[0])->after('# minversion:')->trim()->value();
+        } else {
+            $minversion = '0.0.0';
+        }
         $env_file = collect(preg_grep('/^# env_file:/', explode("\n", $content)))->values();
         if ($env_file->count() > 0) {
             $env_file = str($env_file[0])->after('# env_file:')->trim()->value();
@@ -96,6 +108,8 @@ class ServicesGenerate extends Command
             'slogan' => $slogan,
             'compose' => $yaml,
             'tags' => $tags,
+            'logo' => $logo,
+            'minversion' => $minversion,
         ];
         if ($env_file) {
             $env_file_content = file_get_contents(base_path("templates/compose/$env_file"));

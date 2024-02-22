@@ -86,3 +86,8 @@ function get_installation_path(GithubApp $source)
     $installation_path = $github->html_url === 'https://github.com' ? 'apps' : 'github-apps';
     return "$github->html_url/$installation_path/$name/installations/new";
 }
+function get_permissions_path(GithubApp $source) {
+    $github = GithubApp::where('uuid', $source->uuid)->first();
+    $name = Str::of(Str::kebab($github->name));
+    return "$github->html_url/settings/apps/$name/permissions";
+}

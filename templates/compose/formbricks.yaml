@@ -1,6 +1,7 @@
-# documentation: https://formbricks.com/docs/self-hosting/docker
+# documentation: https://formbricks.com
 # slogan: Open Source Experience Management
 # tags: form, builder, forms, open source, experience, management, self-hosted, docker
+# logo: svgs/formbricks.png
 
 services:
   formbricks:

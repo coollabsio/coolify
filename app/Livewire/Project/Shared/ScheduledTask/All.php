@@ -48,7 +48,7 @@ class All extends Component
             }
             $task->save();
             $this->refreshTasks();
-            $this->dispatch('success', 'Scheduled task added successfully.');
+            $this->dispatch('success', 'Scheduled task added.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

@@ -37,7 +37,7 @@ class Index extends Component
         try {
             $this->team->save();
             refreshSession();
-            $this->dispatch('success', 'Team updated successfully.');
+            $this->dispatch('success', 'Team updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

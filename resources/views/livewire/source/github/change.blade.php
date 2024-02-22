@@ -32,39 +32,64 @@
                     Install Repositories on GitHub
                 </a>
             @else
-                @if (!isCloud())
-                    <div class="w-48">
-                        <x-forms.checkbox label="System Wide?"
-                            helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
-                            instantSave id="github_app.is_system_wide" />
+                <div class="flex flex-col gap-2">
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.name" label="App Name" disabled />
+                        <x-forms.input id="github_app.organization" label="Organization" disabled
+                            placeholder="If empty, personal user will be used" />
                     </div>
-                @endif
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.name" label="App Name" disabled />
-                    <x-forms.input id="github_app.organization" label="Organization" disabled
-                        placeholder="If empty, personal user will be used" />
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
-                    <x-forms.input id="github_app.api_url" label="API Url" disabled />
-                </div>
-                <div class="flex gap-2">
-                    @if ($github_app->html_url === 'https://github.com')
-                        <x-forms.input id="github_app.custom_user" label="User" disabled />
-                        <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
-                    @else
-                        <x-forms.input id="github_app.custom_user" label="User" required />
-                        <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                    @if (!isCloud())
+                        <div class="w-48">
+                            <x-forms.checkbox label="System Wide?"
+                                helper="If checked, this GitHub App will be available for everyone in this Coolify instance."
+                                instantSave id="github_app.is_system_wide" />
+                        </div>
                     @endif
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
-                    <x-forms.input type="number" id="github_app.installation_id" label="Installation Id" disabled />
-                </div>
-                <div class="flex gap-2">
-                    <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
-                    <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
-                    <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.html_url" label="HTML Url" disabled />
+                        <x-forms.input id="github_app.api_url" label="API Url" disabled />
+                    </div>
+                    <div class="flex gap-2">
+                        @if ($github_app->html_url === 'https://github.com')
+                            <x-forms.input id="github_app.custom_user" label="User" disabled />
+                            <x-forms.input type="number" id="github_app.custom_port" label="Port" disabled />
+                        @else
+                            <x-forms.input id="github_app.custom_user" label="User" required />
+                            <x-forms.input type="number" id="github_app.custom_port" label="Port" required />
+                        @endif
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input type="number" id="github_app.app_id" label="App Id" disabled />
+                        <x-forms.input type="number" id="github_app.installation_id" label="Installation Id"
+                            disabled />
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.client_id" label="Client Id" type="password" disabled />
+                        <x-forms.input id="github_app.client_secret" label="Client Secret" type="password" />
+                        <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
+                    </div>
+                    <div class="flex items-end gap-2 ">
+                        <h3 class="pt-4">Permissions</h3>
+                        <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
+                        <a href="{{ get_permissions_path($github_app) }}">
+                            <x-forms.button>
+                                Update
+                                <x-external-link />
+                            </x-forms.button>
+                        </a>
+                    </div>
+                    <div class="flex gap-2">
+                        <x-forms.input id="github_app.contents" helper="read - mandatory." label="Content" readonly
+                            placeholder="N/A" />
+                        <x-forms.input id="github_app.metadata" helper="read - mandatory." label="Metadata" readonly
+                            placeholder="N/A" />
+                        {{-- <x-forms.input id="github_app.administration"
+                            helper="read:write access needed to setup servers as GitHub Runner." label="Administration"
+                            readonly placeholder="N/A" /> --}}
+                        <x-forms.input id="github_app.pull_requests"
+                            helper="write access needed to use deployment status update in previews."
+                            label="Pull Request" readonly placeholder="N/A" />
+                    </div>
                 </div>
             @endif
         </form>
@@ -89,7 +114,7 @@
             <div class="flex gap-2">
                 <h2>Register a GitHub App</h2>
                 <x-forms.button class="bg-coollabs hover:bg-coollabs-100"
-                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}')">
+                    x-on:click.prevent="createGithubApp('{{ $webhook_endpoint }}','{{ $preview_deployment_permissions }}',{{ $administration }})">
                     Register Now
                 </x-forms.button>
             </div>
@@ -114,17 +139,18 @@
                         </x-forms.select>
                     </div>
                 @endif
-                <div class="flex flex-col gap-2 pt-4">
-                    <x-forms.checkbox disabled instantSave id="default_permissions" label="Default Permissions"
+                <div class="flex flex-col gap-2 pt-4 w-96">
+                    <x-forms.checkbox disabled instantSave id="default_permissions" label="Mandatory"
                         helper="Contents: read<br>Metadata: read<br>Email: read" />
-                    <x-forms.checkbox instantSave id="preview_deployment_permissions"
-                        label="Preview Deployments Permission"
+                    <x-forms.checkbox instantSave id="preview_deployment_permissions" label="Preview Deployments "
                         helper="Necessary for updating pull requests with useful comments (deployment status, links, etc.)<br><br>Pull Request: read & write" />
+                    {{-- <x-forms.checkbox instantSave id="administration" label="Administration (for Github Runners)"
+                        helper="Necessary for adding Github Runners to repositories.<br><br>Administration: read & write" /> --}}
                 </div>
             </div>
         </div>
         <script>
-            function createGithubApp(webhook_endpoint, preview_deployment_permissions) {
+            function createGithubApp(webhook_endpoint, preview_deployment_permissions, administration) {
                 const {
                     organization,
                     uuid,
@@ -143,10 +169,14 @@
                 const default_permissions = {
                     contents: 'read',
                     metadata: 'read',
-                    emails: 'read'
+                    emails: 'read',
+                    administration: 'read'
                 };
                 if (preview_deployment_permissions) {
                     default_permissions.pull_requests = 'write';
+                }
+                if (administration) {
+                    default_permissions.administration = 'write';
                 }
                 const data = {
                     name,

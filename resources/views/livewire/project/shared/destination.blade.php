@@ -4,7 +4,7 @@
     <div class="grid grid-cols-1 gap-4 py-4">
         <div class="flex gap-2">
             <div class="relative flex flex-col text-white cursor-default box-without-bg bg-coolgray-100 w-96">
-                <div class="font-bold">Main Server</div>
+                <div class="text-xl font-bold">Primary Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
                     <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge badge-xs">
                     </div>
@@ -21,7 +21,11 @@
             </div>
             @if ($resource?->additional_networks?->count() > 0)
                 <x-forms.button
-                    wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">Redeploy</x-forms.button>
+                    wire:click="redeploy('{{ data_get($resource, 'destination.id') }}','{{ data_get($resource, 'destination.server.id') }}')">Deploy</x-forms.button>
+                @if (str($resource->realStatus())->startsWith('running'))
+                    <x-forms.button isError
+                        wire:click="stop('{{ data_get($resource, 'destination.server.id') }}')">Stop</x-forms.button>
+                @endif
             @endif
         </div>
         @if ($resource?->additional_networks?->count() > 0)
@@ -41,16 +45,23 @@
                         <div>
                             Network: {{ data_get($destination, 'network') }}
                         </div>
-
                     </div>
                     <x-forms.button
-                        wire:click="redeploy('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">Redeploy</x-forms.button>
+                        wire:click="redeploy('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">Deploy</x-forms.button>
+                    <x-forms.button
+                        wire:click="promote('{{ data_get($destination, 'id') }}','{{ data_get($destination, 'server.id') }}')">Promote
+                        to Primary </x-forms.button>
+                    @if (data_get_str($destination, 'pivot.status')->startsWith('running'))
+                        <x-forms.button isError
+                            wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
+                    @endif
                     <x-new-modal
                         action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
                         isErrorButton buttonTitle="Remove Server">
                         This will stop the running application in this server and remove it as a deployment
                         destination.<br><br>Please think again.
                     </x-new-modal>
+
                 </div>
             @endforeach
         @endif

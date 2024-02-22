@@ -63,7 +63,7 @@ class EmailSettings extends Component
             ]);
             $this->team->save();
             refreshSession();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -71,7 +71,7 @@ class EmailSettings extends Component
     public function sendTestNotification()
     {
         $this->team?->notify(new Test($this->emails));
-        $this->dispatch('success', 'Test Email sent successfully.');
+        $this->dispatch('success', 'Test Email sent.');
     }
     public function instantSaveInstance()
     {
@@ -83,7 +83,7 @@ class EmailSettings extends Component
             $this->team->resend_enabled = false;
             $this->team->save();
             refreshSession();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -131,7 +131,7 @@ class EmailSettings extends Component
             ]);
             $this->team->save();
             refreshSession();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             $this->team->smtp_enabled = false;
             return handleError($e, $this);
@@ -148,7 +148,7 @@ class EmailSettings extends Component
             ]);
             $this->team->save();
             refreshSession();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             $this->team->resend_enabled = false;
             return handleError($e, $this);

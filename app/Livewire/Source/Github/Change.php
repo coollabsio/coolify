@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Source\Github;
 
+use App\Jobs\GithubAppPermissionJob;
 use App\Models\GithubApp;
 use App\Models\InstanceSettings;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 
 class Change extends Component
@@ -15,6 +17,7 @@ class Change extends Component
 
     public ?bool $default_permissions = true;
     public ?bool $preview_deployment_permissions = true;
+    public ?bool $administration = false;
 
     public $parameters;
     public ?GithubApp $github_app;
@@ -34,8 +37,52 @@ class Change extends Component
         'github_app.client_secret' => 'required|string',
         'github_app.webhook_secret' => 'required|string',
         'github_app.is_system_wide' => 'required|bool',
+        'github_app.contents' => 'nullable|string',
+        'github_app.metadata' => 'nullable|string',
+        'github_app.pull_requests' => 'nullable|string',
+        'github_app.administration' => 'nullable|string',
     ];
 
+    public function checkPermissions()
+    {
+        GithubAppPermissionJob::dispatchSync($this->github_app);
+        $this->github_app->refresh()->makeVisible('client_secret')->makeVisible('webhook_secret');
+        $this->dispatch('success', 'Github App permissions updated.');
+    }
+    // public function check()
+    // {
+
+    // Need administration:read:write permission
+    // https://docs.github.com/en/rest/actions/self-hosted-runners?apiVersion=2022-11-28#list-self-hosted-runners-for-a-repository
+
+
+    //     $github_access_token = generate_github_installation_token($this->github_app);
+    //     $repositories = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/installation/repositories?per_page=100");
+    //     $runners_by_repository = collect([]);
+    //     $repositories = $repositories->json()['repositories'];
+    //     foreach ($repositories as $repository) {
+    //         $runners_downloads = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/downloads");
+    //         $runners = Http::withToken($github_access_token)->get("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners");
+    //         $token = Http::withHeaders([
+    //             'Authorization' => "Bearer $github_access_token",
+    //             'Accept' => 'application/vnd.github+json'
+    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/registration-token");
+    //         $token = $token->json();
+    //         $remove_token = Http::withHeaders([
+    //             'Authorization' => "Bearer $github_access_token",
+    //             'Accept' => 'application/vnd.github+json'
+    //         ])->withBody(null)->post("{$this->github_app->api_url}/repos/{$repository['full_name']}/actions/runners/remove-token");
+    //         $remove_token = $remove_token->json();
+    //         $runners_by_repository->put($repository['full_name'], [
+    //             'token' => $token,
+    //             'remove_token' => $remove_token,
+    //             'runners' => $runners->json(),
+    //             'runners_downloads' => $runners_downloads->json()
+    //         ]);
+    //     }
+
+    //     ray($runners_by_repository);
+    // }
     public function mount()
     {
         $github_app_uuid = request()->github_app_uuid;
@@ -103,7 +150,7 @@ class Change extends Component
                 'github_app.is_system_wide' => 'required|bool',
             ]);
             $this->github_app->save();
-            $this->dispatch('success', 'Github App updated successfully.');
+            $this->dispatch('success', 'Github App updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -111,6 +158,13 @@ class Change extends Component
 
     public function instantSave()
     {
+        try {
+            $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+            $this->github_app->save();
+            $this->dispatch('success', 'Github App updated.');
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
     }
 
     public function delete()

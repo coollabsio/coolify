@@ -1,6 +1,7 @@
-# documentation: https://docs.openblocks.dev/self-hosting
+# documentation: https://openblocks.dev
 # slogan: OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.
 # tags: openblocks,low,code,platform,open,source,low,code
+# logo: svgs/openblocks.svg
 
 services:
   openblocks:

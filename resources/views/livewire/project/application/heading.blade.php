@@ -1,4 +1,4 @@
-<nav wire:poll.30000ms="check_status">
+<nav wire:poll.5000ms="check_status">
     <x-resources.breadcrumbs :resource="$application" :parameters="$parameters" />
     <div class="navbar-main">
         <a class="{{ request()->routeIs('project.application.configuration') ? 'text-white' : '' }}"

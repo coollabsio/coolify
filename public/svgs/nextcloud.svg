@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Generator: Adobe Illustrator 22.1.0, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   version="1.1"
+   id="Layer_1"
+   inkscape:export-filename="nextcloud-logo-white-transparent.png"
+   inkscape:export-xdpi="300.09631"
+   inkscape:export-ydpi="300.09631"
+   inkscape:version="0.92.4 (5da689c313, 2019-01-14)"
+   sodipodi:docname="nextcloud-icon.svg"
+   x="0px"
+   y="0px"
+   viewBox="0 0 64.000005 64.000001"
+   xml:space="preserve"
+   width="64"
+   height="64"><metadata
+   id="metadata19"><rdf:RDF><cc:Work
+       rdf:about=""><dc:format>image/svg+xml</dc:format><dc:type
+         rdf:resource="http://purl.org/dc/dcmitype/StillImage" /><dc:title></dc:title></cc:Work></rdf:RDF></metadata><defs
+   id="defs17" />
+<style
+   type="text/css"
+   id="style2">
+	.st0{fill:#0082C9;}
+</style>
+<sodipodi:namedview
+   bordercolor="#666666"
+   borderopacity="1"
+   fit-margin-bottom="10"
+   fit-margin-left="10"
+   fit-margin-right="10"
+   fit-margin-top="10"
+   gridtolerance="10"
+   guidetolerance="10"
+   id="namedview16"
+   inkscape:bbox-nodes="true"
+   inkscape:bbox-paths="true"
+   inkscape:current-layer="Layer_1"
+   inkscape:cx="47.896274"
+   inkscape:cy="53.386932"
+   inkscape:pageopacity="0"
+   inkscape:pageshadow="2"
+   inkscape:snap-bbox="true"
+   inkscape:snap-bbox-edge-midpoints="true"
+   inkscape:snap-bbox-midpoints="true"
+   inkscape:snap-page="true"
+   inkscape:window-height="1001"
+   inkscape:window-maximized="1"
+   inkscape:window-width="1920"
+   inkscape:window-x="-9"
+   inkscape:window-y="-9"
+   inkscape:zoom="4"
+   objecttolerance="10"
+   pagecolor="#ffffff"
+   showgrid="false"
+   units="px">
+	</sodipodi:namedview>
+
+<path
+   id="XMLID_107_"
+   inkscape:connector-curvature="0"
+   class="st0"
+   d="m 32.028095,17.446884 c -6.630378,0 -12.249342,4.49517 -13.99122,10.563651 C 16.519754,24.751537 13.260755,22.50395 9.439859,22.50395 4.270413,22.50395 0,26.774363 0,31.999999 c 0,5.225637 4.270413,9.49605 9.496049,9.49605 3.764706,0 7.079895,-2.247586 8.597015,-5.506585 1.685689,6.068481 7.304653,10.563652 13.935031,10.563652 6.574188,0 12.193152,-4.438981 13.99122,-10.451272 1.517121,3.146619 4.77612,5.338015 8.484636,5.338015 5.225637,0 9.496049,-4.270412 9.496049,-9.496049 0,-5.225637 -4.270412,-9.43986 -9.496049,-9.43986 -3.708516,0 -6.967515,2.191396 -8.484636,5.338016 -1.798068,-5.956101 -7.360843,-10.395082 -13.99122,-10.395082 z m 0,5.562773 c 5.000878,0 8.990343,3.989465 8.990343,8.990342 0,5.000879 -3.989465,8.990343 -8.990343,8.990343 -5.000878,0 -8.990343,-3.989464 -8.990343,-8.990343 0,-5.000875 3.989465,-8.99034 8.990343,-8.990342 z M 9.496049,28.066724 c 2.191397,0 3.933275,1.74188 3.933275,3.933275 0,2.191396 -1.741878,3.933276 -3.933275,3.933276 -2.191396,0 -3.933275,-1.74188 -3.933275,-3.933276 0,-2.191395 1.741879,-3.933275 3.933275,-3.933275 z m 45.007902,0 c 2.191396,0 3.933275,1.74188 3.933275,3.933275 0,2.191396 -1.741879,3.933276 -3.933275,3.933276 -2.191396,0 -3.933275,-1.74188 -3.933275,-3.933276 0.05619,-2.191395 1.741879,-3.933275 3.933275,-3.933275 z"
+   style="fill:#0082c9;stroke-width:0.56189638" />
+</svg>

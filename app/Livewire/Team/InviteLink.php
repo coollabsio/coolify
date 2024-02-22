@@ -79,7 +79,7 @@ class InviteLink extends Component
                 ]);
                 $mail->subject('You have been invited to ' . currentTeam()->name . ' on ' . config('app.name') . '.');
                 send_user_an_email($mail, $this->email);
-                $this->dispatch('success', 'Invitation sent via email successfully.');
+                $this->dispatch('success', 'Invitation sent via email.');
                 $this->dispatch('refreshInvitations');
                 return;
             } else {

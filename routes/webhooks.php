@@ -2,6 +2,7 @@
 
 use App\Enums\ProcessStatus;
 use App\Jobs\ApplicationPullRequestUpdateJob;
+use App\Jobs\GithubAppPermissionJob;
 use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\SubscriptionTrialEndedJob;
 use App\Jobs\SubscriptionTrialEndsSoonJob;
@@ -56,6 +57,7 @@ Route::get('/source/github/install', function () {
         $installation_id = request()->get('installation_id');
         $source = request()->get('source');
         $setup_action = request()->get('setup_action');
+        ray(request());
         $github_app = GithubApp::where('uuid', $source)->firstOrFail();
         if ($setup_action === 'install') {
             $github_app->installation_id = $installation_id;
@@ -555,21 +557,24 @@ Route::post('/source/github/events', function () {
             // Just pong
             return response('pong');
         }
-        if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
-            // Installation handled by setup redirect url. Repositories queried on-demand.
-            return response('cool');
-        }
         $github_app = GithubApp::where('app_id', $x_github_hook_installation_target_id)->first();
         if (is_null($github_app)) {
             return response('Nothing to do. No GitHub App found.');
         }
-
         $webhook_secret = data_get($github_app, 'webhook_secret');
         $hmac = hash_hmac('sha256', request()->getContent(), $webhook_secret);
         if (config('app.env') !== 'local') {
             if (!hash_equals($x_hub_signature_256, $hmac)) {
                 return response('Invalid signature.');
             }
+        }
+        if ($x_github_event === 'installation' || $x_github_event === 'installation_repositories') {
+            // Installation handled by setup redirect url. Repositories queried on-demand.
+            $action = data_get($payload, 'action');
+            if ($action === 'new_permissions_accepted') {
+                GithubAppPermissionJob::dispatch($github_app);
+            }
+            return response('cool');
         }
         if ($x_github_event === 'push') {
             $id = data_get($payload, 'repository.id');

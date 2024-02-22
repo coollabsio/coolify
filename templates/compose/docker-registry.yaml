@@ -1,6 +1,7 @@
 # documentation: https://docs.docker.com/registry/
-# slogan: The Docker Registry is a stateless, highly scalable server side application that stores and lets you distribute Docker images.
+# slogan: The Docker Registry is lets you distribute Docker images.
 # tags: registry,images,docker
+# logo: svgs/docker-registry.png
 
 services:
   registry:

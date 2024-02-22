@@ -1,4 +1,3 @@
-@props(['status', 'showRefreshButton' => true])
 @if (str($status)->startsWith('running'))
     <x-status.running :status="$status" />
 @elseif(str($status)->startsWith('restarting') ||
@@ -6,7 +5,7 @@
         str($status)->startsWith('degraded'))
     <x-status.restarting :status="$status" />
 @else
-    <x-status.stopped :status="$status"/>
+    <x-status.stopped :status="$status" />
 @endif
 
 @if (!str($status)->contains('exited') && $showRefreshButton)

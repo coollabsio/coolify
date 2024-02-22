@@ -1,6 +1,7 @@
-# documentation: https://docs.weblate.org/en/latest/admin/install/docker.html
+# documentation: https://weblate.org
 # slogan: Weblate is a libre software web-based continuous localization system.
 # tags: localization, translation, web, web-based, continuous, libre, software
+# logo: svgs/weblate.webp
 
 services:
   weblate:

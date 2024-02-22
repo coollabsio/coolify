@@ -49,7 +49,7 @@ class Email extends Component
                 'settings.smtp_from_name' => 'required',
             ]);
             $this->settings->save();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
@@ -61,7 +61,7 @@ class Email extends Component
                 'settings.resend_api_key' => 'required'
             ]);
             $this->settings->save();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             $this->settings->resend_enabled = false;
             return handleError($e, $this);
@@ -98,7 +98,7 @@ class Email extends Component
                 'settings.smtp_timeout' => 'nullable',
             ]);
             $this->settings->save();
-            $this->dispatch('success', 'Settings saved successfully.');
+            $this->dispatch('success', 'Settings saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

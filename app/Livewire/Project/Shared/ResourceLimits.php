@@ -52,7 +52,7 @@ class ResourceLimits extends Component
             }
             $this->validate();
             $this->resource->save();
-            $this->dispatch('success', 'Resource limits updated successfully.');
+            $this->dispatch('success', 'Resource limits updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
