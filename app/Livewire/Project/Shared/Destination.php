@@ -19,6 +19,7 @@ class Destination extends Component
         $teamId = auth()->user()->currentTeam()->id;
         return [
             "echo-private:team.{$teamId},ApplicationStatusChanged" => 'loadData',
+            "loadData",
         ];
     }
     public function mount()
@@ -39,6 +40,9 @@ class Destination extends Component
         });
         $this->networks = $this->networks->reject(function ($network) {
             return $this->resource->destination->server->id == $network->server->id;
+        });
+        $this->networks = $this->networks->reject(function ($network) {
+            return $this->resource->additional_servers->pluck('id')->contains($network->server->id);
         });
     }
     public function redeploy(int $network_id, int $server_id)
@@ -68,8 +72,8 @@ class Destination extends Component
     {
         $this->resource->additional_networks()->attach($network_id, ['server_id' => $server_id]);
         $this->resource->load(['additional_networks']);
+        $this->dispatch('loadData');
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
-        $this->loadData();
     }
     public function removeServer(int $network_id, int $server_id)
     {
@@ -81,7 +85,7 @@ class Destination extends Component
         StopApplicationOneServer::run($this->resource, $server);
         $this->resource->additional_networks()->detach($network_id, ['server_id' => $server_id]);
         $this->resource->load(['additional_networks']);
+        $this->dispatch('loadData');
         ApplicationStatusChanged::dispatch(data_get($this->resource, 'environment.project.team.id'));
-        $this->loadData();
     }
 }
