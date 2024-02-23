@@ -5,6 +5,7 @@ namespace App\Livewire\Server\New;
 use App\Enums\ProxyStatus;
 use App\Enums\ProxyTypes;
 use App\Models\Server;
+use App\Models\Team;
 use Livewire\Component;
 
 class ByIp extends Component
@@ -75,6 +76,9 @@ class ByIp extends Component
         try {
             if (is_null($this->private_key_id)) {
                 return $this->dispatch('error', 'You must select a private key');
+            }
+            if (Team::serverLimitReached()) {
+                return $this->dispatch('error', 'You have reached the server limit for your subscription.');
             }
             $payload = [
                 'name' => $this->name,
