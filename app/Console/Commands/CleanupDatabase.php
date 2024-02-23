@@ -4,9 +4,8 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 
-class CleanupQueue extends Command
+class CleanupDatabase extends Command
 {
     protected $signature = 'cleanup:database {--yes}';
     protected $description = 'Cleanup database';
