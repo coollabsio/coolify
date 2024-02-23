@@ -6,7 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 
 class Service extends BaseModel
 {
@@ -28,47 +27,73 @@ class Service extends BaseModel
     {
         return $this->morphToMany(Tag::class, 'taggable');
     }
-    public function status() {
-        $foundRunning = false;
-        $isDegraded = false;
-        $foundRestaring = false;
+    public function status()
+    {
         $applications = $this->applications;
         $databases = $this->databases;
+
+        $complexStatus = null;
+        $complexHealth = null;
+
         foreach ($applications as $application) {
             if ($application->exclude_from_status) {
                 continue;
             }
-            if (Str::of($application->status)->startsWith('running')) {
-                $foundRunning = true;
-            } else if (Str::of($application->status)->startsWith('restarting')) {
-                $foundRestaring = true;
+            $status = str($application->status)->before('(')->trim();
+            $health = str($application->status)->between('(', ')')->trim();
+            if ($complexStatus === 'degraded') {
+                continue;
+            }
+            if ($status->startsWith('running')) {
+                if ($complexStatus === 'exited') {
+                    $complexStatus = 'degraded';
+                } else {
+                    $complexStatus = 'running';
+                }
+            } else if ($status->startsWith('restarting')) {
+                $complexStatus = 'degraded';
+            } else if ($status->startsWith('exited')) {
+                $complexStatus = 'exited';
+            }
+            if ($health->value() === 'healthy') {
+                if ($complexHealth === 'unhealthy') {
+                    continue;
+                }
+                $complexHealth = 'healthy';
             } else {
-                $isDegraded = true;
+                $complexHealth = 'unhealthy';
             }
         }
         foreach ($databases as $database) {
             if ($database->exclude_from_status) {
                 continue;
             }
-            if (Str::of($database->status)->startsWith('running')) {
-                $foundRunning = true;
-            } else if (Str::of($database->status)->startsWith('restarting')) {
-                $foundRestaring = true;
+            $status = str($database->status)->before('(')->trim();
+            $health = str($database->status)->between('(', ')')->trim();
+            if ($complexStatus === 'degraded') {
+                continue;
+            }
+            if ($status->startsWith('running')) {
+                if ($complexStatus === 'exited') {
+                    $complexStatus = 'degraded';
+                } else {
+                    $complexStatus = 'running';
+                }
+            } else if ($status->startsWith('restarting')) {
+                $complexStatus = 'degraded';
+            } else if ($status->startsWith('exited')) {
+                $complexStatus = 'exited';
+            }
+            if ($health->value() === 'healthy') {
+                if ($complexHealth === 'unhealthy') {
+                    continue;
+                }
+                $complexHealth = 'healthy';
             } else {
-                $isDegraded = true;
+                $complexHealth = 'unhealthy';
             }
         }
-        if ($foundRestaring) {
-            return 'degraded';
-        }
-        if ($foundRunning && !$isDegraded) {
-            return 'running';
-        } else if ($foundRunning && $isDegraded) {
-            return 'degraded';
-        } else if (!$foundRunning && !$isDegraded) {
-            return 'exited';
-        }
-        return 'exited';
+        return "{$complexStatus}:{$complexHealth}";
     }
     public function extraFields()
     {
@@ -414,7 +439,7 @@ class Service extends BaseModel
     public function documentation()
     {
         $services = getServiceTemplates();
-        $service = data_get($services, Str::of($this->name)->beforeLast('-')->value, []);
+        $service = data_get($services, str($this->name)->beforeLast('-')->value, []);
         return data_get($service, 'documentation', config('constants.docs.base_url'));
     }
     public function applications()

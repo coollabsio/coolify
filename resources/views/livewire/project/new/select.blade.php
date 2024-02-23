@@ -168,7 +168,7 @@
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
-                    wire:model.live.debounce.200ms="search" placeholder="Search...">
+                    wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 @if ($loadingServices)
