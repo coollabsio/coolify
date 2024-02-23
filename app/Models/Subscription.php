@@ -54,7 +54,6 @@ class Subscription extends Model
                 };
             })->first();
             if ($stripePlanId) {
-                raY($stripePlanId);
                 return str($stripePlanId)->after('stripe_price_id_')->before('_')->lower();
             }
         }
