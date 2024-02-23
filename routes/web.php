@@ -72,6 +72,7 @@ use App\Livewire\Server\Proxy\Show as ProxyShow;
 use App\Livewire\Server\Proxy\Logs as ProxyLogs;
 use App\Livewire\Source\Github\Change as GitHubChange;
 use App\Livewire\Subscription\Index as SubscriptionIndex;
+use App\Livewire\Subscription\Show as SubscriptionShow;
 
 use App\Livewire\Tags\Index as TagsIndex;
 use App\Livewire\Tags\Show as TagsShow;
@@ -110,7 +111,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/boarding', BoardingIndex::class)->name('boarding');
 
-    Route::get('/subscription', SubscriptionIndex::class)->name('subscription.index');
+    Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
+    Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
 
     Route::get('/settings', SettingsIndex::class)->name('settings.index');
     Route::get('/settings/license', SettingsLicense::class)->name('settings.license');

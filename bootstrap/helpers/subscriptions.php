@@ -109,7 +109,7 @@ function isPaddle()
 function getStripeCustomerPortalSession(Team $team)
 {
     Stripe::setApiKey(config('subscription.stripe_api_key'));
-    $return_url = route('team.index');
+    $return_url = route('subscription.show');
     $stripe_customer_id = data_get($team,'subscription.stripe_customer_id');
     if (!$stripe_customer_id) {
         return null;
@@ -123,7 +123,7 @@ function getStripeCustomerPortalSession(Team $team)
 function allowedPathsForUnsubscribedAccounts()
 {
     return [
-        'subscription',
+        'subscription/new',
         'login',
         'logout',
         'waitlist',

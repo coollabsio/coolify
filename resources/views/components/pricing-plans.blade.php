@@ -34,7 +34,7 @@
             <div>
             </div>
         </div>
-        <div class="p-4 rounded bg-coolgray-400">
+        {{-- <div class="p-4 rounded bg-coolgray-400">
             <h2 id="tier-hobby" class="flex items-start gap-4 text-4xl font-bold tracking-tight">Unlimited Trial
                 <x-forms.button><a class="font-bold text-white hover:no-underline"
                         href="https://github.com/coollabsio/coolify">Get Started</a></x-forms.button>
@@ -42,8 +42,11 @@
             <p class="mt-4 text-sm leading-6">Start self-hosting <span class="text-warning">without limits</span> with
                 our
                 OSS version. Same features as the paid version, but you have to manage by yourself.</p>
-        </div>
+        </div> --}}
+
         <div class="flow-root mt-12">
+            <div class="pb-10 text-xl text-center">For the detailed list of features, please visit our landing page: <a
+                    class="font-bold text-white underline" href="https://coolify.io">coolify.io</a></div>
             <div
                 class="grid max-w-sm grid-cols-1 -mt-16 divide-y divide-coolgray-500 isolate gap-y-16 sm:mx-auto lg:-mx-8 lg:mt-0 lg:max-w-none lg:grid-cols-3 lg:divide-x lg:divide-y-0 xl:-mx-4">
 
@@ -70,21 +73,18 @@
                             {{ $basic }}
                         @endisset
                     @endif
-                    <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Start self-hosting in
-                        the cloud
-                        with a
-                        single
-                        server.
+                    <p class="mt-10 text-sm leading-6 text-white h-[6.5rem]">Begin hosting your own services in the
+                        cloud.
                     </p>
                     <ul role="list" class="space-y-3 text-sm leading-6 ">
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                        <li class="flex">
+                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            2 servers <x-helper helper="Bring Your Own Server." />
+                            Connect <span class="px-1 font-bold text-white">2</span> servers
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -141,17 +141,18 @@
                             {{ $pro }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 text-white">Scale your business or self-hosting environment.
+                    <p class="h-20 mt-10 text-sm leading-6 text-white">Expand your business or set up your own hosting
+                        environment.
                     </p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                        <li class="flex ">
+                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            10 servers <x-helper helper="Bring Your Own Server." />
+                            Connect <span class="px-1 font-bold text-white">10</span> servers
                         </li>
                         <li class="flex gap-x-3">
                             <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
@@ -208,17 +209,17 @@
                             {{ $ultimate }}
                         @endisset
                     @endif
-                    <p class="h-20 mt-10 text-sm leading-6 text-white">Deploy complex infrastructures and
-                        manage them easily in one place.</p>
+                    <p class="h-20 mt-10 text-sm leading-6 text-white">Easily manage complex infrastructures in a
+                        single location.</p>
                     <ul role="list" class="mt-6 space-y-3 text-sm leading-6 ">
-                        <li class="flex gap-x-3">
-                            <svg class="flex-none w-5 h-6 text-warning" viewBox="0 0 20 20" fill="currentColor"
+                        <li class="flex ">
+                            <svg class="flex-none w-5 h-6 mr-3 text-warning" viewBox="0 0 20 20" fill="currentColor"
                                 aria-hidden="true">
                                 <path fill-rule="evenodd"
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            ? servers <x-helper helper="Bring Your Own Server." />
+                            Connect <span class="px-1 font-bold text-white">unlimited</span> servers
                         </li>
 
                         <li class="flex gap-x-3">
@@ -254,7 +255,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="p-4 mt-10 rounded">
+            {{-- <div class="p-4 mt-10 rounded">
                 <div class="flex items-start gap-4 text-xl tracking-tight">Need official support for
                     your self-hosted instance?
                     <x-forms.button>
@@ -263,9 +264,10 @@
                             Us</a>
                     </x-forms.button>
                 </div>
-            </div>
+            </div> --}}
         </div>
-        <div class="pt-8 pb-12 text-4xl font-bold text-center text-white">Included in all plans</div>
+
+        {{-- <div class="pt-8 pb-12 text-4xl font-bold text-center text-white">Included in all plans</div>
         <div class="grid grid-cols-1 gap-10 md:grid-cols-2 gap-y-28">
             <div>
                 <div class="flex items-center gap-4 mb-4">
@@ -433,7 +435,7 @@
         </div>
         <div class="pt-20 text-xs">
             <span class="text-warning">*</span> Some features are work in progress and will be available soon.
-        </div>
+        </div> --}}
     </div>
     @isset($other)
         {{ $other }}
