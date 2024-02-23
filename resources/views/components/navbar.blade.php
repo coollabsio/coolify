@@ -44,9 +44,8 @@
                 <div>
                     <button x-on:click.prevent="open = !open" x-on:click.away="open = false" type="button"
                         class="py-4 mx-4" id="menu-button" aria-expanded="true" aria-haspopup="true">
-                        <svg class="icon" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor"
-                                d="M224 128a8 8 0 0 1-8 8h-80v80a8 8 0 0 1-16 0v-80H40a8 8 0 0 1 0-16h80V40a8 8 0 0 1 16 0v80h80a8 8 0 0 1 8 8" />
+                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path fill="currentColor" d="M2 6h20v2H2zm0 5h20v2H2zm0 5h20v2H2z"></path>
                         </svg>
                     </button>
                 </div>
