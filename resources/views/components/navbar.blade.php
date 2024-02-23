@@ -44,8 +44,10 @@
                 <div>
                     <button x-on:click.prevent="open = !open" x-on:click.away="open = false" type="button"
                         class="py-4 mx-4" id="menu-button" aria-expanded="true" aria-haspopup="true">
-                        <svg class="icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                            <path fill="currentColor" d="M2 6h20v2H2zm0 5h20v2H2zm0 5h20v2H2z"></path>
+                        <svg class="icon text-neutral-400" xmlns="http://www.w3.org/2000/svg" width="200" height="200"
+                            viewBox="0 0 24 24">
+                            <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
+                                stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                         </svg>
                     </button>
                 </div>
@@ -137,8 +139,12 @@
                             <li title="Subscription" class="hover:bg-coolgray-200">
                                 <a class="hover:bg-transparent hover:no-underline"
                                     href="{{ route('subscription.show') }}">
-                                    <svg xmlns="http://www.w3.org/2000/svg"  class="{{ request()->is('subscription*') ? 'text-warning icon' : 'icon' }}" viewBox="0 0 24 24">
-                                        <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zm0 2h18M7 15h.01M11 15h2"/>
+                                    <svg xmlns="http://www.w3.org/2000/svg"
+                                        class="{{ request()->is('subscription*') ? 'text-warning icon' : 'icon' }}"
+                                        viewBox="0 0 24 24">
+                                        <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                            stroke-linejoin="round" stroke-width="2"
+                                            d="M3 8a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3zm0 2h18M7 15h.01M11 15h2" />
                                     </svg>
                                     Subscription
                                 </a>
