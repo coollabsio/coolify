@@ -188,22 +188,22 @@
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
                     <h3 id="tier-ultimate" class="text-base font-semibold leading-7 text-white">Ultimate</h3>
-                    <p class="flex items-baseline mt-6 gap-x-1">
+                   <p class="flex items-baseline pb-5 mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$?</span>
-                            <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
+                            {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
-                            <span class="text-4xl font-bold tracking-tight text-white">$?</span>
-                            <span class="text-sm font-semibold leading-6 ">/month + VAT</span>
+                            <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
+                            {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
                         </span>
                     </p>
-                    <span x-show="selected === 'monthly'" x-cloak>
+                     {{-- <span x-show="selected === 'monthly'" x-cloak>
                         <span>billed monthly</span>
                     </span>
                     <span x-show="selected === 'yearly'" x-cloak>
                         <span>billed annually</span>
-                    </span>
+                    </span> --}}
                     @if ($showSubscribeButtons)
                         @isset($ultimate)
                             {{ $ultimate }}
