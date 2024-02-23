@@ -159,6 +159,9 @@ class User extends Authenticatable implements SendsEmail
 
     public function role()
     {
+        if (data_get($this, 'pivot')) {
+            return $this->pivot->role;
+        }
         return auth()->user()->teams->where('id', currentTeam()->id)->first()->pivot->role;
     }
 }

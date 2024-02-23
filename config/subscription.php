@@ -13,6 +13,12 @@ return [
     'stripe_price_id_ultimate_yearly' => env('STRIPE_PRICE_ID_ULTIMATE_YEARLY', null),
     'stripe_excluded_plans' => env('STRIPE_EXCLUDED_PLANS', null),
 
+    'stripe_price_id_basic_monthly_old' => env('STRIPE_PRICE_ID_BASIC_MONTHLY_OLD', null),
+    'stripe_price_id_basic_yearly_old' => env('STRIPE_PRICE_ID_BASIC_YEARLY_OLD', null),
+    'stripe_price_id_pro_monthly_old' => env('STRIPE_PRICE_ID_PRO_MONTHLY_OLD', null),
+    'stripe_price_id_pro_yearly_old' => env('STRIPE_PRICE_ID_PRO_YEARLY_OLD', null),
+    'stripe_price_id_ultimate_monthly_old' => env('STRIPE_PRICE_ID_ULTIMATE_MONTHLY_OLD', null),
+    'stripe_price_id_ultimate_yearly_old' => env('STRIPE_PRICE_ID_ULTIMATE_YEARLY_OLD', null),
 
     // Paddle
     'paddle_vendor_id' => env('PADDLE_VENDOR_ID', null),
