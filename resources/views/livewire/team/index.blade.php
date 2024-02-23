@@ -14,19 +14,6 @@
         </div>
     </form>
 
-    @if (isCloud())
-        <div class="pb-8">
-            <h2>Subscription</h2>
-            @if (data_get(currentTeam(), 'subscription'))
-                <livewire:subscription.actions />
-            @else
-                <x-forms.button class="mt-4"><a class="text-white hover:no-underline"
-                        href="{{ route('subscription.index') }}">Subscribe Now</a>
-                </x-forms.button>
-            @endif
-
-        </div>
-    @endif
     <div>
         <h2>Danger Zone</h2>
         <div class="pb-4">Woah. I hope you know what are you doing.</div>
@@ -36,7 +23,7 @@
         @elseif(auth()->user()->teams()->get()->count() === 1)
             <div>You can't delete your last team.</div>
         @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
-            <div>Please cancel your subscription before delete this team (Manage My Subscription).</div>
+            <div>Please cancel your subscription <a class="text-white underline" href="{{route('subscription.show')}}">here</a> before delete this team.</div>
         @else
             @if (currentTeam()->isEmpty())
                 <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>

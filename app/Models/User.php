@@ -67,7 +67,7 @@ class User extends Authenticatable implements SendsEmail
             'team_id' => session('currentTeam')->id
         ]);
 
-        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
+        return new NewAccessToken($token, $token->getKey() . '|' . $plainTextToken);
     }
     public function teams()
     {
@@ -103,9 +103,13 @@ class User extends Authenticatable implements SendsEmail
 
     public function isAdmin()
     {
-        return data_get($this->pivot, 'role') === 'admin' || data_get($this->pivot, 'role') === 'owner';
+        return $this->role() === 'admin' || $this->role() === 'owner';
     }
 
+    public function isOwner()
+    {
+        return $this->role() === 'owner';
+    }
     public function isAdminFromSession()
     {
         if (auth()->user()->id === 0) {
@@ -155,6 +159,9 @@ class User extends Authenticatable implements SendsEmail
 
     public function role()
     {
-        return session('currentTeam')->pivot->role;
+        if (data_get($this, 'pivot')) {
+            return $this->pivot->role;
+        }
+        return auth()->user()->teams->where('id', currentTeam()->id)->first()->pivot->role;
     }
 }

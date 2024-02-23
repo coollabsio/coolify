@@ -1,11 +1,11 @@
 <div class="navbar-main" x-data>
-    <a  class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+    <a class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
         href="{{ route('project.service.configuration', $parameters) }}">
         <button>Configuration</button>
     </a>
     <x-services.links />
     <div class="flex-1"></div>
-    @if ($service->status() === 'degraded')
+    @if (str($service->status())->contains('degraded'))
         <button wire:click='deploy' onclick="startService.showModal()"
             class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -26,11 +26,10 @@
             Stop
         </button>
     @endif
-    @if ($service->status() === 'running')
+    @if (str($service->status())->contains('running'))
         <button wire:click='restart' class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 text-warning" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"
-                    stroke-width="2">
+                <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2">
                     <path d="M19.933 13.041a8 8 0 1 1-9.925-8.788c3.899-1 7.935 1.007 9.425 4.747" />
                     <path d="M20 4v5h-5" />
                 </g>
@@ -47,7 +46,7 @@
             Stop
         </button>
     @endif
-    @if ($service->status() === 'exited')
+    @if (str($service->status())->contains('exited'))
         <button wire:click='stop(true)'
             class="flex items-center gap-2 cursor-pointer hover:text-white text-neutral-400">
             <svg class="w-5 h-5 " viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
@@ -70,9 +69,9 @@
 </div>
 
 @script
-<script>
-    $wire.on('image-pulled', () => {
-        startService.showModal();
-    });
-</script>
+    <script>
+        $wire.on('image-pulled', () => {
+            startService.showModal();
+        });
+    </script>
 @endscript

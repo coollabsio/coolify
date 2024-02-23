@@ -30,8 +30,7 @@ class Subscription extends Model
             if (in_array($subscription, $ultimate)) {
                 return 'ultimate';
             }
-        }
-        if (isStripe()) {
+        } else if (isStripe()) {
             if (!$this->stripe_plan_id) {
                 return 'zero';
             }
@@ -55,7 +54,7 @@ class Subscription extends Model
                 };
             })->first();
             if ($stripePlanId) {
-                return Str::of($stripePlanId)->after('stripe_price_id_')->before('_')->lower();
+                return str($stripePlanId)->after('stripe_price_id_')->before('_')->lower();
             }
         }
         return 'zero';

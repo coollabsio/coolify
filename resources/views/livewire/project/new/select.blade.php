@@ -168,7 +168,7 @@
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
                 <input
                     class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
-                    wire:model.live.debounce.200ms="search" placeholder="Search...">
+                    wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 @if ($loadingServices)
@@ -176,28 +176,29 @@
                 @else
                     @forelse ($services as $serviceName => $service)
                         @if (data_get($service, 'minversion') && version_compare(config('version'), data_get($service, 'minversion'), '<'))
-                        <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
-                            <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>
-                            <x-slot:description>
-                                @if (data_get($service, 'slogan'))
-                                    {{ data_get($service, 'slogan') }}
-                                @endif
+                            <x-resource-view wire="setType('one-click-service-{{ $serviceName }}')">
+                                <x-slot:title> {{ Str::headline($serviceName) }}</x-slot>
+                                <x-slot:description>
+                                    @if (data_get($service, 'slogan'))
+                                        {{ data_get($service, 'slogan') }}
+                                    @endif
 
-                            </x-slot>
-                            <x-slot:logo>
-                                @if (data_get($service, 'logo'))
-                                    <img class="w-[4.5rem]
+                                </x-slot>
+                                <x-slot:logo>
+                                    @if (data_get($service, 'logo'))
+                                        <img class="w-[4.5rem]
                                     aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                                        src="{{ asset(data_get($service, 'logo')) }}">
-                                @endif
-                            </x-slot:logo>
-                            <x-slot:documentation>
-                                {{ data_get($service, 'documentation') }}
-                            </x-slot>
-                            <x-slot:upgrade>
-                                You need to upgrade Coolify to {{ data_get($service, 'minversion') }} to use this service.
-                            </x-slot>
-                        </x-resource-view>
+                                            src="{{ asset(data_get($service, 'logo')) }}">
+                                    @endif
+                                </x-slot:logo>
+                                <x-slot:documentation>
+                                    {{ data_get($service, 'documentation') }}
+                                </x-slot>
+                                <x-slot:upgrade>
+                                    You need to upgrade Coolify to {{ data_get($service, 'minversion') }} to use this
+                                    service.
+                                </x-slot>
+                            </x-resource-view>
                             {{-- <button class="text-left cursor-not-allowed bg-coolgray-100 box-without-bg" disabled>
                                 <div class="flex flex-col mx-6">
                                     <div class="font-bold">
@@ -215,10 +216,14 @@
                                     @endif
                                 </x-slot>
                                 <x-slot:logo>
-                                    @if (data_get($service, 'logo'))
+                                    @if (file_exists(public_path(data_get($service, 'logo'))))
                                         <img class="w-[4.5rem]
-                                        aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                    aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                                             src="{{ asset(data_get($service, 'logo')) }}">
+                                    @else
+                                        <img class="w-[4.5rem]
+                                    aspect-square h-[4.5rem] p-2 transition-all duration-200 opacity-30 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                                            src="{{ asset('svgs/unknown.svg') }}">
                                     @endif
                                 </x-slot:logo>
                                 <x-slot:documentation>

@@ -7,6 +7,13 @@ use Livewire\Component;
 
 class Actions extends Component
 {
+    public $server_limits = 0;
+    public function mount()
+    {
+        $limits = currentTeam()->limits;
+        $this->server_limits = data_get($limits, 'serverLimit', 0);
+
+    }
     public function cancel()
     {
         try {
@@ -69,7 +76,8 @@ class Actions extends Component
             return handleError($e, $this);
         }
     }
-    public function stripeCustomerPortal() {
+    public function stripeCustomerPortal()
+    {
         $session = getStripeCustomerPortalSession(currentTeam());
         redirect($session->url);
     }

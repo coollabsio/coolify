@@ -816,9 +816,7 @@ Route::post('/payments/stripe/events', function () {
                     Sleep::for(5)->seconds();
                     $subscription = Subscription::where('stripe_customer_id', $customerId)->firstOrFail();
                 }
-
                 $subscription->update([
-                    'stripe_plan_id' => $planId,
                     'stripe_invoice_paid' => true,
                 ]);
                 break;

@@ -1,0 +1,56 @@
+# documentation: https://firefly-iii.org
+# slogan: A personal finances manager that can help you save money.
+# tags: finance, money, personal, manager
+# logo: svgs/firefly.svg
+
+services:
+  firefly:
+    image: fireflyiii/core:latest
+    environment:
+      - SERVICE_FQDN_FIREFLY
+      - APP_KEY=$SERVICE_BASE64_APPKEY
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_CONNECTION=mysql
+      - DB_DATABASE=${MYSQL_DATABASE:-firefly}
+      - DB_USERNAME=$SERVICE_USER_MYSQL
+      - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
+      - STATIC_CRON_TOKEN=$SERVICE_BASE64_CRONTOKEN
+    volumes:
+      - firefly-upload:/var/www/html/storage/upload
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    depends_on:
+      mysql:
+        condition: service_healthy
+  mysql:
+    image: mariadb:lts
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-firefly}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-p${SERVICE_PASSWORD_MYSQLROOT}",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - firefly-mysql-data:/var/lib/mysql
+  # cron:
+  #   image: alpine
+  #   command: sh -c "echo \"0 3 * * * wget -qO- http://app:8080/api/v1/cron/$STATIC_CRON_TOKEN\" | crontab - && crond -f -L /dev/stdout"
+  #   environment:
+  #   - STATIC_CRON_TOKEN=$SERVICE_PASSWORD_32_CRONTOKEN
