@@ -25,13 +25,13 @@
             <x-forms.button x-show="selected === 'monthly'" x-cloak aria-describedby="tier-ultimate"
                 class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.contact') }}"
                     target="_blank">
-                    Contact Us</a>
+                    Contact us</a>
             </x-forms.button>
 
             <x-forms.button x-show="selected === 'yearly'" x-cloak aria-describedby="tier-ultimate"
                 class="w-full h-10 buyme"><a class="text-white hover:no-underline" href="{{ config('coolify.contact') }}"
                     target="_blank">
-                    Contact Us</a>
+                    Contact us</a>
             </x-forms.button>
         </x-slot:ultimate>
     @endif

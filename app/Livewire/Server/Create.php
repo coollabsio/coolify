@@ -3,6 +3,7 @@
 namespace App\Livewire\Server;
 
 use App\Models\PrivateKey;
+use App\Models\Team;
 use Livewire\Component;
 
 class Create extends Component
@@ -16,11 +17,7 @@ class Create extends Component
             $this->limit_reached = false;
             return;
         }
-        $team = currentTeam();
-        $servers = $team->servers->count();
-        ['serverLimit' => $serverLimit] = $team->limits;
-
-        $this->limit_reached = $servers >= $serverLimit;
+        $this->limit_reached = Team::serverLimitReached();
     }
     public function render()
     {
