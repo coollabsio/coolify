@@ -151,6 +151,11 @@ class Server extends BaseModel
         }
         return false;
     }
+    public function disableServerDueToOverflow() {
+        $this->settings->update([
+            'disabled_by_overflow' => true,
+        ]);
+    }
     public function isServerReady(int $tries = 3)
     {
         if ($this->skipServer()) {

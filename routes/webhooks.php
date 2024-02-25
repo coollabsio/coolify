@@ -3,6 +3,7 @@
 use App\Enums\ProcessStatus;
 use App\Jobs\ApplicationPullRequestUpdateJob;
 use App\Jobs\GithubAppPermissionJob;
+use App\Jobs\ServerOverflowJob;
 use App\Jobs\SubscriptionInvoiceFailedJob;
 use App\Jobs\SubscriptionTrialEndedJob;
 use App\Jobs\SubscriptionTrialEndsSoonJob;
@@ -882,6 +883,7 @@ Route::post('/payments/stripe/events', function () {
                     $team->update([
                         'custom_server_limit' => $quantity,
                     ]);
+                    ServerOverflowJob::dispatch($team);
                 }
                 $subscription->update([
                     'stripe_feedback' => $feedback,
