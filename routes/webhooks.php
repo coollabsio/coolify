@@ -875,6 +875,14 @@ Route::post('/payments/stripe/events', function () {
                 $alreadyCancelAtPeriodEnd = data_get($subscription, 'stripe_cancel_at_period_end');
                 $feedback = data_get($data, 'cancellation_details.feedback');
                 $comment = data_get($data, 'cancellation_details.comment');
+                $lookup_key = data_get($data, 'items.data.0.price.lookup_key');
+                if (str($lookup_key)->contains('ultimate')) {
+                    $quantity = data_get($data, 'items.data.0.quantity', 10);
+                    $team = data_get($subscription, 'team');
+                    $team->update([
+                        'custom_server_limit' => $quantity,
+                    ]);
+                }
                 $subscription->update([
                     'stripe_feedback' => $feedback,
                     'stripe_comment' => $comment,
