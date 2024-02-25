@@ -188,22 +188,22 @@
                 </div>
                 <div class="pt-16 lg:px-8 lg:pt-0 xl:px-14">
                     <h3 id="tier-ultimate" class="text-base font-semibold leading-7 text-white">Ultimate</h3>
-                   <p class="flex items-baseline pb-5 mt-6 gap-x-1">
+                   <p class="flex items-baseline mt-6 gap-x-1">
                         <span x-show="selected === 'monthly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
-                            {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
+                            {{-- <span class="text-sm font-semibold leading-6 ">pay-as-you-go</span> --}}
                         </span>
                         <span x-show="selected === 'yearly'" x-cloak>
                             <span class="text-4xl font-bold tracking-tight text-white">Custom</span>
                             {{-- <span class="text-sm font-semibold leading-6 ">/month + VAT</span> --}}
                         </span>
                     </p>
-                     {{-- <span x-show="selected === 'monthly'" x-cloak>
-                        <span>billed monthly</span>
+                     <span x-show="selected === 'monthly'" x-cloak>
+                        <span>pay-as-you-go</span>
                     </span>
                     <span x-show="selected === 'yearly'" x-cloak>
-                        <span>billed annually</span>
-                    </span> --}}
+                        <span>pay-as-you-go</span>
+                    </span>
                     @if ($showSubscribeButtons)
                         @isset($ultimate)
                             {{ $ultimate }}
@@ -219,7 +219,7 @@
                                     d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
                                     clip-rule="evenodd" />
                             </svg>
-                            Connect <span class="px-1 font-bold text-white">unlimited</span> servers
+                            Connect <span class="px-1 font-bold text-white">10+</span> servers
                         </li>
 
                         <li class="flex gap-x-3">
