@@ -8,6 +8,15 @@ test('ConvertCapAdd', function () {
     ])->ray();
 });
 
+test('ConvertIp', function () {
+    $input = '--cap-add=NET_ADMIN --cap-add=NET_RAW --cap-add SYS_ADMIN --ip 127.0.0.1 --ip 127.0.0.2';
+    $output = convert_docker_run_to_compose($input);
+    expect($output)->toBe([
+        'cap_add' => ['NET_ADMIN', 'NET_RAW', 'SYS_ADMIN'],
+        'ip' => ['127.0.0.1', '127.0.0.2']
+    ])->ray();
+});
+
 test('ConvertPrivilegedAndInit', function () {
     $input = '---privileged --init';
     $output = convert_docker_run_to_compose($input);

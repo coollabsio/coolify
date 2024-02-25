@@ -43,6 +43,10 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
 
     public function handle()
     {
+        if (!$this->server->isFunctional()) {
+            return 'Server is not ready.';
+        };
+
         $applications = $this->server->applications();
         $skip_these_applications = collect([]);
         foreach ($applications as $application) {
@@ -57,10 +61,6 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
         $applications = $applications->filter(function ($value, $key) use ($skip_these_applications) {
             return !$skip_these_applications->pluck('id')->contains($value->id);
         });
-
-        if (!$this->server->isFunctional()) {
-            return 'Server is not ready.';
-        };
         try {
             if ($this->server->isSwarm()) {
                 $containers = instant_remote_process(["docker service inspect $(docker service ls -q) --format '{{json .}}'"], $this->server, false);
