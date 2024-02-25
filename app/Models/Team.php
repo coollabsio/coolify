@@ -48,7 +48,6 @@ class Team extends Model implements SendsDiscord, SendsEmail
         }
         return explode(',', $recipients);
     }
-
     static public function serverLimitReached() {
         $serverLimit = Team::serverLimit();
         $team = currentTeam();
@@ -57,7 +56,7 @@ class Team extends Model implements SendsDiscord, SendsEmail
     }
     static public function serverLimit()
     {
-        return data_get(Team::find(currentTeam()->id), 'limits.serverLimit', 0);
+        return Team::find(currentTeam()->id)->limits['serverLimit'];
     }
     public function limits(): Attribute
     {
