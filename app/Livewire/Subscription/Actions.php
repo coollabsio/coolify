@@ -9,6 +9,7 @@ use Livewire\Component;
 class Actions extends Component
 {
     public $server_limits = 0;
+    
     public function mount()
     {
         $this->server_limits = Team::serverLimit();

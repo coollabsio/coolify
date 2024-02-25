@@ -54,6 +54,12 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $servers = $team->servers->count();
         return $servers >= $serverLimit;
     }
+    public function serverOverflow() {
+        if ($this->serverLimit() < $this->servers->count()) {
+            return true;
+        }
+        return false;
+    }
     static public function serverLimit()
     {
         return Team::find(currentTeam()->id)->limits['serverLimit'];

@@ -7,7 +7,7 @@
             <magic-bar></magic-bar>
         </div>
     @endpersist
-    <livewire:sponsorship />
+    <livewire:layout-popups />
     @auth
         <livewire:realtime-connection />
     @endauth

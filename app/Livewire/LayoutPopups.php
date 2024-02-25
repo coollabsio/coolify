@@ -4,7 +4,7 @@ namespace App\Livewire;
 
 use Livewire\Component;
 
-class Sponsorship extends Component
+class LayoutPopups extends Component
 {
     public function getListeners()
     {
@@ -23,6 +23,6 @@ class Sponsorship extends Component
     }
     public function render()
     {
-        return view('livewire.sponsorship');
+        return view('livewire.layout-popups');
     }
 }
