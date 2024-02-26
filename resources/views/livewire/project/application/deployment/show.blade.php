@@ -51,7 +51,7 @@
                     @if (decode_remote_command_output($application_deployment_queue)->count() > 0)
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <div @class([
-                                'font-mono',
+                                'font-mono whitespace-pre-line',
                                 'text-warning' => $line['hidden'],
                                 'text-red-500' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
