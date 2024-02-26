@@ -118,6 +118,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->restart_only = $this->application_deployment_queue->restart_only;
         $this->only_this_server = $this->application_deployment_queue->only_this_server;
 
+        if (data_get($this->application, 'dockerfile_location')) {
+            $this->dockerfile_location = $this->application->dockerfile_location;
+        }
+
         $this->git_type = data_get($this->application_deployment_queue, 'git_type');
 
         $source = data_get($this->application, 'source');
@@ -424,9 +428,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     {
         if ($this->use_build_server) {
             $this->server = $this->build_server;
-        }
-        if (data_get($this->application, 'dockerfile_location')) {
-            $this->dockerfile_location = $this->application->dockerfile_location;
         }
         $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
