@@ -68,35 +68,35 @@ class Kernel extends ConsoleKernel
             $containerServers = $servers->where('settings.is_swarm_worker', false)->where('settings.is_build_server', false);
         }
         foreach ($containerServers as $server) {
-            // $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
-            $schedule
-                ->call(function () use ($server) {
-                    $randomSeconds = rand(1, 40);
-                    $job = new ContainerStatusJob($server);
-                    $job->delay($randomSeconds);
-                    ray('dispatching container status job in ' . $randomSeconds . ' seconds');
-                    dispatch($job);
-                })->name('container-status-' . $server->id)->everyMinute()->onOneServer();
+            $schedule->job(new ContainerStatusJob($server))->everyMinute()->onOneServer();
+            // $schedule
+            //     ->call(function () use ($server) {
+            //         $randomSeconds = rand(1, 40);
+            //         $job = new ContainerStatusJob($server);
+            //         $job->delay($randomSeconds);
+            //         ray('dispatching container status job in ' . $randomSeconds . ' seconds');
+            //         dispatch($job);
+            //     })->name('container-status-' . $server->id)->everyMinute()->onOneServer();
             if ($server->isLogDrainEnabled()) {
-                // $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
-                $schedule
-                    ->call(function () use ($server) {
-                        $randomSeconds = rand(1, 40);
-                        $job = new CheckLogDrainContainerJob($server);
-                        $job->delay($randomSeconds);
-                        dispatch($job);
-                    })->name('log-drain-container-check-' . $server->id)->everyMinute()->onOneServer();
+                $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
+                // $schedule
+                //     ->call(function () use ($server) {
+                //         $randomSeconds = rand(1, 40);
+                //         $job = new CheckLogDrainContainerJob($server);
+                //         $job->delay($randomSeconds);
+                //         dispatch($job);
+                //     })->name('log-drain-container-check-' . $server->id)->everyMinute()->onOneServer();
             }
         }
         foreach ($servers as $server) {
-            // $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
-            $schedule
-                ->call(function () use ($server) {
-                    $randomSeconds = rand(1, 40);
-                    $job = new ServerStatusJob($server);
-                    $job->delay($randomSeconds);
-                    dispatch($job);
-                })->name('server-status-job-' . $server->id)->everyMinute()->onOneServer();
+            $schedule->job(new ServerStatusJob($server))->everyMinute()->onOneServer();
+            // $schedule
+            //     ->call(function () use ($server) {
+            //         $randomSeconds = rand(1, 40);
+            //         $job = new ServerStatusJob($server);
+            //         $job->delay($randomSeconds);
+            //         dispatch($job);
+            //     })->name('server-status-job-' . $server->id)->everyMinute()->onOneServer();
         }
     }
     private function instance_auto_update($schedule)
