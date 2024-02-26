@@ -64,7 +64,7 @@ class Navbar extends Component
         StopService::run($this->service);
         $this->service->refresh();
         if ($forceCleanup) {
-            $this->dispatch('success', 'Force cleanup service.');
+            $this->dispatch('success', 'Containers cleaned up.');
         } else {
             $this->dispatch('success', 'Service stopped.');
         }

@@ -1,0 +1,100 @@
+# ignore: true
+# documentation: https://invoiceninja.github.io/selfhost.html
+# slogan: The leading open-source invoicing platform
+# tags: invoicing, billing, accounting, finance, self-hosted
+
+services:
+  invoice-ninja:
+    image: invoiceninja/invoiceninja:5
+    environment:
+      - SERVICE_FQDN_INVOICENINJA
+      - APP_ENV=production
+      - APP_URL=${SERVICE_FQDN_INVOICENINJA}
+      - APP_KEY=${SERVICE_BASE64_INVOICENINJA}
+      - APP_DEBUG=false
+      - REQUIRE_HTTPS=false
+      - PHANTOMJS_PDF_GENERATION=false
+      - PDF_GENERATOR=snappdf
+      - TRUSTED_PROXIES=*
+      - QUEUE_CONNECTION=database
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_DATABASE=${MYSQL_DATABASE:-invoice_ninja}
+      - DB_USERNAME=${SERVICE_USER_MYSQL}
+      - DB_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+    volumes:
+      - invoice-ninja-public:/var/www/app/public
+      - invoice-ninja-storage:/var/www/app/storage
+      - type: bind
+        source: ./php.ini
+        target: /usr/local/etc/php/php.ini
+        content: |
+          session.auto_start = Off
+          short_open_tag = Off
+
+          error_reporting = E_ALL & ~E_NOTICE & ~E_WARNING & ~E_STRICT & ~E_DEPRECATED
+
+          ; opcache.enable=1
+          ; opcache.preload=/srv/www/invoiceninja/current/preload.php
+          ; opcache.preload_user=www-data
+
+          ; ; The OPcache shared memory storage size.
+          ; opcache.max_accelerated_files=300000
+          ; opcache.validate_timestamps=1
+          ; opcache.revalidate_freq=30
+          ; opcache.jit_buffer_size=256M
+          ; opcache.jit=1205
+          ; opcache.memory_consumption=1024M
+
+
+          post_max_size = 60M
+          upload_max_filesize = 50M
+          memory_limit=512M
+      - type: bind
+        source: ./php-cli.ini
+        target: /usr/local/etc/php/php-cli.ini
+        content: |
+          session.auto_start = Off
+          short_open_tag = Off
+
+          error_reporting = E_ALL & ~E_NOTICE & ~E_WARNING & ~E_STRICT & ~E_DEPRECATED
+
+          ; opcache.enable_cli=1
+          ; opcache.fast_shutdown=1
+          ; opcache.memory_consumption=256
+          ; opcache.interned_strings_buffer=8
+          ; opcache.max_accelerated_files=4000
+          ; opcache.revalidate_freq=60
+          ; # http://symfony.com/doc/current/performance.html
+          ; realpath_cache_size = 4096K
+          ; realpath_cache_ttl = 600
+
+          memory_limit = 2G
+          post_max_size = 60M
+          upload_max_filesize = 50M
+    depends_on:
+      mysql:
+        condition: service_healthy
+  mysql:
+    image: mariadb:lts
+    environment:
+      - MYSQL_USER=${SERVICE_USER_MYSQL}
+      - MYSQL_PASSWORD=${SERVICE_PASSWORD_MYSQL}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-invoice_ninja}
+      - MYSQL_ROOT_PASSWORD=${SERVICE_PASSWORD_MYSQLROOT}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-uroot",
+          "-p${SERVICE_PASSWORD_MYSQLROOT}",
+        ]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+    volumes:
+      - invoice-ninja-mysql-data:/var/lib/mysql
