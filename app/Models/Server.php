@@ -147,11 +147,11 @@ class Server extends BaseModel
     public function skipServer()
     {
         if ($this->ip === '1.2.3.4') {
-            ray('skipping 1.2.3.4');
+            // ray('skipping 1.2.3.4');
             return true;
         }
         if ($this->settings->force_disabled === true) {
-            ray('force_disabled');
+            // ray('force_disabled');
             return true;
         }
         return false;

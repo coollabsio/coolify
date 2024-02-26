@@ -110,6 +110,9 @@ function instant_scp(string $source, string $dest, Server $server, $throwError =
 }
 function generateSshCommand(Server $server, string $command)
 {
+    if ($server->settings->force_disabled) {
+        throw new \RuntimeException('Server is disabled.');
+    }
     $user = $server->user;
     $port = $server->port;
     $privateKeyLocation = savePrivateKeyToFs($server);
