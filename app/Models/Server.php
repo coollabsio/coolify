@@ -10,6 +10,7 @@ use App\Notifications\Server\Unreachable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Spatie\SchemalessAttributes\Casts\SchemalessAttributes;
 use Spatie\SchemalessAttributes\SchemalessAttributesTrait;
 use Illuminate\Support\Str;
@@ -69,7 +70,7 @@ class Server extends BaseModel
 
     static public function isUsable()
     {
-        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false);
+        return Server::ownedByCurrentTeam()->whereRelation('settings', 'is_reachable', true)->whereRelation('settings', 'is_usable', true)->whereRelation('settings', 'is_swarm_worker', false)->whereRelation('settings', 'is_build_server', false)->whereRelation('settings', 'force_disabled', false);
     }
 
     static public function destinationsByServer(string $server_id)
@@ -149,12 +150,30 @@ class Server extends BaseModel
             ray('skipping 1.2.3.4');
             return true;
         }
+        if ($this->settings->force_disabled === true) {
+            ray('force_disabled');
+            return true;
+        }
         return false;
     }
-    public function disableServerDueToOverflow() {
+    public function isForceDisabled()
+    {
+        return $this->settings->force_disabled;
+    }
+    public function forceEnableServer()
+    {
         $this->settings->update([
-            'disabled_by_overflow' => true,
+            'force_disabled' => false,
         ]);
+    }
+    public function forceDisableServer()
+    {
+        $this->settings->update([
+            'force_disabled' => true,
+        ]);
+        $sshKeyFileLocation = "id.root@{$this->uuid}";
+        Storage::disk('ssh-keys')->delete($sshKeyFileLocation);
+        Storage::disk('ssh-mux')->delete($this->muxFilename());
     }
     public function isServerReady(int $tries = 3)
     {
@@ -379,7 +398,7 @@ class Server extends BaseModel
     }
     public function isFunctional()
     {
-        return $this->settings->is_reachable && $this->settings->is_usable;
+        return $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
     }
     public function isLogDrainEnabled()
     {

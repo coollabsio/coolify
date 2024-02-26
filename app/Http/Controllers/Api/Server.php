@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Server as ModelsServer;
 use Illuminate\Http\Request;
 
-class Server extends Controller
+class APIServer extends Controller
 {
     public function servers(Request $request)
     {

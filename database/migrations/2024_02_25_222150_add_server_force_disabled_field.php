@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->boolean('disabled_by_overflow')->default(false);
+            $table->boolean('force_disabled')->default(false);
         });
     }
 
@@ -22,7 +22,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('server_settings', function (Blueprint $table) {
-            $table->dropColumn('disabled_by_overflow');
+            $table->dropColumn('force_disabled');
         });
     }
 };

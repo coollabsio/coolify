@@ -11,7 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-class DisabledDueToOverflow extends Notification implements ShouldQueue
+class ForceDisabled extends Notification implements ShouldQueue
 {
     use Queueable;
 
@@ -43,7 +43,7 @@ class DisabledDueToOverflow extends Notification implements ShouldQueue
     {
         $mail = new MailMessage();
         $mail->subject("Coolify: Server ({$this->server->name}) disabled because it is not paid!");
-        $mail->view('emails.server-disabled-due-to-overflow', [
+        $mail->view('emails.server-force-disabled', [
             'name' => $this->server->name,
         ]);
         return $mail;

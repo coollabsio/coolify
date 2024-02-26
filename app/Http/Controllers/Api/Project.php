@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Project as ModelsProject;
 use Illuminate\Http\Request;
 
-class Project extends Controller
+class APIProject extends Controller
 {
     public function projects(Request $request)
     {

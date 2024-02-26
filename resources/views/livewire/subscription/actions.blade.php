@@ -17,7 +17,7 @@
                 <div class="py-4"><span class="font-bold text-red-500">WARNING:</span> You must delete
                     {{ currentTeam()->servers->count() - $server_limits }} servers,
                     or upgrade your subscription. {{ currentTeam()->servers->count() - $server_limits }} servers will be
-                    deactivated in the next billing cycle.</div>
+                    deactivated.</div>
             @endif
             <h2 class="pt-4">Manage your subscription</h2>
             <div class="pb-4">Cancel, upgrade or downgrade your subscription.</div>

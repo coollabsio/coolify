@@ -2,7 +2,7 @@
 
 namespace App\Livewire\Tags;
 
-use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\APIDeploy as Deploy;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Tag;
 use Livewire\Component;

@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\Server as ApiServer;
 use App\Models\GitlabApp;
 use App\Models\PrivateKey;
 use App\Models\Server;
