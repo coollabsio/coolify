@@ -41,15 +41,6 @@ class ServerStatusJob implements ShouldQueue, ShouldBeEncrypted
             throw new \RuntimeException('Server is not ready.');
         };
         try {
-            // $this->server->validateConnection();
-            // $this->server->validateOS();
-            // $docker_installed = $this->server->validateDockerEngine();
-            // if (!$docker_installed) {
-            //     $this->server->installDocker();
-            //     $this->server->validateDockerEngine();
-            // }
-
-            // $this->server->validateDockerEngineVersion();
             if ($this->server->isFunctional()) {
                 $this->cleanup(notify: false);
             }
