@@ -29,8 +29,8 @@ class Import extends Component
     public string $container;
     public array $importCommands = [];
     public string $postgresqlRestoreCommand = 'pg_restore -U $POSTGRES_USER -d $POSTGRES_DB';
-    public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p $MYSQL_PASSWORD $MYSQL_DATABASE';
-    public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p $MARIADB_PASSWORD $MARIADB_DATABASE';
+    public string $mysqlRestoreCommand = 'mysql -u $MYSQL_USER -p$MYSQL_PASSWORD $MYSQL_DATABASE';
+    public string $mariadbRestoreCommand = 'mariadb -u $MARIADB_USER -p$MARIADB_PASSWORD $MARIADB_DATABASE';
 
     public function getListeners()
     {
