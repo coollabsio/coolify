@@ -11,4 +11,13 @@
             </div>
         </div>
     @endif
+    @if (currentTeam()->serverOverflow())
+        <x-banner :closable=false>
+            <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
+                covered by your payment. If not resolved, some of your servers <span class="font-bold text-red-500">will
+                    be deactivated</span>. Visit <a href="{{ route('subscription.show') }}"
+                    class="text-white underline">/subscription</a> to update your subscription or remove some servers.
+            </div>
+        </x-banner>
+    @endif
 </div>

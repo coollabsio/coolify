@@ -1,7 +1,7 @@
 <div>
     <x-server.navbar :server="$server" :parameters="$parameters" />
+    <x-server.sidebar :server="$server" :parameters="$parameters" />
     <div class="flex gap-2">
-        <x-server.sidebar :server="$server" :parameters="$parameters" />
         <div class="w-full">
             @if ($server->isFunctional())
                 <div class="flex gap-2">
@@ -48,7 +48,6 @@
                         <div wire:loading.remove> No dynamic configurations found.</div>
                     @endif
                 </div>
-
             @endif
         </div>
     </div>

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\User;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Crypt;
 use Livewire\Component;
 
@@ -27,6 +28,7 @@ class Index extends Component
         auth()->login($user);
 
         if ($user_id === 0) {
+            Cache::forget('team:0');
             session()->forget('adminToken');
         } else {
             $token_payload = [
@@ -35,6 +37,7 @@ class Index extends Component
             $token = Crypt::encrypt($token_payload);
             session(['adminToken' => $token]);
         }
+        session()->regenerate();
         return refreshSession();
     }
     public function render()

@@ -423,7 +423,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--security-opt',
         '--sysctl',
         '--ulimit',
-        '--device'
+        '--device',
     ]);
     $mapping = collect([
         '--cap-add' => 'cap_add',
@@ -435,6 +435,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         '--init' => 'init',
         '--ulimit' => 'ulimits',
         '--privileged' => 'privileged',
+        '--ip' => 'ip',
     ]);
     foreach ($matches as $match) {
         $option = $match[1];

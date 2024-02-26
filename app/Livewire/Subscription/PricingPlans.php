@@ -9,8 +9,9 @@ use Stripe\Checkout\Session;
 class PricingPlans extends Component
 {
     public bool $isTrial = false;
-    public function mount() {
-        $this->isTrial = !data_get(currentTeam(),'subscription.stripe_trial_already_ended');
+    public function mount()
+    {
+        $this->isTrial = !data_get(currentTeam(), 'subscription.stripe_trial_already_ended');
         if (config('constants.limits.trial_period') == 0) {
             $this->isTrial = false;
         }
@@ -26,14 +27,14 @@ class PricingPlans extends Component
             case 'basic-yearly':
                 $priceId = config('subscription.stripe_price_id_basic_yearly');
                 break;
-            case 'ultimate-monthly':
-                $priceId = config('subscription.stripe_price_id_ultimate_monthly');
-                break;
             case 'pro-monthly':
                 $priceId = config('subscription.stripe_price_id_pro_monthly');
                 break;
             case 'pro-yearly':
                 $priceId = config('subscription.stripe_price_id_pro_yearly');
+                break;
+            case 'ultimate-monthly':
+                $priceId = config('subscription.stripe_price_id_ultimate_monthly');
                 break;
             case 'ultimate-yearly':
                 $priceId = config('subscription.stripe_price_id_ultimate_yearly');
@@ -64,18 +65,25 @@ class PricingPlans extends Component
             'success_url' => route('dashboard', ['success' => true]),
             'cancel_url' => route('subscription.index', ['cancelled' => true]),
         ];
-
-        if (!data_get($team,'subscription.stripe_trial_already_ended')) {
-            if (config('constants.limits.trial_period') > 0) {
-            $payload['subscription_data'] = [
-                'trial_period_days' => config('constants.limits.trial_period'),
-                'trial_settings' => [
-                    'end_behavior' => [
-                        'missing_payment_method' => 'cancel',
-                    ]
-                ],
+        if (str($type)->contains('ultimate')) {
+            $payload['line_items'][0]['adjustable_quantity'] = [
+                'enabled' => true,
+                'minimum' => 10,
             ];
+            $payload['line_items'][0]['quantity'] = 10;
         }
+
+        if (!data_get($team, 'subscription.stripe_trial_already_ended')) {
+            if (config('constants.limits.trial_period') > 0) {
+                $payload['subscription_data'] = [
+                    'trial_period_days' => config('constants.limits.trial_period'),
+                    'trial_settings' => [
+                        'end_behavior' => [
+                            'missing_payment_method' => 'cancel',
+                        ]
+                    ],
+                ];
+            }
             $payload['payment_method_collection'] = 'if_required';
         }
         $customer = currentTeam()->subscription?->stripe_customer_id ?? null;

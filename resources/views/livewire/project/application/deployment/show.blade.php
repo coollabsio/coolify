@@ -52,8 +52,8 @@
                         @foreach (decode_remote_command_output($application_deployment_queue) as $line)
                             <div @class([
                                 'font-mono',
-                                'text-warning' => $line['hidden'],
-                                'text-red-500' => $line['type'] == 'stderr',
+                                'text-warning whitespace-pre-line' => $line['hidden'],
+                                'text-red-500 whitespace-pre-line' => $line['type'] == 'stderr',
                             ])>[{{ $line['timestamp'] }}] @if ($line['hidden'])
                                     <br>COMMAND: <br>{{ $line['command'] }} <br><br>OUTPUT:
                                     @endif @if (str($line['output'])->contains('http://') || str($line['output'])->contains('https://'))

@@ -16,6 +16,7 @@ services:
       - DB_USERNAME=$SERVICE_USER_MYSQL
       - DB_PASSWORD=$SERVICE_PASSWORD_MYSQL
       - STATIC_CRON_TOKEN=$SERVICE_BASE64_CRONTOKEN
+      - TRUSTED_PROXIES=*
     volumes:
       - firefly-upload:/var/www/html/storage/upload
     healthcheck:
@@ -49,8 +50,20 @@ services:
       retries: 10
     volumes:
       - firefly-mysql-data:/var/lib/mysql
-  # cron:
-  #   image: alpine
-  #   command: sh -c "echo \"0 3 * * * wget -qO- http://app:8080/api/v1/cron/$STATIC_CRON_TOKEN\" | crontab - && crond -f -L /dev/stdout"
-  #   environment:
-  #   - STATIC_CRON_TOKEN=$SERVICE_PASSWORD_32_CRONTOKEN
+  cron:
+    image: alpine
+    entrypoint: ["/entrypoint.sh"]
+    volumes:
+      - type: bind
+        source: ./entrypoint.sh
+        target: /entrypoint.sh
+        content: |
+          #!/bin/sh
+          # Substitute the environment variable into the cron command
+          CRON_COMMAND="0 3 * * * wget -qO- http://firefly:8080/api/v1/cron/${STATIC_CRON_TOKEN}"
+          # Add the cron command to the crontab
+          echo "$CRON_COMMAND" | crontab -
+          # Start the cron daemon in the foreground with logging to stdout
+          crond -f -L /dev/stdout
+    environment:
+      - STATIC_CRON_TOKEN=$SERVICE_BASE64_CRONTOKEN

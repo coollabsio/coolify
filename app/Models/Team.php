@@ -48,7 +48,22 @@ class Team extends Model implements SendsDiscord, SendsEmail
         }
         return explode(',', $recipients);
     }
-
+    static public function serverLimitReached() {
+        $serverLimit = Team::serverLimit();
+        $team = currentTeam();
+        $servers = $team->servers->count();
+        return $servers >= $serverLimit;
+    }
+    public function serverOverflow() {
+        if ($this->serverLimit() < $this->servers->count()) {
+            return true;
+        }
+        return false;
+    }
+    static public function serverLimit()
+    {
+        return Team::find(currentTeam()->id)->limits['serverLimit'];
+    }
     public function limits(): Attribute
     {
         return Attribute::make(
@@ -63,14 +78,19 @@ class Team extends Model implements SendsDiscord, SendsEmail
                         $subscription = $subscription->type();
                     }
                 }
-                $serverLimit = config('constants.limits.server')[strtolower($subscription)];
+                if ($this->custom_server_limit) {
+                    $serverLimit = $this->custom_server_limit;
+                } else {
+                    $serverLimit = config('constants.limits.server')[strtolower($subscription)];
+                }
                 $sharedEmailEnabled = config('constants.limits.email')[strtolower($subscription)];
                 return ['serverLimit' => $serverLimit, 'sharedEmailEnabled' => $sharedEmailEnabled];
             }
 
         );
     }
-    public function environment_variables() {
+    public function environment_variables()
+    {
         return $this->hasMany(SharedEnvironmentVariable::class)->whereNull('project_id')->whereNull('environment_id');
     }
     public function members()
@@ -130,7 +150,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
     {
         return $this->hasMany(S3Storage::class)->where('is_usable', true);
     }
-    public function trialEnded() {
+    public function trialEnded()
+    {
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => false,
@@ -138,7 +159,8 @@ class Team extends Model implements SendsDiscord, SendsEmail
             ]);
         }
     }
-    public function trialEndedButSubscribed() {
+    public function trialEndedButSubscribed()
+    {
         foreach ($this->servers as $server) {
             $server->settings()->update([
                 'is_usable' => true,

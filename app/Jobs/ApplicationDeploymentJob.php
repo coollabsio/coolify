@@ -1223,6 +1223,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
             $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if (count($custom_compose) > 0) {
+                $ipv4 = data_get($custom_compose, 'ip.0');
+                $ipv6 = data_get($custom_compose, 'ip6.0');
+                data_forget($custom_compose, 'ip');
+                data_forget($custom_compose, 'ip6');
+                if ($ipv4 || $ipv6) {
+                    data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                }
+                if ($ipv4) {
+                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                }
+                if ($ipv6) {
+                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                }
                 $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
             }
         } else {
@@ -1230,6 +1243,19 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             data_forget($docker_compose, 'services.' . $this->container_name);
             $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if (count($custom_compose) > 0) {
+                $ipv4 = data_get($custom_compose, 'ip.0');
+                $ipv6 = data_get($custom_compose, 'ip6.0');
+                data_forget($custom_compose, 'ip');
+                data_forget($custom_compose, 'ip6');
+                if ($ipv4 || $ipv6) {
+                    data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                }
+                if ($ipv4) {
+                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                }
+                if ($ipv6) {
+                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                }
                 $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
             }
         }
@@ -1649,7 +1675,6 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         }
-
         $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }

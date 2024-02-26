@@ -1,18 +1,18 @@
 <div>
     <div class="flex items-start gap-2">
         <h1>Servers</h1>
-        <a  class="text-white hover:no-underline" href="{{ route('server.create') }}">
+        <a class="text-white hover:no-underline" href="{{ route('server.create') }}">
             <x-forms.button class="btn">+ Add</x-forms.button>
         </a>
     </div>
     <div class="subtitle ">All Servers</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
-            <a  href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+            <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                 @class([
                     'gap-2 border cursor-pointer box group',
-                    'border-transparent' => $server->settings->is_reachable,
-                    'border-red-500' => !$server->settings->is_reachable,
+                    'border-transparent' => $server->settings->is_reachable && $server->settings->is_usable && !$server->settings->force_disabled,
+                    'border-red-500' => !$server->settings->is_reachable || $server->settings->force_disabled,
                 ])>
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">
@@ -29,6 +29,9 @@
                         @endif
                         @if (!$server->settings->is_usable)
                             <span>Not usable by Coolify</span>
+                        @endif
+                        @if ($server->settings->force_disabled)
+                            <span>Disabled by the system</span>
                         @endif
                     </div>
                 </div>
