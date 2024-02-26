@@ -23,8 +23,8 @@ class Dashboard extends Component
     public function cleanup_queue()
     {
         $this->dispatch('success', 'Cleanup started.');
-        Artisan::queue('app:init', [
-            '--cleanup-deployments' => 'true'
+        Artisan::queue('cleanup:application-deployment-queue', [
+            '--team-id' => currentTeam()->id
         ]);
     }
     public function get_deployments()

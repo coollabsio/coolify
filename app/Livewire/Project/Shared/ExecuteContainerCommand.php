@@ -107,6 +107,9 @@ class ExecuteContainerCommand extends Component
     {
         $this->validate();
         try {
+            if ($this->server->isForceDisabled()) {
+                throw new \RuntimeException('Server is disabled.');
+            }
             // Wrap command to prevent escaped execution in the host.
             $cmd = 'sh -c "if [ -f ~/.profile ]; then . ~/.profile; fi; ' . str_replace('"', '\"', $this->command)  . '"';
             if (!empty($this->workDir)) {

@@ -24,12 +24,6 @@ trait ExecuteRemoteCommand
         if ($this->server instanceof Server === false) {
             throw new \RuntimeException('Server is not set or is not an instance of Server model');
         }
-        if ($this->server->settings->force_disabled) {
-            $this->application_deployment_queue->update([
-                'status' => ApplicationDeploymentStatus::FAILED->value,
-            ]);
-            throw new \RuntimeException('Server is disabled');
-        }
         $commandsText->each(function ($single_command) {
             $command = data_get($single_command, 'command') ?? $single_command[0] ?? null;
             if ($command === null) {

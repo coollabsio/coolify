@@ -167,65 +167,71 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             if ($this->application->is_github_based()) {
                 ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::IN_PROGRESS);
             }
+            if ($this->application->build_pack === 'dockerfile') {
+                if (data_get($this->application, 'dockerfile_location')) {
+                    $this->dockerfile_location = $this->application->dockerfile_location;
+                }
+            }
         }
     }
 
     public function handle(): void
     {
-        // Generate custom host<->ip mapping
-        $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
-        if (!is_null($allContainers)) {
-            $allContainers = format_docker_command_output_to_json($allContainers);
-            $ips = collect([]);
-            if (count($allContainers) > 0) {
-                $allContainers = $allContainers[0];
-                $allContainers = collect($allContainers)->sort()->values();
-                foreach ($allContainers as $container) {
-                    $containerName = data_get($container, 'Name');
-                    if ($containerName === 'coolify-proxy') {
-                        continue;
-                    }
-                    if (preg_match('/-(\d{12})/', $containerName)) {
-                        continue;
-                    }
-                    $containerIp = data_get($container, 'IPv4Address');
-                    if ($containerName && $containerIp) {
-                        $containerIp = str($containerIp)->before('/');
-                        $ips->put($containerName, $containerIp->value());
+        try {
+            // Generate custom host<->ip mapping
+            $allContainers = instant_remote_process(["docker network inspect {$this->destination->network} -f '{{json .Containers}}' "], $this->server);
+
+            if (!is_null($allContainers)) {
+                $allContainers = format_docker_command_output_to_json($allContainers);
+                $ips = collect([]);
+                if (count($allContainers) > 0) {
+                    $allContainers = $allContainers[0];
+                    $allContainers = collect($allContainers)->sort()->values();
+                    foreach ($allContainers as $container) {
+                        $containerName = data_get($container, 'Name');
+                        if ($containerName === 'coolify-proxy') {
+                            continue;
+                        }
+                        if (preg_match('/-(\d{12})/', $containerName)) {
+                            continue;
+                        }
+                        $containerIp = data_get($container, 'IPv4Address');
+                        if ($containerName && $containerIp) {
+                            $containerIp = str($containerIp)->before('/');
+                            $ips->put($containerName, $containerIp->value());
+                        }
                     }
                 }
+                $this->addHosts = $ips->map(function ($ip, $name) {
+                    return "--add-host $name:$ip";
+                })->implode(' ');
             }
-            $this->addHosts = $ips->map(function ($ip, $name) {
-                return "--add-host $name:$ip";
-            })->implode(' ');
-        }
 
-        if ($this->application->dockerfile_target_build) {
-            $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
-        }
+            if ($this->application->dockerfile_target_build) {
+                $this->buildTarget = " --target {$this->application->dockerfile_target_build} ";
+            }
 
-        // Check custom port
-        ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
+            // Check custom port
+            ['repository' => $this->customRepository, 'port' => $this->customPort] = $this->application->customRepository();
 
-        if (data_get($this->application, 'settings.is_build_server_enabled')) {
-            $teamId = data_get($this->application, 'environment.project.team.id');
-            $buildServers = Server::buildServers($teamId)->get();
-            if ($buildServers->count() === 0) {
-                $this->application_deployment_queue->addLogEntry("Build server feature activated, but no suitable build server found. Using the deployment server.");
+            if (data_get($this->application, 'settings.is_build_server_enabled')) {
+                $teamId = data_get($this->application, 'environment.project.team.id');
+                $buildServers = Server::buildServers($teamId)->get();
+                if ($buildServers->count() === 0) {
+                    $this->application_deployment_queue->addLogEntry("Build server feature activated, but no suitable build server found. Using the deployment server.");
+                    $this->build_server = $this->server;
+                    $this->original_server = $this->server;
+                } else {
+                    $this->application_deployment_queue->addLogEntry("Build server feature activated and found a suitable build server. Using it to build your application - if needed.");
+                    $this->build_server = $buildServers->random();
+                    $this->original_server = $this->server;
+                    $this->use_build_server = true;
+                }
+            } else {
+                // Set build server & original_server to the same as deployment server
                 $this->build_server = $this->server;
                 $this->original_server = $this->server;
-            } else {
-                $this->application_deployment_queue->addLogEntry("Build server feature activated and found a suitable build server. Using it to build your application - if needed.");
-                $this->build_server = $buildServers->random();
-                $this->original_server = $this->server;
-                $this->use_build_server = true;
             }
-        } else {
-            // Set build server & original_server to the same as deployment server
-            $this->build_server = $this->server;
-            $this->original_server = $this->server;
-        }
-        try {
             if ($this->restart_only && $this->application->build_pack !== 'dockerimage') {
                 $this->just_restart();
                 if ($this->server->isProxyShouldRun()) {
@@ -1660,6 +1666,8 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     public function failed(Throwable $exception): void
     {
+
+        $this->next(ApplicationDeploymentStatus::FAILED->value);
         $this->application_deployment_queue->addLogEntry("Oops something is not okay, are you okay? 😢", 'stderr');
         if (str($exception->getMessage())->isNotEmpty()) {
             $this->application_deployment_queue->addLogEntry($exception->getMessage(), 'stderr');
@@ -1667,6 +1675,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
         if ($this->application->build_pack !== 'dockercompose') {
             $code = $exception->getCode();
+            ray($code);
             if ($code !== 69420) {
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 $this->application_deployment_queue->addLogEntry("Deployment failed. Removing the new version of your application.", 'stderr');
@@ -1675,6 +1684,5 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 );
             }
         }
-        $this->next(ApplicationDeploymentStatus::FAILED->value);
     }
 }
