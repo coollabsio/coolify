@@ -15,30 +15,26 @@ class Index extends Component
         if (!isCloud()) {
             return redirect()->route('dashboard');
         }
-        if (auth()->user()->id !== 0 && session('adminToken') === null) {
+        if (auth()->user()->id !== 0) {
             return redirect()->route('dashboard');
         }
         $this->users = User::whereHas('teams', function ($query) {
             $query->whereRelation('subscription', 'stripe_subscription_id', '!=', null);
-        })->get();
+        })->get()->filter(function ($user) {
+            return $user->id !== 0;
+        });
     }
     public function switchUser(int $user_id)
     {
-        $user = User::find($user_id);
-        auth()->login($user);
-
-        if ($user_id === 0) {
-            Cache::forget('team:0');
-            session()->forget('adminToken');
-        } else {
-            $token_payload = [
-                'valid' => true,
-            ];
-            $token = Crypt::encrypt($token_payload);
-            session(['adminToken' => $token]);
+        if (auth()->user()->id !== 0) {
+            return redirect()->route('dashboard');
         }
-        session()->regenerate();
-        return refreshSession();
+        $user = User::find($user_id);
+        $team_to_switch_to = $user->teams->first();
+        Cache::forget("team:{$user->id}");
+        auth()->login($user);
+        refreshSession($team_to_switch_to);
+        return redirect(request()->header('Referer'));
     }
     public function render()
     {
