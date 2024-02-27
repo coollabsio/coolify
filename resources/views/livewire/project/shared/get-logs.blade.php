@@ -2,7 +2,9 @@
     <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
         <div class="flex items-center gap-2">
             <h3>{{ $container }}</h3>
-            <div>({{ $pull_request }})</div>
+            @if ($pull_request)
+                <div>({{ $pull_request }})</div>
+            @endif
             @if ($streamLogs)
                 <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
             @endif
