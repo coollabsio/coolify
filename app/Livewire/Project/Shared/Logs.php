@@ -41,13 +41,19 @@ class Logs extends Component
                     ]
                 ]);
             } else {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
+                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, includePullrequests: true);
             }
             if ($containers->count() > 0) {
                 $containers->each(function ($container) {
                     $this->containers->push(str_replace('/', '', $container['Names']));
                 });
             }
+            $this->containers = $this->containers->sortByDesc(function ($container) {
+                if (str_contains($container, '-pr-')) {
+                    return explode('-pr-', $container)[1];
+                }
+                return $container;
+            });
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
             $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
@@ -70,21 +76,15 @@ class Logs extends Component
             $this->status = $this->resource->status;
             $this->server = $this->resource->destination->server;
             $this->container = $this->resource->uuid;
-            // if (str(data_get($this, 'resource.status'))->startsWith('running')) {
-                $this->containers->push($this->container);
-            // }
+            $this->containers->push($this->container);
         } else if (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->resource->applications()->get()->each(function ($application) {
-                // if (str(data_get($application, 'status'))->contains('running')) {
-                    $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
-                // }
+                $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
             });
             $this->resource->databases()->get()->each(function ($database) {
-                // if (str(data_get($database, 'status'))->contains('running')) {
-                    $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
-                // }
+                $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
             });
 
             $this->server = $this->resource->server;

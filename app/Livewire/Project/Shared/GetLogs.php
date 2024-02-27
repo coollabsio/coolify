@@ -23,6 +23,7 @@ class GetLogs extends Component
     public ServiceApplication|ServiceDatabase|null $servicesubtype = null;
     public Server $server;
     public ?string $container = null;
+    public ?string $pull_request = null;
     public ?bool $streamLogs = false;
     public ?bool $showTimeStamps = true;
     public int $numberOfLines = 100;
@@ -70,7 +71,14 @@ class GetLogs extends Component
     }
     public function getLogs($refresh = false)
     {
-        if (!$refresh && $this->resource?->getMorphClass() === 'App\Models\Service') return;
+        if ($this->resource?->getMorphClass() === 'App\Models\Application') {
+            if (str($this->container)->contains('-pr-')) {
+                $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
+            } else {
+                $this->pull_request = 'branch';
+            }
+        }
+        if (!$refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) return;
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
