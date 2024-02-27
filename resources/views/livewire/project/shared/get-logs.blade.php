@@ -1,8 +1,8 @@
 <div>
-    <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" >
+    <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
         <div class="flex items-center gap-2">
             <h3>{{ $container }}</h3>
-            <div>({{$pull_request}})</div>
+            <div>({{ $pull_request }})</div>
             @if ($streamLogs)
                 <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
             @endif
@@ -17,7 +17,7 @@
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
-            <div class="flex flex-col-reverse w-full p-4 pt-2 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
+            <div class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
                 :class="fullscreen ? '' : 'max-h-96 border border-solid rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
@@ -47,7 +47,11 @@
                                 d="M9.793 12.793a1 1 0 0 1 1.497 1.32l-.083.094L6.414 19H9a1 1 0 0 1 .117 1.993L9 21H4a1 1 0 0 1-.993-.883L3 20v-5a1 1 0 0 1 1.993-.117L5 15v2.586l4.793-4.793ZM20 3a1 1 0 0 1 .993.883L21 4v5a1 1 0 0 1-1.993.117L19 9V6.414l-4.793 4.793a1 1 0 0 1-1.497-1.32l.083-.094L17.586 5H15a1 1 0 0 1-.117-1.993L15 3h5Z" />
                         </g>
                     </svg></button>
-                <pre id="logs" class="font-mono whitespace-pre-wrap">{{ $outputs }}</pre>
+                @if ($outputs)
+                    <pre id="logs" class="font-mono whitespace-pre-wrap">{{ $outputs }}</pre>
+                @else
+                    <pre id="logs" class="font-mono whitespace-pre-wrap">Refresh to get the logs...</pre>
+                @endif
             </div>
         </div>
         <script>

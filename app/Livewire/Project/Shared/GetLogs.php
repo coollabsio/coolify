@@ -71,13 +71,13 @@ class GetLogs extends Component
     }
     public function getLogs($refresh = false)
     {
-        if (!$refresh && $this->resource?->getMorphClass() === 'App\Models\Service') return;
+        if (str($this->container)->contains('-pr-')) {
+            $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
+        } else {
+            $this->pull_request = 'branch';
+        }
+        if (!$refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) return;
         if ($this->container) {
-            if (str($this->container)->contains('-pr-')) {
-                $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
-            } else {
-                $this->pull_request = 'branch';
-            }
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
                     $sshCommand = generateSshCommand($this->server, "docker service logs -n {$this->numberOfLines} -t {$this->container}");
