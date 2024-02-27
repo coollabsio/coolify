@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Visus\Cuid2\Cuid2;
 
-class APIDeploy extends Controller
+class Deploy extends Controller
 {
     public function deploy(Request $request)
     {

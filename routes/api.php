@@ -1,8 +1,8 @@
 <?php
 
-use App\Http\Controllers\Api\APIDeploy as Deploy;
-use App\Http\Controllers\Api\APIProject as Project;
-use App\Http\Controllers\Api\APIServer as Server;
+use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\Project;
+use App\Http\Controllers\Api\Server;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
