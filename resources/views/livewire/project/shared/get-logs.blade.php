@@ -1,23 +1,24 @@
 <div>
-    <div x-init="$wire.getLogs">
-        <div class="flex gap-2">
-            <h4>Container: {{ $container }}</h4>
+    <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" >
+        <div class="flex items-center gap-2">
+            <h3>{{ $container }}</h3>
+            <div>({{$pull_request}})</div>
             @if ($streamLogs)
                 <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
             @endif
         </div>
-        <div class="flex gap-2">
+        <form wire:submit='getLogs(true)' class="flex items-end gap-2 pt-2 ">
+            <div class="w-96">
+                <x-forms.input label="Only Show Number of Lines" placeholder="1000" required
+                    id="numberOfLines"></x-forms.input>
+            </div>
+            <x-forms.button type="submit">Refresh</x-forms.button>
             <x-forms.checkbox instantSave label="Stream Logs" id="streamLogs"></x-forms.checkbox>
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
-        </div>
-        <form wire:submit='getLogs(true)' class="flex items-end gap-2">
-            <x-forms.input label="Only Show Number of Lines" placeholder="1000" required
-                id="numberOfLines"></x-forms.input>
-            <x-forms.button type="submit">Refresh</x-forms.button>
         </form>
-        <div id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }" :class="fullscreen ? 'fullscreen' : 'w-full py-4 mx-auto'">
-            <div class="relative flex flex-col-reverse w-full p-4 pt-6 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
-                :class="fullscreen ? '' : 'max-h-[40rem] border border-solid rounded'">
+        <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
+            <div class="flex flex-col-reverse w-full p-4 pt-2 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
+                :class="fullscreen ? '' : 'max-h-96 border border-solid rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
@@ -36,8 +37,8 @@
                             stroke-width="2" d="M12 5v14m4-4l-4 4m-4-4l4 4" />
                     </svg></button>
 
-                <button title="Fullscreen" x-show="!fullscreen" class="absolute top-2 right-2"
-                    x-on:click="makeFullscreen"><svg class=" icon" viewBox="0 0 24 24"
+                <button title="Fullscreen" x-show="!fullscreen" class="absolute top-6 right-4"
+                    x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"
                         xmlns="http://www.w3.org/2000/svg">
                         <g fill="none">
                             <path

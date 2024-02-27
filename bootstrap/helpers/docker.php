@@ -8,16 +8,19 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Spatie\Url\Url;
 
-function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null): Collection
+function getCurrentApplicationContainerStatus(Server $server, int $id, ?int $pullRequestId = null, ?bool $includePullrequests = false): Collection
 {
     $containers = collect([]);
     if (!$server->isSwarm()) {
         $containers = instant_remote_process(["docker ps -a --filter='label=coolify.applicationId={$id}' --format '{{json .}}' "], $server);
         $containers = format_docker_command_output_to_json($containers);
-        $containers = $containers->map(function ($container) use ($pullRequestId) {
+        $containers = $containers->map(function ($container) use ($pullRequestId, $includePullrequests) {
             $labels = data_get($container, 'Labels');
             if (!str($labels)->contains("coolify.pullRequestId=")) {
                 data_set($container, 'Labels', $labels . ",coolify.pullRequestId={$pullRequestId}");
+                return $container;
+            }
+            if ($includePullrequests) {
                 return $container;
             }
             if (str($labels)->contains("coolify.pullRequestId=$pullRequestId")) {
