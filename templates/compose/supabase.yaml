@@ -1,10 +1,259 @@
-# ignore: true
-# documentation:
-# slogan:
-# tags:
-# logo:
+# documentation: https://supabase.io
+# slogan: The open source Firebase alternative.
+# tags: firebase, alternative, open-source
+# minversion: 4.0.0-beta.228
 
 services:
+  supabase-kong:
+    image: kong:2.8.1
+    # https://unix.stackexchange.com/a/294837
+    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
+    depends_on:
+      supabase-analytics:
+        condition: service_healthy
+    environment:
+      - JWT_SERCET=${SERVICE_PASSWORD_JWT}
+      - SERVICE_FQDN_SUPABASE
+      - KONG_DATABASE=off
+      - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
+      # https://github.com/supabase/cli/issues/14
+      - KONG_DNS_ORDER=LAST,A,CNAME
+      - KONG_PLUGINS=request-transformer,cors,key-auth,acl,basic-auth
+      - KONG_NGINX_PROXY_PROXY_BUFFER_SIZE=160k
+      - KONG_NGINX_PROXY_PROXY_BUFFERS=64 160k
+      - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - DASHBOARD_USERNAME=${SERVICE_USER_ADMIN}
+      - DASHBOARD_PASSWORD=${SERVICE_PASSWORD_ADMIN}
+    volumes:
+      # https://github.com/supabase/supabase/issues/12661
+      - type: bind
+        source: ./volumes/api/kong.yml
+        target: /home/kong/temp.yml
+        content: |
+          _format_version: '2.1'
+          _transform: true
+
+          ###
+          ### Consumers / Users
+          ###
+          consumers:
+            - username: DASHBOARD
+            - username: anon
+              keyauth_credentials:
+                - key: $SUPABASE_ANON_KEY
+            - username: service_role
+              keyauth_credentials:
+                - key: $SUPABASE_SERVICE_KEY
+
+          ###
+          ### Access Control List
+          ###
+          acls:
+            - consumer: anon
+              group: anon
+            - consumer: service_role
+              group: admin
+
+          ###
+          ### Dashboard credentials
+          ###
+          basicauth_credentials:
+          - consumer: DASHBOARD
+            username: $DASHBOARD_USERNAME
+            password: $DASHBOARD_PASSWORD
+
+
+          ###
+          ### API Routes
+          ###
+          services:
+
+            ## Open Auth routes
+            - name: auth-v1-open
+              url: http://supabase-auth:9999/verify
+              routes:
+                - name: auth-v1-open
+                  strip_path: true
+                  paths:
+                    - /auth/v1/verify
+              plugins:
+                - name: cors
+            - name: auth-v1-open-callback
+              url: http://supabase-auth:9999/callback
+              routes:
+                - name: auth-v1-open-callback
+                  strip_path: true
+                  paths:
+                    - /auth/v1/callback
+              plugins:
+                - name: cors
+            - name: auth-v1-open-authorize
+              url: http://supabase-auth:9999/authorize
+              routes:
+                - name: auth-v1-open-authorize
+                  strip_path: true
+                  paths:
+                    - /auth/v1/authorize
+              plugins:
+                - name: cors
+
+            ## Secure Auth routes
+            - name: auth-v1
+              _comment: 'GoTrue: /auth/v1/* -> http://supabase-auth:9999/*'
+              url: http://supabase-auth:9999/
+              routes:
+                - name: auth-v1-all
+                  strip_path: true
+                  paths:
+                    - /auth/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## Secure REST routes
+            - name: rest-v1
+              _comment: 'PostgREST: /rest/v1/* -> http://supabase-rest:3000/*'
+              url: http://supabase-rest:3000/
+              routes:
+                - name: rest-v1-all
+                  strip_path: true
+                  paths:
+                    - /rest/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: true
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## Secure GraphQL routes
+            - name: graphql-v1
+              _comment: 'PostgREST: /graphql/v1/* -> http://supabase-rest:3000/rpc/graphql'
+              url: http://supabase-rest:3000/rpc/graphql
+              routes:
+                - name: graphql-v1-all
+                  strip_path: true
+                  paths:
+                    - /graphql/v1
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: true
+                - name: request-transformer
+                  config:
+                    add:
+                      headers:
+                        - Content-Profile:graphql_public
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## Secure Realtime routes
+            - name: realtime-v1
+              _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
+              url: http://realtime-dev.supabase-realtime:4000/socket/
+              routes:
+                - name: realtime-v1-all
+                  strip_path: true
+                  paths:
+                    - /realtime/v1/
+              plugins:
+                - name: cors
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+                      - anon
+
+            ## Storage routes: the storage server manages its own auth
+            - name: storage-v1
+              _comment: 'Storage: /storage/v1/* -> http://supabase-storage:5000/*'
+              url: http://supabase-storage:5000/
+              routes:
+                - name: storage-v1-all
+                  strip_path: true
+                  paths:
+                    - /storage/v1/
+              plugins:
+                - name: cors
+
+            ## Edge Functions routes
+            - name: functions-v1
+              _comment: 'Edge Functions: /functions/v1/* -> http://functions:9000/*'
+              url: http://functions:9000/
+              routes:
+                - name: functions-v1-all
+                  strip_path: true
+                  paths:
+                    - /functions/v1/
+              plugins:
+                - name: cors
+
+            ## Analytics routes
+            - name: analytics-v1
+              _comment: 'Analytics: /analytics/v1/* -> http://logflare:4000/*'
+              url: http://supabase-analytics:4000/
+              routes:
+                - name: analytics-v1-all
+                  strip_path: true
+                  paths:
+                    - /analytics/v1/
+
+            ## Secure Database routes
+            - name: meta
+              _comment: 'pg-meta: /pg/* -> http://supabase-meta:8080/*'
+              url: http://supabase-meta:8080/
+              routes:
+                - name: meta-all
+                  strip_path: true
+                  paths:
+                    - /pg/
+              plugins:
+                - name: key-auth
+                  config:
+                    hide_credentials: false
+                - name: acl
+                  config:
+                    hide_groups_header: true
+                    allow:
+                      - admin
+
+            ## Protected Dashboard - catch all remaining routes
+            - name: dashboard
+              _comment: 'Studio: /* -> http://studio:3000/*'
+              url: http://supabase-studio:3000/
+              routes:
+                - name: dashboard-all
+                  strip_path: true
+                  paths:
+                    - /
+              plugins:
+                - name: cors
+                - name: basic-auth
+                  config:
+                    hide_credentials: true
   supabase-studio:
     image: supabase/studio:20240205-b145c86
     healthcheck:
@@ -22,18 +271,17 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASE
       - HOSTNAME=0.0.0.0
-      - STUDIO_PG_META_URL=http://meta:8080
+      - STUDIO_PG_META_URL=http://supabase-meta:8080
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
       - DEFAULT_ORGANIZATION_NAME=${STUDIO_DEFAULT_ORGANIZATION:-Default Organization}
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
-      - SUPABASE_URL=http://kong:8000
+      - SUPABASE_URL=http://supabase-kong:8000
       - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASE}
-      - SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
-      - SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
+      - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
 
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_URL=http://supabase-analytics:4000
@@ -65,10 +313,9 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
       - PGPASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
-      - POSTGRES_USER=${SERVICE_USER_POSTGRES}
       - PGDATABASE=${POSTGRES_DB:-supabase}
       - POSTGRES_DB=${POSTGRES_DB:-supabase}
-      - JWT_SECRET=oasfhtfwevsna8e7wo3mca0d8x5aw2btk8on0eh4
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - JWT_EXP=${JWT_EXPIRY:-3600}
     volumes:
       - supabase-db-data:/var/lib/postgresql/data
@@ -76,7 +323,7 @@ services:
         source: ./volumes/db/realtime.sql
         target: /docker-entrypoint-initdb.d/migrations/99-realtime.sql
         content: |
-          \set pguser `echo "$SERVICE_USER_POSTGRES"`
+          \set pguser `echo "supabase_admin"`
 
           create schema if not exists _realtime;
           alter schema _realtime owner to :pguser;
@@ -318,7 +565,7 @@ services:
         source: ./volumes/db/logs.sql
         target: /docker-entrypoint-initdb.d/migrations/99-logs.sql
         content: |
-          \set pguser `echo "$SERVICE_USER_POSTGRES"`
+          \set pguser `echo "supabase_admin"`
 
           create schema if not exists _analytics;
           alter schema _analytics owner to :pguser;
@@ -333,10 +580,9 @@ services:
     depends_on:
       supabase-db:
         condition: service_healthy
-    # Uncomment to use Big Query backend for analytics
     # volumes:
     #   - type: bind
-    #     source: ${PWD}/gcloud.json
+    #     source: ./volumes/gcloud.json
     #     target: /opt/app/rel/logflare/bin/gcloud.json
     #     read_only: true
     environment:
@@ -349,6 +595,7 @@ services:
       - DB_SCHEMA=_analytics
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
       - LOGFLARE_SINGLE_TENANT=true
+      - LOGFLARE_SINGLE_TENANT_MODE=true
       - LOGFLARE_SUPABASE_MODE=true
 
       # Comment variables to use Big Query backend for analytics
@@ -412,13 +659,13 @@ services:
               inputs:
                 - project_logs
               route:
-                kong: '.appname == "supabase-kong"'
-                auth: '.appname == "supabase-auth"'
-                rest: '.appname == "supabase-rest"'
-                realtime: '.appname == "supabase-realtime"'
-                storage: '.appname == "supabase-storage"'
-                functions: '.appname == "supabase-functions"'
-                db: '.appname == "supabase-db"'
+                kong: 'starts_with(string!(.appname), "supabase-kong")'
+                auth: 'starts_with(string!(.appname), "supabase-auth")'
+                rest: 'starts_with(string!(.appname), "supabase-rest")'
+                realtime: 'starts_with(string!(.appname), "supabase-realtime")'
+                storage: 'starts_with(string!(.appname), "supabase-storage")'
+                functions: 'starts_with(string!(.appname), "supabase-functions")'
+                db: 'starts_with(string!(.appname), "supabase-db")'
             # Ignores non nginx errors since they are related with kong booting up
             kong_logs:
               type: remap
@@ -580,7 +827,7 @@ services:
               # We must route the sink through kong because ingesting logs before logflare is fully initialised will
               # lead to broken queries from studio. This works by the assumption that containers are started in the
               # following order: vector > db > logflare > kong
-              uri: 'http://kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY}'
+              uri: 'http://supabase-kong:8000/analytics/v1/api/logs?source_name=postgres.logs&api_key=${LOGFLARE_API_KEY}'
             logflare_functions:
               type: 'http'
               inputs:
@@ -617,254 +864,7 @@ services:
     environment:
       - LOGFLARE_API_KEY=${SERVICE_PASSWORD_LOGFLARE}
     command: ["--config", "etc/vector/vector.yml"]
-  supabase-kong:
-    image: kong:2.8.1
-    # https://unix.stackexchange.com/a/294837
-    entrypoint: bash -c 'eval "echo \"$$(cat ~/temp.yml)\"" > ~/kong.yml && /docker-entrypoint.sh kong docker-start'
-    depends_on:
-      supabase-analytics:
-        condition: service_healthy
-    environment:
-      - KONG_DATABASE="off"
-      - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
-      # https://github.com/supabase/cli/issues/14
-      - KONG_DNS_ORDER=LAST,A,CNAME
-      - KONG_PLUGINS=request-transformer,cors,key-auth,acl,basic-auth
-      - KONG_NGINX_PROXY_PROXY_BUFFER_SIZE=160k
-      - KONG_NGINX_PROXY_PROXY_BUFFERS=64 160k
-      - SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
-      - SUPABASE_SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
-      - DASHBOARD_USERNAME=admin
-      - DASHBOARD_PASSWORD=admin
-    volumes:
-      # https://github.com/supabase/supabase/issues/12661
-      - type: bind
-        source: ./volumes/api/kong.yml
-        target: /home/kong/temp.yml
-        content: |
-          _format_version: '2.1'
-          _transform: true
 
-          ###
-          ### Consumers / Users
-          ###
-          consumers:
-            - username: DASHBOARD
-            - username: anon
-              keyauth_credentials:
-                - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
-            - username: service_role
-              keyauth_credentials:
-                - key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
-
-          ###
-          ### Access Control List
-          ###
-          acls:
-            - consumer: anon
-              group: anon
-            - consumer: service_role
-              group: admin
-
-          ###
-          ### Dashboard credentials
-          ###
-          basicauth_credentials:
-          - consumer: DASHBOARD
-            username: admin
-            password: admin
-
-
-          ###
-          ### API Routes
-          ###
-          services:
-
-            ## Open Auth routes
-            - name: auth-v1-open
-              url: http://auth:9999/verify
-              routes:
-                - name: auth-v1-open
-                  strip_path: true
-                  paths:
-                    - /auth/v1/verify
-              plugins:
-                - name: cors
-            - name: auth-v1-open-callback
-              url: http://auth:9999/callback
-              routes:
-                - name: auth-v1-open-callback
-                  strip_path: true
-                  paths:
-                    - /auth/v1/callback
-              plugins:
-                - name: cors
-            - name: auth-v1-open-authorize
-              url: http://auth:9999/authorize
-              routes:
-                - name: auth-v1-open-authorize
-                  strip_path: true
-                  paths:
-                    - /auth/v1/authorize
-              plugins:
-                - name: cors
-
-            ## Secure Auth routes
-            - name: auth-v1
-              _comment: 'GoTrue: /auth/v1/* -> http://auth:9999/*'
-              url: http://auth:9999/
-              routes:
-                - name: auth-v1-all
-                  strip_path: true
-                  paths:
-                    - /auth/v1/
-              plugins:
-                - name: cors
-                - name: key-auth
-                  config:
-                    hide_credentials: false
-                - name: acl
-                  config:
-                    hide_groups_header: true
-                    allow:
-                      - admin
-                      - anon
-
-            ## Secure REST routes
-            - name: rest-v1
-              _comment: 'PostgREST: /rest/v1/* -> http://supabase-rest:3000/*'
-              url: http://supabase-rest:3000/
-              routes:
-                - name: rest-v1-all
-                  strip_path: true
-                  paths:
-                    - /rest/v1/
-              plugins:
-                - name: cors
-                - name: key-auth
-                  config:
-                    hide_credentials: true
-                - name: acl
-                  config:
-                    hide_groups_header: true
-                    allow:
-                      - admin
-                      - anon
-
-            ## Secure GraphQL routes
-            - name: graphql-v1
-              _comment: 'PostgREST: /graphql/v1/* -> http://supabase-rest:3000/rpc/graphql'
-              url: http://supabase-rest:3000/rpc/graphql
-              routes:
-                - name: graphql-v1-all
-                  strip_path: true
-                  paths:
-                    - /graphql/v1
-              plugins:
-                - name: cors
-                - name: key-auth
-                  config:
-                    hide_credentials: true
-                - name: request-transformer
-                  config:
-                    add:
-                      headers:
-                        - Content-Profile:graphql_public
-                - name: acl
-                  config:
-                    hide_groups_header: true
-                    allow:
-                      - admin
-                      - anon
-
-            ## Secure Realtime routes
-            - name: realtime-v1
-              _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-              url: http://realtime-dev.supabase-realtime:4000/socket/
-              routes:
-                - name: realtime-v1-all
-                  strip_path: true
-                  paths:
-                    - /realtime/v1/
-              plugins:
-                - name: cors
-                - name: key-auth
-                  config:
-                    hide_credentials: false
-                - name: acl
-                  config:
-                    hide_groups_header: true
-                    allow:
-                      - admin
-                      - anon
-
-            ## Storage routes: the storage server manages its own auth
-            - name: storage-v1
-              _comment: 'Storage: /storage/v1/* -> http://storage:5000/*'
-              url: http://storage:5000/
-              routes:
-                - name: storage-v1-all
-                  strip_path: true
-                  paths:
-                    - /storage/v1/
-              plugins:
-                - name: cors
-
-            ## Edge Functions routes
-            - name: functions-v1
-              _comment: 'Edge Functions: /functions/v1/* -> http://functions:9000/*'
-              url: http://functions:9000/
-              routes:
-                - name: functions-v1-all
-                  strip_path: true
-                  paths:
-                    - /functions/v1/
-              plugins:
-                - name: cors
-
-            ## Analytics routes
-            - name: analytics-v1
-              _comment: 'Analytics: /analytics/v1/* -> http://logflare:4000/*'
-              url: http://supabase-analytics:4000/
-              routes:
-                - name: analytics-v1-all
-                  strip_path: true
-                  paths:
-                    - /analytics/v1/
-
-            ## Secure Database routes
-            - name: meta
-              _comment: 'pg-meta: /pg/* -> http://pg-meta:8080/*'
-              url: http://meta:8080/
-              routes:
-                - name: meta-all
-                  strip_path: true
-                  paths:
-                    - /pg/
-              plugins:
-                - name: key-auth
-                  config:
-                    hide_credentials: false
-                - name: acl
-                  config:
-                    hide_groups_header: true
-                    allow:
-                      - admin
-
-            ## Protected Dashboard - catch all remaining routes
-            - name: dashboard
-              _comment: 'Studio: /* -> http://studio:3000/*'
-              url: http://supabase-studio:3000/
-              routes:
-                - name: dashboard-all
-                  strip_path: true
-                  paths:
-                    - /
-              plugins:
-                - name: cors
-                - name: basic-auth
-                  config:
-                    hide_credentials: true
   supabase-rest:
     image: postgrest/postgrest:v12.0.1
     depends_on:
@@ -878,8 +878,368 @@ services:
       - PGRST_DB_URI=postgres://authenticator:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
       - PGRST_DB_SCHEMAS=${PGRST_DB_SCHEMAS:-public}
       - PGRST_DB_ANON_ROLE=anon
-      - PGRST_JWT_SECRET=oasfhtfwevsna8e7wo3mca0d8x5aw2btk8on0eh4
-      - PGRST_DB_USE_LEGACY_GUCS="false"
-      - PGRST_APP_SETTINGS_JWT_SECRET=oasfhtfwevsna8e7wo3mca0d8x5aw2btk8on0eh4
+      - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - PGRST_DB_USE_LEGACY_GUCS=false
+      - PGRST_APP_SETTINGS_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
+  supabase-auth:
+    image: supabase/gotrue:v2.132.3
+    depends_on:
+      supabase-db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
+      supabase-analytics:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9999/health",
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - GOTRUE_API_HOST=0.0.0.0
+      - GOTRUE_API_PORT=9999
+      - API_EXTERNAL_URL=${API_EXTERNAL_URL:-http://supabase-kong:8000}
+
+      - GOTRUE_DB_DRIVER=postgres
+      - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+
+      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE}
+      - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
+      - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
+
+      - GOTRUE_JWT_ADMIN_ROLES=service_role
+      - GOTRUE_JWT_AUD=authenticated
+      - GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated
+      - GOTRUE_JWT_EXP=${JWT_EXPIRY:-3600}
+      - GOTRUE_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+
+      - GOTRUE_EXTERNAL_EMAIL_ENABLED=${ENABLE_EMAIL_SIGNUP:-true}
+      - GOTRUE_MAILER_AUTOCONFIRM=${ENABLE_EMAIL_AUTOCONFIRM:-false}
+      # GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true
+      # GOTRUE_SMTP_MAX_FREQUENCY=1s
+      - GOTRUE_SMTP_ADMIN_EMAIL=${SMTP_ADMIN_EMAIL}
+      - GOTRUE_SMTP_HOST=${SMTP_HOST}
+      - GOTRUE_SMTP_PORT=${SMTP_PORT:-587}
+      - GOTRUE_SMTP_USER=${SMTP_USER}
+      - GOTRUE_SMTP_PASS=${SMTP_PASS}
+      - GOTRUE_SMTP_SENDER_NAME=${SMTP_SENDER_NAME}
+      - GOTRUE_MAILER_URLPATHS_INVITE=${MAILER_URLPATHS_INVITE:-/auth/v1/verify}
+      - GOTRUE_MAILER_URLPATHS_CONFIRMATION=${MAILER_URLPATHS_CONFIRMATION:-/auth/v1/verify}
+      - GOTRUE_MAILER_URLPATHS_RECOVERY=${MAILER_URLPATHS_RECOVERY:-/auth/v1/verify}
+      - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=${MAILER_URLPATHS_EMAIL_CHANGE:-/auth/v1/verify}
+
+      - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
+      - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
+  supabase-realtime:
+    # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
+    image: supabase/realtime:v2.25.50
+    depends_on:
+      supabase-db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
+      supabase-analytics:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bash", "-c", "printf \\0 > /dev/tcp/localhost/4000"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - PORT=4000
+      - DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - DB_PORT=${POSTGRES_PORT:-5432}
+      - DB_USER=supabase_admin
+      - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+      - DB_NAME=${POSTGRES_DB:-supabase}
+      - DB_AFTER_CONNECT_QUERY='SET search_path TO _realtime'
+      - DB_ENC_KEY=supabaserealtime
+      - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - FLY_ALLOC_ID=fly123
+      - FLY_APP_NAME=realtime
+      - SECRET_KEY_BASE=${SECRET_PASSWORD_REALTIME}
+      - ERL_AFLAGS=-proto_dist inet_tcp
+      - ENABLE_TAILSCALE=false
+      - DNS_NODES=''
+    command: >
+      sh -c "/app/bin/migrate && /app/bin/realtime eval 'Realtime.Release.seeds(Realtime.Repo)' && /app/bin/server"
+  supabase-minio:
+    image: minio/minio
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    command: server --console-address ":9001" /data
+    healthcheck:
+      test: sleep 5 && exit 0
+      interval: 2s
+      timeout: 10s
+      retries: 5
+    volumes:
+      - ./volumes/storage:/data
+
+  minio-createbucket:
+    image: minio/mc
+    restart: "no"
+    environment:
+      - MINIO_ROOT_USER=${SERVICE_USER_MINIO}
+      - MINIO_ROOT_PASSWORD=${SERVICE_PASSWORD_MINIO}
+    depends_on:
+      supabase-minio:
+        condition: service_healthy
+    entrypoint: ["/entrypoint.sh"]
+    volumes:
+      - type: bind
+        source: ./entrypoint.sh
+        target: /entrypoint.sh
+        content: |
+          #!/bin/sh
+          /usr/bin/mc alias set supabase-minio http://supabase-minio:9000 ${MINIO_ROOT_USER} ${MINIO_ROOT_PASSWORD};
+          /usr/bin/mc mb supabase-minio/stub;
+          exit 0
+
+  supabase-storage:
+    image: supabase/storage-api:v0.46.4
+    depends_on:
+      supabase-db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
+      supabase-rest:
+        condition: service_started
+      imgproxy:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:5000/status",
+        ]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - SERVER_PORT=5000
+      - SERVER_REGION=local
+      - MULTI_TENANT=false
+      - AUTH_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      - DB_INSTALL_ROLES=false
+      - STORAGE_BACKEND=s3
+      - STORAGE_S3_BUCKET=stub
+      - STORAGE_S3_ENDPOINT=http://supabase-minio:9000
+      - STORAGE_S3_FORCE_PATH_STYLE=true
+      - STORAGE_S3_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      - UPLOAD_FILE_SIZE_LIMIT=524288000
+      - UPLOAD_FILE_SIZE_LIMIT_STANDARD=524288000
+      - UPLOAD_SIGNED_URL_EXPIRATION_TIME=120
+      - TUS_URL_PATH=/upload/resumable
+      - TUS_MAX_SIZE=3600000
+      - IMAGE_TRANSFORMATION_ENABLED=true
+      - IMGPROXY_URL=http://imgproxy:8080
+      - IMGPROXY_REQUEST_TIMEOUT=15
+      - DATABASE_SEARCH_PATH=storage
+
+      # - ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogImFub24iLAogICJpc3MiOiAic3VwYWJhc2UiLAogICJpYXQiOiAxNzA4OTg4NDAwLAogICJleHAiOiAxODY2ODQxMjAwCn0.jCDqsoXGT58JnAjf27KOowNQsokkk0aR7rdbGG18P-8
+      # - SERVICE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.ewogICJyb2xlIjogInNlcnZpY2Vfcm9sZSIsCiAgImlzcyI6ICJzdXBhYmFzZSIsCiAgImlhdCI6IDE3MDg5ODg0MDAsCiAgImV4cCI6IDE4NjY4NDEyMDAKfQ.GA7yF2BmqTzqGkP_oqDdJAQVt0djjIxGYuhE0zFDJV4
+      # - POSTGREST_URL=http://supabase-rest:3000
+      # - PGRST_JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      # - DATABASE_URL=postgres://supabase_storage_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      # - FILE_SIZE_LIMIT=52428800
+      # - STORAGE_BACKEND=s3
+      # - STORAGE_S3_BUCKET=stub
+      # - STORAGE_S3_ENDPOINT=http://supabase-minio:9000
+      # - STORAGE_S3_PROTOCOL=http
+      # - STORAGE_S3_REGION=stub
+      # - STORAGE_S3_FORCE_PATH_STYLE=true
+      # - AWS_ACCESS_KEY_ID=${SERVICE_USER_MINIO}
+      # - AWS_SECRET_ACCESS_KEY=${SERVICE_PASSWORD_MINIO}
+      # - AWS_DEFAULT_REGION=stub
+      # - FILE_STORAGE_BACKEND_PATH=/var/lib/storage
+      # - TENANT_ID=stub
+      # # TODO: https://github.com/supabase/storage-api/issues/55
+      # - REGION=stub
+      # - ENABLE_IMAGE_TRANSFORMATION=true
+      # - IMGPROXY_URL=http://imgproxy:8080
+    volumes:
+      - ./volumes/storage:/var/lib/storage
+  imgproxy:
+    image: darthsim/imgproxy:v3.8.0
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      timeout: 5s
+      interval: 5s
+      retries: 3
+    environment:
+      - IMGPROXY_LOCAL_FILESYSTEM_ROOT=/
+      - IMGPROXY_USE_ETAG=true
+      - IMGPROXY_ENABLE_WEBP_DETECTION=${IMGPROXY_ENABLE_WEBP_DETECTION:-true}
+    volumes:
+      - ./volumes/storage:/var/lib/storage
+
+  supabase-meta:
+    image: supabase/postgres-meta:v0.77.2
+    depends_on:
+      supabase-db:
+        # Disable this if you are using an external Postgres database
+        condition: service_healthy
+      supabase-analytics:
+        condition: service_healthy
+    environment:
+      - PG_META_PORT=8080
+      - PG_META_DB_HOST=${POSTGRES_HOST:-supabase-db}
+      - PG_META_DB_PORT=${POSTGRES_PORT:-5432}
+      - PG_META_DB_NAME=${POSTGRES_DB:-supabase}
+      - PG_META_DB_USER=supabase_admin
+      - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
+
+  supabase-edge-functions:
+    image: supabase/edge-runtime:v1.36.1
+    depends_on:
+      supabase-analytics:
+        condition: service_healthy
+    environment:
+      - JWT_SECRET=${SERVICE_PASSWORD_JWT}
+      - SUPABASE_URL=http://supabase-kong:8000
+      - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SERVICE_SUPABASESERVICE_KEY}
+      - SUPABASE_DB_URL=postgresql://postgres:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
+      # TODO: Allow configuring VERIFY_JWT per function. This PR might help: https://github.com/supabase/cli/pull/786
+      - VERIFY_JWT=${FUNCTIONS_VERIFY_JWT:-false}
+    volumes:
+      - ./volumes/functions:/home/deno/functions
+      - type: bind
+        source: ./volumes/functions/main/index.ts
+        target: /home/deno/functions/main/index.ts
+        content: |
+          import { serve } from 'https://deno.land/std@0.131.0/http/server.ts'
+          import * as jose from 'https://deno.land/x/jose@v4.14.4/index.ts'
+
+          console.log('main function started')
+
+          const JWT_SECRET = Deno.env.get('JWT_SECRET')
+          const VERIFY_JWT = Deno.env.get('VERIFY_JWT') === 'true'
+
+          function getAuthToken(req: Request) {
+            const authHeader = req.headers.get('authorization')
+            if (!authHeader) {
+              throw new Error('Missing authorization header')
+            }
+            const [bearer, token] = authHeader.split(' ')
+            if (bearer !== 'Bearer') {
+              throw new Error(`Auth header is not 'Bearer {token}'`)
+            }
+            return token
+          }
+
+          async function verifyJWT(jwt: string): Promise<boolean> {
+            const encoder = new TextEncoder()
+            const secretKey = encoder.encode(JWT_SECRET)
+            try {
+              await jose.jwtVerify(jwt, secretKey)
+            } catch (err) {
+              console.error(err)
+              return false
+            }
+            return true
+          }
+
+          serve(async (req: Request) => {
+            if (req.method !== 'OPTIONS' && VERIFY_JWT) {
+              try {
+                const token = getAuthToken(req)
+                const isValidJWT = await verifyJWT(token)
+
+                if (!isValidJWT) {
+                  return new Response(JSON.stringify({ msg: 'Invalid JWT' }), {
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json' },
+                  })
+                }
+              } catch (e) {
+                console.error(e)
+                return new Response(JSON.stringify({ msg: e.toString() }), {
+                  status: 401,
+                  headers: { 'Content-Type': 'application/json' },
+                })
+              }
+            }
+
+            const url = new URL(req.url)
+            const { pathname } = url
+            const path_parts = pathname.split('/')
+            const service_name = path_parts[1]
+
+            if (!service_name || service_name === '') {
+              const error = { msg: 'missing function name in request' }
+              return new Response(JSON.stringify(error), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' },
+              })
+            }
+
+            const servicePath = `/home/deno/functions/${service_name}`
+            console.error(`serving the request with ${servicePath}`)
+
+            const memoryLimitMb = 150
+            const workerTimeoutMs = 1 * 60 * 1000
+            const noModuleCache = false
+            const importMapPath = null
+            const envVarsObj = Deno.env.toObject()
+            const envVars = Object.keys(envVarsObj).map((k) => [k, envVarsObj[k]])
+
+            try {
+              const worker = await EdgeRuntime.userWorkers.create({
+                servicePath,
+                memoryLimitMb,
+                workerTimeoutMs,
+                noModuleCache,
+                importMapPath,
+                envVars,
+              })
+              return await worker.fetch(req)
+            } catch (e) {
+              const error = { msg: e.toString() }
+              return new Response(JSON.stringify(error), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+              })
+            }
+          })
+      - type: bind
+        source: ./volumes/functions/hello/index.ts
+        target: /home/deno/functions/hello/index.ts
+        content: |
+          // Follow this setup guide to integrate the Deno language server with your editor:
+          // https://deno.land/manual/getting_started/setup_your_environment
+          // This enables autocomplete, go to definition, etc.
+
+          import { serve } from "https://deno.land/std@0.177.1/http/server.ts"
+
+          serve(async () => {
+            return new Response(
+              `"Hello from Edge Functions!"`,
+              { headers: { "Content-Type": "application/json" } },
+            )
+          })
+
+          // To invoke:
+          // curl 'http://localhost:<KONG_HTTP_PORT>/functions/v1/hello' \
+          //   --header 'Authorization: Bearer <anon/service_role API key>'
+
+    command:
+      - start
+      - --main-service
+      - /home/deno/functions/main

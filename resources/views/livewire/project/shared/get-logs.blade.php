@@ -1,7 +1,7 @@
 <div>
     <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
         <div class="flex items-center gap-2">
-            <h3>{{ $container }}</h3>
+            <h3>{{ str($container)->beforeLast('-')->headline() }}</h3>
             @if ($pull_request)
                 <div>({{ $pull_request }})</div>
             @endif

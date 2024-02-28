@@ -10,7 +10,8 @@ use Livewire\Component;
 class Create extends Component
 {
     public $type;
-    public function mount() {
+    public function mount()
+    {
         $services = getServiceTemplates();
         $type = str(request()->query('type'));
         $destination_uuid = request()->query('destination');
@@ -70,7 +71,7 @@ class Create extends Component
                         $generatedValue = $value;
                         if ($value->contains('SERVICE_')) {
                             $command = $value->after('SERVICE_')->beforeLast('_');
-                            $generatedValue = generateEnvValue($command->value());
+                            $generatedValue = generateEnvValue($command->value(), $service);
                         }
                         EnvironmentVariable::create([
                             'key' => $key,
