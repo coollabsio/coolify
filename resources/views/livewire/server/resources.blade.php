@@ -45,7 +45,7 @@
                                                         {{ data_get($resource, 'environment.name') }}
                                                     </td>
                                                     <td class="px-5 py-4 text-sm whitespace-nowrap"><a class=""
-                                                            href="{{ $resource->link() }}">{{ $resource->name }} </a>
+                                                            href="{{ $resource->link() }}">{{ $resource->name }} <x-internal-link/></a>
                                                     </td>
                                                     <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                         {{ str($resource->type())->headline() }}</td>
