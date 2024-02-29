@@ -1,5 +1,5 @@
 #!/bin/bash
-## Do not modify this file. You will lost the ability to autoupdate!
+## Do not modify this file. You will lose the ability to autoupdate!
 
 VERSION="1.0.4"
 CDN="https://cdn.coollabs.io/coolify"
