@@ -50,7 +50,7 @@
                 <template x-for="item in filteredApplications" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col w-full px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -66,8 +66,8 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
-                                <div class="description break-all" x-text="item.fqdn"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.fqdn"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -83,7 +83,7 @@
                 <template x-for="item in filteredPostgresqls" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -99,7 +99,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -115,7 +115,7 @@
                 <template x-for="item in filteredRedis" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -131,7 +131,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -147,7 +147,7 @@
                 <template x-for="item in filteredMongodbs" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -163,7 +163,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -179,7 +179,7 @@
                 <template x-for="item in filteredMysqls" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -195,7 +195,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -211,7 +211,7 @@
                 <template x-for="item in filteredMariadbs" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -227,7 +227,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
@@ -243,7 +243,7 @@
                 <template x-for="item in filteredServices" :key="item.id">
                     <span>
                         <a class="h-24 box group" :href="item.hrefLink">
-                            <div class="flex flex-col mx-6">
+                            <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
@@ -259,7 +259,7 @@
                                         <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
                                     </template>
                                 </div>
-                                <div class="description" x-text="item.description"></div>
+                                <div class="max-w-full truncate description" x-text="item.description"></div>
                             </div>
                         </a>
                         <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
