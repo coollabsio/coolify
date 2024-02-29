@@ -2,6 +2,7 @@
 # slogan: The open source Firebase alternative.
 # tags: firebase, alternative, open-source
 # minversion: 4.0.0-beta.228
+# logo: svgs/supabase.svg
 
 services:
   supabase-kong:
@@ -12,8 +13,8 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - JWT_SERCET=${SERVICE_PASSWORD_JWT}
       - SERVICE_FQDN_SUPABASE
+      - JWT_SERCET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
       # https://github.com/supabase/cli/issues/14

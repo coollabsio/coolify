@@ -931,6 +931,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $savedService->fqdn = $fqdn;
                                 $savedService->save();
                             }
+                            EnvironmentVariable::create([
+                                'key' => $key,
+                                'value' => $fqdn,
+                                'is_build_time' => false,
+                                'service_id' => $resource->id,
+                                'is_preview' => false,
+                            ]);
                         }
                         // data_forget($service, "environment.$variableName");
                         // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
