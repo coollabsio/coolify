@@ -62,6 +62,9 @@ class Team extends Model implements SendsDiscord, SendsEmail
     }
     static public function serverLimit()
     {
+        if (currentTeam()->id === 0 && isDev()) {
+            return 9999999;
+        }
         return Team::find(currentTeam()->id)->limits['serverLimit'];
     }
     public function limits(): Attribute
