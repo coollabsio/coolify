@@ -55,7 +55,7 @@ class Resources extends Component
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
-        $this->loadUnmanagedContainers();
+        // $this->loadUnmanagedContainers();
     }
     public function render()
     {

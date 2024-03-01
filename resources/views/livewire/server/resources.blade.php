@@ -68,7 +68,7 @@
                 </div>
             </div>
             <div x-cloak x-show="activeTab === 'unmanaged'" class="h-full">
-                <div class="flex flex-col">
+                <div class="flex flex-col" x-init="$wire.loadUnmanagedContainers()">
                     <div class="flex gap-2">
                         <h2>Resources</h2>
                         <x-forms.button wire:click="refreshStatus">Refresh</x-forms.button>
