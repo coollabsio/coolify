@@ -10,7 +10,7 @@ class Configuration extends Component
 {
     public Application $application;
     public $servers;
-    protected $listeners = ['build_pack_updated' => '$refresh'];
+    protected $listeners = ['buildPackUpdated' => '$refresh'];
 
     public function mount()
     {

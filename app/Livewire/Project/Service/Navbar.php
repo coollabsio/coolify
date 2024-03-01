@@ -17,7 +17,20 @@ class Navbar extends Component
     public array $parameters;
     public array $query;
     public $isDeploymentProgress = false;
-
+    public function getListeners()
+    {
+        return [
+            "serviceStatusChanged"
+        ];
+    }
+    public function serviceStatusChanged()
+    {
+        $this->dispatch('refresh')->self();
+    }
+    public function render()
+    {
+        return view('livewire.project.service.navbar');
+    }
     public function checkDeployments()
     {
         $activity = Activity::where('properties->type_uuid', $this->service->uuid)->latest()->first();
@@ -27,26 +40,6 @@ class Navbar extends Component
         } else {
             $this->isDeploymentProgress = false;
         }
-    }
-    public function getListeners()
-    {
-        return [
-            "serviceStatusChanged"
-        ];
-    }
-    public function serviceStatusChanged()
-    {
-        $this->service->refresh();
-    }
-    public function render()
-    {
-        return view('livewire.project.service.navbar');
-    }
-    public function check_status($showNotification = false)
-    {
-        dispatch_sync(new ContainerStatusJob($this->service->destination->server));
-        $this->service->refresh();
-        if ($showNotification) $this->dispatch('success', 'Service status updated.');
     }
     public function deploy()
     {
@@ -62,7 +55,6 @@ class Navbar extends Component
     public function stop(bool $forceCleanup = false)
     {
         StopService::run($this->service);
-        $this->service->refresh();
         if ($forceCleanup) {
             $this->dispatch('success', 'Containers cleaned up.');
         } else {
