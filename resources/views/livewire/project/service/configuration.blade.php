@@ -1,4 +1,4 @@
-<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.checkStatus">
+<div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'service-stack' }" x-init="$wire.check_status" wire:poll.5000ms="check_status">
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col items-start gap-4 min-w-fit">

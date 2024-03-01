@@ -45,7 +45,7 @@
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
+            <x-forms.input autofocus="true" placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.id">
                     <span>

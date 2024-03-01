@@ -11,7 +11,7 @@
                 </svg>
             </div>
         @empty
-            <div>No tags yet</div>
+            <div class="py-1">No tags yet</div>
         @endforelse
     </div>
     <form wire:submit='submit' class="flex items-end gap-2 pt-4">
@@ -23,8 +23,7 @@
         <x-forms.button type="submit">Add</x-forms.button>
     </form>
     @if ($tags->count() > 0)
-        <h3 class="pt-4">Already defined tags</h3>
-        <div>Click to quickly add one.</div>
+        <h3 class="pt-4">Quickly Add</h3>
         <div class="flex gap-2 pt-4">
             @foreach ($tags as $tag)
                 <x-forms.button wire:click="addTag('{{ $tag->id }}','{{ $tag->name }}')">

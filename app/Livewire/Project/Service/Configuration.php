@@ -17,9 +17,7 @@ class Configuration extends Component
     {
         $userId = auth()->user()->id;
         return [
-            "echo-private:user.{$userId},ServiceStatusChanged" => 'checkStatus',
-            "refreshStacks",
-            "checkStatus",
+            "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
         ];
     }
     public function render()
@@ -37,21 +35,10 @@ class Configuration extends Component
         $this->applications = $this->service->applications->sort();
         $this->databases = $this->service->databases->sort();
     }
-    public function checkStatus()
+    public function check_status()
     {
         dispatch_sync(new ContainerStatusJob($this->service->server));
-        $this->refreshStacks();
+        $this->dispatch('refresh')->self();
         $this->dispatch('serviceStatusChanged');
-    }
-    public function refreshStacks()
-    {
-        $this->applications = $this->service->applications->sort();
-        $this->applications->each(function ($application) {
-            $application->refresh();
-        });
-        $this->databases = $this->service->databases->sort();
-        $this->databases->each(function ($database) {
-            $database->refresh();
-        });
     }
 }

@@ -218,12 +218,12 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $teamId = data_get($this->application, 'environment.project.team.id');
                 $buildServers = Server::buildServers($teamId)->get();
                 if ($buildServers->count() === 0) {
-                    $this->application_deployment_queue->addLogEntry("Build server feature activated, but no suitable build server found. Using the deployment server.");
+                    $this->application_deployment_queue->addLogEntry("No suitable build server found. Using the deployment server.");
                     $this->build_server = $this->server;
                     $this->original_server = $this->server;
                 } else {
-                    $this->application_deployment_queue->addLogEntry("Build server feature activated and found a suitable build server. Using it to build your application - if needed.");
                     $this->build_server = $buildServers->random();
+                    $this->application_deployment_queue->addLogEntry("Found a suitable build server ({$this->build_server->name}).");
                     $this->original_server = $this->server;
                     $this->use_build_server = true;
                 }
@@ -427,13 +427,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     }
     private function deploy_dockerfile_buildpack()
     {
+        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         if ($this->use_build_server) {
             $this->server = $this->build_server;
         }
         if (data_get($this->application, 'dockerfile_location')) {
             $this->dockerfile_location = $this->application->dockerfile_location;
         }
-        $this->application_deployment_queue->addLogEntry("Starting deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
         $this->prepare_builder_image();
         $this->check_git_if_build_needed();
         $this->set_base_dir();
@@ -528,9 +528,11 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->server = $this->original_server;
             }
             $readme = generate_readme_file($this->application->name, $this->application_deployment_queue->updated_at);
-            $composeFileName = "$this->configuration_dir/docker-compose.yml";
-            if ($this->pull_request_id !== 0) {
+            if ($this->pull_request_id === 0) {
+                $composeFileName = "$this->configuration_dir/docker-compose.yml";
+            } else {
                 $composeFileName = "$this->configuration_dir/docker-compose-pr-{$this->pull_request_id}.yml";
+                $this->docker_compose_location = "/docker-compose-pr-{$this->pull_request_id}.yml";
             }
             $this->execute_remote_command(
                 [
@@ -725,13 +727,17 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->application->pull_request_id !== 0) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
                 }
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                     $this->application_deployment_queue->addLogEntry("Consistent container name feature enabled, rolling update is not supported.");
+                }
+                if ($this->application->pull_request_id !== 0) {
+                    $this->application->settings->is_consistent_container_name_enabled = true;
+                    $this->application_deployment_queue->addLogEntry("Pull request deployment, rolling update is not supported.");
                 }
                 $this->stop_running_container(force: true);
                 $this->start_by_compose_file();
@@ -810,26 +816,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $this->add_build_env_variables_to_dockerfile();
         }
         $this->build_image();
-        $this->stop_running_container();
-        if ($this->application->destination->server->isSwarm()) {
-            $this->push_to_docker_registry();
-            $this->execute_remote_command(
-                [
-                    executeInDocker($this->deployment_uuid, "docker stack deploy --with-registry-auth -c {$this->workdir}{$this->docker_compose_location} {$this->application->uuid}-{$this->pull_request_id}")
-                ],
-            );
-        } else {
-            $this->application_deployment_queue->addLogEntry("Starting preview deployment.");
-            if ($this->use_build_server) {
-                $this->execute_remote_command(
-                    ["SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up --build -d", "hidden" => true],
-                );
-            } else {
-                $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up --build -d"), "hidden" => true],
-                );
-            }
-        }
+        $this->push_to_docker_registry();
+        // $this->stop_running_container();
+        $this->rolling_update();
     }
     private function create_workdir()
     {
@@ -1226,43 +1215,45 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //     ];
         // }
 
-        if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
-            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
-            if (count($custom_compose) > 0) {
-                $ipv4 = data_get($custom_compose, 'ip.0');
-                $ipv6 = data_get($custom_compose, 'ip6.0');
-                data_forget($custom_compose, 'ip');
-                data_forget($custom_compose, 'ip6');
-                if ($ipv4 || $ipv6) {
-                    data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+        if ($this->application->pull_request_id === 0) {
+            if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
+                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+                if (count($custom_compose) > 0) {
+                    $ipv4 = data_get($custom_compose, 'ip.0');
+                    $ipv6 = data_get($custom_compose, 'ip6.0');
+                    data_forget($custom_compose, 'ip');
+                    data_forget($custom_compose, 'ip6');
+                    if ($ipv4 || $ipv6) {
+                        data_forget($docker_compose['services'][$this->container_name], 'networks');
+                    }
+                    if ($ipv4) {
+                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                    }
+                    if ($ipv6) {
+                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                    }
+                    $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
                 }
-                if ($ipv4) {
-                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+            } else {
+                $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
+                data_forget($docker_compose, 'services.' . $this->container_name);
+                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+                if (count($custom_compose) > 0) {
+                    $ipv4 = data_get($custom_compose, 'ip.0');
+                    $ipv6 = data_get($custom_compose, 'ip6.0');
+                    data_forget($custom_compose, 'ip');
+                    data_forget($custom_compose, 'ip6');
+                    if ($ipv4 || $ipv6) {
+                        data_forget($docker_compose['services'][$this->application->uuid], 'networks');
+                    }
+                    if ($ipv4) {
+                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                    }
+                    if ($ipv6) {
+                        $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                    }
+                    $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
-                if ($ipv6) {
-                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                }
-                $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
-            }
-        } else {
-            $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-            data_forget($docker_compose, 'services.' . $this->container_name);
-            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
-            if (count($custom_compose) > 0) {
-                $ipv4 = data_get($custom_compose, 'ip.0');
-                $ipv6 = data_get($custom_compose, 'ip6.0');
-                data_forget($custom_compose, 'ip');
-                data_forget($custom_compose, 'ip6');
-                if ($ipv4 || $ipv6) {
-                    data_forget($docker_compose['services'][$this->application->uuid], 'networks');
-                }
-                if ($ipv4) {
-                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                }
-                if ($ipv6) {
-                    $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                }
-                $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
             }
         }
 
@@ -1539,18 +1530,18 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
             if ($this->pull_request_id === 0) {
                 $containers = $containers->filter(function ($container) {
-                    return data_get($container, 'Names') !== $this->container_name;
+                    return data_get($container, 'Names') !== $this->container_name && data_get($container, 'Names') !== $this->container_name . '-pr-' . $this->pull_request_id;
                 });
             }
             $containers->each(function ($container) {
                 $containerName = data_get($container, 'Names');
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $containerName >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+                    ["docker rm -f $containerName >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true],
                 );
             });
             if ($this->application->settings->is_consistent_container_name_enabled) {
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+                    ["docker rm -f $this->container_name >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true],
                 );
             }
         } else {
@@ -1559,7 +1550,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 'status' => ApplicationDeploymentStatus::FAILED->value,
             ]);
             $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true],
+                ["docker rm -f $this->container_name >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true],
             );
         }
     }
@@ -1680,7 +1671,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 // 69420 means failed to push the image to the registry, so we don't need to remove the new version as it is the currently running one
                 $this->application_deployment_queue->addLogEntry("Deployment failed. Removing the new version of your application.", 'stderr');
                 $this->execute_remote_command(
-                    [executeInDocker($this->deployment_uuid, "docker rm -f $this->container_name >/dev/null 2>&1"), "hidden" => true, "ignore_errors" => true]
+                    ["docker rm -f $this->container_name >/dev/null 2>&1", "hidden" => true, "ignore_errors" => true]
                 );
             }
         }

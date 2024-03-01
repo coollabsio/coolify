@@ -65,6 +65,12 @@ class Application extends BaseModel
         return $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')
             ->withPivot('server_id', 'status');
     }
+    public function is_public_repository(): bool {
+        if (data_get($this, 'source.is_public')) {
+            return true;
+        }
+        return false;
+    }
     public function is_github_based(): bool
     {
         if (data_get($this, 'source')) {
