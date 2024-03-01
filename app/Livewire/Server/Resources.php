@@ -12,7 +12,7 @@ class Resources extends Component
     use AuthorizesRequests;
     public ?Server $server = null;
     public $parameters = [];
-    public ?Collection $unmanagedContainers = null;
+    public Collection $unmanagedContainers;
     public function getListeners()
     {
         $teamId = auth()->user()->currentTeam()->id;
