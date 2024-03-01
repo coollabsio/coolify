@@ -33,7 +33,9 @@ Special thanks to our biggest sponsors, [CCCareers](https://cccareers.org/) and 
 <a href="https://cccareers.org/" target="_blank"><img src="./other/logos/ccc-logo.webp" alt="cccareers logo" width="200"/></a>
 <a href="https://appwrite.io" target="_blank"><img src="./other/logos/appwrite.svg" alt="appwrite logo" width="200"/></a>
 
-## Github Sponsors ($15+)
+## Github Sponsors ($40+)
+<a href="https://cryptojobslist.com/?utm_source=coolify.io"><img src="https://github.com/cryptojobslist.png" width="60px" alt="CryptoJobsList" /></a>
+<a href="https://typebot.io/?utm_source=coolify.io"><img src="https://pbs.twimg.com/profile_images/1509194008366657543/9I-C7uWT_400x400.jpg" width="60px" alt="typebot"/></a>
 <a href="https://bc.direct"><img width="60px" alt="BC Direct" src="https://github.com/coollabsio/coolify/assets/5845193/a4063c41-95ed-4a32-8814-cd1475572e37"/></a>
 <a href="https://github.com/automazeio"><img src="https://github.com/automazeio.png" width="60px" alt="Corentin Clichy" /></a>
 <a href="https://github.com/corentinclichy"><img src="https://github.com/corentinclichy.png" width="60px" alt="Corentin Clichy" /></a>

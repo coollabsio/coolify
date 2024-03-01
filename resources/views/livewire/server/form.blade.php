@@ -4,7 +4,7 @@
             <h2>General</h2>
             @if ($server->id === 0)
                 <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
-                    You could lost a lot of functionalities if you change the server details of the server where Coolify
+                    You could lose a lot of functionalities if you change the server details of the server where Coolify
                     is
                     running on.<br>Please think again.
                 </x-new-modal>

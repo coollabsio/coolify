@@ -16,7 +16,6 @@
                     <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
                 </a>
             @empty
-                <div class="">N/A</div>
             @endforelse
             @forelse ($server->swarmDockers as $docker)
                 <a
@@ -24,7 +23,6 @@
                     <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
                 </a>
             @empty
-                <div class="">N/A</div>
             @endforelse
         </div>
         <div class="pt-2">

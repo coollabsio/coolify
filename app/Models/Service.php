@@ -102,6 +102,30 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('kong'):
+                    $data = collect([]);
+                    $dashboard_user = $this->environment_variables()->where('key', 'SERVICE_USER_ADMIN')->first();
+                    $dashboard_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_ADMIN')->first();
+                    if ($dashboard_user) {
+                        $data = $data->merge([
+                            'Dashboard User' => [
+                                'key' => data_get($dashboard_user, 'key'),
+                                'value' => data_get($dashboard_user, 'value'),
+                                'rules' => 'required',
+                            ],
+                        ]);
+                    }
+                    if ($dashboard_password) {
+                        $data = $data->merge([
+                            'Dashboard Password' => [
+                                'key' => data_get($dashboard_password, 'key'),
+                                'value' => data_get($dashboard_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Supabase', $data->toArray());
                 case str($image)?->contains('minio'):
                     $data = collect([]);
                     $console_url = $this->environment_variables()->where('key', 'MINIO_BROWSER_REDIRECT_URL')->first();

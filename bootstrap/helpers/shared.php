@@ -33,6 +33,11 @@ use Illuminate\Support\Facades\Request;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Illuminate\Support\Stringable;
+use Lcobucci\JWT\Encoding\ChainedFormatter;
+use Lcobucci\JWT\Encoding\JoseEncoder;
+use Lcobucci\JWT\Signer\Key\InMemory;
+use Lcobucci\JWT\Signer\Hmac\Sha256;
+use Lcobucci\JWT\Token\Builder;
 use Poliander\Cron\CronExpression;
 use Visus\Cuid2\Cuid2;
 use phpseclib3\Crypt\RSA;
@@ -625,7 +630,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
             $definedNetwork = collect([$resource->uuid]);
-
             $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource) {
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
@@ -927,6 +931,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $savedService->fqdn = $fqdn;
                                 $savedService->save();
                             }
+                            EnvironmentVariable::create([
+                                'key' => $key,
+                                'value' => $fqdn,
+                                'is_build_time' => false,
+                                'service_id' => $resource->id,
+                                'is_preview' => false,
+                            ]);
                         }
                         // data_forget($service, "environment.$variableName");
                         // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
@@ -978,7 +989,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     }
                                 }
                             } else {
-                                $generatedValue = generateEnvValue($command);
+                                $generatedValue = generateEnvValue($command, $resource);
                                 if (!$foundEnv) {
                                     EnvironmentVariable::create([
                                         'key' => $key,
@@ -1394,7 +1405,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]);
                             }
                         } else {
-                            $generatedValue = generateEnvValue($command);
+                            $generatedValue = generateEnvValue($command, $service);
                             if (!$foundEnv) {
                                 EnvironmentVariable::create([
                                     'key' => $key,
@@ -1570,7 +1581,7 @@ function parseEnvVariable(Str|string $value)
         'port' => $port,
     ];
 }
-function generateEnvValue(string $command)
+function generateEnvValue(string $command, Service $service)
 {
     switch ($command) {
         case 'PASSWORD':
@@ -1590,6 +1601,46 @@ function generateEnvValue(string $command)
             break;
         case 'USER':
             $generatedValue = Str::random(16);
+            break;
+        case 'SUPABASEANON':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256();
+            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+            $now = new DateTimeImmutable();
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'anon')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
+            break;
+        case 'SUPABASESERVICE':
+            $signingKey = $service->environment_variables()->where('key', 'SERVICE_PASSWORD_JWT')->first();
+            if (is_null($signingKey)) {
+                return;
+            } else {
+                $signingKey = $signingKey->value;
+            }
+            $key = InMemory::plainText($signingKey);
+            $algorithm = new Sha256();
+            $tokenBuilder = (new Builder(new JoseEncoder(), ChainedFormatter::default()));
+            $now = new DateTimeImmutable();
+            $now = $now->setTime($now->format('H'), $now->format('i'));
+            $token = $tokenBuilder
+                ->issuedBy('supabase')
+                ->issuedAt($now)
+                ->expiresAt($now->modify('+100 year'))
+                ->withClaim('role', 'service_role')
+                ->getToken($algorithm, $key);
+            $generatedValue = $token->toString();
             break;
         default:
             $generatedValue = Str::random(16);
