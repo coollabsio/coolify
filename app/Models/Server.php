@@ -275,6 +275,8 @@ class Server extends BaseModel
             });
             $containers = $containers->filter();
             return collect($containers);
+        } else {
+            return collect([]);
         }
     }
     public function hasDefinedResources()
