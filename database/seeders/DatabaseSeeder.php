@@ -18,7 +18,6 @@ class DatabaseSeeder extends Seeder
             ProjectSeeder::class,
             ProjectSettingSeeder::class,
             EnvironmentSeeder::class,
-            TeamEnvironmentVariableSeeder::class,
             StandaloneDockerSeeder::class,
             SwarmDockerSeeder::class,
             KubernetesSeeder::class,

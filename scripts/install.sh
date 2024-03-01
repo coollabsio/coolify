@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.2.0"
+VERSION="1.2.1"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -27,11 +27,11 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-    arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
-    *)
-        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-        exit
-        ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
+*)
+    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+    exit
+    ;;
 esac
 
 # Overwrite LATEST_VERSION if user pass a version number
@@ -54,27 +54,27 @@ echo -e "-------------"
 echo "Installing required packages..."
 
 case "$OS_TYPE" in
-    arch)
-        pacman -Sy >/dev/null 2>&1 || true
-        if ! pacman -Q curl wget git jq >/dev/null 2>&1; then
-            pacman -S --noconfirm curl wget git jq >/dev/null 2>&1 || true
-        fi
-        ;;
-    ubuntu | debian | raspbian)
-        apt update -y >/dev/null 2>&1
-            apt install -y curl wget git jq >/dev/null 2>&1
-        ;;
-    centos | fedora | rhel | ol | rocky)
-        dnf install -y curl wget git jq >/dev/null 2>&1
-        ;;
-    sles | opensuse-leap | opensuse-tumbleweed)
-        zypper refresh >/dev/null 2>&1
-        zypper install -y curl wget git jq >/dev/null 2>&1
-        ;;
-    *)
-        echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
-        exit
-        ;;
+arch)
+    pacman -Sy >/dev/null 2>&1 || true
+    if ! pacman -Q curl wget git jq >/dev/null 2>&1; then
+        pacman -S --noconfirm curl wget git jq >/dev/null 2>&1 || true
+    fi
+    ;;
+ubuntu | debian | raspbian)
+    apt update -y >/dev/null 2>&1
+    apt install -y curl wget git jq >/dev/null 2>&1
+    ;;
+centos | fedora | rhel | ol | rocky)
+    dnf install -y curl wget git jq >/dev/null 2>&1
+    ;;
+sles | opensuse-leap | opensuse-tumbleweed)
+    zypper refresh >/dev/null 2>&1
+    zypper install -y curl wget git jq >/dev/null 2>&1
+    ;;
+*)
+    echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
+    exit
+    ;;
 esac
 
 # Detect OpenSSH server
@@ -112,7 +112,6 @@ if [ "$SSH_PERMIT_ROOT_LOGIN_CONFIG" = "prohibit-password" ] || [ "$SSH_PERMIT_R
     echo "PermitRootLogin is enabled."
     SSH_PERMIT_ROOT_LOGIN=true
 fi
-
 
 if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
     echo "###############################################################################"
@@ -198,7 +197,7 @@ fi
 
 echo -e "-------------"
 
-mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy}
+mkdir -p /data/coolify/{source,ssh,applications,databases,backups,services,proxy,webhooks-during-maintenance}
 mkdir -p /data/coolify/ssh/{keys,mux}
 mkdir -p /data/coolify/proxy/dynamic
 
