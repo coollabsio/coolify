@@ -43,7 +43,11 @@ class DeploymentSuccess extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
-        return setNotificationChannels($notifiable, 'deployments');
+        $channels = setNotificationChannels($notifiable, 'deployments');
+        $channels = array_filter($channels, function ($channel) {
+            return $channel !== 'App\Notifications\Channels\EmailChannel';
+        });
+        return $channels;
     }
 
     public function toMail(): MailMessage
@@ -69,7 +73,7 @@ class DeploymentSuccess extends Notification implements ShouldQueue
     public function toDiscord(): string
     {
         if ($this->preview) {
-            $message = 'Coolify:  New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '
+            $message = 'Coolify: New PR' . $this->preview->pull_request_id . ' version successfully deployed of ' . $this->application_name . '
 
 ';
             if ($this->preview->fqdn) {
