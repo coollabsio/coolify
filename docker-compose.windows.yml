@@ -26,6 +26,7 @@ services:
       - ./databases:/var/www/html/storage/app/databases
       - ./services:/var/www/html/storage/app/services
       - ./backups:/var/www/html/storage/app/backups
+      - ./webhooks-during-maintenance:/var/www/html/storage/app/webhooks-during-maintenance
     env_file:
       - .env
     environment:

@@ -65,7 +65,8 @@ class Application extends BaseModel
         return $this->belongsToMany(StandaloneDocker::class, 'additional_destinations')
             ->withPivot('server_id', 'status');
     }
-    public function is_public_repository(): bool {
+    public function is_public_repository(): bool
+    {
         if (data_get($this, 'source.is_public')) {
             return true;
         }
@@ -401,7 +402,10 @@ class Application extends BaseModel
         }
         return false;
     }
-
+    public function get_last_days_deployments()
+    {
+        return ApplicationDeploymentQueue::where('application_id', $this->id)->where('created_at', '>=', now()->subDays(7))->orderBy('created_at', 'desc')->get();
+    }
     public function deployments(int $skip = 0, int $take = 10)
     {
         $deployments = ApplicationDeploymentQueue::where('application_id', $this->id)->orderBy('created_at', 'desc');

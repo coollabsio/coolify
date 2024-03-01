@@ -2,10 +2,12 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\DatabaseBackupStatusJob;
 use App\Jobs\SendConfirmationForWaitlistJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\ScheduledDatabaseBackup;
+use App\Models\ScheduledDatabaseBackupExecution;
 use App\Models\Server;
 use App\Models\StandalonePostgresql;
 use App\Models\Team;
@@ -15,6 +17,7 @@ use App\Notifications\Application\DeploymentSuccess;
 use App\Notifications\Application\StatusChanged;
 use App\Notifications\Database\BackupFailed;
 use App\Notifications\Database\BackupSuccess;
+use App\Notifications\Database\DailyBackup;
 use App\Notifications\Test;
 use Exception;
 use Illuminate\Console\Command;
@@ -54,6 +57,8 @@ class Emails extends Command
             options: [
                 'updates' => 'Send Update Email to all users',
                 'emails-test' => 'Test',
+                'database-backup-statuses-daily' => 'Database - Backup Statuses (Daily)',
+                'application-deployment-success-daily' => 'Application - Deployment Success (Daily)',
                 'application-deployment-success' => 'Application - Deployment Success',
                 'application-deployment-failed' => 'Application - Deployment Failed',
                 'application-status-changed' => 'Application - Status Changed',
@@ -67,8 +72,12 @@ class Emails extends Command
             ],
         );
         $emailsGathered = ['realusers-before-trial', 'realusers-server-lost-connection'];
-        if (!in_array($type, $emailsGathered)) {
-            $this->email = text('Email Address to send to');
+        if (isDev()) {
+            $this->email = "test@example.com";
+        } else {
+            if (!in_array($type, $emailsGathered)) {
+                $this->email = text('Email Address to send to:');
+            }
         }
         set_transanctional_email_settings();
 
@@ -102,7 +111,7 @@ class Emails extends Command
                         $unsubscribeUrl = route('unsubscribe.marketing.emails', [
                             'token' => encrypt($email),
                         ]);
-                        $this->mail->view('emails.updates',["unsubscribeUrl" => $unsubscribeUrl]);
+                        $this->mail->view('emails.updates', ["unsubscribeUrl" => $unsubscribeUrl]);
                         $this->sendEmail($email);
                     }
                 }
@@ -110,6 +119,35 @@ class Emails extends Command
             case 'emails-test':
                 $this->mail = (new Test())->toMail();
                 $this->sendEmail();
+                break;
+            case 'database-backup-statuses-daily':
+                $scheduled_backups = ScheduledDatabaseBackup::all();
+                $databases = collect();
+                foreach ($scheduled_backups as $scheduled_backup) {
+                    $last_days_backups = $scheduled_backup->get_last_days_backup_status();
+                    if ($last_days_backups->isEmpty()) {
+                        continue;
+                    }
+                    $failed = $last_days_backups->where('status', 'failed');
+                    $database = $scheduled_backup->database;
+                    $databases->put($database->name, [
+                        'failed_count' => $failed->count(),
+                    ]);
+                }
+                $this->mail = (new DailyBackup($databases))->toMail();
+                $this->sendEmail();
+                break;
+            case 'application-deployment-success-daily':
+                $applications = Application::all();
+                foreach ($applications as $application) {
+                    $deployments = $application->get_last_days_deployments();
+                    ray($deployments);
+                    if ($deployments->isEmpty()) {
+                        continue;
+                    }
+                    $this->mail = (new DeploymentSuccess($application, 'test'))->toMail();
+                    $this->sendEmail();
+                }
                 break;
             case 'application-deployment-success':
                 $application = Application::all()->first();
