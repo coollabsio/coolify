@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Server\CleanupDocker;
 use App\Models\Server;
+use App\Notifications\Server\DockerCleanup;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -47,8 +48,9 @@ class DockerCleanupJob implements ShouldQueue, ShouldBeEncrypted
                 CleanupDocker::run($this->server);
                 $usageAfter = $this->server->getDiskUsage();
                 if ($usageAfter <  $this->usageBefore) {
-                    ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
-                    send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
+                    $this->server->team?->notify(new DockerCleanup($this->server, 'Saved ' . ($this->usageBefore - $usageAfter) . '% disk space.'));
+                    // ray('Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
+                    // send_internal_notification('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                     Log::info('DockerCleanupJob done: Saved ' . ($this->usageBefore - $usageAfter) . '% disk space on ' . $this->server->name);
                 } else {
                     Log::info('DockerCleanupJob failed to save disk space on ' . $this->server->name);
