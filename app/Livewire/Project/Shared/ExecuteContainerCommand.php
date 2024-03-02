@@ -10,29 +10,21 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class ExecuteContainerCommand extends Component
 {
     public string $command;
     public string $container;
-    public $containers;
+    public Collection $containers;
     public $parameters;
     public $resource;
     public string $type;
     public string $workDir = '';
     public Server $server;
-    public $servers = [];
-    public function getListeners()
-    {
-        return [
-            "serviceStatusChanged",
-        ];
-    }
-    public function serviceStatusChanged()
-    {
-        $this->getContainers();
-    }
+    public Collection $servers;
+
     protected $rules = [
         'server' => 'required',
         'container' => 'required',
@@ -43,20 +35,18 @@ class ExecuteContainerCommand extends Component
     public function mount()
     {
         $this->parameters = get_route_parameters();
-        $this->getContainers();
-    }
-    public function getContainers()
-    {
         $this->containers = collect();
+        $this->servers = collect();
         if (data_get($this->parameters, 'application_uuid')) {
             $this->type = 'application';
             $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
-            $this->server = $this->resource->destination->server;
-            $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, 0);
-            if ($containers->count() > 0) {
-                $containers->each(function ($container) {
-                    $this->containers->push(str_replace('/', '', $container['Names']));
-                });
+            if ($this->resource->destination->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->destination->server);
+            }
+            foreach ($this->resource->additional_servers as $server) {
+                if ($server->isFunctional()) {
+                    $this->servers = $this->servers->push($server);
+                }
             }
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
@@ -77,47 +67,85 @@ class ExecuteContainerCommand extends Component
                 }
             }
             $this->resource = $resource;
-            $this->server = $this->resource->destination->server;
+            if ($this->resource->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->server);
+            }
             $this->container = $this->resource->uuid;
-            // if (!str(data_get($this,'resource.status'))->startsWith('exited')) {
-                $this->containers->push($this->container);
-            // }
+            $this->containers->push($this->container);
         } else if (data_get($this->parameters, 'service_uuid')) {
             $this->type = 'service';
             $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
             $this->resource->applications()->get()->each(function ($application) {
-                // if (str(data_get($application, 'status'))->contains('running')) {
-                    $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
-                // }
+                $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
             });
             $this->resource->databases()->get()->each(function ($database) {
-                // if (str(data_get($database, 'status'))->contains('running')) {
-                    $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
-                // }
+                $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
             });
-
-            $this->server = $this->resource->server;
+            if ($this->resource->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->server);
+            }
         }
         if ($this->containers->count() > 0) {
             $this->container = $this->containers->first();
         }
     }
+    public function loadContainers()
+    {
+        foreach ($this->servers as $server) {
+            if (data_get($this->parameters, 'application_uuid')) {
+                if ($server->isSwarm()) {
+                    $containers = collect([
+                        [
+                            'Names' => $this->resource->uuid . '_' . $this->resource->uuid,
+                        ]
+                    ]);
+                } else {
+                    $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
+                }
+                foreach ($containers as $container) {
+                    $payload = [
+                        'server' => $server,
+                        'container' => $container,
+                    ];
+                    $this->containers = $this->containers->push($payload);
+                }
+            }
+        }
+        if ($containers->count() > 0) {
+            if (data_get($this->parameters, 'application_uuid')) {
+                $this->container = data_get($this->containers->first(), 'container.Names');
+            } elseif (data_get($this->parameters, 'database_uuid')) {
+                $this->container = $this->containers->first();
+            } elseif (data_get($this->parameters, 'service_uuid')) {
+                $this->container = $this->containers->first();
+            }
+        }
+    }
 
     public function runCommand()
     {
-        $this->validate();
         try {
-            if ($this->server->isForceDisabled()) {
+            if (data_get($this->parameters, 'application_uuid')) {
+                $container = $this->containers->where('container.Names', $this->container)->first();
+                $container_name = data_get($container, 'container.Names');
+                if (is_null($container)) {
+                    throw new \RuntimeException('Container not found.');
+                }
+                $server = data_get($container, 'server');
+            } else {
+                $container_name = $this->container;
+                $server = $this->servers->first();
+            }
+            if ($server->isForceDisabled()) {
                 throw new \RuntimeException('Server is disabled.');
             }
-            // Wrap command to prevent escaped execution in the host.
             $cmd = 'sh -c "if [ -f ~/.profile ]; then . ~/.profile; fi; ' . str_replace('"', '\"', $this->command)  . '"';
             if (!empty($this->workDir)) {
-                $exec = "docker exec -w {$this->workDir} {$this->container} {$cmd}";
+                $exec = "docker exec -w {$this->workDir} {$container_name} {$cmd}";
             } else {
-                $exec = "docker exec {$this->container} {$cmd}";
+                $exec = "docker exec {$container_name} {$cmd}";
             }
-            $activity = remote_process([$exec], $this->server, ignore_errors: true);
+            $activity = remote_process([$exec], $server, ignore_errors: true);
             $this->dispatch('activityMonitor', $activity->id);
         } catch (\Throwable $e) {
             return handleError($e, $this);

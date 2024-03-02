@@ -1,7 +1,12 @@
 <div>
     <div x-init="$wire.getLogs" id="screen" x-data="{ fullscreen: false, alwaysScroll: false, intervalId: null }">
         <div class="flex items-center gap-2">
-            <h3>{{ str($container)->beforeLast('-')->headline() }}</h3>
+            @if ($resource->type() === 'application')
+                <h3>{{ $container }}</h3>
+            @else
+                <h3>{{ str($container)->beforeLast('-')->headline() }}</h3>
+            @endif
+            <div>Server: {{ $server->name }} </div>
             @if ($pull_request)
                 <div>({{ $pull_request }})</div>
             @endif
