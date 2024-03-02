@@ -10,50 +10,57 @@ use App\Models\StandaloneMongodb;
 use App\Models\StandaloneMysql;
 use App\Models\StandalonePostgresql;
 use App\Models\StandaloneRedis;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class Logs extends Component
 {
     public ?string $type = null;
     public Application|Service|StandalonePostgresql|StandaloneRedis|StandaloneMongodb|StandaloneMysql|StandaloneMariadb $resource;
-    public Server $server;
+    public Collection $servers;
+    public Collection $containers;
     public $container = [];
-    public $containers;
     public $parameters;
     public $query;
     public $status;
     public $serviceSubType;
 
-    public function mount()
+    public function loadContainers($server_id)
     {
-        $this->containers = collect();
-        $this->parameters = get_route_parameters();
-        $this->query = request()->query();
-        if (data_get($this->parameters, 'application_uuid')) {
-            $this->type = 'application';
-            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
-            $this->status = $this->resource->status;
-            $this->server = $this->resource->destination->server;
-            if ($this->server->isSwarm()) {
+        try {
+            $server = $this->servers->firstWhere('id', $server_id);
+            if ($server->isSwarm()) {
                 $containers = collect([
                     [
                         'Names' => $this->resource->uuid . '_' . $this->resource->uuid,
                     ]
                 ]);
             } else {
-                $containers = getCurrentApplicationContainerStatus($this->server, $this->resource->id, includePullrequests: true);
+                $containers = getCurrentApplicationContainerStatus($server, $this->resource->id, includePullrequests: true);
             }
-            if ($containers->count() > 0) {
-                $containers->each(function ($container) {
-                    $this->containers->push(str_replace('/', '', $container['Names']));
-                });
+            $server->containers = $containers;
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
+    }
+    public function mount()
+    {
+        $this->containers = collect();
+        $this->servers = collect();
+        $this->parameters = get_route_parameters();
+        $this->query = request()->query();
+        if (data_get($this->parameters, 'application_uuid')) {
+            $this->type = 'application';
+            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+            $this->status = $this->resource->status;
+            if ($this->resource->destination->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->destination->server);
             }
-            $this->containers = $this->containers->sortByDesc(function ($container) {
-                if (str_contains($container, '-pr-')) {
-                    return explode('-pr-', $container)[1];
+            foreach ($this->resource->additional_servers as $server) {
+                if ($server->isFunctional()) {
+                    $this->servers = $this->servers->push($server);
                 }
-                return $container;
-            });
+            }
         } else if (data_get($this->parameters, 'database_uuid')) {
             $this->type = 'database';
             $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
@@ -74,7 +81,9 @@ class Logs extends Component
             }
             $this->resource = $resource;
             $this->status = $this->resource->status;
-            $this->server = $this->resource->destination->server;
+            if ($this->resource->destination->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->destination->server);
+            }
             $this->container = $this->resource->uuid;
             $this->containers->push($this->container);
         } else if (data_get($this->parameters, 'service_uuid')) {
@@ -87,7 +96,9 @@ class Logs extends Component
                 $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
             });
 
-            $this->server = $this->resource->server;
+            if ($this->resource->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->server);
+            }
         }
     }
 

@@ -727,7 +727,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->application->pull_request_id !== 0) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
@@ -735,7 +735,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ((bool) $this->application->settings->is_consistent_container_name_enabled) {
                     $this->application_deployment_queue->addLogEntry("Consistent container name feature enabled, rolling update is not supported.");
                 }
-                if ($this->application->pull_request_id !== 0) {
+                if ($this->pull_request_id !== 0) {
                     $this->application->settings->is_consistent_container_name_enabled = true;
                     $this->application_deployment_queue->addLogEntry("Pull request deployment, rolling update is not supported.");
                 }
@@ -1215,7 +1215,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         //     ];
         // }
 
-        if ($this->application->pull_request_id === 0) {
+        if ($this->pull_request_id === 0) {
             if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
                 $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
