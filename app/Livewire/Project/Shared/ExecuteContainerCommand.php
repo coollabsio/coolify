@@ -67,8 +67,8 @@ class ExecuteContainerCommand extends Component
                 }
             }
             $this->resource = $resource;
-            if ($this->resource->server->isFunctional()) {
-                $this->servers = $this->servers->push($this->resource->server);
+            if ($this->resource->destination->server->isFunctional()) {
+                $this->servers = $this->servers->push($this->resource->destination->server);
             }
             $this->container = $this->resource->uuid;
             $this->containers->push($this->container);
@@ -109,9 +109,9 @@ class ExecuteContainerCommand extends Component
                     ];
                     $this->containers = $this->containers->push($payload);
                 }
-            }
+            } 
         }
-        if ($containers->count() > 0) {
+        if ($this->containers->count() > 0) {
             if (data_get($this->parameters, 'application_uuid')) {
                 $this->container = data_get($this->containers->first(), 'container.Names');
             } elseif (data_get($this->parameters, 'database_uuid')) {
