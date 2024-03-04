@@ -1405,7 +1405,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]);
                             }
                         } else {
-                            $generatedValue = generateEnvValue($command, $service);
+                            $generatedValue = generateEnvValue($command);
                             if (!$foundEnv) {
                                 EnvironmentVariable::create([
                                     'key' => $key,
@@ -1581,7 +1581,7 @@ function parseEnvVariable(Str|string $value)
         'port' => $port,
     ];
 }
-function generateEnvValue(string $command, Service $service)
+function generateEnvValue(string $command, ?Service $service = null)
 {
     switch ($command) {
         case 'PASSWORD':
