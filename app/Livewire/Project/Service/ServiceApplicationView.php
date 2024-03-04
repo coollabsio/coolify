@@ -18,6 +18,7 @@ class ServiceApplicationView extends Component
         'application.required_fqdn' => 'required|boolean',
         'application.is_log_drain_enabled' => 'nullable|boolean',
         'application.is_gzip_enabled' => 'nullable|boolean',
+        'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
     public function render()
     {

@@ -20,6 +20,11 @@
                 helper="The deployed container will have the same name ({{ $application->uuid }}). <span class='font-bold text-warning'>You will lose the rolling update feature!</span>"
                 instantSave id="application.settings.is_consistent_container_name_enabled"
                 label="Consistent Container Names" />
+            <x-forms.checkbox label="Enable gzip compression"
+                helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this."
+                instantSave id="is_gzip_enabled" />
+            <x-forms.checkbox helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api."
+                instantSave id="is_stripprefix_enabled" label="Strip Prefixes" />
             <h3>Logs</h3>
             @if (!$application->settings->is_raw_compose_deployment_enabled)
                 <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."

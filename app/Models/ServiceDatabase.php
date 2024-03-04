@@ -21,9 +21,13 @@ class ServiceDatabase extends BaseModel
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
+    public function isStripprefixEnabled()
+    {
+        return data_get($this, 'is_stripprefix_enabled', true);
+    }
     public function isGzipEnabled()
     {
-        return true;
+        return data_get($this, 'is_gzip_enabled', true);
     }
     public function type()
     {

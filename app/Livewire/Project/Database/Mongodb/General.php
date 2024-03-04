@@ -44,9 +44,9 @@ class General extends Component
 
     public function mount()
     {
-        $this->db_url = $this->database->getDbUrl(true);
+        $this->db_url = $this->database->get_db_url(true);
         if ($this->database->is_public) {
-            $this->db_url_public = $this->database->getDbUrl();
+            $this->db_url_public = $this->database->get_db_url();
         }
     }
     public function instantSaveAdvanced()
@@ -95,7 +95,7 @@ class General extends Component
                     return;
                 }
                 StartDatabaseProxy::run($this->database);
-                $this->db_url_public = $this->database->getDbUrl();
+                $this->db_url_public = $this->database->get_db_url();
                 $this->dispatch('success', 'Database is now publicly accessible.');
             } else {
                 StopDatabaseProxy::run($this->database);

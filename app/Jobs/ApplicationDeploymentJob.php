@@ -374,6 +374,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->cleanup_git();
         $this->application->loadComposeFile(isInit: false);
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            $this->application->parseRawCompose();
             $yaml = $composeFile = $this->application->docker_compose_raw;
         } else {
             $composeFile = $this->application->parseCompose(pull_request_id: $this->pull_request_id);
@@ -413,16 +414,33 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             ]);
         }
         $this->write_deployment_configurations();
+
         // Start compose file
-        if ($this->docker_compose_custom_start_command) {
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
-            );
+        if ($this->application->settings->is_raw_compose_deployment_enabled) {
+            if ($this->docker_compose_custom_start_command) {
+                $this->execute_remote_command(
+                    ["cd {$this->basedir} && {$this->docker_compose_custom_start_command}", "hidden" => true],
+                );
+            } else {
+                $server_workdir = $this->application->workdir();
+                ray("SOURCE_COMMIT={$this->commit} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d");
+                $this->execute_remote_command(
+                    ["SOURCE_COMMIT={$this->commit} docker compose --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d", "hidden" => true],
+                );
+            }
         } else {
-            $this->execute_remote_command(
-                [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
-            );
+            if ($this->docker_compose_custom_start_command) {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "cd {$this->basedir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
+                );
+            } else {
+                $this->execute_remote_command(
+                    [executeInDocker($this->deployment_uuid, "SOURCE_COMMIT={$this->commit} docker compose --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d"), "hidden" => true],
+                );
+            }
         }
+
+
         $this->application_deployment_queue->addLogEntry("New container started.");
     }
     private function deploy_dockerfile_buildpack()

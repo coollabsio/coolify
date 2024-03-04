@@ -34,7 +34,9 @@
         <h3 class="pt-2">Advanced</h3>
         <div class="w-96">
             <x-forms.checkbox instantSave id="application.is_gzip_enabled" label="Enable gzip compression"
-            helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
+                helper="You can disable gzip compression if you want. Some services are compressing data by default. In this case, you do not need this." />
+            <x-forms.checkbox instantSave id="application.is_stripprefix_enabled" label="Strip Prefixes"
+                helper="Strip Prefix is used to remove prefixes from paths. Like /api/ to /api." />
             <x-forms.checkbox instantSave label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
                 id="application.exclude_from_status"></x-forms.checkbox>

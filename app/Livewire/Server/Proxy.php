@@ -4,6 +4,7 @@ namespace App\Livewire\Server;
 
 use App\Actions\Proxy\CheckConfiguration;
 use App\Actions\Proxy\SaveConfiguration;
+use App\Actions\Proxy\StartProxy;
 use App\Models\Server;
 use Livewire\Component;
 use Illuminate\Support\Str;
@@ -26,7 +27,7 @@ class Proxy extends Component
 
     public function proxyStatusUpdated()
     {
-        $this->server->refresh();
+        $this->dispatch('refresh')->self();
     }
 
     public function change_proxy()
@@ -41,6 +42,9 @@ class Proxy extends Component
         $this->server->proxy->set('type', $proxy_type);
         $this->server->save();
         $this->selectedProxy = $this->server->proxy->type;
+        if ($this->selectedProxy !== 'NONE') {
+            StartProxy::run($this->server, false);
+        }
         $this->dispatch('proxyStatusUpdated');
     }
 

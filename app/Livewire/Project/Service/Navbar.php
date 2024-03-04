@@ -6,7 +6,6 @@ use App\Actions\Shared\PullImage;
 use App\Actions\Service\StartService;
 use App\Actions\Service\StopService;
 use App\Events\ServiceStatusChanged;
-use App\Jobs\ContainerStatusJob;
 use App\Models\Service;
 use Livewire\Component;
 use Spatie\Activitylog\Models\Activity;
@@ -26,6 +25,10 @@ class Navbar extends Component
     public function serviceStatusChanged()
     {
         $this->dispatch('refresh')->self();
+    }
+    public function check_status() {
+        $this->dispatch('check_status');
+        $this->dispatch('success', 'Service status updated.');
     }
     public function render()
     {

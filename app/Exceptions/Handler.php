@@ -77,6 +77,9 @@ class Handler extends ExceptionHandler
                     );
                 }
             );
+            if (str($e->getMessage())->contains('No space left on device')) {
+                return;
+            }
             ray('reporting to sentry');
             Integration::captureUnhandledException($e);
         });

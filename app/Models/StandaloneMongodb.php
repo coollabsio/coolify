@@ -142,7 +142,7 @@ class StandaloneMongodb extends BaseModel
     {
         return 'standalone-mongodb';
     }
-    public function getDbUrl(bool $useInternal = false)
+    public function get_db_url(bool $useInternal = false)
     {
         if ($this->is_public && !$useInternal) {
             return "mongodb://{$this->mongo_initdb_root_username}:{$this->mongo_initdb_root_password}@{$this->destination->server->getIp}:{$this->public_port}/?directConnection=true";

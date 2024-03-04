@@ -1,8 +1,10 @@
 <div class="group">
-    @if (data_get($application, 'fqdn') ||
+    @if (
+        (data_get($application, 'fqdn') ||
             collect(json_decode($this->application->docker_compose_domains))->count() > 0 ||
             data_get($application, 'previews', collect([]))->count() > 0 ||
-            data_get($application, 'ports_mappings_array'))
+            data_get($application, 'ports_mappings_array')) &&
+            data_get($application, 'settings.is_raw_compose_deployment_enabled') !== true)
         <label tabindex="0" class="flex items-center gap-2 cursor-pointer hover:text-white"> Open Application
             <x-chevron-down />
         </label>

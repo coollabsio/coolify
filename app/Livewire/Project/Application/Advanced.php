@@ -9,6 +9,8 @@ class Advanced extends Component
 {
     public Application $application;
     public bool $is_force_https_enabled;
+    public bool $is_gzip_enabled;
+    public bool $is_stripprefix_enabled;
     protected $rules = [
         'application.settings.is_git_submodules_enabled' => 'boolean|required',
         'application.settings.is_git_lfs_enabled' => 'boolean|required',
@@ -19,13 +21,17 @@ class Advanced extends Component
         'application.settings.is_gpu_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
         'application.settings.is_consistent_container_name_enabled' => 'boolean|required',
+        'application.settings.is_gzip_enabled' => 'boolean|required',
+        'application.settings.is_stripprefix_enabled' => 'boolean|required',
         'application.settings.gpu_driver' => 'string|required',
         'application.settings.gpu_count' => 'string|required',
         'application.settings.gpu_device_ids' => 'string|required',
         'application.settings.gpu_options' => 'string|required',
     ];
     public function mount() {
-        $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
+        $this->is_force_https_enabled = $this->application->isForceHttpsEnabled();
+        $this->is_gzip_enabled = $this->application->isGzipEnabled();
+        $this->is_stripprefix_enabled = $this->application->isStripprefixEnabled();
     }
     public function instantSave()
     {
@@ -38,6 +44,14 @@ class Advanced extends Component
         }
         if ($this->application->settings->is_force_https_enabled !== $this->is_force_https_enabled) {
             $this->application->settings->is_force_https_enabled = $this->is_force_https_enabled;
+            $this->dispatch('resetDefaultLabels', false);
+        }
+        if ($this->application->settings->is_gzip_enabled !== $this->is_gzip_enabled) {
+            $this->application->settings->is_gzip_enabled = $this->is_gzip_enabled;
+            $this->dispatch('resetDefaultLabels', false);
+        }
+        if ($this->application->settings->is_stripprefix_enabled !== $this->is_stripprefix_enabled) {
+            $this->application->settings->is_stripprefix_enabled = $this->is_stripprefix_enabled;
             $this->dispatch('resetDefaultLabels', false);
         }
         $this->application->settings->save();

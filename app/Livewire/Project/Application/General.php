@@ -263,7 +263,11 @@ class General extends Component
             }
             if ($this->application->build_pack === 'dockercompose') {
                 $this->application->docker_compose_domains = json_encode($this->parsedServiceDomains);
-                $this->parsedServices = $this->application->parseCompose();
+                if ($this->application->settings->is_raw_compose_deployment_enabled) {
+                    $this->application->parseRawCompose();
+                } else {
+                    $this->parsedServices = $this->application->parseCompose();
+                }
             }
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();

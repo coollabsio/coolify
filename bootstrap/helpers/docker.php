@@ -215,7 +215,7 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
-function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?string $service_name = null)
+function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
 {
     $labels = collect([]);
     $labels->push('traefik.enable=true');
@@ -281,8 +281,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.services.{$https_label}.loadbalancer.server.port=$port");
                 }
                 if ($path !== '/') {
-                    $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $middlewares = collect(["{$https_label}-stripprefix"]);
+                    if ($is_stripprefix_enabled) {
+                        $labels->push("traefik.http.middlewares.{$https_label}-stripprefix.stripprefix.prefixes={$path}");
+                        $middlewares = collect(["{$https_label}-stripprefix"]);
+                    }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
@@ -334,8 +336,10 @@ function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_
                     $labels->push("traefik.http.routers.{$http_label}.service={$http_label}");
                 }
                 if ($path !== '/') {
-                    $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
-                    $middlewares = collect(["{$http_label}-stripprefix"]);
+                    if ($is_stripprefix_enabled) {
+                        $labels->push("traefik.http.middlewares.{$http_label}-stripprefix.stripprefix.prefixes={$path}");
+                        $middlewares = collect(["{$http_label}-stripprefix"]);
+                    }
                     if ($is_gzip_enabled) {
                         $middlewares->push('gzip');
                     }
@@ -392,7 +396,14 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
         // Add Traefik labels no matter which proxy is selected
-        $labels = $labels->merge(fqdnLabelsForTraefik($appUuid, $domains, $application->settings->is_force_https_enabled, $onlyPort));
+        $labels = $labels->merge(fqdnLabelsForTraefik(
+            uuid: $appUuid,
+            domains: $domains,
+            onlyPort: $onlyPort,
+            is_force_https_enabled: $application->isForceHttpsEnabled(),
+            is_gzip_enabled: $application->isGzipEnabled(),
+            is_stripprefix_enabled: $application->isStripprefixEnabled()
+        ));
     }
     return $labels->all();
 }

@@ -127,7 +127,7 @@ class StandaloneMysql extends BaseModel
         );
     }
 
-    public function getDbUrl(bool $useInternal = false): string
+    public function get_db_url(bool $useInternal = false): string
     {
         if ($this->is_public && !$useInternal) {
             return "mysql://{$this->mysql_user}:{$this->mysql_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->mysql_database}";

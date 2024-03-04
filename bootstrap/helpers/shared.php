@@ -1047,7 +1047,15 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled(), service_name: $serviceName));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            uuid: $resource->uuid,
+                            domains: $fqdns,
+                            is_force_https_enabled: true,
+                            serviceLabels: $serviceLabels,
+                            is_gzip_enabled: $savedService->isGzipEnabled(),
+                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                            service_name: $serviceName));
+
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
@@ -1249,7 +1257,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
-                    ray($networkDetails);
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });
@@ -1405,7 +1412,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]);
                             }
                         } else {
-                            $generatedValue = generateEnvValue($command, $service);
+                            $generatedValue = generateEnvValue($command);
                             if (!$foundEnv) {
                                 EnvironmentVariable::create([
                                     'key' => $key,
@@ -1581,7 +1588,7 @@ function parseEnvVariable(Str|string $value)
         'port' => $port,
     ];
 }
-function generateEnvValue(string $command, Service $service)
+function generateEnvValue(string $command, ?Service $service = null)
 {
     switch ($command) {
         case 'PASSWORD':

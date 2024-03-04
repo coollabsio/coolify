@@ -51,6 +51,9 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     {
         $this->backup = $backup;
         $this->team = Team::find($backup->team_id);
+        if (is_null($this->team)) {
+            return;
+        }
         if (data_get($this->backup, 'database_type') === 'App\Models\ServiceDatabase') {
             $this->database = data_get($this->backup, 'database');
             $this->server = $this->database->service->server;
@@ -316,7 +319,7 @@ class DatabaseBackupJob implements ShouldQueue, ShouldBeEncrypted
     private function backup_standalone_mongodb(string $databaseWithCollections): void
     {
         try {
-            $url = $this->database->getDbUrl(useInternal: true);
+            $url = $this->database->get_db_url(useInternal: true);
             if ($databaseWithCollections === 'all') {
                 $commands[] = "mkdir -p " . $this->backup_dir;
                 $commands[] = "docker exec $this->container_name mongodump --authenticationDatabase=admin --uri=$url --gzip --archive > $this->backup_location";

@@ -18,6 +18,7 @@ class Configuration extends Component
         $userId = auth()->user()->id;
         return [
             "echo-private:user.{$userId},ServiceStatusChanged" => 'check_status',
+            "check_status"
         ];
     }
     public function render()
