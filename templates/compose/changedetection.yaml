@@ -1,6 +1,7 @@
 # documentation: https://github.com/dgtlmoon/changedetection.io/
-# slogan: Website change detection monitor and notifications
+# slogan: Website change detection monitor and notifications.
 # tags: web, alert, monitor
+# logo: svgs/changedetection.png
 
 services:
   changedetection:

@@ -53,14 +53,14 @@
     },
     "changedetection": {
         "documentation": "https:\/\/github.com\/dgtlmoon\/changedetection.io\/",
-        "slogan": "Website change detection monitor and notifications",
+        "slogan": "Website change detection monitor and notifications.",
         "compose": "c2VydmljZXM6CiAgY2hhbmdlZGV0ZWN0aW9uOgogICAgaW1hZ2U6IGdoY3IuaW8vZGd0bG1vb24vY2hhbmdlZGV0ZWN0aW9uLmlvCiAgICB2b2x1bWVzOgogICAgICAtICdjaGFuZ2VkZXRlY3Rpb24tZGF0YTovZGF0YXN0b3JlJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX0NIQU5HRURFVEVDVElPTgogICAgICAtIFBVSUQ9MTAwMAogICAgICAtIFBHSUQ9MTAwMAogICAgICAtIEJBU0VfVVJMPSRTRVJWSUNFX0ZRRE5fQ0hBTkdFREVURUNUSU9OCiAgICAgIC0gJ1BMQVlXUklHSFRfRFJJVkVSX1VSTD13czovL3BsYXl3cmlnaHQtY2hyb21lOjMwMDAvP3N0ZWFsdGg9MSYtLWRpc2FibGUtd2ViLXNlY3VyaXR5PXRydWUnCiAgICAgIC0gSElERV9SRUZFUkVSPXRydWUKICAgIGRlcGVuZHNfb246CiAgICAgIHBsYXl3cmlnaHQtY2hyb21lOgogICAgICAgIGNvbmRpdGlvbjogc2VydmljZV9zdGFydGVkCiAgcGxheXdyaWdodC1jaHJvbWU6CiAgICBpbWFnZTogJ2RndGxtb29uL3NvY2twdXBwZXRicm93c2VyOmxhdGVzdCcKICAgIHJlc3RhcnQ6IHVubGVzcy1zdG9wcGVkCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTQ1JFRU5fV0lEVEg9MTkyMAogICAgICAtIFNDUkVFTl9IRUlHSFQ9MTAyNAogICAgICAtIFNDUkVFTl9ERVBUSD0xNgogICAgICAtIE1BWF9DT05DVVJSRU5UX0NIUk9NRV9QUk9DRVNTRVM9MTAK",
         "tags": [
             "web",
             "alert",
             "monitor"
         ],
-        "logo": "svgs\/unknown.svg",
+        "logo": "svgs\/changedetection.png",
         "minversion": "0.0.0"
     },
     "code-server": {
