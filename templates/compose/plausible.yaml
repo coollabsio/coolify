@@ -12,6 +12,7 @@ services:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible
       - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
+      - TOTP_VAULT_KEY=$SERVICE_BASE64_TOTP
     depends_on:
       - plausible_db
       - plausible_events_db
