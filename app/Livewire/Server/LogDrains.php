@@ -54,7 +54,7 @@ class LogDrains extends Component
     {
         try {
             InstallLogDrain::run($this->server);
-            if (!$this->server->is_log_drain_enabled()) {
+            if (!$this->server->isLogDrainEnabled()) {
                 $this->dispatch('serverRefresh');
                 $this->dispatch('success', 'Log drain service stopped.');
                 return;

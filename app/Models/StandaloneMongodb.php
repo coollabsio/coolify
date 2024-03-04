@@ -92,7 +92,7 @@ class StandaloneMongodb extends BaseModel
     {
         return data_get($this, 'environment.project.team');
     }
-    public function is_log_drain_enabled()
+    public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }

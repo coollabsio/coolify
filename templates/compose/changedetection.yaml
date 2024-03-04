@@ -5,8 +5,6 @@
 services:
   changedetection:
     image: ghcr.io/dgtlmoon/changedetection.io
-    container_name: changedetection
-    hostname: changedetection
     volumes:
       - changedetection-data:/datastore
     environment:
@@ -21,7 +19,6 @@ services:
       playwright-chrome:
         condition: service_started
   playwright-chrome:
-    hostname: playwright-chrome
     image: dgtlmoon/sockpuppetbrowser:latest
     # cap_add:
     #   - SYS_ADMIN

@@ -12,7 +12,7 @@
                 </div>
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        @if ($server->is_log_drain_enabled())
+                        @if ($server->isLogDrainEnabled())
                             <x-forms.input disabled type="password" required
                                 id="server.settings.logdrain_newrelic_license_key" label="License Key" />
                             <x-forms.input disabled required id="server.settings.logdrain_newrelic_base_uri"
@@ -44,7 +44,7 @@
             <form wire:submit='submit("axiom")' class="flex flex-col">
                 <div class="flex flex-col gap-4">
                     <div class="flex flex-col w-full gap-2 xl:flex-row">
-                        @if ($server->is_log_drain_enabled())
+                        @if ($server->isLogDrainEnabled())
                             <x-forms.input disabled type="password" required id="server.settings.logdrain_axiom_api_key"
                                 label="API Key" />
                             <x-forms.input disabled required id="server.settings.logdrain_axiom_dataset_name"
@@ -88,7 +88,7 @@
             </div>
             <form wire:submit='submit("custom")' class="flex flex-col">
                 <div class="flex flex-col gap-4">
-                    @if ($server->is_log_drain_enabled())
+                    @if ($server->isLogDrainEnabled())
                         <x-forms.textarea disabled rows="6" required id="server.settings.logdrain_custom_config"
                             label="Custom FluentBit Configuration" />
                         <x-forms.textarea disabled id="server.settings.logdrain_custom_config_parser"

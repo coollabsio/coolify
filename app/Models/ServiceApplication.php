@@ -19,15 +19,15 @@ class ServiceApplication extends BaseModel
             $service->fileStorages()->delete();
         });
     }
-    public function is_log_drain_enabled()
+    public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
-    public function is_stripprefix_enabled()
+    public function isStripprefixEnabled()
     {
         return data_get($this, 'is_stripprefix_enabled', true);
     }
-    public function is_gzip_enabled()
+    public function isGzipEnabled()
     {
         return data_get($this, 'is_gzip_enabled', true);
     }

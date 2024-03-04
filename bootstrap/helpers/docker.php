@@ -400,9 +400,9 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
             uuid: $appUuid,
             domains: $domains,
             onlyPort: $onlyPort,
-            is_force_https_enabled: $application->is_force_https_enabled(),
-            is_gzip_enabled: $application->is_gzip_enabled(),
-            is_stripprefix_enabled: $application->is_stripprefix_enabled()
+            is_force_https_enabled: $application->isForceHttpsEnabled(),
+            is_gzip_enabled: $application->isGzipEnabled(),
+            is_stripprefix_enabled: $application->isStripprefixEnabled()
         ));
     }
     return $labels->all();

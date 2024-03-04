@@ -29,14 +29,14 @@ class Advanced extends Component
         'application.settings.gpu_options' => 'string|required',
     ];
     public function mount() {
-        $this->is_force_https_enabled = $this->application->settings->is_force_https_enabled;
-        $this->is_gzip_enabled = $this->application->settings->is_gzip_enabled;
-        $this->is_stripprefix_enabled = $this->application->settings->is_stripprefix_enabled;
+        $this->is_force_https_enabled = $this->application->isForceHttpsEnabled();
+        $this->is_gzip_enabled = $this->application->isGzipEnabled();
+        $this->is_stripprefix_enabled = $this->application->isStripprefixEnabled();
     }
     public function instantSave()
     {
-        if ($this->application->is_log_drain_enabled()) {
-            if (!$this->application->destination->server->is_log_drain_enabled()) {
+        if ($this->application->isLogDrainEnabled()) {
+            if (!$this->application->destination->server->isLogDrainEnabled()) {
                 $this->application->settings->is_log_drain_enabled = false;
                 $this->dispatch('error', 'Log drain is not enabled on this server.');
                 return;

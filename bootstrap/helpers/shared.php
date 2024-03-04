@@ -1052,12 +1052,13 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             domains: $fqdns,
                             is_force_https_enabled: true,
                             serviceLabels: $serviceLabels,
-                            is_gzip_enabled: $savedService->is_gzip_enabled(),
-                            is_stripprefix_enabled: $savedService->is_stripprefix_enabled(),
+                            is_gzip_enabled: $savedService->isGzipEnabled(),
+                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                             service_name: $serviceName));
+
                     }
                 }
-                if ($resource->server->is_log_drain_enabled() && $savedService->is_log_drain_enabled()) {
+                if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
                     data_set($service, 'logging', [
                         'driver' => 'fluentd',
                         'options' => [
@@ -1501,7 +1502,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
-            if ($server->is_log_drain_enabled() && $resource->is_log_drain_enabled()) {
+            if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
                 data_set($service, 'logging', [
                     'driver' => 'fluentd',
                     'options' => [

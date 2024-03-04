@@ -97,7 +97,7 @@ class StandalonePostgresql extends BaseModel
         }
         return null;
     }
-    public function is_log_drain_enabled()
+    public function isLogDrainEnabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }

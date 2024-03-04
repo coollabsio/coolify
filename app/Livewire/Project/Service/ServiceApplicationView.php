@@ -30,7 +30,7 @@ class ServiceApplicationView extends Component
     }
     public function instantSaveAdvanced()
     {
-        if (!$this->application->service->destination->server->is_log_drain_enabled()) {
+        if (!$this->application->service->destination->server->isLogDrainEnabled()) {
             $this->application->is_log_drain_enabled = false;
             $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
             return;
