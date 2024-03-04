@@ -12,12 +12,23 @@
                 </div>
                 @if (!$branch_found)
                     <div class="px-2 pt-4">
-                        <p>Public repositories: <span class='text-helper'>https://...</span></p>
-                        <p>Private repositories: <span class='text-helper'>git@...</span></p>
-                        <p>Preselect branch: <span
-                                class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/static</span> to
-                            select 'static' branch.</p>
-                    </div>
+                        <div class="flex gap-1">
+                            <div>Public:</div>
+                            <div class='text-helper'>https://..</div>
+                        </div>
+                        <div class="flex gap-1">
+                            <div>Private:</div>
+                            <div class='text-helper'>git@..</div>
+                        </div>
+                        <div class="flex gap-1">
+                            <div>Preselect branch (eg: static):</div>
+                            <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/static</div>
+                        </div>
+                        <div>
+                            For example application deployments, checkout <a class="text-white underline"
+                                href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
+                                Examples</a>.
+                        </div>
                 @endif
                 @if ($branch_found)
                     @if ($rate_limit_remaining && $rate_limit_reset)
