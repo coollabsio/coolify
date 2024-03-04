@@ -1598,13 +1598,14 @@ function generateEnvValue(string $command, ?Service $service = null)
             $generatedValue = Str::password(length: 64, symbols: false);
             break;
         case 'BASE64_64':
-            $generatedValue = Str::random(64);
+            $generatedValue = base64_encode(Str::random(64));
             break;
         case 'BASE64_128':
-            $generatedValue = Str::random(128);
+            $generatedValue = base64_encode(Str::random(128));
             break;
         case 'BASE64':
-            $generatedValue = Str::random(32);
+        case 'BASE64_32':
+            $generatedValue = base64_encode(Str::random(32));
             break;
         case 'USER':
             $generatedValue = Str::random(16);
