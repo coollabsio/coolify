@@ -1054,8 +1054,8 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             serviceLabels: $serviceLabels,
                             is_gzip_enabled: $savedService->isGzipEnabled(),
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
-                            service_name: $serviceName));
-
+                            service_name: $serviceName
+                        ));
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
@@ -1597,6 +1597,7 @@ function generateEnvValue(string $command, ?Service $service = null)
         case 'PASSWORD_64':
             $generatedValue = Str::password(length: 64, symbols: false);
             break;
+            // This is not base64, it's just a random string
         case 'BASE64_64':
             $generatedValue = Str::random(64);
             break;
@@ -1604,7 +1605,19 @@ function generateEnvValue(string $command, ?Service $service = null)
             $generatedValue = Str::random(128);
             break;
         case 'BASE64':
+        case 'BASE64_32':
             $generatedValue = Str::random(32);
+            break;
+            // This is base64,
+        case 'REALBASE64_64':
+            $generatedValue = base64_encode(Str::random(64));
+            break;
+        case 'REALBASE64_128':
+            $generatedValue = base64_encode(Str::random(128));
+            break;
+        case 'REALBASE64':
+        case 'REALBASE64_32':
+            $generatedValue = base64_encode(Str::random(32));
             break;
         case 'USER':
             $generatedValue = Str::random(16);
