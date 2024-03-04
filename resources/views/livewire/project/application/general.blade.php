@@ -209,7 +209,11 @@
                         placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
                         id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @endif
-
+            @else
+            <x-forms.input
+                helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+                id="application.custom_docker_run_options" label="Custom Docker Options" />
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
