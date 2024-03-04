@@ -5,6 +5,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="preconnect" href="https://api.fonts.coollabs.io" crossorigin>
+    <link rel="dns-prefetch" href="https://api.fonts.coollabs.io" />
+    <link rel="preload" href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" as="style" />
+    <link rel="preload" href="https://cdn.fonts.coollabs.io/inter/normal/400.woff2" as="style" />
     <link href="https://api.fonts.coollabs.io/css2?family=Inter&display=swap" rel="stylesheet">
     <meta name="robots" content="noindex">
     <title>Coolify</title>
