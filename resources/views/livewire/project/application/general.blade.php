@@ -45,9 +45,11 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
+                    <div class="w-96">
                         <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
                             label="Raw Compose Deployment"
                             helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
+                    </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))

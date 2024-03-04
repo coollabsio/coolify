@@ -1249,7 +1249,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             // Collect/create/update networks
             if ($serviceNetworks->count() > 0) {
                 foreach ($serviceNetworks as $networkName => $networkDetails) {
-                    ray($networkDetails);
                     $networkExists = $topLevelNetworks->contains(function ($value, $key) use ($networkName) {
                         return $value == $networkName || $key == $networkName;
                     });

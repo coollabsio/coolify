@@ -26,7 +26,7 @@ class Proxy extends Component
 
     public function proxyStatusUpdated()
     {
-        $this->server->refresh();
+        $this->dispatch('refresh')->self();
     }
 
     public function change_proxy()
