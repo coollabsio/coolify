@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Models\Activity;
 use Illuminate\Support\Str;
 use RuntimeException;
+use Symfony\Component\Yaml\Yaml;
 use Visus\Cuid2\Cuid2;
 
 class Application extends BaseModel
@@ -476,6 +477,10 @@ class Application extends BaseModel
         }
         return false;
     }
+    public function workdir()
+    {
+        return application_configuration_dir() . "/{$this->uuid}";
+    }
     public function isLogDrainEnabled()
     {
         return data_get($this, 'settings.is_log_drain_enabled', false);
@@ -709,6 +714,64 @@ class Application extends BaseModel
                 'fullRepoUrl' => $fullRepoUrl
             ];
         }
+    }
+    function parseRawCompose()
+    {
+        try {
+            $yaml = Yaml::parse($this->docker_compose_raw);
+        } catch (\Exception $e) {
+            throw new \Exception($e->getMessage());
+        }
+        $services = data_get($yaml, 'services');
+        $commands = collect([]);
+        $services = collect($services)->map(function ($service) use ($commands) {
+            $serviceVolumes = collect(data_get($service, 'volumes', []));
+            if ($serviceVolumes->count() > 0) {
+                foreach ($serviceVolumes as $volume) {
+                    $workdir = $this->workdir();
+                    $type = null;
+                    $source = null;
+                    if (is_string($volume)) {
+                        $source = Str::of($volume)->before(':');
+                        if ($source->startsWith('./') || $source->startsWith('/') || $source->startsWith('~')) {
+                            $type = Str::of('bind');
+                        }
+                    } else if (is_array($volume)) {
+                        $type = data_get_str($volume, 'type');
+                        $source = data_get_str($volume, 'source');
+                    }
+                    if ($type->value() === 'bind') {
+                        if ($source->value() === "/var/run/docker.sock") {
+                            continue;
+                        }
+                        if ($source->value() === '/tmp' || $source->value() === '/tmp/') {
+                            continue;
+                        }
+                        if ($source->startsWith('.')) {
+                            $source = $source->after('.');
+                            $source = $workdir . $source;
+                        }
+                        $commands->push("mkdir -p $source > /dev/null 2>&1 || true");
+                    }
+                }
+            }
+            $labels = collect(data_get($service, 'labels', []));
+            if (!$labels->contains('coolify.managed')) {
+                $labels->push('coolify.managed=true');
+            }
+            if (!$labels->contains('coolify.applicationId')) {
+                $labels->push('coolify.applicationId=' . $this->id);
+            }
+            if (!$labels->contains('coolify.type')) {
+                $labels->push('coolify.type=application');
+            }
+            data_set($service, 'labels', $labels->toArray());
+            return $service;
+        });
+        data_set($yaml, 'services', $services->toArray());
+        $this->docker_compose_raw = Yaml::dump($yaml, 10, 2);
+
+        instant_remote_process($commands, $this->destination->server, false);
     }
     function parseCompose(int $pull_request_id = 0)
     {
