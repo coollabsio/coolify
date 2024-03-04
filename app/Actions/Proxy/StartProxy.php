@@ -15,6 +15,9 @@ class StartProxy
     {
         try {
             $proxyType = $server->proxyType();
+            if ($proxyType === 'NONE') {
+                return 'OK';
+            }
             $commands = collect([]);
             $proxy_path = get_proxy_path();
             $configuration = CheckConfiguration::run($server);
