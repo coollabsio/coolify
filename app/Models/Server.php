@@ -405,7 +405,7 @@ class Server extends BaseModel
     {
         return $this->settings->is_reachable && $this->settings->is_usable && !$this->settings->force_disabled;
     }
-    public function isLogDrainEnabled()
+    public function is_log_drain_enabled()
     {
         return $this->settings->is_logdrain_newrelic_enabled || $this->settings->is_logdrain_highlight_enabled || $this->settings->is_logdrain_axiom_enabled || $this->settings->is_logdrain_custom_enabled;
     }

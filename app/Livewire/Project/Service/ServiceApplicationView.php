@@ -18,6 +18,7 @@ class ServiceApplicationView extends Component
         'application.required_fqdn' => 'required|boolean',
         'application.is_log_drain_enabled' => 'nullable|boolean',
         'application.is_gzip_enabled' => 'nullable|boolean',
+        'application.is_stripprefix_enabled' => 'nullable|boolean',
     ];
     public function render()
     {
@@ -29,7 +30,7 @@ class ServiceApplicationView extends Component
     }
     public function instantSaveAdvanced()
     {
-        if (!$this->application->service->destination->server->isLogDrainEnabled()) {
+        if (!$this->application->service->destination->server->is_log_drain_enabled()) {
             $this->application->is_log_drain_enabled = false;
             $this->dispatch('error', 'Log drain is not enabled on the server. Please enable it first.');
             return;

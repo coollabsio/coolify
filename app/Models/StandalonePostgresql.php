@@ -97,7 +97,7 @@ class StandalonePostgresql extends BaseModel
         }
         return null;
     }
-    public function isLogDrainEnabled()
+    public function is_log_drain_enabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
@@ -126,7 +126,7 @@ class StandalonePostgresql extends BaseModel
     {
         return 'standalone-postgresql';
     }
-    public function getDbUrl(bool $useInternal = false): string
+    public function get_db_url(bool $useInternal = false): string
     {
         if ($this->is_public && !$useInternal) {
             return "postgres://{$this->postgres_user}:{$this->postgres_password}@{$this->destination->server->getIp}:{$this->public_port}/{$this->postgres_db}";

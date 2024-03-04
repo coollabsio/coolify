@@ -17,11 +17,11 @@ class ServiceDatabase extends BaseModel
             $service->fileStorages()->delete();
         });
     }
-    public function isLogDrainEnabled()
+    public function is_log_drain_enabled()
     {
         return data_get($this, 'is_log_drain_enabled', false);
     }
-    public function isGzipEnabled()
+    public function is_gzip_enabled()
     {
         return true;
     }

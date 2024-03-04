@@ -1047,10 +1047,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 $serviceLabels = $serviceLabels->merge($defaultLabels);
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($resource->uuid, $fqdns, true, serviceLabels: $serviceLabels, is_gzip_enabled: $savedService->isGzipEnabled(), service_name: $serviceName));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            uuid: $resource->uuid,
+                            domains: $fqdns,
+                            is_force_https_enabled: true,
+                            serviceLabels: $serviceLabels,
+                            is_gzip_enabled: $savedService->is_gzip_enabled(),
+                            is_stripprefix_enabled: $savedService->is_stripprefix_enabled(),
+                            service_name: $serviceName));
                     }
                 }
-                if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
+                if ($resource->server->is_log_drain_enabled() && $savedService->is_log_drain_enabled()) {
                     data_set($service, 'logging', [
                         'driver' => 'fluentd',
                         'options' => [
@@ -1494,7 +1501,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             $defaultLabels = defaultLabels($resource->id, $containerName, $pull_request_id, type: 'application');
             $serviceLabels = $serviceLabels->merge($defaultLabels);
 
-            if ($server->isLogDrainEnabled() && $resource->isLogDrainEnabled()) {
+            if ($server->is_log_drain_enabled() && $resource->is_log_drain_enabled()) {
                 data_set($service, 'logging', [
                     'driver' => 'fluentd',
                     'options' => [

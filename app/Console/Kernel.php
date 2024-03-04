@@ -77,7 +77,7 @@ class Kernel extends ConsoleKernel
             //         ray('dispatching container status job in ' . $randomSeconds . ' seconds');
             //         dispatch($job);
             //     })->name('container-status-' . $server->id)->everyMinute()->onOneServer();
-            if ($server->isLogDrainEnabled()) {
+            if ($server->is_log_drain_enabled()) {
                 $schedule->job(new CheckLogDrainContainerJob($server))->everyMinute()->onOneServer();
                 // $schedule
                 //     ->call(function () use ($server) {
