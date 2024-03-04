@@ -25,7 +25,7 @@
                     </div>
                     <div wire:loading.remove wire:target="loadProxyConfiguration">
                         @if ($proxy_settings)
-                            <div class="flex flex-col gap-2 pt-2">
+                            <div class="flex flex-col gap-2 pt-4">
                                 <x-forms.textarea label="Configuration file: traefik.conf" name="proxy_settings"
                                     wire:model="proxy_settings" rows="30" />
                                 <x-forms.button wire:click.prevent="reset_proxy_configuration">
