@@ -158,7 +158,7 @@ class User extends Authenticatable implements SendsEmail
     public function currentTeam()
     {
         return Cache::remember('team:' . auth()->user()->id, 3600, function () {
-            if (is_null(data_get(session('currentTeam'), 'id'))) {
+            if (is_null(data_get(session('currentTeam'), 'id')) && auth()->user()->teams->count() > 0){
                 return auth()->user()->teams[0];
             }
             return Team::find(session('currentTeam')->id);
