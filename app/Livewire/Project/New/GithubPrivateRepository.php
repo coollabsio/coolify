@@ -80,7 +80,7 @@ class GithubPrivateRepository extends Component
             }
         }
         if ($this->repositories->count() > 0) {
-            $this->selected_repository_id = $this->repositories[0]['id'];
+            $this->selected_repository_id = data_get($this->repositories,'0.id');
         }
         $this->current_step = 'repository';
     }
