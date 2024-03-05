@@ -8,14 +8,12 @@ use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Models\InstanceSettings;
 use App\Models\User;
-use App\Models\Waitlist;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Fortify\Contracts\RegisterResponse;
-use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -76,7 +74,11 @@ class FortifyServiceProvider extends ServiceProvider
             ) {
                 $user->updated_at = now();
                 $user->save();
-                session(['currentTeam' => $user->currentTeam = $user->teams->firstWhere('personal_team', true)]);
+                $user->currentTeam = $user->teams->firstWhere('personal_team', true);
+                if (!$user->currentTeam) {
+                    $user->currentTeam = $user->recreate_personal_team();
+                }
+                session(['currentTeam' => $user->currentTeam]);
                 return $user;
             }
         });

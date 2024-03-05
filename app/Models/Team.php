@@ -144,7 +144,6 @@ class Team extends Model implements SendsDiscord, SendsEmail
         $sources = collect([]);
         $github_apps = $this->hasMany(GithubApp::class)->whereisPublic(false)->get();
         $gitlab_apps = $this->hasMany(GitlabApp::class)->whereisPublic(false)->get();
-        // $bitbucket_apps = $this->hasMany(BitbucketApp::class)->get();
         $sources = $sources->merge($github_apps)->merge($gitlab_apps);
         return $sources;
     }

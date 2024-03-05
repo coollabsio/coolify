@@ -1,8 +1,8 @@
-@if (Str::of($complexStatus)->startsWith('running'))
+@if (str($complexStatus)->contains('running'))
     <x-status.running :status="$complexStatus" />
-@elseif(Str::of($complexStatus)->startsWith('restarting'))
+@elseif(str($complexStatus)->contains('restarting'))
     <x-status.restarting :status="$complexStatus" />
-@elseif(Str::of($complexStatus)->startsWith('degraded'))
+@elseif(str($complexStatus)->contains('degraded'))
     <x-status.degraded :status="$complexStatus" />
 @else
     <x-status.stopped :status="$complexStatus" />

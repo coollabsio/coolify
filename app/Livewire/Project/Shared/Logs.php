@@ -45,60 +45,64 @@ class Logs extends Component
     }
     public function mount()
     {
-        $this->containers = collect();
-        $this->servers = collect();
-        $this->parameters = get_route_parameters();
-        $this->query = request()->query();
-        if (data_get($this->parameters, 'application_uuid')) {
-            $this->type = 'application';
-            $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
-            $this->status = $this->resource->status;
-            if ($this->resource->destination->server->isFunctional()) {
-                $this->servers = $this->servers->push($this->resource->destination->server);
-            }
-            foreach ($this->resource->additional_servers as $server) {
-                if ($server->isFunctional()) {
-                    $this->servers = $this->servers->push($server);
+        try {
+            $this->containers = collect();
+            $this->servers = collect();
+            $this->parameters = get_route_parameters();
+            $this->query = request()->query();
+            if (data_get($this->parameters, 'application_uuid')) {
+                $this->type = 'application';
+                $this->resource = Application::where('uuid', $this->parameters['application_uuid'])->firstOrFail();
+                $this->status = $this->resource->status;
+                if ($this->resource->destination->server->isFunctional()) {
+                    $this->servers = $this->servers->push($this->resource->destination->server);
                 }
-            }
-        } else if (data_get($this->parameters, 'database_uuid')) {
-            $this->type = 'database';
-            $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
-            if (is_null($resource)) {
-                $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
+                foreach ($this->resource->additional_servers as $server) {
+                    if ($server->isFunctional()) {
+                        $this->servers = $this->servers->push($server);
+                    }
+                }
+            } else if (data_get($this->parameters, 'database_uuid')) {
+                $this->type = 'database';
+                $resource = StandalonePostgresql::where('uuid', $this->parameters['database_uuid'])->first();
                 if (is_null($resource)) {
-                    $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
+                    $resource = StandaloneRedis::where('uuid', $this->parameters['database_uuid'])->first();
                     if (is_null($resource)) {
-                        $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
+                        $resource = StandaloneMongodb::where('uuid', $this->parameters['database_uuid'])->first();
                         if (is_null($resource)) {
-                            $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
+                            $resource = StandaloneMysql::where('uuid', $this->parameters['database_uuid'])->first();
                             if (is_null($resource)) {
-                                abort(404);
+                                $resource = StandaloneMariadb::where('uuid', $this->parameters['database_uuid'])->first();
+                                if (is_null($resource)) {
+                                    abort(404);
+                                }
                             }
                         }
                     }
                 }
-            }
-            $this->resource = $resource;
-            $this->status = $this->resource->status;
-            if ($this->resource->destination->server->isFunctional()) {
-                $this->servers = $this->servers->push($this->resource->destination->server);
-            }
-            $this->container = $this->resource->uuid;
-            $this->containers->push($this->container);
-        } else if (data_get($this->parameters, 'service_uuid')) {
-            $this->type = 'service';
-            $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
-            $this->resource->applications()->get()->each(function ($application) {
-                $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
-            });
-            $this->resource->databases()->get()->each(function ($database) {
-                $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
-            });
+                $this->resource = $resource;
+                $this->status = $this->resource->status;
+                if ($this->resource->destination->server->isFunctional()) {
+                    $this->servers = $this->servers->push($this->resource->destination->server);
+                }
+                $this->container = $this->resource->uuid;
+                $this->containers->push($this->container);
+            } else if (data_get($this->parameters, 'service_uuid')) {
+                $this->type = 'service';
+                $this->resource = Service::where('uuid', $this->parameters['service_uuid'])->firstOrFail();
+                $this->resource->applications()->get()->each(function ($application) {
+                    $this->containers->push(data_get($application, 'name') . '-' . data_get($this->resource, 'uuid'));
+                });
+                $this->resource->databases()->get()->each(function ($database) {
+                    $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
+                });
 
-            if ($this->resource->server->isFunctional()) {
-                $this->servers = $this->servers->push($this->resource->server);
+                if ($this->resource->server->isFunctional()) {
+                    $this->servers = $this->servers->push($this->resource->server);
+                }
             }
+        } catch (\Exception $e) {
+            return handleError($e, $this);
         }
     }
 
