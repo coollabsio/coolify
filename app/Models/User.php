@@ -50,6 +50,21 @@ class User extends Authenticatable implements SendsEmail
             $user->teams()->attach($new_team, ['role' => 'owner']);
         });
     }
+    public function recreate_personal_team()
+    {
+        $team = [
+            'name' => $this->name . "'s Team",
+            'personal_team' => true,
+            'show_boarding' => true
+        ];
+        if ($this->id === 0) {
+            $team['id'] = 0;
+            $team['name'] = 'Root Team';
+        }
+        $new_team = Team::create($team);
+        $this->teams()->attach($new_team, ['role' => 'owner']);
+        return $new_team;
+    }
     public function createToken(string $name, array $abilities = ['*'], DateTimeInterface $expiresAt = null)
     {
         $plainTextToken = sprintf(

@@ -20,10 +20,11 @@
         <h4 class="pb-4">Delete Team</h4>
         @if (session('currentTeam.id') === 0)
             <div>This is the default team. You can't delete it.</div>
-        @elseif(auth()->user()->teams()->get()->count() === 1)
-            <div>You can't delete your last team.</div>
+        @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
+            <div>You can't delete your last / personal team.</div>
         @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
-            <div>Please cancel your subscription <a class="text-white underline" href="{{route('subscription.show')}}">here</a> before delete this team.</div>
+            <div>Please cancel your subscription <a class="text-white underline"
+                    href="{{ route('subscription.show') }}">here</a> before delete this team.</div>
         @else
             @if (currentTeam()->isEmpty())
                 <div class="pb-4">This will delete your team. Beware! There is no coming back!</div>

@@ -26,6 +26,7 @@ class TeamInvitation extends Model
             return true;
         } else {
             $this->delete();
+            return false;
         }
     }
 }
