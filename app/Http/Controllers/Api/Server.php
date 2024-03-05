@@ -19,11 +19,11 @@ class Server extends Controller
             $server['is_usable'] = $server->settings->is_usable;
             return $server;
         });
-        ray($servers);
         return response()->json($servers);
     }
     public function server_by_uuid(Request $request)
     {
+        $with_resources = $request->query('resources');
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
@@ -32,23 +32,26 @@ class Server extends Controller
         if (is_null($server)) {
             return response()->json(['error' => 'Server not found.'], 404);
         }
-        $server->load(['settings']);
-        $server['resources'] = $server->definedResources()->map(function ($resource) {
-            $payload = [
-                'id' => $resource->id,
-                'uuid' => $resource->uuid,
-                'name' => $resource->name,
-                'type' => $resource->type(),
-                'created_at' => $resource->created_at,
-                'updated_at' => $resource->updated_at,
-            ];
-            if ($resource->type() === 'service') {
-                $payload['status'] = $resource->status();
-            } else {
-                $payload['status'] = $resource->status;
-            }
-            return $payload;
-        });
+        if ($with_resources) {
+            $server['resources'] = $server->definedResources()->map(function ($resource) {
+                $payload = [
+                    'id' => $resource->id,
+                    'uuid' => $resource->uuid,
+                    'name' => $resource->name,
+                    'type' => $resource->type(),
+                    'created_at' => $resource->created_at,
+                    'updated_at' => $resource->updated_at,
+                ];
+                if ($resource->type() === 'service') {
+                    $payload['status'] = $resource->status();
+                } else {
+                    $payload['status'] = $resource->status;
+                }
+                return $payload;
+            });
+        } else {
+            $server->load(['settings']);
+        }
         return response()->json($server);
     }
 }
