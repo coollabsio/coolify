@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -27,7 +27,7 @@ if [ $EUID != 0 ]; then
 fi
 
 case "$OS_TYPE" in
-arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed) ;;
+arch | ubuntu | debian | raspbian | centos | fedora | rhel | ol | rocky | sles | opensuse-leap | opensuse-tumbleweed | almalinux) ;;
 *)
     echo "This script only supports Debian, Redhat, Arch Linux, or SLES based operating systems for now."
     exit
@@ -64,7 +64,7 @@ ubuntu | debian | raspbian)
     apt update -y >/dev/null 2>&1
     apt install -y curl wget git jq >/dev/null 2>&1
     ;;
-centos | fedora | rhel | ol | rocky)
+centos | fedora | rhel | ol | rocky | almalinux)
     dnf install -y curl wget git jq >/dev/null 2>&1
     ;;
 sles | opensuse-leap | opensuse-tumbleweed)
@@ -123,33 +123,48 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
 fi
 
 if ! [ -x "$(command -v docker)" ]; then
-    echo "Docker is not installed. Installing Docker."
-    if [ "$OS_TYPE" = "arch" ]; then
-        pacman -Sy docker docker-compose --noconfirm
-        systemctl enable docker.service
-        if [ -x "$(command -v docker)" ]; then
-            echo "Docker installed successfully."
-        else
-            echo "Failed to install Docker with pacman. Try to install it manually."
-            echo "Please visit https://wiki.archlinux.org/title/docker for more information."
-            exit
+    if [ "$OS_TYPE" == 'almalinux' ]; then
+        dnf config-manager --add-repo=https://download.docker.com/linux/centos/docker-ce.repo
+        dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+        if ! [ -x "$(command -v docker)" ]; then
+            echo "Docker could not be installed automatically. Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+            exit 1
         fi
+        systemctl start docker
+        systemctl enable docker
     else
-        curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
-        if [ -x "$(command -v docker)" ]; then
-            echo "Docker installed successfully."
-        else
-            echo "Docker installation failed with Rancher script. Trying with official script."
-            curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
-            if [ -x "$(command -v docker)" ]; then
-                echo "Docker installed successfully."
+        set +e
+        if ! [ -x "$(command -v docker)" ]; then
+            echo "Docker is not installed. Installing Docker."
+            if [ "$OS_TYPE" = "arch" ]; then
+                pacman -Sy docker docker-compose --noconfirm
+                systemctl enable docker.service
+                if [ -x "$(command -v docker)" ]; then
+                    echo "Docker installed successfully."
+                else
+                    echo "Failed to install Docker with pacman. Try to install it manually."
+                    echo "Please visit https://wiki.archlinux.org/title/docker for more information."
+                    exit
+                fi
             else
-                echo "Docker installation failed with official script."
-                echo "Maybe your OS is not supported?"
-                echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
-                exit 1
+                curl https://releases.rancher.com/install-docker/${DOCKER_VERSION}.sh | sh
+                if [ -x "$(command -v docker)" ]; then
+                    echo "Docker installed successfully."
+                else
+                    echo "Docker installation failed with Rancher script. Trying with official script."
+                    curl https://get.docker.com | sh -s -- --version ${DOCKER_VERSION}
+                    if [ -x "$(command -v docker)" ]; then
+                        echo "Docker installed successfully."
+                    else
+                        echo "Docker installation failed with official script."
+                        echo "Maybe your OS is not supported?"
+                        echo "Please visit https://docs.docker.com/engine/install/ and install Docker manually to continue."
+                        exit 1
+                    fi
+                fi
             fi
         fi
+        set -e
     fi
 fi
 
