@@ -79,6 +79,7 @@ class GithubPrivateRepository extends Component
                 $this->loadRepositoryByPage();
             }
         }
+        $this->repositories = $this->repositories->sortBy('name');
         if ($this->repositories->count() > 0) {
             $this->selected_repository_id = data_get($this->repositories,'0.id');
         }
