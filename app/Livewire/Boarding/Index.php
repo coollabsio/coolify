@@ -199,7 +199,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function installServer()
     {
-        $this->dispatch('validateServer', true);
+        $this->dispatch('init', true);
     }
     public function validateServer()
     {
