@@ -1,5 +1,5 @@
 # documentation: https://github.com/coollabsio/next-image-transformation
-# slogan: Self-hosted Next.js Image Transformation Service
+# slogan: Drop-in replacement for Vercel's Nextjs image optimization service.
 # tags: nextjs,image,transformation,service
 
 services:
@@ -22,7 +22,7 @@ services:
       - IMGPROXY_JPEG_PROGRESSIVE=true
       - IMGPROXY_USE_ETAG=true
     healthcheck:
-      test: [ "CMD", "imgproxy", "health" ]
+      test: ["CMD", "imgproxy", "health"]
       interval: 2s
       timeout: 10s
       retries: 5

@@ -514,7 +514,7 @@
     },
     "next-image-transformation": {
         "documentation": "https:\/\/github.com\/coollabsio\/next-image-transformation",
-        "slogan": "Self-hosted Next.js Image Transformation Service",
+        "slogan": "Drop-in replacement for Vercel's Nextjs image optimization service.",
         "compose": "c2VydmljZXM6CiAgbmV4dC1pbWFnZS10cmFuc2Zvcm1hdGlvbjoKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL25leHQtaW1hZ2UtdHJhbnNmb3JtYXRpb246bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1RSQU5TRk9STUFUSU9OCiAgICAgIC0gTk9ERV9FTlY9cHJvZHVjdGlvbgogICAgICAtICdBTExPV0VEX1JFTU9URV9ET01BSU5TPSR7QUxMT1dFRF9SRU1PVEVfRE9NQUlOUzotKn0nCiAgICAgIC0gJ0lNR1BST1hZX1VSTD0ke0lNR1BST1hZX1VSTDotaHR0cDovL2ltZ3Byb3h5OjgwODB9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6ICd3Z2V0IC1xTy0gaHR0cDovL2xvY2FsaG9zdDozMDAwL2hlYWx0aCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogNQogIGltZ3Byb3h5OgogICAgaW1hZ2U6IGRhcnRoc2ltL2ltZ3Byb3h5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBJTUdQUk9YWV9FTkFCTEVfV0VCUF9ERVRFQ1RJT049dHJ1ZQogICAgICAtIElNR1BST1hZX0pQRUdfUFJPR1JFU1NJVkU9dHJ1ZQogICAgICAtIElNR1BST1hZX1VTRV9FVEFHPXRydWUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBpbWdwcm94eQogICAgICAgIC0gaGVhbHRoCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogNQo=",
         "tags": [
             "nextjs",
