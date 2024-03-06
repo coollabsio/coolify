@@ -175,3 +175,7 @@ input.input-sm {
 option{
     @apply text-white;
 }
+
+.toast {
+    z-index: 1;
+}

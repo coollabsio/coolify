@@ -9,6 +9,8 @@
             <a :class="activeTab === 'smtp' && 'text-white'"
                 @click.prevent="activeTab = 'smtp'; window.location.hash = 'smtp'" href="#">Transactional
                 Email</a>
+            <a :class="activeTab === 'auth' && 'text-white'"
+                @click.prevent="activeTab = 'auth'; window.location.hash = 'auth'" href="#">Authentication</a>
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">
@@ -19,6 +21,9 @@
             </div>
             <div x-cloak x-show="activeTab === 'smtp'" class="h-full">
                 <livewire:settings.email :settings="$settings" />
+            </div>
+            <div x-cloak x-show="activeTab === 'auth'" class="h-full">
+                <livewire:settings.auth />
             </div>
         </div>
     </div>

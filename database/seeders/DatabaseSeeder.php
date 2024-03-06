@@ -32,6 +32,7 @@ class DatabaseSeeder extends Seeder
             StandalonePostgresqlSeeder::class,
             ScheduledDatabaseBackupSeeder::class,
             ScheduledDatabaseBackupExecutionSeeder::class,
+            OauthSettingSeeder::class,
         ]);
     }
 }
