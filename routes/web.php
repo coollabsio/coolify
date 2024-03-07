@@ -121,11 +121,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', TagsIndex::class)->name('tags.index');
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', TeamNotificationIndex::class)->name('notification.index');
+    });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
-        Route::get('/notifications', TeamNotificationIndex::class)->name('team.notification.index');
         Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
         Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
         Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
