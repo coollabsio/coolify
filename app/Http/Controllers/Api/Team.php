@@ -26,7 +26,7 @@ class Team extends Controller
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
         if (is_null($team)) {
-            return response()->json(['error' => 'Team not found.'], 404);
+            return response()->json(['error' => 'Team not found.',  "docs" => "https://coolify.io/docs/api/team-by-id"], 404);
         }
         return response()->json($team);
     }
@@ -40,7 +40,7 @@ class Team extends Controller
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
         if (is_null($team)) {
-            return response()->json(['error' => 'Team not found.'], 404);
+            return response()->json(['error' => 'Team not found.', "docs" => "https://coolify.io/docs/api/team-by-members"], 404);
         }
         return response()->json($team->members);
     }
@@ -53,7 +53,8 @@ class Team extends Controller
         $team = auth()->user()->currentTeam();
         return response()->json($team);
     }
-    public function current_team_members(Request $request) {
+    public function current_team_members(Request $request)
+    {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
             return invalid_token();
