@@ -6,7 +6,7 @@ set -e # Exit immediately if a command exits with a non-zero status
 #set -u # Treat unset variables as an error and exit
 set -o pipefail # Cause a pipeline to return the status of the last command that exited with a non-zero status
 
-VERSION="1.2.2"
+VERSION="1.2.3"
 DOCKER_VERSION="24.0"
 
 CDN="https://cdn.coollabs.io/coolify"
@@ -120,6 +120,16 @@ if [ "$SSH_PERMIT_ROOT_LOGIN" != "true" ]; then
     echo -e "Please make sure it is set, otherwise Coolify cannot connect to the host system. \n"
     echo "(Currently we only support root user to login via SSH, this will be changed in the future.)"
     echo "###############################################################################"
+fi
+
+# Detect if docker is installed via snap
+if [ -x "$(command -v snap)" ]; then
+    if snap list | grep -q docker; then
+        echo "Docker is installed via snap."
+        echo "Please note that Coolify does not support Docker installed via snap."
+        echo "Please remove Docker with snap (snap remove docker) and reexecute this script."
+        exit 1
+    fi
 fi
 
 if ! [ -x "$(command -v docker)" ]; then
