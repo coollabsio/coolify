@@ -11,7 +11,7 @@ class Team extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $teams = auth()->user()->teams;
         return response()->json($teams);
@@ -21,7 +21,7 @@ class Team extends Controller
         $id = $request->id;
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
@@ -35,7 +35,7 @@ class Team extends Controller
         $id = $request->id;
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $teams = auth()->user()->teams;
         $team = $teams->where('id', $id)->first();
@@ -48,7 +48,7 @@ class Team extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $team = auth()->user()->currentTeam();
         return response()->json($team);
@@ -56,7 +56,7 @@ class Team extends Controller
     public function current_team_members(Request $request) {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $team = auth()->user()->currentTeam();
         return response()->json($team->members);

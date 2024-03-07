@@ -12,7 +12,7 @@ class Project extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $projects = ModelsProject::whereTeamId($teamId)->select('id', 'name', 'uuid')->get();
         return response()->json($projects);
@@ -21,7 +21,7 @@ class Project extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $project = ModelsProject::whereTeamId($teamId)->whereUuid(request()->uuid)->first()->load(['environments']);
         return response()->json($project);
@@ -30,7 +30,7 @@ class Project extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $project = ModelsProject::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         $environment = $project->environments()->whereName(request()->environment_name)->first()->load(['applications', 'postgresqls', 'redis', 'mongodbs', 'mysqls', 'mariadbs', 'services']);

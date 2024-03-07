@@ -9,13 +9,32 @@ use App\Actions\Database\StartPostgresql;
 use App\Actions\Database\StartRedis;
 use App\Actions\Service\StartService;
 use App\Http\Controllers\Controller;
+use App\Models\ApplicationDeploymentQueue;
+use App\Models\Server;
 use App\Models\Tag;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Visus\Cuid2\Cuid2;
 
 class Deploy extends Controller
 {
+    public function deployments(Request $request) {
+        $teamId = get_team_id_from_token();
+        if (is_null($teamId)) {
+            return invalid_token();
+        }
+        $servers = Server::whereTeamId($teamId)->get();
+        $deployments_per_server = ApplicationDeploymentQueue::whereIn("status", ["in_progress", "queued"])->whereIn("server_id", $servers->pluck("id"))->get([
+            "id",
+            "application_id",
+            "application_name",
+            "deployment_url",
+            "pull_request_id",
+            "server_name",
+            "server_id",
+            "status"
+        ])->sortBy('id')->toArray();
+        return response()->json($deployments_per_server, 200);
+    }
     public function deploy(Request $request)
     {
         $teamId = get_team_id_from_token();
@@ -27,7 +46,7 @@ class Deploy extends Controller
             return response()->json(['error' => 'You can only use uuid or tag, not both.', 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 400);
         }
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         if ($tags) {
             return $this->by_tags($tags, $teamId, $force);

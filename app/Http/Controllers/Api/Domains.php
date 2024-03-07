@@ -13,7 +13,7 @@ class Domains extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $projects = ModelsProject::where('team_id', $teamId)->get();
         $domains = collect();

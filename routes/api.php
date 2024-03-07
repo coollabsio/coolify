@@ -32,6 +32,7 @@ Route::group([
         return response(config('version'));
     });
     Route::get('/deploy', [Deploy::class, 'deploy']);
+    Route::get('/deployments', [Deploy::class, 'deployments']);
 
     Route::get('/servers', [Server::class, 'servers']);
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
