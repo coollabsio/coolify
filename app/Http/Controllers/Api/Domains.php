@@ -48,7 +48,12 @@ class Domains extends Controller
         }
         $domains = $domains->groupBy('ip')->map(function ($domain) {
             return $domain->pluck('domain')->flatten();
-        });
+        })->map(function ($domain, $ip) {
+            return [
+                'ip' => $ip,
+                'domains' => $domain,
+            ];
+        })->values();
 
         return response()->json($domains);
     }
