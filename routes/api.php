@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Domains;
 use App\Http\Controllers\Api\Project;
 use App\Http\Controllers\Api\Resources;
 use App\Http\Controllers\Api\Server;
+use App\Http\Controllers\Api\Team;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +36,13 @@ Route::group([
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
     Route::get('/resources', [Resources::class, 'resources']);
     Route::get('/domains', [Domains::class, 'domains']);
+    Route::get('/teams', [Team::class, 'teams']);
+    Route::get('/team/current', [Team::class, 'current_team']);
+    Route::get('/team/current/members', [Team::class, 'current_team_members']);
+    Route::get('/team/{id}', [Team::class, 'team_by_id']);
+    Route::get('/team/{id}/members', [Team::class, 'members_by_id']);
+
+
     //Route::get('/projects', [Project::class, 'projects']);
     //Route::get('/project/{uuid}', [Project::class, 'project_by_uuid']);
     //Route::get('/project/{uuid}/{environment_name}', [Project::class, 'environment_details']);
