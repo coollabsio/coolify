@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\InstanceSettings;
 use App\Models\Project as ModelsProject;
 use Illuminate\Http\Request;
 
@@ -17,9 +18,13 @@ class Domains extends Controller
         $projects = ModelsProject::where('team_id', $teamId)->get();
         $domains = collect();
         $applications = $projects->pluck('applications')->flatten();
+        $settings = InstanceSettings::get();
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;
+                if ($ip === 'host.docker.internal') {
+                    $ip =  $settings->ipv4 || $settings->ipv6 || 'host.docker.internal';
+                }
                 $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
                     return str($fqdn)->replace('http://', '')->replace('https://', '')->replace('/', '');
                 });
