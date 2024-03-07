@@ -45,15 +45,24 @@ class Deploy extends Controller
             return response()->json(['error' => 'No UUIDs provided.', 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 400);
         }
         $message = collect([]);
+        $deployments = collect();
+        $payload = collect();
         foreach ($uuids as $uuid) {
             $resource = getResourceByUuid($uuid, $teamId);
             if ($resource) {
-                $return_message = $this->deploy_resource($resource, $force);
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
+                if ($deployment_uuid) {
+                    $deployments->push(['resource_uuid' => $uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                }
                 $message = $message->merge($return_message);
             }
         }
         if ($message->count() > 0) {
-            return response()->json(['message' => $message->toArray()], 200);
+            $payload->put('message', $message->toArray());
+            if ($deployments->count() > 0) {
+                $payload->put('details', $deployments->toArray());
+            }
+            return response()->json($payload->toArray(), 200);
         }
         return response()->json(['error' => "No resources found.", 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 404);
     }
@@ -66,6 +75,8 @@ class Deploy extends Controller
             return response()->json(['error' => 'No TAGs provided.', 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 400);
         }
         $message = collect([]);
+        $deployments = collect();
+        $payload = collect();
         foreach ($tags as $tag) {
             $found_tag = Tag::where(['name' => $tag, 'team_id' => $team_id])->first();
             if (!$found_tag) {
@@ -79,21 +90,28 @@ class Deploy extends Controller
                 continue;
             }
             foreach ($applications as $resource) {
-                $return_message = $this->deploy_resource($resource, $force);
+                ['message' => $return_message, 'deployment_uuid' => $deployment_uuid] = $this->deploy_resource($resource, $force);
+                if ($deployment_uuid) {
+                    $deployments->push(['resource_uuid' => $resource->uuid, 'deployment_uuid' => $deployment_uuid->toString()]);
+                }
                 $message = $message->merge($return_message);
             }
             foreach ($services as $resource) {
-                $return_message = $this->deploy_resource($resource, $force);
+                ['message' => $return_message] = $this->deploy_resource($resource, $force);
                 $message = $message->merge($return_message);
             }
         }
         if ($message->count() > 0) {
-            return response()->json(['message' => $message->toArray()], 200);
+            $payload->put('message', $message->toArray());
+            if ($deployments->count() > 0) {
+                $payload->put('details', $deployments->toArray());
+            }
+            return response()->json($payload->toArray(), 200);
         }
 
         return response()->json(['error' => "No resources found.", 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 404);
     }
-    public function deploy_resource($resource, bool $force = false): Collection
+    public function deploy_resource($resource, bool $force = false): array
     {
         $message = collect([]);
         if (gettype($resource) !== 'object') {
@@ -101,9 +119,10 @@ class Deploy extends Controller
         }
         $type = $resource?->getMorphClass();
         if ($type === 'App\Models\Application') {
+            $deployment_uuid = new Cuid2(7);
             queue_application_deployment(
                 application: $resource,
-                deployment_uuid: new Cuid2(7),
+                deployment_uuid: $deployment_uuid,
                 force_rebuild: $force,
             );
             $message->push("Application {$resource->name} deployment queued.");
@@ -156,6 +175,6 @@ class Deploy extends Controller
             StartService::run($resource);
             $message->push("Service {$resource->name} started. It could take a while, be patient.");
         }
-        return $message;
+        return ['message' => $message, 'deployment_uuid' => $deployment_uuid];
     }
 }

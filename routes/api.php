@@ -32,10 +32,13 @@ Route::group([
         return response(config('version'));
     });
     Route::get('/deploy', [Deploy::class, 'deploy']);
+
     Route::get('/servers', [Server::class, 'servers']);
     Route::get('/server/{uuid}', [Server::class, 'server_by_uuid']);
+
     Route::get('/resources', [Resources::class, 'resources']);
     Route::get('/domains', [Domains::class, 'domains']);
+
     Route::get('/teams', [Team::class, 'teams']);
     Route::get('/team/current', [Team::class, 'current_team']);
     Route::get('/team/current/members', [Team::class, 'current_team_members']);
