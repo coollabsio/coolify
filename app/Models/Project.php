@@ -45,6 +45,10 @@ class Project extends BaseModel
         return $this->belongsTo(Team::class);
     }
 
+    public function services()
+    {
+        return $this->hasManyThrough(Service::class, Environment::class);
+    }
     public function applications()
     {
         return $this->hasManyThrough(Application::class, Environment::class);

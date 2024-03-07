@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\Deploy;
+use App\Http\Controllers\Api\Domains;
 use App\Http\Controllers\Api\Project;
 use App\Http\Controllers\Api\Server;
 use Illuminate\Http\Request;
@@ -34,6 +35,7 @@ Route::group([
     Route::get('/projects', [Project::class, 'projects']);
     Route::get('/project/{uuid}', [Project::class, 'project_by_uuid']);
     Route::get('/project/{uuid}/{environment_name}', [Project::class, 'environment_details']);
+    Route::get('/domains', [Domains::class, 'domains']);
 });
 
 Route::get('/{any}', function () {
