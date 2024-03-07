@@ -22,16 +22,36 @@ class Domains extends Controller
         if ($applications->count() > 0) {
             foreach ($applications as $application) {
                 $ip = $application->destination->server->ip;
-                if ($ip === 'host.docker.internal') {
-                    $ip =  $settings->ipv4 || $settings->ipv6 || 'host.docker.internal';
-                }
                 $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
                     return str($fqdn)->replace('http://', '')->replace('https://', '')->replace('/', '');
                 });
-                $domains->push([
-                    'domain' => $fqdn,
-                    'ip' => $ip,
-                ]);
+                if ($ip === 'host.docker.internal') {
+                    if ($settings->public_ipv4) {
+                        $domains->push([
+                            'domain' => $fqdn,
+                            'ip' => $settings->public_ipv4,
+                        ]);
+                    }
+                    if ($settings->public_ipv6) {
+                        $domains->push([
+                            'domain' => $fqdn,
+                            'ip' => $settings->public_ipv6,
+                        ]);
+                    }
+                    if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                        $domains->push([
+                            'domain' => $fqdn,
+                            'ip' => $ip,
+                        ]);
+                    }
+                } else {
+                    if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                        $domains->push([
+                            'domain' => $fqdn,
+                            'ip' => $ip,
+                        ]);
+                    }
+                }
             }
         }
         $services = $projects->pluck('services')->flatten();
@@ -43,10 +63,33 @@ class Domains extends Controller
                         $fqdn = str($application->fqdn)->explode(',')->map(function ($fqdn) {
                             return str($fqdn)->replace('http://', '')->replace('https://', '')->replace('/', '');
                         });
-                        $domains->push([
-                            'domain' => $fqdn,
-                            'ip' => $ip,
-                        ]);
+                        if ($ip === 'host.docker.internal') {
+                            if ($settings->public_ipv4) {
+                                $domains->push([
+                                    'domain' => $fqdn,
+                                    'ip' => $settings->public_ipv4,
+                                ]);
+                            }
+                            if ($settings->public_ipv6) {
+                                $domains->push([
+                                    'domain' => $fqdn,
+                                    'ip' => $settings->public_ipv6,
+                                ]);
+                            }
+                            if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                                $domains->push([
+                                    'domain' => $fqdn,
+                                    'ip' => $ip,
+                                ]);
+                            }
+                        } else {
+                            if (!$settings->public_ipv4 && !$settings->public_ipv6) {
+                                $domains->push([
+                                    'domain' => $fqdn,
+                                    'ip' => $ip,
+                                ]);
+                            }
+                        }
                     }
                 }
             }
