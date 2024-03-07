@@ -18,11 +18,9 @@ class Resources extends Controller
         $resources = collect();
         $resources->push($projects->pluck('applications')->flatten());
         $resources->push($projects->pluck('services')->flatten());
-        $resources->push($projects->pluck('postgresqls')->flatten());
-        $resources->push($projects->pluck('redis')->flatten());
-        $resources->push($projects->pluck('mongodbs')->flatten());
-        $resources->push($projects->pluck('mysqls')->flatten());
-        $resources->push($projects->pluck('mariadbs')->flatten());
+        foreach (collect(DATABASE_TYPES) as $db) {
+            $resources->push($projects->pluck(str($db)->plural(2))->flatten());
+        }
         $resources = $resources->flatten();
         return response()->json($resources);
     }
