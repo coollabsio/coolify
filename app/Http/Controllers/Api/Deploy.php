@@ -99,7 +99,7 @@ class Deploy extends Controller
         foreach ($tags as $tag) {
             $found_tag = Tag::where(['name' => $tag, 'team_id' => $team_id])->first();
             if (!$found_tag) {
-                $message->push("Tag {$tag} not found.");
+                // $message->push("Tag {$tag} not found.");
                 continue;
             }
             $applications = $found_tag->applications()->get();
@@ -120,6 +120,7 @@ class Deploy extends Controller
                 $message = $message->merge($return_message);
             }
         }
+        ray($message);
         if ($message->count() > 0) {
             $payload->put('message', $message->toArray());
             if ($deployments->count() > 0) {
@@ -128,7 +129,7 @@ class Deploy extends Controller
             return response()->json($payload->toArray(), 200);
         }
 
-        return response()->json(['error' => "No resources found.", 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 404);
+        return response()->json(['error' => "No resources found with this tag.", 'docs' => 'https://coolify.io/docs/api/deploy-webhook'], 404);
     }
     public function deploy_resource($resource, bool $force = false): array
     {
