@@ -3,7 +3,7 @@
     <div>
         @if ($currentState === 'welcome')
             <h1 class="text-5xl font-bold">Welcome to Coolify</h1>
-            <p class="py-6 text-xl text-center">Let me help you to set the basics.</p>
+            <p class="py-6 text-xl text-center">Let me help you set up the basics.</p>
             <div class="flex justify-center ">
                 <x-forms.button class="justify-center w-64 box" wire:click="$set('currentState','explanation')">Get
                     Started
@@ -24,12 +24,12 @@
                         <x-highlighted text="Self-hosting with superpowers!" /></span>
                 </x-slot:question>
                 <x-slot:explanation>
-                    <p><x-highlighted text="Task automation:" /> You do not to manage your servers too much. Coolify do
+                    <p><x-highlighted text="Task automation:" /> You don't need to manage your servers anymore. Coolify does
                         it for you.</p>
-                    <p><x-highlighted text="No vendor lock-in:" /> All configurations are stored on your server, so
-                        everything works without Coolify (except integrations and automations).</p>
-                    <p><x-highlighted text="Monitoring:" />You will get notified on your favourite platform (Discord,
-                        Telegram, Email, etc.) when something goes wrong, or an action needed from your side.</p>
+                    <p><x-highlighted text="No vendor lock-in:" /> All configurations are stored on your servers, so
+                        everything works without a connection to Coolify (except integrations and automations).</p>
+                    <p><x-highlighted text="Monitoring:" />You can get notified on your favourite platforms (Discord,
+                        Telegram, Email, etc.) when something goes wrong, or an action is needed from your side.</p>
                 </x-slot:explanation>
                 <x-slot:actions>
                     <x-forms.button class="justify-center w-64 box" wire:click="explanation">Next
@@ -40,8 +40,8 @@
         @if ($currentState === 'select-server-type')
             <x-boarding-step title="Server">
                 <x-slot:question>
-                    Do you want to deploy your resources on your <x-highlighted text="Localhost" />
-                    or on a <x-highlighted text="Remote Server" />?
+                    Do you want to deploy your resources to your <x-highlighted text="Localhost" />
+                    or to a <x-highlighted text="Remote Server" />?
                 </x-slot:question>
                 <x-slot:actions>
                     <x-forms.button class="justify-center w-64 box" wire:target="setServerType('localhost')"
@@ -297,12 +297,12 @@
                         You already have some projects. Do you want to use one of them or should I create a new one for
                         you?
                     @else
-                        I will create an initial project for you. You can change all the details later on.
+                        Let's create an initial project for you. You can change all the details later on.
                     @endif
                 </x-slot:question>
                 <x-slot:actions>
-                    <x-forms.button class="justify-center w-64 box" wire:click="createNewProject">Let's create a new
-                        one!</x-forms.button>
+                    <x-forms.button class="justify-center w-64 box" wire:click="createNewProject">Create new
+                        project!</x-forms.button>
                     <div>
                         @if (count($projects) > 0)
                             <form wire:submit='selectExistingProject' class="flex flex-col w-full gap-4 lg:w-96">
@@ -319,9 +319,9 @@
                     </div>
                 </x-slot:actions>
                 <x-slot:explanation>
-                    <p>Projects are bound together several resources into one virtual group. There are no
-                        limitations on the number of projects you could have.</p>
-                    <p>Each project should have at least one environment. This helps you to create a production &
+                    <p>Projects contain several resources combined into one virtual group. There are no
+                        limitations on the number of projects you can add.</p>
+                    <p>Each project should have at least one environment, this allows you to create a production &
                         staging version of the same application, but grouped separately.</p>
                 </x-slot:explanation>
             </x-boarding-step>
@@ -331,7 +331,7 @@
         @if ($currentState === 'create-resource')
             <x-boarding-step title="Resources">
                 <x-slot:question>
-                    I will redirect you to the new resource page, where you can create your first resource.
+                    Let's go to the new resource page, where you can create your first resource.
                 </x-slot:question>
                 <x-slot:actions>
                     <div class="items-center justify-center w-64 box" wire:click="showNewResource">Let's do
