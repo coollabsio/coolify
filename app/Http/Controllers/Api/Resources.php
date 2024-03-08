@@ -22,6 +22,16 @@ class Resources extends Controller
             $resources->push($projects->pluck(str($db)->plural(2))->flatten());
         }
         $resources = $resources->flatten();
+        $resources = $resources->map(function ($resource) {
+            $payload = $resource->toArray();
+            if ($resource->getMorphClass() === 'App\Models\Service') {
+                $payload['status'] = $resource->status();
+            } else {
+                $payload['status'] = $resource->status;
+            }
+            $payload['type'] = $resource->type();
+            return $payload;
+        });
         return response()->json($resources);
     }
 
