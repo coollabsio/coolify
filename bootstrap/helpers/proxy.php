@@ -186,6 +186,9 @@ function generate_default_proxy_configuration(Server $server)
                     "extra_hosts" => [
                         "host.docker.internal:host-gateway",
                     ],
+                    "environment" => [
+                        "CADDY_DOCKER_POLLING_INTERVAL=5s",
+                    ],
                     "networks" => $networks->toArray(),
                     "ports" => [
                         "80:80",
