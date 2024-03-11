@@ -249,8 +249,9 @@ class Server extends BaseModel
                 if (empty($settings->fqdn)) {
                     instant_remote_process([
                         "rm -f $file",
-                        "docker exec coolify-proxy caddy reload --config /dynamic/Caddyfile",
                     ], $this);
+                    $this->reloadCaddy();
+
                 } else {
                     $url = Url::fromString($settings->fqdn);
                     $host = $url->getHost();
@@ -262,11 +263,16 @@ $schema://$host {
                     $base64 = base64_encode($caddy_file);
                     instant_remote_process([
                         "echo '$base64' | base64 -d > $file",
-                        "docker exec coolify-proxy caddy reload --config /dynamic/Caddyfile",
                     ], $this);
+                    $this->reloadCaddy();
                 }
             }
         }
+    }
+    public function reloadCaddy() {
+        return instant_remote_process([
+            "docker exec coolify-proxy caddy reload --config /dynamic/Caddyfile",
+        ], $this);
     }
     public function proxyPath()
     {

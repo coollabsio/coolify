@@ -19,7 +19,7 @@
                                     Add</button>
                             </x-slide-over>
                         </div>
-                        <div class='pb-4'>You can add dynamic Traefik configurations here.</div>
+                        <div class='pb-4'>You can add dynamic proxy configurations here.</div>
                     </div>
                 </div>
                 <div wire:loading wire:target="loadDynamicConfigurations">
@@ -29,7 +29,7 @@
                     @if ($contents?->isNotEmpty())
                         @foreach ($contents as $fileName => $value)
                             <div class="flex flex-col gap-2 py-2">
-                                @if (str_replace('|', '.', $fileName) === 'coolify.yaml')
+                                @if (str_replace('|', '.', $fileName) === 'coolify.yaml' ||str_replace('|', '.', $fileName) === 'Caddyfile' )
                                     <div>
                                         <h3 class="text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
                                     </div>
