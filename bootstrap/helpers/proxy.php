@@ -188,6 +188,7 @@ function generate_default_proxy_configuration(Server $server)
                     ],
                     "environment" => [
                         "CADDY_DOCKER_POLLING_INTERVAL=5s",
+                        "CADDY_DOCKER_CADDYFILE_PATH=/dynamic/Caddyfile",
                     ],
                     "networks" => $networks->toArray(),
                     "ports" => [
@@ -202,6 +203,7 @@ function generate_default_proxy_configuration(Server $server)
                     // ],
                     "volumes" => [
                         "/var/run/docker.sock:/var/run/docker.sock:ro",
+                        "{$proxy_path}/dynamic:/dynamic",
                         "{$proxy_path}/config:/config",
                         "{$proxy_path}/data:/data",
                     ],
@@ -216,132 +218,7 @@ function generate_default_proxy_configuration(Server $server)
     SaveConfiguration::run($server, $config);
     return $config;
 }
-function setup_dynamic_configuration()
-{
-    $settings = InstanceSettings::get();
-    $server = Server::find(0);
-    $dynamic_config_path = $server->proxyPath() . "/dynamic";
-    if ($server) {
-        $file = "$dynamic_config_path/coolify.yaml";
-        if (empty($settings->fqdn)) {
-            instant_remote_process([
-                "rm -f $file",
-            ], $server);
-        } else {
-            $url = Url::fromString($settings->fqdn);
-            $host = $url->getHost();
-            $schema = $url->getScheme();
-            $traefik_dynamic_conf = [
-                'http' =>
-                [
-                    'middlewares' => [
-                        'redirect-to-https' => [
-                            'redirectscheme' => [
-                                'scheme' => 'https',
-                            ],
-                        ],
-                        'gzip' => [
-                            'compress' => true,
-                        ],
-                    ],
-                    'routers' =>
-                    [
-                        'coolify-http' =>
-                        [
-                            'middlewares' => [
-                                0 => 'gzip',
-                            ],
-                            'entryPoints' => [
-                                0 => 'http',
-                            ],
-                            'service' => 'coolify',
-                            'rule' => "Host(`{$host}`)",
-                        ],
-                        'coolify-realtime-ws' =>
-                        [
-                            'entryPoints' => [
-                                0 => 'http',
-                            ],
-                            'service' => 'coolify-realtime',
-                            'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                        ],
-                    ],
-                    'services' =>
-                    [
-                        'coolify' =>
-                        [
-                            'loadBalancer' =>
-                            [
-                                'servers' =>
-                                [
-                                    0 =>
-                                    [
-                                        'url' => 'http://coolify:80',
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'coolify-realtime' =>
-                        [
-                            'loadBalancer' =>
-                            [
-                                'servers' =>
-                                [
-                                    0 =>
-                                    [
-                                        'url' => 'http://coolify-realtime:6001',
-                                    ],
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ];
 
-            if ($schema === 'https') {
-                $traefik_dynamic_conf['http']['routers']['coolify-http']['middlewares'] = [
-                    0 => 'redirect-to-https',
-                ];
-
-                $traefik_dynamic_conf['http']['routers']['coolify-https'] = [
-                    'entryPoints' => [
-                        0 => 'https',
-                    ],
-                    'service' => 'coolify',
-                    'rule' => "Host(`{$host}`)",
-                    'tls' => [
-                        'certresolver' => 'letsencrypt',
-                    ],
-                ];
-                $traefik_dynamic_conf['http']['routers']['coolify-realtime-wss'] = [
-                    'entryPoints' => [
-                        0 => 'https',
-                    ],
-                    'service' => 'coolify-realtime',
-                    'rule' => "Host(`{$host}`) && PathPrefix(`/app`)",
-                    'tls' => [
-                        'certresolver' => 'letsencrypt',
-                    ],
-                ];
-            }
-            $yaml = Yaml::dump($traefik_dynamic_conf, 12, 2);
-            $yaml =
-                "# This file is automatically generated by Coolify.\n" .
-                "# Do not edit it manually (only if you know what are you doing).\n\n" .
-                $yaml;
-
-            $base64 = base64_encode($yaml);
-            instant_remote_process([
-                "mkdir -p $dynamic_config_path",
-                "echo '$base64' | base64 -d > $file",
-            ], $server);
-
-            if (config('app.env') == 'local') {
-                // ray($yaml);
-            }
-        }
-    }
-}
 function setup_default_redirect_404(string|null $redirect_url, Server $server)
 {
     $traefik_dynamic_conf_path = $server->proxyPath() . "/dynamic";

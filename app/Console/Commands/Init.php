@@ -35,7 +35,8 @@ class Init extends Command
             $this->call('cleanup:queue');
             $this->call('cleanup:stucked-resources');
             try {
-                setup_dynamic_configuration();
+                $server = Server::find(0)->first();
+                $server->setupDynamicProxyConfiguration();
             } catch (\Throwable $e) {
                 echo "Could not setup dynamic configuration: {$e->getMessage()}\n";
             }

@@ -37,8 +37,10 @@ class StartProxy
                     "echo 'Proxy started successfully.'"
                 ]);
             } else {
+                $caddfile = "import /dynamic/*.caddy";
                 $commands = $commands->merge([
                     "mkdir -p $proxy_path/dynamic && cd $proxy_path",
+                    "echo '$caddfile' > $proxy_path/dynamic/Caddyfile",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Pulling docker image.'",
                     'docker compose pull',
