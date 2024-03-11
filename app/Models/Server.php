@@ -250,7 +250,7 @@ class Server extends BaseModel
                     instant_remote_process([
                         "rm -f $file",
                     ], $this);
-                    $this->reloadCaddy();
+                    // $this->reloadCaddy();
 
                 } else {
                     $url = Url::fromString($settings->fqdn);
@@ -264,7 +264,7 @@ $schema://$host {
                     instant_remote_process([
                         "echo '$base64' | base64 -d > $file",
                     ], $this);
-                    $this->reloadCaddy();
+                    // $this->reloadCaddy();
                 }
             }
         }

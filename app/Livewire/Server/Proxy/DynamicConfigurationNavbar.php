@@ -23,7 +23,7 @@ class DynamicConfigurationNavbar extends Component
         }
         instant_remote_process(["rm -f {$proxy_path}/dynamic/{$file}"], $server);
         if ($proxy_type === 'CADDY') {
-            $server->reloadCaddy();
+            // $server->reloadCaddy();
         }
         $this->dispatch('success', 'File deleted.');
         $this->dispatch('loadDynamicConfigurations');

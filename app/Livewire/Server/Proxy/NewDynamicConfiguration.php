@@ -71,7 +71,7 @@ class NewDynamicConfiguration extends Component
                 "echo '{$base64_value}' | base64 -d > {$file}",
             ], $this->server);
             if ($proxy_type === 'CADDY') {
-                $this->server->reloadCaddy();
+                // $this->server->reloadCaddy();
             }
             $this->dispatch('loadDynamicConfigurations');
             $this->dispatch('dynamic-configuration-added');
