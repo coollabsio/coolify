@@ -66,8 +66,6 @@ class StartProxy
         } catch (\Throwable $e) {
             ray($e);
             throw $e;
-        } finally {
-            $server->setupDynamicProxyConfiguration();
         }
     }
 }
