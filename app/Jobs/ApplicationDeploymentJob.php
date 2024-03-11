@@ -1077,7 +1077,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_compose_file()
     {
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
-
+        $onlyPort = null;
+        if (count($ports) > 0) {
+            $onlyPort = $ports[0];
+        }
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables($ports);
@@ -1088,6 +1091,25 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = $labels->filter(function ($value, $key) {
                 return !Str::startsWith($value, 'coolify.');
             });
+            $found_caddy_labels = $labels->filter(function ($value, $key) {
+                return Str::startsWith($value, 'caddy_');
+            });
+            if ($found_caddy_labels->count() === 0) {
+                if ($this->pull_request_id !== 0) {
+                    $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
+                } else {
+                    $domains = str(data_get($this->application, 'fqdn'))->explode(',');
+                }
+                $labels = $labels->merge(fqdnLabelsForCaddy(
+                    network: $this->application->destination->network,
+                    uuid: $this->application->uuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $this->application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $this->application->isGzipEnabled(),
+                    is_stripprefix_enabled: $this->application->isStripprefixEnabled()
+                ));
+            }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {

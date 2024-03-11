@@ -13,7 +13,7 @@
                         <x-forms.button type="submit">Save</x-forms.button>
 
                     </div>
-                    <div class="pb-4 ">Before switching proxies, please read <a>this</a>.</div>
+                    <div class="pb-4 ">Before switching proxies, please read <a href="https://coolify.io/docs/server/switching-proxies">this</a>.</div>
                     @if ($server->proxyType() === 'TRAEFIK_V2')
                         <div class="pb-4">Traefik v2</div>
                     @elseif ($server->proxyType() === 'CADDY')
