@@ -112,6 +112,10 @@ class General extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->application->fqdn = null;
+            $this->application->settings->save();
+        }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
 
         $this->ports_exposes = $this->application->ports_exposes;
@@ -163,7 +167,12 @@ class General extends Component
         }
         return $domain;
     }
-
+    public function updatedApplicationBaseDirectory() {
+        raY('asdf');
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->loadComposeFile();
+        }
+    }
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -211,7 +220,6 @@ class General extends Component
         $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->application->save();
         $this->resetDefaultLabels(false);
-        // $this->dispatch('success', 'Labels reset to default!');
     }
     public function submit($showToaster = true)
     {
