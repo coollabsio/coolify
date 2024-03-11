@@ -118,17 +118,30 @@ class Server extends BaseModel
             }
         }
     }
+    public function proxyPath() {
+        $base_path = config('coolify.base_config_path');
+        $proxyType = $this->proxyType();
+        $proxy_path = "$base_path/proxy";
+        if ($proxyType === ProxyTypes::TRAEFIK_V2->value) {
+            $proxy_path = $proxy_path;
+        } else if ($proxyType === ProxyTypes::CADDY->value) {
+            $proxy_path = $proxy_path . '/caddy';
+        } else if ($proxyType === ProxyTypes::NGINX->value) {
+            $proxy_path = $proxy_path . '/nginx';
+        }
+        return $proxy_path;
+    }
     public function proxyType()
     {
         $proxyType = $this->proxy->get('type');
         if ($proxyType === ProxyTypes::NONE->value) {
             return $proxyType;
         }
-        if (is_null($proxyType)) {
-            $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
-            $this->proxy->status = ProxyStatus::EXITED->value;
-            $this->save();
-        }
+        // if (is_null($proxyType)) {
+        //     $this->proxy->type = ProxyTypes::TRAEFIK_V2->value;
+        //     $this->proxy->status = ProxyStatus::EXITED->value;
+        //     $this->save();
+        // }
         return $this->proxy->get('type');
     }
     public function scopeWithProxy(): Builder

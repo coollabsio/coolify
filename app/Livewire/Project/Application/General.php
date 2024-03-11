@@ -124,7 +124,7 @@ class General extends Component
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         $this->customLabels = $this->application->parseContainerLabels();
-        if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+        if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
             $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -224,7 +224,7 @@ class General extends Component
     public function submit($showToaster = true)
     {
         try {
-            if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+            if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
                 $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();

@@ -126,6 +126,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     }
     public function getProxyType()
     {
+        // Set Default Proxy Type
         $this->selectProxy(ProxyTypes::TRAEFIK_V2->value);
         // $proxyTypeSet = $this->createdServer->proxy->type;
         // if (!$proxyTypeSet) {

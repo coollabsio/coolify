@@ -1056,6 +1056,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
                             service_name: $serviceName
                         ));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            network: $resource->destination->network,
+                            uuid: $resource->uuid,
+                            domains: $fqdns,
+                            is_force_https_enabled: true,
+                            serviceLabels: $serviceLabels,
+                            is_gzip_enabled: $savedService->isGzipEnabled(),
+                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                            service_name: $serviceName
+                        ));
                     }
                 }
                 if ($resource->server->isLogDrainEnabled() && $savedService->isLogDrainEnabled()) {
@@ -1495,7 +1505,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 return $preview_fqdn;
                             });
                         }
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns, serviceLabels: $serviceLabels));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            uuid: $uuid,
+                            domains: $fqdns,
+                            serviceLabels: $serviceLabels
+                        ));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            network: $resource->destination->network,
+                            uuid: $uuid,
+                            domains: $fqdns,
+                            serviceLabels: $serviceLabels
+                        ));
                     }
                 }
             }

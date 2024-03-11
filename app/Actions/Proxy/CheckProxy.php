@@ -10,6 +10,9 @@ class CheckProxy
     use AsAction;
     public function handle(Server $server, $fromUI = false)
     {
+        if ($server->proxyType() === 'NONE') {
+            return false;
+        }
         if (!$server->isProxyShouldRun()) {
             if ($fromUI) {
                 throw new \Exception("Proxy should not run. You selected the Custom Proxy.");

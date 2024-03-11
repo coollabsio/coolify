@@ -46,7 +46,7 @@ class NewDynamicConfiguration extends Component
                 $this->dispatch('error', 'File name is reserved.');
                 return;
             }
-            $proxy_path = get_proxy_path();
+            $proxy_path = $this->proxyPath();
             $file = "{$proxy_path}/dynamic/{$this->fileName}";
             if ($this->newFile) {
                 $exists = instant_remote_process(["test -f $file && echo 1 || echo 0"], $this->server);

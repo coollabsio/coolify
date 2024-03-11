@@ -15,11 +15,11 @@ class StartProxy
     {
         try {
             $proxyType = $server->proxyType();
-            if ($proxyType === 'NONE') {
+            if (is_null($proxyType) || $proxyType === 'NONE') {
                 return 'OK';
             }
             $commands = collect([]);
-            $proxy_path = get_proxy_path();
+            $proxy_path = $server->proxyPath();
             $configuration = CheckConfiguration::run($server);
             if (!$configuration) {
                 throw new \Exception("Configuration is not synced");

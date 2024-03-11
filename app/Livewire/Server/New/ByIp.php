@@ -89,6 +89,7 @@ class ByIp extends Component
                 'team_id' => currentTeam()->id,
                 'private_key_id' => $this->private_key_id,
                 'proxy' => [
+                    // set default proxy type to traefik v2
                     "type" => ProxyTypes::TRAEFIK_V2->value,
                     "status" => ProxyStatus::EXITED->value,
                 ],

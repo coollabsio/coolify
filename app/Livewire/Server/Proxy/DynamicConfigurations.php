@@ -17,7 +17,7 @@ class DynamicConfigurations extends Component
     ];
     public function loadDynamicConfigurations()
     {
-        $proxy_path = get_proxy_path();
+        $proxy_path = $this->server->proxyPath();
         $files = instant_remote_process(["mkdir -p $proxy_path/dynamic && ls -1 {$proxy_path}/dynamic"], $this->server);
         $files = collect(explode("\n", $files))->filter(fn ($file) => !empty($file));
         $files = $files->map(fn ($file) => trim($file));
