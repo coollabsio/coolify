@@ -637,7 +637,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 } else {
                     $tempServiceName = $serviceName;
                 }
-                if (str(data_get($service,'image'))->contains('glitchtip')) {
+                if (str(data_get($service, 'image'))->contains('glitchtip')) {
                     $tempServiceName = 'glitchtip';
                 }
                 $serviceDefinition = data_get($allServices, $tempServiceName);
@@ -1023,21 +1023,18 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                         $savedService->save();
                                     }
                                     // Caddy needs exact port in some cases.
-                                    ray($predefinedPort, $key, $fqdn);
-                                    if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
-                                        if ($resource->server->proxyType() === 'CADDY') {
-                                            $env = EnvironmentVariable::where([
-                                                'key' => $key,
-                                                'service_id' => $resource->id,
-                                            ])->first();
-                                            if ($env) {
-                                                $env_url = Url::fromString($env->value);
-                                                $env_port = $env_url->getPort();
-                                                if ($env_port !== $predefinedPort) {
-                                                    $env_url = $env_url->withPort($predefinedPort);
-                                                    $savedService->fqdn = $env_url->__toString();
-                                                    $savedService->save();
-                                                }
+                                    if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                        $env = EnvironmentVariable::where([
+                                            'key' => $key,
+                                            'service_id' => $resource->id,
+                                        ])->first();
+                                        if ($env) {
+                                            $env_url = Url::fromString($env->value);
+                                            $env_port = $env_url->getPort();
+                                            if ($env_port !== $predefinedPort) {
+                                                $env_url = $env_url->withPort($predefinedPort);
+                                                $savedService->fqdn = $env_url->__toString();
+                                                $savedService->save();
                                             }
                                         }
                                     }
