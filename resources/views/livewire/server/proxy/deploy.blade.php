@@ -16,10 +16,10 @@
             </p>
         </x-slot:modalBody>
     </x-modal>
-    @if ($server->isFunctional() && data_get($server, 'proxy.type') !== 'NONE')
+    @if ($server->isFunctional() && $server->proxyType() !== 'NONE')
         @if (data_get($server, 'proxy.status') === 'running')
             <div class="flex gap-4">
-                @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable)
+                @if ($currentRoute === 'server.proxy' && $traefikDashboardAvailable && $server->proxyType() === 'TRAEFIK_V2')
                     <button>
                         <a target="_blank" href="http://{{ $serverIp }}:8080">
                             Traefik Dashboard

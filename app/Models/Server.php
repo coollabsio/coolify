@@ -400,7 +400,7 @@ $schema://$host {
         //     $this->proxy->status = ProxyStatus::EXITED->value;
         //     $this->save();
         // }
-        return data_get($this->proxy, 'type.type');
+        return data_get($this->proxy, 'type');
     }
     public function scopeWithProxy(): Builder
     {

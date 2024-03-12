@@ -21,7 +21,7 @@ class Proxy extends Component
 
     public function mount()
     {
-        $this->selectedProxy = data_get($this->server, 'proxy.type');
+        $this->selectedProxy = $this->server->proxyType();
         $this->redirect_url = data_get($this->server, 'proxy.redirect_url');
     }
 
