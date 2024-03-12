@@ -36,7 +36,8 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup activity_log table
-        $activity_log = DB::table('activity_log')->where('created_at', '<', now()->subDays($keep_days));
+        // but keep the last 10
+        $activity_log = DB::table('activity_log')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $activity_log->count();
         echo "Delete $count entries from activity_log.\n";
         if ($this->option('yes')) {
@@ -44,7 +45,7 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup application_deployment_queues table
-        $application_deployment_queues = DB::table('application_deployment_queues')->where('created_at', '<', now()->subDays($keep_days));
+        $application_deployment_queues = DB::table('application_deployment_queues')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $application_deployment_queues->count();
         echo "Delete $count entries from application_deployment_queues.\n";
         if ($this->option('yes')) {
@@ -52,7 +53,7 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup webhooks table
-        $webhooks = DB::table('webhooks')->where('created_at', '<', now()->subDays($keep_days));
+        $webhooks = DB::table('webhooks')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $webhooks->count();
         echo "Delete $count entries from webhooks.\n";
         if ($this->option('yes')) {
