@@ -2,12 +2,13 @@
 # slogan: Fider is a feedback platform for collecting and managing user feedback.
 # tags: feedback, user-feedback
 # logo: svgs/fider.svg
+# port: 3000
 
 services:
   fider:
     image: getfider/fider:stable
     environment:
-      BASE_URL: $SERVICE_FQDN_FIDER
+      BASE_URL: $SERVICE_FQDN_FIDER_3000
       DATABASE_URL: postgres://$SERVICE_USER_MYSQL:$SERVICE_PASSWORD_MYSQL@database:5432/fider?sslmode=disable
       JWT_SECRET: $SERVICE_PASSWORD_64_FIDER
       EMAIL_NOREPLY: ${EMAIL_NOREPLY:-noreply@example.com}

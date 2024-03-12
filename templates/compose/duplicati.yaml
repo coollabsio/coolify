@@ -2,12 +2,13 @@
 # slogan: Duplicati is a backup solution, allowing you to make scheduled backups with encryption.
 # tags: backup, encryption
 # logo: svgs/duplicati.webp
+# port: 8200
 
 services:
   duplicati:
     image: lscr.io/linuxserver/duplicati:latest
     environment:
-      - SERVICE_FQDN_DUPLICATI
+      - SERVICE_FQDN_DUPLICATI_8200
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

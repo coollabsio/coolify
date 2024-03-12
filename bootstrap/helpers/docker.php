@@ -233,6 +233,7 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         }
         $labels->push("caddy_{$loop}={$schema}://{$host}");
         $labels->push("caddy_{$loop}.header=-Server");
+        $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
         if ($serviceLabels) {
             $labels->push("caddy_ingress_network={$uuid}");

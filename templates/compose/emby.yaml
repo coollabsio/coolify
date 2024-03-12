@@ -2,12 +2,13 @@
 # slogan: A media server software that allows you to organize, stream, and access your multimedia content effortlessly.
 # tags: media, server, movies, tv, music
 # logo: svgs/emby.png
+# port: 8096
 
 services:
   emby:
     image: lscr.io/linuxserver/emby:latest
     environment:
-      - SERVICE_FQDN_EMBY
+      - SERVICE_FQDN_EMBY_8096
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid
