@@ -102,6 +102,29 @@ class Service extends BaseModel
         foreach ($applications as $application) {
             $image = str($application->image)->before(':')->value();
             switch ($image) {
+                case str($image)?->contains('grafana'):
+                    $data = collect([]);
+                    $admin_password = $this->environment_variables()->where('key', 'SERVICE_PASSWORD_GRAFANA')->first();
+                    $data = $data->merge([
+                        'Admin User' => [
+                            'key' => 'GF_SECURITY_ADMIN_USER',
+                            'value' => 'admin',
+                            'readonly' => true,
+                            'rules' => 'required',
+                        ],
+                    ]);
+                    if ($admin_password) {
+                        $data = $data->merge([
+                            'Admin Password' => [
+                                'key' => 'GF_SECURITY_ADMIN_PASSWORD',
+                                'value' => data_get($admin_password, 'value'),
+                                'rules' => 'required',
+                                'isPassword' => true,
+                            ],
+                        ]);
+                    }
+                    $fields->put('Grafana', $data);
+                    break;
                 case str($image)?->contains('directus'):
                     $data = collect([]);
                     $admin_email = $this->environment_variables()->where('key', 'ADMIN_EMAIL')->first();
