@@ -219,6 +219,11 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
 function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
 {
     $labels = collect([]);
+    if ($serviceLabels) {
+        $labels->push("caddy_ingress_network={$uuid}");
+    } else {
+        $labels->push("caddy_ingress_network={$network}");
+    }
     foreach ($domains as $loop => $domain) {
         $loop = $loop;
         $url = Url::fromString($domain);
@@ -236,14 +241,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
         if ($serviceLabels) {
-            $labels->push("caddy_ingress_network={$uuid}");
             if ($port) {
                 $labels->push("caddy_{$loop}.reverse_proxy={{upstreams $port}}");
             } else {
                 $labels->push("caddy_{$loop}.reverse_proxy={{upstreams}}");
             }
         } else {
-            $labels->push("caddy_ingress_network={$network}");
             if ($port) {
                 $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
             } else {
