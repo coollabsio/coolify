@@ -357,6 +357,9 @@ ray($conf);
                     $schema = $url->getScheme();
                     $caddy_file = "
 $schema://$host {
+    handle /app/* {
+        reverse_proxy coolify-realtime:6001
+    }
     reverse_proxy coolify:80
 }";
                     $base64 = base64_encode($caddy_file);
