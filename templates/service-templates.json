@@ -505,7 +505,7 @@
     "n8n-with-postgresql": {
         "documentation": "https:\/\/n8n.io",
         "slogan": "n8n is an extendable workflow automation tool.",
-        "compose": "c2VydmljZXM6CiAgbjhuOgogICAgaW1hZ2U6IGRvY2tlci5uOG4uaW8vbjhuaW8vbjhuCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTjhOCiAgICAgIC0gJ044Tl9FRElUT1JfQkFTRV9VUkw9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnV0VCSE9PS19VUkw9JHtTRVJWSUNFX0ZRRE5fTjhOfScKICAgICAgLSAnTjhOX0hPU1Q9JHtTRVJWSUNFX1VSTF9OOE59JwogICAgICAtICdHRU5FUklDX1RJTUVaT05FPSJFdXJvcGUvQmVybGluIicKICAgICAgLSAnVFo9IkV1cm9wZS9CZXJsaW4iJwogICAgICAtIERCX1RZUEU9cG9zdGdyZXNkYgogICAgICAtICdEQl9QT1NUR1JFU0RCX0RBVEFCQVNFPSR7UE9TVEdSRVNfREI6LW44bn0nCiAgICAgIC0gREJfUE9TVEdSRVNEQl9IT1NUPXBvc3RncmVzcWwKICAgICAgLSBEQl9QT1NUR1JFU0RCX1BPUlQ9NTQzMgogICAgICAtIERCX1BPU1RHUkVTREJfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gREJfUE9TVEdSRVNEQl9TQ0hFTUE9cHVibGljCiAgICAgIC0gREJfUE9TVEdSRVNEQl9QQVNTV09SRD0kU0VSVklDRV9QQVNTV09SRF9QT1NUR1JFUwogICAgdm9sdW1lczoKICAgICAgLSAnbjhuLWRhdGE6L2hvbWUvbm9kZS8ubjhuJwogICAgZGVwZW5kc19vbjoKICAgICAgLSBwb3N0Z3Jlc3FsCiAgcG9zdGdyZXNxbDoKICAgIGltYWdlOiAncG9zdGdyZXM6MTYtYWxwaW5lJwogICAgdm9sdW1lczoKICAgICAgLSAncG9zdGdyZXNxbC1kYXRhOi92YXIvbGliL3Bvc3RncmVzcWwvZGF0YScKICAgIGVudmlyb25tZW50OgogICAgICAtIFBPU1RHUkVTX1VTRVI9JFNFUlZJQ0VfVVNFUl9QT1NUR1JFUwogICAgICAtIFBPU1RHUkVTX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICAgIC0gJ1BPU1RHUkVTX0RCPSR7UE9TVEdSRVNfREI6LW44bn0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRC1TSEVMTAogICAgICAgIC0gJ3BnX2lzcmVhZHkgLVUgJCR7UE9TVEdSRVNfVVNFUn0gLWQgJCR7UE9TVEdSRVNfREJ9JwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
+        "compose": "c2VydmljZXM6CiAgbjhuOgogICAgaW1hZ2U6IGRvY2tlci5uOG4uaW8vbjhuaW8vbjhuCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fTjhOXzU2NzgKICAgICAgLSAnTjhOX0VESVRPUl9CQVNFX1VSTD0ke1NFUlZJQ0VfRlFETl9OOE59JwogICAgICAtICdXRUJIT09LX1VSTD0ke1NFUlZJQ0VfRlFETl9OOE59JwogICAgICAtICdOOE5fSE9TVD0ke1NFUlZJQ0VfVVJMX044Tn0nCiAgICAgIC0gJ0dFTkVSSUNfVElNRVpPTkU9IkV1cm9wZS9CZXJsaW4iJwogICAgICAtICdUWj0iRXVyb3BlL0JlcmxpbiInCiAgICAgIC0gREJfVFlQRT1wb3N0Z3Jlc2RiCiAgICAgIC0gJ0RCX1BPU1RHUkVTREJfREFUQUJBU0U9JHtQT1NUR1JFU19EQjotbjhufScKICAgICAgLSBEQl9QT1NUR1JFU0RCX0hPU1Q9cG9zdGdyZXNxbAogICAgICAtIERCX1BPU1RHUkVTREJfUE9SVD01NDMyCiAgICAgIC0gREJfUE9TVEdSRVNEQl9VU0VSPSRTRVJWSUNFX1VTRVJfUE9TVEdSRVMKICAgICAgLSBEQl9QT1NUR1JFU0RCX1NDSEVNQT1wdWJsaWMKICAgICAgLSBEQl9QT1NUR1JFU0RCX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX1BPU1RHUkVTCiAgICB2b2x1bWVzOgogICAgICAtICduOG4tZGF0YTovaG9tZS9ub2RlLy5uOG4nCiAgICBkZXBlbmRzX29uOgogICAgICAtIHBvc3RncmVzcWwKICBwb3N0Z3Jlc3FsOgogICAgaW1hZ2U6ICdwb3N0Z3JlczoxNi1hbHBpbmUnCiAgICB2b2x1bWVzOgogICAgICAtICdwb3N0Z3Jlc3FsLWRhdGE6L3Zhci9saWIvcG9zdGdyZXNxbC9kYXRhJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gUE9TVEdSRVNfVVNFUj0kU0VSVklDRV9VU0VSX1BPU1RHUkVTCiAgICAgIC0gUE9TVEdSRVNfUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfUE9TVEdSRVMKICAgICAgLSAnUE9TVEdSRVNfREI9JHtQT1NUR1JFU19EQjotbjhufScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ELVNIRUxMCiAgICAgICAgLSAncGdfaXNyZWFkeSAtVSAkJHtQT1NUR1JFU19VU0VSfSAtZCAkJHtQT1NUR1JFU19EQn0nCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
         "tags": [
             "n8n",
             "workflow",
@@ -516,7 +516,8 @@
             "code"
         ],
         "logo": "svgs\/n8n.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "5678"
     },
     "n8n": {
         "documentation": "https:\/\/n8n.io",
@@ -538,7 +539,7 @@
     "next-image-transformation": {
         "documentation": "https:\/\/github.com\/coollabsio\/next-image-transformation",
         "slogan": "Drop-in replacement for Vercel's Nextjs image optimization service.",
-        "compose": "c2VydmljZXM6CiAgbmV4dC1pbWFnZS10cmFuc2Zvcm1hdGlvbjoKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL25leHQtaW1hZ2UtdHJhbnNmb3JtYXRpb246bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1RSQU5TRk9STUFUSU9OCiAgICAgIC0gTk9ERV9FTlY9cHJvZHVjdGlvbgogICAgICAtICdBTExPV0VEX1JFTU9URV9ET01BSU5TPSR7QUxMT1dFRF9SRU1PVEVfRE9NQUlOUzotKn0nCiAgICAgIC0gJ0lNR1BST1hZX1VSTD0ke0lNR1BST1hZX1VSTDotaHR0cDovL2ltZ3Byb3h5OjgwODB9JwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6ICd3Z2V0IC1xTy0gaHR0cDovL2xvY2FsaG9zdDozMDAwL2hlYWx0aCB8fCBleGl0IDEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogNQogIGltZ3Byb3h5OgogICAgaW1hZ2U6IGRhcnRoc2ltL2ltZ3Byb3h5CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBJTUdQUk9YWV9FTkFCTEVfV0VCUF9ERVRFQ1RJT049dHJ1ZQogICAgICAtIElNR1BST1hZX0pQRUdfUFJPR1JFU1NJVkU9dHJ1ZQogICAgICAtIElNR1BST1hZX1VTRV9FVEFHPXRydWUKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBpbWdwcm94eQogICAgICAgIC0gaGVhbHRoCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogNQo=",
+        "compose": "c2VydmljZXM6CiAgbmV4dC1pbWFnZS10cmFuc2Zvcm1hdGlvbjoKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL25leHQtaW1hZ2UtdHJhbnNmb3JtYXRpb246bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1RSQU5TRk9STUFUSU9OXzMwMDAKICAgICAgLSBOT0RFX0VOVj1wcm9kdWN0aW9uCiAgICAgIC0gJ0FMTE9XRURfUkVNT1RFX0RPTUFJTlM9JHtBTExPV0VEX1JFTU9URV9ET01BSU5TOi0qfScKICAgICAgLSAnSU1HUFJPWFlfVVJMPSR7SU1HUFJPWFlfVVJMOi1odHRwOi8vaW1ncHJveHk6ODA4MH0nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDogJ3dnZXQgLXFPLSBodHRwOi8vbG9jYWxob3N0OjMwMDAvaGVhbHRoIHx8IGV4aXQgMScKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1CiAgaW1ncHJveHk6CiAgICBpbWFnZTogZGFydGhzaW0vaW1ncHJveHkKICAgIGVudmlyb25tZW50OgogICAgICAtIElNR1BST1hZX0VOQUJMRV9XRUJQX0RFVEVDVElPTj10cnVlCiAgICAgIC0gSU1HUFJPWFlfSlBFR19QUk9HUkVTU0lWRT10cnVlCiAgICAgIC0gSU1HUFJPWFlfVVNFX0VUQUc9dHJ1ZQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGltZ3Byb3h5CiAgICAgICAgLSBoZWFsdGgKICAgICAgaW50ZXJ2YWw6IDJzCiAgICAgIHRpbWVvdXQ6IDEwcwogICAgICByZXRyaWVzOiA1Cg==",
         "tags": [
             "nextjs",
             "image",
@@ -546,7 +547,8 @@
             "service"
         ],
         "logo": "svgs\/unknown.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "nextcloud": {
         "documentation": "https:\/\/docs.nextcloud.com",
@@ -565,7 +567,7 @@
     "nocodb": {
         "documentation": "https:\/\/nocodb.com\/",
         "slogan": "NocoDB is an open source Airtable alternative. Turns any MySQL, PostgreSQL, SQL Server, SQLite & MariaDB into a smart-spreadsheet.",
-        "compose": "c2VydmljZXM6CiAgbm9jb2RiOgogICAgaW1hZ2U6IG5vY29kYi9ub2NvZGIKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9OT0NPREIKICAgIHZvbHVtZXM6CiAgICAgIC0gJ25vY29kYi1kYXRhOi91c3IvYXBwL2RhdGEvJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwODAnCiAgICAgIGludGVydmFsOiA1cwogICAgICB0aW1lb3V0OiAyMHMKICAgICAgcmV0cmllczogMTAK",
+        "compose": "c2VydmljZXM6CiAgbm9jb2RiOgogICAgaW1hZ2U6IG5vY29kYi9ub2NvZGIKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9OT0NPREJfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAnbm9jb2RiLWRhdGE6L3Vzci9hcHAvZGF0YS8nCiAgICBoZWFsdGhjaGVjazoKICAgICAgdGVzdDoKICAgICAgICAtIENNRAogICAgICAgIC0gd2dldAogICAgICAgIC0gJy1xJwogICAgICAgIC0gJy0tc3BpZGVyJwogICAgICAgIC0gJ2h0dHA6Ly9sb2NhbGhvc3Q6ODA4MCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
         "tags": [
             "nocodb",
             "airtable",
@@ -576,12 +578,13 @@
             "mariadb"
         ],
         "logo": "svgs\/nocodb.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "8080"
     },
     "openblocks": {
         "documentation": "https:\/\/openblocks.dev",
         "slogan": "OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.",
-        "compose": "c2VydmljZXM6CiAgb3BlbmJsb2NrczoKICAgIGltYWdlOiBvcGVuYmxvY2tzZGV2L29wZW5ibG9ja3MtY2UKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUEVOQkxPQ0tTCiAgICAgIC0gJ0VOQUJMRV9VU0VSX1NJR05fVVA9JHtFTkFCTEVfVVNFUl9TSUdOX1VQOi10cnVlfScKICAgICAgLSBFTkNSWVBUSU9OX1BBU1NXT1JEPSRTRVJWSUNFX1BBU1NXT1JEX0VOQ1JZUFRJT04KICAgICAgLSBFTkNSWVBUSU9OX1NBTFQ9JFNFUlZJQ0VfUEFTU1dPUkRfU0FMVAogICAgdm9sdW1lczoKICAgICAgLSAnb3BlbmJsb2Nrcy1kYXRhOi9vcGVuYmxvY2tzLXN0YWNrcycKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwL2hlYWx0aCcKICAgICAgaW50ZXJ2YWw6IDVzCiAgICAgIHRpbWVvdXQ6IDIwcwogICAgICByZXRyaWVzOiAxMAo=",
+        "compose": "c2VydmljZXM6CiAgb3BlbmJsb2NrczoKICAgIGltYWdlOiBvcGVuYmxvY2tzZGV2L29wZW5ibG9ja3MtY2UKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9PUEVOQkxPQ0tTXzMwMDAKICAgICAgLSAnRU5BQkxFX1VTRVJfU0lHTl9VUD0ke0VOQUJMRV9VU0VSX1NJR05fVVA6LXRydWV9JwogICAgICAtIEVOQ1JZUFRJT05fUEFTU1dPUkQ9JFNFUlZJQ0VfUEFTU1dPUkRfRU5DUllQVElPTgogICAgICAtIEVOQ1JZUFRJT05fU0FMVD0kU0VSVklDRV9QQVNTV09SRF9TQUxUCiAgICB2b2x1bWVzOgogICAgICAtICdvcGVuYmxvY2tzLWRhdGE6L29wZW5ibG9ja3Mtc3RhY2tzJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjMwMDAvaGVhbHRoJwogICAgICBpbnRlcnZhbDogNXMKICAgICAgdGltZW91dDogMjBzCiAgICAgIHJldHJpZXM6IDEwCg==",
         "tags": [
             "openblocks",
             "low",
@@ -593,12 +596,13 @@
             "code"
         ],
         "logo": "svgs\/openblocks.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "pairdrop": {
         "documentation": "https:\/\/pairdrop.net\/",
         "slogan": "Pairdrop is a self-hosted file sharing and collaboration platform, offering secure file sharing and collaboration capabilities for efficient teamwork.",
-        "compose": "c2VydmljZXM6CiAgcGFpcmRyb3A6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcGFpcmRyb3A6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BBSVJEUk9QCiAgICAgIC0gUFVJRD0xMDAwCiAgICAgIC0gUEdJRD0xMDAwCiAgICAgIC0gVFo9RXVyb3BlL01hZHJpZAogICAgICAtIERFQlVHX01PREU9ZmFsc2UKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDozMDAwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "compose": "c2VydmljZXM6CiAgcGFpcmRyb3A6CiAgICBpbWFnZTogJ2xzY3IuaW8vbGludXhzZXJ2ZXIvcGFpcmRyb3A6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BBSVJEUk9QXzMwMDAKICAgICAgLSBQVUlEPTEwMDAKICAgICAgLSBQR0lEPTEwMDAKICAgICAgLSBUWj1FdXJvcGUvTWFkcmlkCiAgICAgIC0gREVCVUdfTU9ERT1mYWxzZQogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjMwMDAnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "file",
             "sharing",
@@ -606,7 +610,8 @@
             "teamwork"
         ],
         "logo": "svgs\/unknown.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "3000"
     },
     "phpmyadmin": {
         "documentation": "https:\/\/phpmyadmin.net",
@@ -621,7 +626,7 @@
     "pocketbase": {
         "documentation": "https:\/\/pocketbase.io\/docs\/",
         "slogan": "Open Source backend for your next SaaS and Mobile app in 1 file",
-        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0UKICAgIHZvbHVtZXM6CiAgICAgIC0gJ3BvY2tldGJhc2UtZGF0YTovYXBwL3BiX2RhdGEnCg==",
+        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0VfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncG9ja2V0YmFzZS1kYXRhOi9hcHAvcGJfZGF0YScK",
         "tags": [
             "pocketbase",
             "backend",
@@ -630,7 +635,8 @@
             "api"
         ],
         "logo": "svgs\/pocketbase.svg",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "8080"
     },
     "posthog": {
         "documentation": "https:\/\/posthog.com",
@@ -665,7 +671,7 @@
     "stirling-pdf": {
         "documentation": "https:\/\/github.com\/Stirling-Tools\/Stirling-PDF",
         "slogan": "Stirling is a powerful web based PDF manipulation tool",
-        "compose": "c2VydmljZXM6CiAgc3RpcmxpbmctcGRmOgogICAgaW1hZ2U6ICdmcm9vb2RsZS9zLXBkZjpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdzdGlybGluZy10cmFpbmluZy1kYXRhOi91c3Ivc2hhcmUvdGVzc2VyYWN0LW9jci81L3Rlc3NkYXRhJwogICAgICAtICdzdGlybGluZy1jb25maWdzOi9jb25maWdzJwogICAgICAtICdzdGlybGluZy1jdXN0b20tZmlsZXM6L2N1c3RvbUZpbGVzLycKICAgICAgLSAnc3RpcmxpbmctbG9nczovbG9ncy8nCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU1BERgogICAgICAtIERPQ0tFUl9FTkFCTEVfU0VDVVJJVFk9ZmFsc2UK",
+        "compose": "c2VydmljZXM6CiAgc3RpcmxpbmctcGRmOgogICAgaW1hZ2U6ICdmcm9vb2RsZS9zLXBkZjpsYXRlc3QnCiAgICB2b2x1bWVzOgogICAgICAtICdzdGlybGluZy10cmFpbmluZy1kYXRhOi91c3Ivc2hhcmUvdGVzc2VyYWN0LW9jci81L3Rlc3NkYXRhJwogICAgICAtICdzdGlybGluZy1jb25maWdzOi9jb25maWdzJwogICAgICAtICdzdGlybGluZy1jdXN0b20tZmlsZXM6L2N1c3RvbUZpbGVzLycKICAgICAgLSAnc3RpcmxpbmctbG9nczovbG9ncy8nCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU1BERl84MDgwCiAgICAgIC0gRE9DS0VSX0VOQUJMRV9TRUNVUklUWT1mYWxzZQo=",
         "tags": [
             "pdf",
             "manipulation",
@@ -673,7 +679,8 @@
             "tool"
         ],
         "logo": "svgs\/stirling.png",
-        "minversion": "0.0.0"
+        "minversion": "0.0.0",
+        "port": "8080"
     },
     "supabase": {
         "documentation": "https:\/\/supabase.io",
