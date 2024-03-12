@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\Deploy;
 use App\Http\Controllers\Api\Domains;
-use App\Http\Controllers\Api\Project;
 use App\Http\Controllers\Api\Resources;
 use App\Http\Controllers\Api\Server;
 use App\Http\Controllers\Api\Team;
