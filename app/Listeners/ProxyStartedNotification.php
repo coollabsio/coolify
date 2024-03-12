@@ -14,7 +14,7 @@ class ProxyStartedNotification
 
     public function handle(ProxyStarted $event): void
     {
-        $this->server = data_get($event, 'server');
+        $this->server = data_get($event, 'data');
         $this->server->setupDefault404Redirect();
         $this->server->setupDynamicProxyConfiguration();
     }

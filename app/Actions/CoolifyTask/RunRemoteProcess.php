@@ -114,7 +114,6 @@ class RunRemoteProcess
         }
         if ($this->call_event_on_finish) {
             try {
-                ray($this->call_event_data);
                 if ($this->call_event_data) {
                     event(resolve("App\\Events\\$this->call_event_on_finish", [
                         "data" => $this->call_event_data,

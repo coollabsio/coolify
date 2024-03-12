@@ -11,7 +11,15 @@ class DynamicConfigurations extends Component
     public ?Server $server = null;
     public $parameters = [];
     public Collection $contents;
-    protected $listeners = ['loadDynamicConfigurations', 'refresh' => '$refresh'];
+    public function getListeners()
+    {
+        $teamId = auth()->user()->currentTeam()->id;
+        return [
+            "echo-private:team.{$teamId},ProxyStatusChanged" => 'loadDynamicConfigurations',
+            'loadDynamicConfigurations',
+            'refresh' => '$refresh'
+        ];
+    }
     protected $rules = [
         'contents.*' => 'nullable|string',
     ];
@@ -24,6 +32,7 @@ class DynamicConfigurations extends Component
         $files = $files->sort();
         if ($files->contains('coolify.yaml')) {
             $files = $files->filter(fn ($file) => $file !== 'coolify.yaml')->prepend('coolify.yaml');
+            $files = $files->filter(fn ($file) => $file !== 'Caddyfile')->prepend('Caddyfile');
         }
         $contents = collect([]);
         foreach ($files as $file) {
@@ -31,6 +40,7 @@ class DynamicConfigurations extends Component
             $contents[$without_extension] = instant_remote_process(["cat {$proxy_path}/dynamic/{$file}"], $this->server);
         }
         $this->contents = $contents;
+        $this->dispatch('refresh');
     }
     public function mount()
     {

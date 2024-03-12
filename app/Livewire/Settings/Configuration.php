@@ -75,12 +75,7 @@ class Configuration extends Component
 
         $this->settings->save();
         $this->server = Server::findOrFail(0);
-        $this->setup_instance_fqdn();
-        $this->dispatch('success', 'Instance settings updated successfully!');
-    }
-
-    private function setup_instance_fqdn()
-    {
         $this->server->setupDynamicProxyConfiguration();
+        $this->dispatch('success', 'Instance settings updated successfully!');
     }
 }
