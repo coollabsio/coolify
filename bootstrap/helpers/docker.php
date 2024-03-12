@@ -236,7 +236,11 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
 
         if ($serviceLabels) {
             $labels->push("caddy_ingress_network={$uuid}");
-            $labels->push("caddy_{$loop}.reverse_proxy={{upstreams}}");
+            if ($port) {
+                $labels->push("caddy_{$loop}.reverse_proxy={{upstreams $port}}");
+            } else {
+                $labels->push("caddy_{$loop}.reverse_proxy={{upstreams}}");
+            }
         } else {
             $labels->push("caddy_ingress_network={$network}");
             if ($port) {
