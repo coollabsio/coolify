@@ -36,7 +36,6 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup activity_log table
-        // but keep the last 10
         $activity_log = DB::table('activity_log')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $activity_log->count();
         echo "Delete $count entries from activity_log.\n";
@@ -53,7 +52,7 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup webhooks table
-        $webhooks = DB::table('webhooks')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
+        $webhooks = DB::table('webhooks')->where('created_at', '<', now()->subDays($keep_days));
         $count = $webhooks->count();
         echo "Delete $count entries from webhooks.\n";
         if ($this->option('yes')) {
