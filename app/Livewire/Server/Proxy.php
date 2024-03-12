@@ -54,8 +54,7 @@ class Proxy extends Component
             SaveConfiguration::run($this->server, $this->proxy_settings);
             $this->server->proxy->redirect_url = $this->redirect_url;
             $this->server->save();
-
-            setup_default_redirect_404(redirect_url: $this->server->proxy->redirect_url, server: $this->server);
+            $this->server->setupDefault404Redirect();
             $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
@@ -66,6 +65,9 @@ class Proxy extends Component
     {
         try {
             $this->proxy_settings = CheckConfiguration::run($this->server, true);
+            SaveConfiguration::run($this->server, $this->proxy_settings);
+            $this->server->save();
+            $this->dispatch('success', 'Proxy configuration saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

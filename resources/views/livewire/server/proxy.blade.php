@@ -13,7 +13,8 @@
                         <x-forms.button type="submit">Save</x-forms.button>
 
                     </div>
-                    <div class="pb-4 ">Before switching proxies, please read <a href="https://coolify.io/docs/server/switching-proxies">this</a>.</div>
+                    <div class="pb-4 ">Before switching proxies, please read <a
+                            href="https://coolify.io/docs/server/switching-proxies">this</a>.</div>
                     @if ($server->proxyType() === 'TRAEFIK_V2')
                         <div class="pb-4">Traefik v2</div>
                     @elseif ($server->proxyType() === 'CADDY')
@@ -26,11 +27,8 @@
                             configurations.
                         </div>
                     @endif
-                    @if ($server->proxyType() === 'TRAEFIK_V2')
-                        <x-forms.input placeholder="https://app.coolify.io" id="redirect_url"
-                            label="Default Redirect 404"
-                            helper="All urls that has no service available will be redirected to this domain." />
-                    @endif
+                    <x-forms.input placeholder="https://app.coolify.io" id="redirect_url" label="Default Redirect 404"
+                        helper="All urls that has no service available will be redirected to this domain." />
                     <div wire:loading wire:target="loadProxyConfiguration" class="pt-4">
                         <x-loading text="Loading proxy configuration..." />
                     </div>
