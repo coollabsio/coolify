@@ -12,9 +12,13 @@ class CleanupDatabase extends Command
 
     public function handle()
     {
-        echo "Running database cleanup...\n";
+        if ($this->option('yes')) {
+            echo "Running database cleanup...\n";
+        } else {
+            echo "Running database cleanup in dry-run mode...\n";
+        }
         $keep_days = 60;
-
+        echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
         $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(7));
         $count = $failed_jobs->count();
