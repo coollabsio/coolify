@@ -21,7 +21,8 @@ class CoolifyTask implements ShouldQueue, ShouldBeEncrypted
     public function __construct(
         public Activity $activity,
         public bool     $ignore_errors = false,
-        public $call_event_on_finish = null
+        public $call_event_on_finish = null,
+        public $call_event_data = null
     ) {
     }
 
@@ -33,7 +34,8 @@ class CoolifyTask implements ShouldQueue, ShouldBeEncrypted
         $remote_process = resolve(RunRemoteProcess::class, [
             'activity' => $this->activity,
             'ignore_errors' => $this->ignore_errors,
-            'call_event_on_finish' => $this->call_event_on_finish
+            'call_event_on_finish' => $this->call_event_on_finish,
+            'call_event_data' => $this->call_event_data
         ]);
 
         $remote_process();

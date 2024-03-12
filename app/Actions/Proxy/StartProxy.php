@@ -2,7 +2,7 @@
 
 namespace App\Actions\Proxy;
 
-use App\Events\ProxyStatusChanged;
+use App\Events\ProxyStarted;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -54,13 +54,14 @@ class StartProxy
             }
 
             if ($async) {
-                $activity = remote_process($commands, $server);
+                $activity = remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
                 return $activity;
             } else {
                 instant_remote_process($commands, $server);
                 $server->proxy->set('status', 'running');
                 $server->proxy->set('type', $proxyType);
                 $server->save();
+                ProxyStarted::dispatch($server);
                 return 'OK';
             }
         } catch (\Throwable $e) {

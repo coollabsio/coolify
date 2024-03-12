@@ -24,7 +24,8 @@ function remote_process(
     ?string $type_uuid = null,
     ?Model  $model = null,
     bool    $ignore_errors = false,
-    $callEventOnFinish = null
+    $callEventOnFinish = null,
+    $callEventData = null
 ): Activity {
     if (is_null($type)) {
         $type = ActivityTypes::INLINE->value;
@@ -50,6 +51,7 @@ function remote_process(
             model: $model,
             ignore_errors: $ignore_errors,
             call_event_on_finish: $callEventOnFinish,
+            call_event_data: $callEventData,
         ),
     ])();
 }
