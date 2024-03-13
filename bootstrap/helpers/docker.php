@@ -240,21 +240,12 @@ function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, 
         $labels->push("caddy_{$loop}.header=-Server");
         $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
 
-        if ($serviceLabels) {
-            if ($port) {
-                $labels->push("caddy_{$loop}.reverse_proxy={{upstreams $port}}");
-            } else {
-                $labels->push("caddy_{$loop}.reverse_proxy={{upstreams}}");
-            }
+        if ($port) {
+            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
         } else {
-            if ($port) {
-                $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
-            } else {
-                $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
-            }
-            $labels->push("caddy_{$loop}.handle_path={$path}*");
+            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
         }
-
+        $labels->push("caddy_{$loop}.handle_path={$path}*");
         if ($is_gzip_enabled) {
             $labels->push("caddy_{$loop}.encode=zstd gzip");
         }
