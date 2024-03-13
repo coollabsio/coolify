@@ -274,6 +274,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
                 }
             }
+            $this->run_post_deployment_command();
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
@@ -874,8 +875,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [
                 "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}")
             ],
-
         );
+        $this->run_pre_deployment_command();
     }
     private function deploy_to_additional_destinations()
     {
@@ -1688,6 +1689,57 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
             executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d > {$this->workdir}{$this->dockerfile_location}"),
             "hidden" => true
         ]);
+    }
+
+    private function run_pre_deployment_command()
+    {
+        if (empty($this->application->pre_deployment_command)) {
+            return;
+        }
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        if ($containers->count() == 0) {
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Executing pre deployment command: {$this->application->post_deployment_command}");
+
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Names');
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container. '-' . $this->application->uuid)) {
+                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->pre_deployment_command)  . '"';
+                $exec = "docker exec {$containerName} {$cmd}";
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                    ],
+                );
+                return;
+            }
+        }
+        throw new RuntimeException('Pre deployment command: Could not find a valid container. Is the container name correct?');
+    }
+
+    private function run_post_deployment_command()
+    {
+        if (empty($this->application->post_deployment_command)) {
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Executing post deployment command: {$this->application->post_deployment_command}");
+
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Names');
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container. '-' . $this->application->uuid)) {
+                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->post_deployment_command)  . '"';
+                $exec = "docker exec {$containerName} {$cmd}";
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                    ],
+                );
+                return;
+            }
+        }
+        throw new RuntimeException('Post deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     private function next(string $status)

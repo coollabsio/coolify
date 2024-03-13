@@ -250,6 +250,20 @@
                 <x-forms.textarea label="Container Labels" rows="15" id="customLabels"></x-forms.textarea>
                 <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
             @endif
+
+            <h3 class="pt-8">Deployment scripts</h3>
+            <div class="flex flex-col gap-2 xl:flex-row">
+                    <x-forms.input placeholder="" id="application.pre_deployment_command" label="Pre deployment command"
+                        helper="An optional script or command to execute in the existing container before the deployment begins." />
+                    <x-forms.input placeholder="" id="application.pre_deployment_command_container" label="Container name"
+                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+            </div>
+            <div class="flex flex-col gap-2 xl:flex-row">
+                    <x-forms.input placeholder="php artisan migrate" id="application.post_deployment_command" label="Post deployment command"
+                        helper="An optional script or command to execute in the newly built container after the deployment completes." />
+                    <x-forms.input placeholder="php" id="application.post_deployment_command_container" label="Container name"
+                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+            </div>
         </div>
     </form>
 </div>
