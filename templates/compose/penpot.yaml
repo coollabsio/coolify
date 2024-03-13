@@ -1,0 +1,83 @@
+# documentation: https://help.penpot.app/technical-guide/getting-started/#install-with-docker
+# slogan: Penpot is the first Open Source design and prototyping platform for product teams.
+# tags: penpot,design,prototyping,figma,open,source
+
+version: '3.5'
+networks:
+  penpot: null
+volumes:
+  penpot_postgres_v15: null
+  penpot_assets: null
+services:
+  penpot-frontend:
+    image: 'penpotapp/frontend:latest'
+    restart: always
+    ports:
+      - '9001:80'
+    volumes:
+      - 'penpot_assets:/opt/data/assets'
+    depends_on:
+      - penpot-backend
+      - penpot-exporter
+    networks:
+      - penpot
+    environment:
+      - SERVICE_FQDN_PENPOT-FRONTEND
+      - 'PENPOT_FLAGS=${PENPOT_FRONTEND_FLAGS}'
+  penpot-backend:
+    image: 'penpotapp/backend:latest'
+    restart: always
+    volumes:
+      - 'penpot_assets:/opt/data/assets'
+    depends_on:
+      - penpot-postgres
+      - penpot-redis
+    networks:
+      - penpot
+    environment:
+      - SERVICE_FQDN_PENPOT-BACKEND
+      - 'PENPOT_FLAGS=${PENPOT_BACKEND_FLAGS}'
+      - 'PENPOT_SECRET_KEY=${PENPOT_SECRET_KEY}'
+      - 'PENPOT_PUBLIC_URI=${SERVICE_FQDN_PENPOT-FRONTEND}'
+      - 'PENPOT_DATABASE_URI=postgresql://penpot-postgres/penpot'
+      - 'PENPOT_DATABASE_USERNAME=${SERVICE_USER_POSTGRES}'
+      - 'PENPOT_DATABASE_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+      - 'PENPOT_REDIS_URI=redis://penpot-redis/0'
+      - PENPOT_ASSETS_STORAGE_BACKEND=assets-fs
+      - PENPOT_STORAGE_ASSETS_FS_DIRECTORY=/opt/data/assets
+      - 'PENPOT_TELEMETRY_ENABLED=${PENPOT_TELEMETRY_ENABLED}'
+      - 'PENPOT_SMTP_DEFAULT_FROM=${PENPOT_SMTP_DEFAULT_FROM}'
+      - 'PENPOT_SMTP_DEFAULT_REPLY_TO=${PENPOT_SMTP_DEFAULT_REPLY_TO}'
+      - 'PENPOT_SMTP_HOST=${PENPOT_SMTP_HOST}'
+      - 'PENPOT_SMTP_PORT=${PENPOT_SMTP_PORT}'
+      - 'PENPOT_SMTP_USERNAME=${PENPOT_SMTP_USERNAME}'
+      - 'PENPOT_SMTP_PASSWORD=${PENPOT_SMTP_PASSWORD}'
+      - 'PENPOT_SMTP_TLS=${PENPOT_SMTP_TLS}'
+      - 'PENPOT_SMTP_SSL=${PENPOT_SMTP_SSL}'
+  penpot-exporter:
+    image: 'penpotapp/exporter:latest'
+    restart: always
+    networks:
+      - penpot
+    environment:
+      - SERVICE_FQDN_PENPOT-EXPORTER
+      - 'PENPOT_PUBLIC_URI=${SERVICE_FQDN_PENPOT-FRONTEND}'
+      - 'PENPOT_REDIS_URI=redis://penpot-redis/0'
+  penpot-postgres:
+    image: 'postgres:15'
+    restart: always
+    stop_signal: SIGINT
+    volumes:
+      - 'penpot_postgres_v15:/var/lib/postgresql/data'
+    networks:
+      - penpot
+    environment:
+      - POSTGRES_INITDB_ARGS=--data-checksums
+      - POSTGRES_DB=penpot
+      - 'POSTGRES_USER=${SERVICE_USER_POSTGRES}'
+      - 'POSTGRES_PASSWORD=${SERVICE_PASSWORD_POSTGRES}'
+  penpot-redis:
+    image: 'redis:7'
+    restart: always
+    networks:
+      - penpot
