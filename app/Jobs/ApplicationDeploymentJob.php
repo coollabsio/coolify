@@ -294,13 +294,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true,
                 ]
             );
-            $this->execute_remote_command(
-                [
-                    "docker image prune -f >/dev/null 2>&1",
-                    "hidden" => true,
-                    "ignore_errors" => true,
-                ]
-            );
+            // $this->execute_remote_command(
+            //     [
+            //         "docker image prune -f >/dev/null 2>&1",
+            //         "hidden" => true,
+            //         "ignore_errors" => true,
+            //     ]
+            // );
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
@@ -456,6 +456,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->check_git_if_build_needed();
         $this->set_base_dir();
         $this->generate_image_names();
+        $this->clone_repository();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
@@ -467,7 +468,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 return;
             }
         }
-        $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
@@ -1119,6 +1119,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
+
+        // Check for custom HEALTHCHECK
+        $custom_healthcheck_found = false;
+        if ($this->application->build_pack === 'dockerfile') {
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
+            ]);
+            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+            if (str($dockerfile)->contains('HEALTHCHECK')) {
+                $custom_healthcheck_found = true;
+            }
+        }
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -1131,16 +1143,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'networks' => [
                         $this->destination->network,
                     ],
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            $this->generate_healthcheck_commands()
-                        ],
-                        'interval' => $this->application->health_check_interval . 's',
-                        'timeout' => $this->application->health_check_timeout . 's',
-                        'retries' => $this->application->health_check_retries,
-                        'start_period' => $this->application->health_check_start_period . 's'
-                    ],
+
                     'mem_limit' => $this->application->limits_memory,
                     'memswap_limit' => $this->application->limits_memory_swap,
                     'mem_swappiness' => $this->application->limits_memory_swappiness,
@@ -1157,6 +1160,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if (!$custom_healthcheck_found) {
+            $docker_compose['services'][$this->container_name]['healthcheck'] = [
+                'test' => [
+                    'CMD-SHELL',
+                    $this->generate_healthcheck_commands()
+                ],
+                'interval' => $this->application->health_check_interval . 's',
+                'timeout' => $this->application->health_check_timeout . 's',
+                'retries' => $this->application->health_check_retries,
+                'start_period' => $this->application->health_check_start_period . 's'
+            ];
+        }
         if (!is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
         }
