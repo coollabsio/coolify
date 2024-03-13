@@ -1678,12 +1678,14 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     {
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
-        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value) {
+        if (
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+        ) {
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
         }
-        if ($status === ApplicationDeploymentStatus::FAILED->value) {
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
             return;
         }
