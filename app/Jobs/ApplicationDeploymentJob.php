@@ -92,6 +92,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ?string $buildTarget = null;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
+    private bool $custom_healthcheck_found = false;
 
     private string $serverUser = 'root';
     private string $serverUserHomeDir = '/root';
@@ -775,7 +776,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->server->isSwarm()) {
             // Implement healthcheck for swarm
         } else {
-            if ($this->application->isHealthcheckDisabled()) {
+            if ($this->application->isHealthcheckDisabled() && $this->custom_healthcheck_found === false) {
                 $this->newVersionIsHealthy = true;
                 return;
             }
@@ -1121,14 +1122,14 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
 
         // Check for custom HEALTHCHECK
-        $custom_healthcheck_found = false;
-        if ($this->application->build_pack === 'dockerfile') {
+        $this->custom_healthcheck_found = false;
+        if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
             $this->execute_remote_command([
                 executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
             ]);
             $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
             if (str($dockerfile)->contains('HEALTHCHECK')) {
-                $custom_healthcheck_found = true;
+                $this->custom_healthcheck_found = true;
             }
         }
         $docker_compose = [
@@ -1160,7 +1161,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
-        if (!$custom_healthcheck_found) {
+        if (!$this->custom_healthcheck_found) {
             $docker_compose['services'][$this->container_name]['healthcheck'] = [
                 'test' => [
                     'CMD-SHELL',
