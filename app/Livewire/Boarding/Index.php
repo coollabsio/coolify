@@ -73,7 +73,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
 
     public function restartBoarding()
     {
-        return redirect()->route('boarding');
+        return redirect()->route('onboarding');
     }
     public function skipBoarding()
     {

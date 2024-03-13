@@ -17,7 +17,7 @@
     @endif
     @if ($projects->count() === 0 && $servers->count() === 0)
         No resources found. Add your first server & private key <a class="text-white underline"
-            href="{{ route('server.create') }}">here</a> or go to the <a class="text-white underline" href="{{ route('boarding') }}">boarding  page</a>.
+            href="{{ route('server.create') }}">here</a> or go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page</a>.
     @endif
     @if ($projects->count() > 0)
         <h3 class="pb-4">Projects</h3>
