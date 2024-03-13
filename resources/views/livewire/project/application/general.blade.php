@@ -45,11 +45,11 @@
                         </div>
                     @endif
                     @if ($application->build_pack === 'dockercompose')
-                    <div class="w-96">
-                        <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
-                            label="Raw Compose Deployment"
-                            helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
-                    </div>
+                        <div class="w-96">
+                            <x-forms.checkbox instantSave id="application.settings.is_raw_compose_deployment_enabled"
+                                label="Raw Compose Deployment"
+                                helper="WARNING: Advanced use cases only. Your docker compose file will be deployed as-is. Nothing is modified by Coolify. You need to configure the proxy parts. More info in the <a href='https://coolify.io/docs/docker/compose#raw-docker-compose-deployment'>documentation.</a>" />
+                        </div>
                         @if (count($parsedServices) > 0 && !$application->settings->is_raw_compose_deployment_enabled)
                             @foreach (data_get($parsedServices, 'services') as $serviceName => $service)
                                 @if (!isDatabaseImage(data_get($service, 'image')))
@@ -210,10 +210,10 @@
                         id="application.custom_docker_run_options" label="Custom Docker Options" />
                 @endif
             @else
-            <x-forms.input
-                helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
-                placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
-                id="application.custom_docker_run_options" label="Custom Docker Options" />
+                <x-forms.input
+                    helper="You can add custom docker run options that will be used when your container is started.<br>Note: Not all options are supported, as they could mess up Coolify's automation and could cause bad experience for users.<br><br>Check the <a class='text-white underline' href='https://coolify.io/docs/custom-docker-options'>docs.</a>"
+                    placeholder="--cap-add SYS_ADMIN --device=/dev/fuse --security-opt apparmor:unconfined --ulimit nofile=1024:1024 --tmpfs /run:rw,noexec,nosuid,size=65536k"
+                    id="application.custom_docker_run_options" label="Custom Docker Options" />
             @endif
             @if ($application->build_pack === 'dockercompose')
                 <x-forms.button wire:click="loadComposeFile">Reload Compose File</x-forms.button>
@@ -251,18 +251,19 @@
                 <x-forms.button wire:click="resetDefaultLabels">Reset to Coolify Generated Labels</x-forms.button>
             @endif
 
-            <h3 class="pt-8">Deployment scripts</h3>
+            <h3 class="pt-8">Pre/Post Deployment Commands</h3>
             <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input placeholder="" id="application.pre_deployment_command" label="Pre deployment command"
-                        helper="An optional script or command to execute in the existing container before the deployment begins." />
-                    <x-forms.input placeholder="" id="application.pre_deployment_command_container" label="Container name"
-                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                <x-forms.input id="application.pre_deployment_command" label="Pre-deployment Command"
+                    helper="An optional script or command to execute in the existing container before the deployment begins." />
+                <x-forms.input id="application.pre_deployment_command_container" label="Container Name"
+                    helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
             </div>
             <div class="flex flex-col gap-2 xl:flex-row">
-                    <x-forms.input placeholder="php artisan migrate" id="application.post_deployment_command" label="Post deployment command"
-                        helper="An optional script or command to execute in the newly built container after the deployment completes." />
-                    <x-forms.input placeholder="php" id="application.post_deployment_command_container" label="Container name"
-                        helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
+                <x-forms.input placeholder="php artisan migrate" id="application.post_deployment_command"
+                    label="Post-deployment Command"
+                    helper="An optional script or command to execute in the newly built container after the deployment completes." />
+                <x-forms.input id="application.post_deployment_command_container" label="Container Name"
+                    helper="The name of the container to execute within. You can leave it blank if your application only has one container." />
             </div>
         </div>
     </form>

@@ -240,6 +240,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
                 $this->application->isConfigurationChanged(false);
+                $this->run_post_deployment_command();
                 return;
             } else if ($this->pull_request_id !== 0) {
                 $this->deploy_pull_request();
@@ -1700,11 +1701,11 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if ($containers->count() == 0) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing pre deployment command: {$this->application->post_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output): {$this->application->pre_deployment_command}");
 
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
-            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container. '-' . $this->application->uuid)) {
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container . '-' . $this->application->uuid)) {
                 $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->pre_deployment_command)  . '"';
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
@@ -1715,7 +1716,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Pre deployment command: Could not find a valid container. Is the container name correct?');
+        throw new RuntimeException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     private function run_post_deployment_command()
@@ -1723,12 +1724,12 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         if (empty($this->application->post_deployment_command)) {
             return;
         }
-        $this->application_deployment_queue->addLogEntry("Executing post deployment command: {$this->application->post_deployment_command}");
+        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output): {$this->application->post_deployment_command}");
 
         $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
         foreach ($containers as $container) {
             $containerName = data_get($container, 'Names');
-            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container. '-' . $this->application->uuid)) {
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
                 $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->post_deployment_command)  . '"';
                 $exec = "docker exec {$containerName} {$cmd}";
                 $this->execute_remote_command(
@@ -1739,7 +1740,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
                 return;
             }
         }
-        throw new RuntimeException('Post deployment command: Could not find a valid container. Is the container name correct?');
+        throw new RuntimeException('Post-deployment command: Could not find a valid container. Is the container name correct?');
     }
 
     private function next(string $status)
