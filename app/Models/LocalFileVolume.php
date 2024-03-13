@@ -13,7 +13,7 @@ class LocalFileVolume extends BaseModel
     {
         static::created(function (LocalFileVolume $fileVolume) {
             $fileVolume->load(['service']);
-            $fileVolume->saveStorageOnServer();
+            dispatch(new \App\Jobs\ServerStorageSaveJob($fileVolume));
         });
     }
     public function service()

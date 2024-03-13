@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
@@ -867,7 +868,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         }
-                        $savedService->getFilesFromServer(isInit: true);
+                        dispatch(new ServerFilesFromServerJob($savedService));
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
