@@ -914,8 +914,14 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 // SERVICE_FQDN_UMAMI_1000
                                 $port = $key->afterLast('_');
                             } else {
-                                // SERVICE_FQDN_UMAMI
-                                $port = null;
+                                $last = $key->afterLast('_');
+                                if (is_numeric($last->value())) {
+                                    // SERVICE_FQDN_3001
+                                    $port = $last;
+                                } else {
+                                    // SERVICE_FQDN_UMAMI
+                                    $port = null;
+                                }
                             }
                             if ($port) {
                                 $fqdn = "$fqdn:$port";

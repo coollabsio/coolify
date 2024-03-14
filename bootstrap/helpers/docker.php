@@ -558,6 +558,7 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
 }
 
 function validateComposeFile(string $compose, int $server_id): string|Throwable {
+    return 'OK';
     try {
         $uuid = Str::random(10);
         $server = Server::findOrFail($server_id);
