@@ -69,7 +69,7 @@
                         <x-forms.input id="github_app.webhook_secret" label="Webhook Secret" type="password" />
                     </div>
                     <div class="flex items-end gap-2 ">
-                        <h3 class="pt-4">Permissions</h3>
+                        <h2 class="pt-4">Permissions</h2>
                         <x-forms.button wire:click.prevent="checkPermissions">Refetch</x-forms.button>
                         <a href="{{ get_permissions_path($github_app) }}">
                             <x-forms.button>
@@ -93,6 +93,57 @@
                 </div>
             @endif
         </form>
+        <div class="w-full pt-10">
+            <div class="h-full">
+                <div class="flex flex-col">
+                    <div class="flex gap-2">
+                        <h2>Resources</h2>
+                    </div>
+                    <div class="pb-4 title">Here you can find all resources that are used by this source.</div>
+                </div>
+                <div class="flex flex-col">
+                    <div class="flex flex-col">
+                        <div class="overflow-x-auto">
+                            <div class="inline-block min-w-full">
+                                <div class="overflow-hidden">
+                                    <table class="min-w-full divide-y divide-coolgray-400">
+                                        <thead>
+                                            <tr class="text-neutral-500">
+                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Project
+                                                </th>
+                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">
+                                                    Environment</th>
+                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Name</th>
+                                                <th class="px-5 py-3 text-xs font-medium text-left uppercase">Type</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-coolgray-400">
+                                            @forelse ($applications->sortBy('name',SORT_NATURAL) as $resource)
+                                                <tr class="text-white bg-coolblack hover:bg-coolgray-100">
+                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                        {{ data_get($resource->project(), 'name') }}
+                                                    </td>
+                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                        {{ data_get($resource, 'environment.name') }}
+                                                    </td>
+                                                    <td class="px-5 py-4 text-sm whitespace-nowrap"><a class=""
+                                                            href="{{ $resource->link() }}">{{ $resource->name }}
+                                                            <x-internal-link /></a>
+                                                    </td>
+                                                    <td class="px-5 py-4 text-sm whitespace-nowrap">
+                                                        {{ str($resource->type())->headline() }}</td>
+                                                </tr>
+                                            @empty
+                                            @endforelse
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     @else
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>

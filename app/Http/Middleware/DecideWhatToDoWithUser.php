@@ -21,7 +21,7 @@ class DecideWhatToDoWithUser
         }
         if (!auth()->user() || !isCloud() || isInstanceAdmin()) {
             if (!isCloud() && showBoarding() && !in_array($request->path(), allowedPathsForBoardingAccounts())) {
-                return redirect()->route('boarding');
+                return redirect()->route('onboarding');
             }
             return $next($request);
         }
@@ -43,7 +43,7 @@ class DecideWhatToDoWithUser
             if (Str::startsWith($request->path(), 'invitations')) {
                 return $next($request);
             }
-            return redirect()->route('boarding');
+            return redirect()->route('onboarding');
         }
         if (auth()->user()->hasVerifiedEmail() && $request->path() === 'verify') {
             return redirect(RouteServiceProvider::HOME);

@@ -11,7 +11,12 @@ class CheckConfiguration
     use AsAction;
     public function handle(Server $server, bool $reset = false)
     {
-        $proxy_path = get_proxy_path();
+        $proxyType = $server->proxyType();
+        if ($proxyType === 'NONE') {
+            return 'OK';
+        }
+        $proxy_path = $server->proxyPath();
+
         $proxy_configuration = instant_remote_process([
             "mkdir -p $proxy_path",
             "cat $proxy_path/docker-compose.yml",

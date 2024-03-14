@@ -419,7 +419,7 @@ const magicActions = [{
 },
 {
     id: 24,
-    name: 'Goto: Boarding process',
+    name: 'Goto: Onboarding process',
     icon: 'goto',
     sequence: ['main', 'redirect']
 },
@@ -667,7 +667,7 @@ async function redirect() {
             targetUrl.pathname = `/team`
             break;
         case 24:
-            targetUrl.pathname = `/boarding`
+            targetUrl.pathname = `/onboarding`
             break;
         case 25:
             targetUrl.pathname = `/security/api-tokens`

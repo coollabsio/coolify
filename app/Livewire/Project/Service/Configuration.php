@@ -38,8 +38,12 @@ class Configuration extends Component
     }
     public function check_status()
     {
-        dispatch_sync(new ContainerStatusJob($this->service->server));
-        $this->dispatch('refresh')->self();
-        $this->dispatch('serviceStatusChanged');
+        try {
+            dispatch_sync(new ContainerStatusJob($this->service->server));
+            $this->dispatch('refresh')->self();
+            $this->dispatch('serviceStatusChanged');
+        } catch (\Exception $e) {
+            return handleError($e, $this);
+        }
     }
 }

@@ -24,6 +24,8 @@ class Change extends Component
     public string $name;
     public bool $is_system_wide;
 
+    public $applications;
+
     protected $rules = [
         'github_app.name' => 'required|string',
         'github_app.organization' => 'nullable|string',
@@ -90,6 +92,7 @@ class Change extends Component
         if (!$this->github_app) {
             return redirect()->route('source.all');
         }
+        $this->applications = $this->github_app->applications;
         $settings = InstanceSettings::get();
         $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
 
@@ -170,6 +173,11 @@ class Change extends Component
     public function delete()
     {
         try {
+            if ($this->github_app->applications->isNotEmpty()) {
+                $this->dispatch('error', 'This source is being used by an application. Please delete all applications first.');
+                $this->github_app->makeVisible('client_secret')->makeVisible('webhook_secret');
+                return;
+            }
             $this->github_app->delete();
             return redirect()->route('source.all');
         } catch (\Throwable $e) {

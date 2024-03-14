@@ -2,6 +2,7 @@
 # slogan: Stirling is a powerful web based PDF manipulation tool
 # tags: pdf, manipulation, web, tool
 # logo: svgs/stirling.png
+# port: 8080
 
 services:
   stirling-pdf:
@@ -12,5 +13,5 @@ services:
       - stirling-custom-files:/customFiles/
       - stirling-logs:/logs/
     environment:
-      - SERVICE_FQDN_SPDF
+      - SERVICE_FQDN_SPDF_8080
       - DOCKER_ENABLE_SECURITY=false

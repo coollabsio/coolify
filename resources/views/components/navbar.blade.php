@@ -150,7 +150,17 @@
                                 </a>
                             </li>
                         @endif
-
+                        <li title="Notifications" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('notification.index') }}">
+                                <svg class="{{ request()->is('notifications*') ? 'text-warning icon' : 'icon' }}"
+                                    xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                                    <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                        stroke-linejoin="round" stroke-width="2"
+                                        d="M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3H4a4 4 0 0 0 2-3v-3a7 7 0 0 1 4-6M9 17v1a3 3 0 0 0 6 0v-1" />
+                                </svg>
+                                Notifications
+                            </a>
+                        </li>
                         @if (isInstanceAdmin())
                             <li title="Settings" class="hover:bg-coolgray-200">
                                 <a class="hover:bg-transparent hover:no-underline" href="/settings">
@@ -167,14 +177,14 @@
                                 </a>
                             </li>
                         @endif
-                        <li title="Boarding" class="hover:bg-coolgray-200">
-                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('boarding') }}">
-                                <svg class="{{ request()->is('boarding*') ? 'text-warning icon' : 'icon' }}"
+                        <li title="Onboarding" class="hover:bg-coolgray-200">
+                            <a class="hover:bg-transparent hover:no-underline" href="{{ route('onboarding') }}">
+                                <svg class="{{ request()->is('onboarding*') ? 'text-warning icon' : 'icon' }}"
                                     viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
                                     <path fill="currentColor"
                                         d="M224 128a8 8 0 0 1-8 8h-88a8 8 0 0 1 0-16h88a8 8 0 0 1 8 8m-96-56h88a8 8 0 0 0 0-16h-88a8 8 0 0 0 0 16m88 112h-88a8 8 0 0 0 0 16h88a8 8 0 0 0 0-16M82.34 42.34L56 68.69L45.66 58.34a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32m0 64L56 132.69l-10.34-10.35a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32m0 64L56 196.69l-10.34-10.35a8 8 0 0 0-11.32 11.32l16 16a8 8 0 0 0 11.32 0l32-32a8 8 0 0 0-11.32-11.32" />
                                 </svg>
-                                Boarding
+                                Onboarding
                             </a>
                         </li>
                     </div>

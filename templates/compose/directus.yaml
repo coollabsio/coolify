@@ -2,15 +2,17 @@
 # slogan: Directus wraps databases with a dynamic API, and provides an intuitive app for managing its content.
 # tags: directus, cms, database, sql
 # logo: svgs/directus.svg
+# port: 8055
 
 services:
   directus:
-    image: directus/directus:10.7
+    image: directus/directus:10
     volumes:
-      - directus-database:/directus/database
       - directus-uploads:/directus/uploads
+      - directus-database:/directus/database
+      - directus-extensions:/directus/extensions
     environment:
-      - SERVICE_FQDN_DIRECTUS
+      - SERVICE_FQDN_DIRECTUS_8055
       - KEY=$SERVICE_BASE64_64_KEY
       - SECRET=$SERVICE_BASE64_64_SECRET
       - ADMIN_EMAIL=${ADMIN_EMAIL:-admin@example.com}

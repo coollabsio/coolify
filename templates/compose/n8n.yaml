@@ -2,12 +2,13 @@
 # slogan: n8n is an extendable workflow automation tool.
 # tags: n8n,workflow,automation,open,source,low,code
 # logo: svgs/n8n.png
+# port: 5678
 
 services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     environment:
-      - SERVICE_FQDN_N8N
+      - SERVICE_FQDN_N8N_5678
       - N8N_EDITOR_BASE_URL=${SERVICE_FQDN_N8N}
       - WEBHOOK_URL=${SERVICE_FQDN_N8N}
       - N8N_HOST=${SERVICE_URL_N8N}

@@ -10,7 +10,8 @@ class Execution extends Component
     public $backup;
     public $executions;
     public $s3s;
-    public function mount() {
+    public function mount()
+    {
         $backup_uuid = request()->route('backup_uuid');
         $project = currentTeam()->load(['projects'])->projects->where('uuid', request()->route('project_uuid'))->first();
         if (!$project) {
@@ -33,6 +34,11 @@ class Execution extends Component
         $this->backup = $backup;
         $this->executions = $executions;
         $this->s3s = currentTeam()->s3s;
+    }
+    public function cleanupFailed()
+    {
+        $this->backup->executions()->where('status', 'failed')->delete();
+        $this->dispatch('refreshBackupExecutions');
     }
     public function render()
     {

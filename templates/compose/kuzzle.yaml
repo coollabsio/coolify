@@ -1,7 +1,7 @@
 # documentation: https://kuzzle.io
 # slogan: Kuzzle is a generic backend offering the basic building blocks common to every application.
 # tags: backend, api, realtime, websocket, mqtt, rest, sdk, iot, geofencing, low-code
-
+# port: 7512
 
 services:
   redis:

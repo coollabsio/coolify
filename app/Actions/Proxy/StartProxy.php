@@ -2,7 +2,7 @@
 
 namespace App\Actions\Proxy;
 
-use App\Events\ProxyStatusChanged;
+use App\Events\ProxyStarted;
 use App\Models\Server;
 use Illuminate\Support\Str;
 use Lorisleiva\Actions\Concerns\AsAction;
@@ -15,11 +15,11 @@ class StartProxy
     {
         try {
             $proxyType = $server->proxyType();
-            if ($proxyType === 'NONE') {
+            if (is_null($proxyType) || $proxyType === 'NONE') {
                 return 'OK';
             }
             $commands = collect([]);
-            $proxy_path = get_proxy_path();
+            $proxy_path = $server->proxyPath();
             $configuration = CheckConfiguration::run($server);
             if (!$configuration) {
                 throw new \Exception("Configuration is not synced");
@@ -37,8 +37,10 @@ class StartProxy
                     "echo 'Proxy started successfully.'"
                 ]);
             } else {
+                $caddfile = "import /dynamic/*.caddy";
                 $commands = $commands->merge([
                     "mkdir -p $proxy_path/dynamic && cd $proxy_path",
+                    "echo '$caddfile' > $proxy_path/dynamic/Caddyfile",
                     "echo 'Creating required Docker Compose file.'",
                     "echo 'Pulling docker image.'",
                     'docker compose pull',
@@ -52,13 +54,14 @@ class StartProxy
             }
 
             if ($async) {
-                $activity = remote_process($commands, $server);
+                $activity = remote_process($commands, $server, callEventOnFinish: 'ProxyStarted', callEventData: $server);
                 return $activity;
             } else {
                 instant_remote_process($commands, $server);
                 $server->proxy->set('status', 'running');
                 $server->proxy->set('type', $proxyType);
                 $server->save();
+                ProxyStarted::dispatch($server);
                 return 'OK';
             }
         } catch (\Throwable $e) {

@@ -2,12 +2,13 @@
 # slogan: OpenBlocks is a self-hosted, open-source, low-code platform for building internal tools.
 # tags: openblocks,low,code,platform,open,source,low,code
 # logo: svgs/openblocks.svg
+# port: 3000
 
 services:
   openblocks:
     image: openblocksdev/openblocks-ce
     environment:
-      - SERVICE_FQDN_OPENBLOCKS
+      - SERVICE_FQDN_OPENBLOCKS_3000
       - ENABLE_USER_SIGN_UP=${ENABLE_USER_SIGN_UP:-true}
       - ENCRYPTION_PASSWORD=$SERVICE_PASSWORD_ENCRYPTION
       - ENCRYPTION_SALT=$SERVICE_PASSWORD_SALT
