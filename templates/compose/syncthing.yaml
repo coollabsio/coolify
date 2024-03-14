@@ -2,12 +2,13 @@
 # slogan: Syncthing synchronizes files between two or more computers in real time.
 # tags: filestorage, data, synchronization
 # logo: svgs/syncthing.svg
+# port: 8384
 
 services:
   syncthing:
     image: 'lscr.io/linuxserver/syncthing:latest'
     environment:
-      - SERVICE_FQDN_SYNCTHING
+      - SERVICE_FQDN_SYNCTHING_8384
       - PUID=1000
       - PGID=1000
       - TZ=Etc/UTC

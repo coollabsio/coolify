@@ -100,6 +100,12 @@ class ServicesGenerate extends Command
         } else {
             $tags = null;
         }
+        $port = collect(preg_grep('/^# port:/', explode("\n", $content)))->values();
+        if ($port->count() > 0) {
+            $port = str($port[0])->after('# port:')->trim()->value();
+        } else {
+            $port = null;
+        }
         $json = Yaml::parse($content);
         $yaml = base64_encode(Yaml::dump($json, 10, 2));
         $payload = [
@@ -111,6 +117,9 @@ class ServicesGenerate extends Command
             'logo' => $logo,
             'minversion' => $minversion,
         ];
+        if ($port) {
+            $payload['port'] = $port;
+        }
         if ($env_file) {
             $env_file_content = file_get_contents(base_path("templates/compose/$env_file"));
             $env_file_base64 = base64_encode($env_file_content);

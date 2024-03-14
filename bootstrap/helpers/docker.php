@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\ProxyTypes;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
@@ -215,6 +216,45 @@ function generateServiceSpecificFqdns(ServiceApplication|Application $resource, 
     }
     return $payload;
 }
+function fqdnLabelsForCaddy(string $network, string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
+{
+    $labels = collect([]);
+    if ($serviceLabels) {
+        $labels->push("caddy_ingress_network={$uuid}");
+    } else {
+        $labels->push("caddy_ingress_network={$network}");
+    }
+    foreach ($domains as $loop => $domain) {
+        $loop = $loop;
+        $url = Url::fromString($domain);
+        $host = $url->getHost();
+        $path = $url->getPath();
+        // $stripped_path = str($path)->replaceEnd('/', '');
+
+        $schema = $url->getScheme();
+        $port = $url->getPort();
+        if (is_null($port) && !is_null($onlyPort)) {
+            $port = $onlyPort;
+        }
+        $labels->push("caddy_{$loop}={$schema}://{$host}");
+        $labels->push("caddy_{$loop}.header=-Server");
+        $labels->push("caddy_{$loop}.try_files={path} /index.html /index.php");
+
+        if ($port) {
+            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams $port}}");
+        } else {
+            $labels->push("caddy_{$loop}.handle_path.{$loop}_reverse_proxy={{upstreams}}");
+        }
+        $labels->push("caddy_{$loop}.handle_path={$path}*");
+        if ($is_gzip_enabled) {
+            $labels->push("caddy_{$loop}.encode=zstd gzip");
+        }
+        if (isDev()) {
+            // $labels->push("caddy_{$loop}.tls=internal");
+        }
+    }
+    return $labels->sort();
+}
 function fqdnLabelsForTraefik(string $uuid, Collection $domains, bool $is_force_https_enabled = false, $onlyPort = null, ?Collection $serviceLabels = null, ?bool $is_gzip_enabled = true, ?bool $is_stripprefix_enabled = true, ?string $service_name = null)
 {
     $labels = collect([]);
@@ -395,8 +435,18 @@ function generateLabelsApplication(Application $application, ?ApplicationPreview
         } else {
             $domains = Str::of(data_get($application, 'fqdn'))->explode(',');
         }
-        // Add Traefik labels no matter which proxy is selected
+        // Add Traefik labels
         $labels = $labels->merge(fqdnLabelsForTraefik(
+            uuid: $appUuid,
+            domains: $domains,
+            onlyPort: $onlyPort,
+            is_force_https_enabled: $application->isForceHttpsEnabled(),
+            is_gzip_enabled: $application->isGzipEnabled(),
+            is_stripprefix_enabled: $application->isStripprefixEnabled()
+        ));
+        // Add Caddy labels
+        $labels = $labels->merge(fqdnLabelsForCaddy(
+            network: $application->destination->network,
             uuid: $appUuid,
             domains: $domains,
             onlyPort: $onlyPort,
@@ -505,4 +555,26 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
         }
     }
     return $compose_options->toArray();
+}
+
+function validateComposeFile(string $compose, int $server_id): string|Throwable {
+    return 'OK';
+    try {
+        $uuid = Str::random(10);
+        $server = Server::findOrFail($server_id);
+        $base64_compose = base64_encode($compose);
+        $output = instant_remote_process([
+            "echo {$base64_compose} | base64 -d > /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config",
+        ], $server);
+        ray($output);
+        return 'OK';
+    } catch (\Throwable $e) {
+        ray($e);
+        return $e->getMessage();
+    } finally {
+        instant_remote_process([
+            "rm /tmp/{$uuid}.yml",
+        ], $server);
+    }
 }

@@ -2,12 +2,13 @@
 # slogan: Jellyfin is a media server for hosting and streaming your media collection.
 # tags: media, server, movies, tv, music
 # logo: svgs/jellyfin.svg
+# port: 8096
 
 services:
   jellyfin:
     image: lscr.io/linuxserver/jellyfin:latest
     environment:
-      - SERVICE_FQDN_JELLYFIN
+      - SERVICE_FQDN_JELLYFIN_8096
       - PUID=1000
       - PGID=1000
       - TZ=Europe/Madrid

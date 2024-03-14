@@ -17,7 +17,7 @@
         </div>
         <div>Environment variables (secrets) for this resource.</div>
         @if ($resource->type() === 'service')
-            <div>If you cannot find a variable here, or need a new one, define it in the Docker Compose file.</div>
+            <div>Hardcoded variables are not shown here.</div>
         @endif
     </div>
     @if ($view === 'normal')

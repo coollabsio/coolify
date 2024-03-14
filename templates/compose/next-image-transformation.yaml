@@ -1,0 +1,29 @@
+# documentation: https://github.com/coollabsio/next-image-transformation
+# slogan: Drop-in replacement for Vercel's Nextjs image optimization service.
+# tags: nextjs,image,transformation,service
+# port: 3000
+
+services:
+  next-image-transformation:
+    image: ghcr.io/coollabsio/next-image-transformation:latest
+    environment:
+      - SERVICE_FQDN_TRANSFORMATION_3000
+      - NODE_ENV=production
+      - ALLOWED_REMOTE_DOMAINS=${ALLOWED_REMOTE_DOMAINS:-*}
+      - IMGPROXY_URL=${IMGPROXY_URL:-http://imgproxy:8080}
+    healthcheck:
+      test: "wget -qO- http://localhost:3000/health || exit 1"
+      interval: 2s
+      timeout: 10s
+      retries: 5
+  imgproxy:
+    image: darthsim/imgproxy
+    environment:
+      - IMGPROXY_ENABLE_WEBP_DETECTION=true
+      - IMGPROXY_JPEG_PROGRESSIVE=true
+      - IMGPROXY_USE_ETAG=true
+    healthcheck:
+      test: ["CMD", "imgproxy", "health"]
+      interval: 2s
+      timeout: 10s
+      retries: 5

@@ -41,7 +41,6 @@ class StackForm extends Component
     }
     public function saveCompose($raw)
     {
-
         $this->service->docker_compose_raw = $raw;
         $this->submit();
     }
@@ -55,6 +54,10 @@ class StackForm extends Component
     {
         try {
             $this->validate();
+            $isValid = validateComposeFile($this->service->docker_compose_raw, $this->service->server->id);
+            if ($isValid !== 'OK') {
+                throw new \Exception("Invalid docker-compose file.\n$isValid");
+            }
             $this->service->save();
             $this->service->saveExtraFields($this->fields);
             $this->service->parse();

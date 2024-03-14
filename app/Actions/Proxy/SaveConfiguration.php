@@ -15,7 +15,7 @@ class SaveConfiguration
         if (is_null($proxy_settings)) {
             $proxy_settings = CheckConfiguration::run($server, true);
         }
-        $proxy_path = get_proxy_path();
+        $proxy_path = $server->proxyPath();
         $docker_compose_yml_base64 = base64_encode($proxy_settings);
 
         $server->proxy->last_saved_settings = Str::of($docker_compose_yml_base64)->pipe('md5')->value;

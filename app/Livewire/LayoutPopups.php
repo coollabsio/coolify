@@ -17,9 +17,13 @@ class LayoutPopups extends Component
     {
         $this->dispatch('success', 'Realtime events configured!');
     }
-    public function disable()
+    public function disableSponsorship()
     {
         auth()->user()->update(['is_notification_sponsorship_enabled' => false]);
+    }
+    public function disableNotifications()
+    {
+        auth()->user()->update(['is_notification_notifications_enabled' => false]);
     }
     public function render()
     {

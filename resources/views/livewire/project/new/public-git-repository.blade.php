@@ -21,8 +21,8 @@
                             <div class='text-helper'>git@..</div>
                         </div>
                         <div class="flex gap-1">
-                            <div>Preselect branch (eg: static):</div>
-                            <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/static</div>
+                            <div>Preselect branch (eg: main):</div>
+                            <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
                         </div>
                         <div>
                             For example application deployments, checkout <a class="text-white underline"
