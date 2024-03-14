@@ -1359,22 +1359,30 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = collect();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->runtime_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $real_value = escapeEnvVariables($env->real_value);
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $real_value = escapeEnvVariables($env->real_value);
+                $environment_variables->push("$env->key=$real_value");
             }
         } else {
             foreach ($this->application->runtime_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $real_value = escapeEnvVariables($env->real_value);
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                $real_value = escapeEnvVariables($env->real_value);
+                $environment_variables->push("$env->key=$real_value");
             }
         }
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
+        }
+        // Add HOST if not exists
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+            $environment_variables->push("HOST=0.0.0.0");
         }
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
             if (!is_null($this->commit)) {
@@ -1383,6 +1391,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $environment_variables->push("SOURCE_COMMIT=unknown");
             }
         }
+        ray($environment_variables->all());
         return $environment_variables->all();
     }
 

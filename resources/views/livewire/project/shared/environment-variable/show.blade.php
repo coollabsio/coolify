@@ -20,11 +20,18 @@
                     <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                 @endif
             @else
-                <x-forms.input id="env.key" />
-                <x-forms.input type="password" id="env.value" />
+                @if ($env->is_multiline)
+                    <x-forms.input class="h-12" id="env.key" />
+                    <textarea wire:model.lazy="env.value" rows="1" id="env.value"
+                        class="w-full leading-normal text-white rounded textarea bg-coolgray-100 scrollbar disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"></textarea>
+                @else
+                    <x-forms.input id="env.key" />
+                    <x-forms.input type="password" id="env.value" />
+                @endif
                 @if ($env->is_shared)
                     <x-forms.input disabled type="password" id="env.real_value" />
                 @endif
+                <x-forms.checkbox instantSave id="env.is_multiline" label="Is Multiline?" />
                 @if ($type !== 'service' && !$isSharedVariable)
                     <x-forms.checkbox instantSave id="env.is_build_time" label="Build Variable?" />
                 @endif

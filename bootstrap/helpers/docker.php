@@ -557,7 +557,8 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     return $compose_options->toArray();
 }
 
-function validateComposeFile(string $compose, int $server_id): string|Throwable {
+function validateComposeFile(string $compose, int $server_id): string|Throwable
+{
     return 'OK';
     try {
         $uuid = Str::random(10);
@@ -577,4 +578,11 @@ function validateComposeFile(string $compose, int $server_id): string|Throwable 
             "rm /tmp/{$uuid}.yml",
         ], $server);
     }
+}
+
+function escapeEnvVariables($value)
+{
+    $search = array("\\", "\r", "\t", "\x0", '"', "'", "$");
+    $replace = array("\\\\", "\\r", "\\t", "\\0", '\"', "\'", "$$");
+    return str_replace($search, $replace, $value);
 }
