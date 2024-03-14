@@ -556,3 +556,24 @@ function convert_docker_run_to_compose(?string $custom_docker_run_options = null
     }
     return $compose_options->toArray();
 }
+
+function validateComposeFile(string $compose, int $server_id): string|Throwable {
+    try {
+        $uuid = Str::random(10);
+        $server = Server::findOrFail($server_id);
+        $base64_compose = base64_encode($compose);
+        $output = instant_remote_process([
+            "echo {$base64_compose} | base64 -d > /tmp/{$uuid}.yml",
+            "docker compose -f /tmp/{$uuid}.yml config",
+        ], $server);
+        ray($output);
+        return 'OK';
+    } catch (\Throwable $e) {
+        ray($e);
+        return $e->getMessage();
+    } finally {
+        instant_remote_process([
+            "rm /tmp/{$uuid}.yml",
+        ], $server);
+    }
+}
