@@ -66,6 +66,10 @@ class General extends Component
         'application.docker_compose_custom_build_command' => 'nullable',
         'application.custom_labels' => 'nullable',
         'application.custom_docker_run_options' => 'nullable',
+        'application.pre_deployment_command' => 'nullable',
+        'application.pre_deployment_command_container' => 'nullable',
+        'application.post_deployment_command' => 'nullable',
+        'application.post_deployment_command_container' => 'nullable',
         'application.settings.is_static' => 'boolean|required',
         'application.settings.is_raw_compose_deployment_enabled' => 'boolean|required',
         'application.settings.is_build_server_enabled' => 'boolean|required',
@@ -112,6 +116,10 @@ class General extends Component
         } catch (\Throwable $e) {
             $this->dispatch('error', $e->getMessage());
         }
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->application->fqdn = null;
+            $this->application->settings->save();
+        }
         $this->parsedServiceDomains = $this->application->docker_compose_domains ? json_decode($this->application->docker_compose_domains, true) : [];
 
         $this->ports_exposes = $this->application->ports_exposes;
@@ -120,7 +128,7 @@ class General extends Component
         }
         $this->isConfigurationChanged = $this->application->isConfigurationChanged();
         $this->customLabels = $this->application->parseContainerLabels();
-        if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+        if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
             $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
             $this->application->custom_labels = base64_encode($this->customLabels);
             $this->application->save();
@@ -163,7 +171,12 @@ class General extends Component
         }
         return $domain;
     }
-
+    public function updatedApplicationBaseDirectory() {
+        raY('asdf');
+        if ($this->application->build_pack === 'dockercompose') {
+            $this->loadComposeFile();
+        }
+    }
     public function updatedApplicationBuildPack()
     {
         if ($this->application->build_pack !== 'nixpacks') {
@@ -211,12 +224,11 @@ class General extends Component
         $this->application->fqdn = $this->application->fqdn->unique()->implode(',');
         $this->application->save();
         $this->resetDefaultLabels(false);
-        // $this->dispatch('success', 'Labels reset to default!');
     }
     public function submit($showToaster = true)
     {
         try {
-            if (!$this->customLabels && $this->application->destination->server->proxyType() === 'TRAEFIK_V2') {
+            if (!$this->customLabels && $this->application->destination->server->proxyType() !== 'NONE') {
                 $this->customLabels = str(implode("|", generateLabelsApplication($this->application)))->replace("|", "\n");
                 $this->application->custom_labels = base64_encode($this->customLabels);
                 $this->application->save();

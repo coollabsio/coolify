@@ -12,7 +12,7 @@ class Server extends Controller
     {
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $servers = ModelsServer::whereTeamId($teamId)->select('id', 'name', 'uuid', 'ip', 'user', 'port')->get()->load(['settings'])->map(function ($server) {
             $server['is_reachable'] = $server->settings->is_reachable;
@@ -26,7 +26,7 @@ class Server extends Controller
         $with_resources = $request->query('resources');
         $teamId = get_team_id_from_token();
         if (is_null($teamId)) {
-            return response()->json(['error' => 'Invalid token.', 'docs' => 'https://coolify.io/docs/api/authentication'], 400);
+            return invalid_token();
         }
         $server = ModelsServer::whereTeamId($teamId)->whereUuid(request()->uuid)->first();
         if (is_null($server)) {

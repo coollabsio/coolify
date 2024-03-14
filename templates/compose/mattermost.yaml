@@ -5,7 +5,7 @@
 
 services:
   mattermost:
-    image: mattermost/mattermost-team-edition:9.1
+    image: mattermost/mattermost-team-edition:9
     volumes:
       - mattermost-data:/mattermost
     environment:

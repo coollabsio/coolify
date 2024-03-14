@@ -24,6 +24,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Spatie\Url\Url;
@@ -92,6 +93,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private ?string $buildTarget = null;
     private Collection $saved_outputs;
     private ?string $full_healthcheck_url = null;
+    private bool $custom_healthcheck_found = false;
 
     private string $serverUser = 'root';
     private string $serverUserHomeDir = '/root';
@@ -239,6 +241,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 }
                 $this->next(ApplicationDeploymentStatus::FINISHED->value);
                 $this->application->isConfigurationChanged(false);
+                $this->run_post_deployment_command();
                 return;
             } else if ($this->pull_request_id !== 0) {
                 $this->deploy_pull_request();
@@ -273,6 +276,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     ApplicationPullRequestUpdateJob::dispatch(application: $this->application, preview: $this->preview, deployment_uuid: $this->deployment_uuid, status: ProcessStatus::FINISHED);
                 }
             }
+            $this->run_post_deployment_command();
             $this->application->isConfigurationChanged(true);
         } catch (Exception $e) {
             if ($this->pull_request_id !== 0 && $this->application->is_github_based()) {
@@ -294,13 +298,13 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     "ignore_errors" => true,
                 ]
             );
-            $this->execute_remote_command(
-                [
-                    "docker image prune -f >/dev/null 2>&1",
-                    "hidden" => true,
-                    "ignore_errors" => true,
-                ]
-            );
+            // $this->execute_remote_command(
+            //     [
+            //         "docker image prune -f >/dev/null 2>&1",
+            //         "hidden" => true,
+            //         "ignore_errors" => true,
+            //     ]
+            // );
             ApplicationStatusChanged::dispatch(data_get($this->application, 'environment.project.team.id'));
         }
     }
@@ -456,6 +460,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->check_git_if_build_needed();
         $this->set_base_dir();
         $this->generate_image_names();
+        $this->clone_repository();
         if (!$this->force_rebuild) {
             $this->check_image_locally_or_remotely();
             if (str($this->saved_outputs->get('local_image_found'))->isNotEmpty() && !$this->application->isConfigurationChanged()) {
@@ -467,7 +472,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 return;
             }
         }
-        $this->clone_repository();
         $this->cleanup_git();
         $this->generate_compose_file();
         $this->generate_build_env_variables();
@@ -775,7 +779,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->server->isSwarm()) {
             // Implement healthcheck for swarm
         } else {
-            if ($this->application->isHealthcheckDisabled()) {
+            if ($this->application->isHealthcheckDisabled() && $this->custom_healthcheck_found === false) {
                 $this->newVersionIsHealthy = true;
                 return;
             }
@@ -808,7 +812,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         break;
                     }
                     $counter++;
-                    sleep($this->application->health_check_interval);
+                    Sleep::for($this->application->health_check_interval)->seconds();
                 }
             }
         }
@@ -873,8 +877,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             [
                 "command" => executeInDocker($this->deployment_uuid, "mkdir -p {$this->basedir}")
             ],
-
         );
+        $this->run_pre_deployment_command();
     }
     private function deploy_to_additional_destinations()
     {
@@ -1077,7 +1081,10 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
     private function generate_compose_file()
     {
         $ports = $this->application->settings->is_static ? [80] : $this->application->ports_exposes_array;
-
+        $onlyPort = null;
+        if (count($ports) > 0) {
+            $onlyPort = $ports[0];
+        }
         $persistent_storages = $this->generate_local_persistent_volumes();
         $volume_names = $this->generate_local_persistent_volumes_only_volume_names();
         $environment_variables = $this->generate_environment_variables($ports);
@@ -1088,6 +1095,25 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = $labels->filter(function ($value, $key) {
                 return !Str::startsWith($value, 'coolify.');
             });
+            $found_caddy_labels = $labels->filter(function ($value, $key) {
+                return Str::startsWith($value, 'caddy_');
+            });
+            if ($found_caddy_labels->count() === 0) {
+                if ($this->pull_request_id !== 0) {
+                    $domains = str(data_get($this->preview, 'fqdn'))->explode(',');
+                } else {
+                    $domains = str(data_get($this->application, 'fqdn'))->explode(',');
+                }
+                $labels = $labels->merge(fqdnLabelsForCaddy(
+                    network: $this->application->destination->network,
+                    uuid: $this->application->uuid,
+                    domains: $domains,
+                    onlyPort: $onlyPort,
+                    is_force_https_enabled: $this->application->isForceHttpsEnabled(),
+                    is_gzip_enabled: $this->application->isGzipEnabled(),
+                    is_stripprefix_enabled: $this->application->isStripprefixEnabled()
+                ));
+            }
             $this->application->custom_labels = base64_encode($labels->implode("\n"));
             $this->application->save();
         } else {
@@ -1097,6 +1123,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             $labels = collect(generateLabelsApplication($this->application, $this->preview));
         }
         $labels = $labels->merge(defaultLabels($this->application->id, $this->application->uuid, $this->pull_request_id))->toArray();
+
+        // Check for custom HEALTHCHECK
+        $this->custom_healthcheck_found = false;
+        if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
+            $this->execute_remote_command([
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
+            ]);
+            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+            if (str($dockerfile)->contains('HEALTHCHECK')) {
+                $this->custom_healthcheck_found = true;
+            }
+        }
         $docker_compose = [
             'version' => '3.8',
             'services' => [
@@ -1108,16 +1146,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     'expose' => $ports,
                     'networks' => [
                         $this->destination->network,
-                    ],
-                    'healthcheck' => [
-                        'test' => [
-                            'CMD-SHELL',
-                            $this->generate_healthcheck_commands()
-                        ],
-                        'interval' => $this->application->health_check_interval . 's',
-                        'timeout' => $this->application->health_check_timeout . 's',
-                        'retries' => $this->application->health_check_retries,
-                        'start_period' => $this->application->health_check_start_period . 's'
                     ],
                     'mem_limit' => $this->application->limits_memory,
                     'memswap_limit' => $this->application->limits_memory_swap,
@@ -1135,6 +1163,18 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 ]
             ]
         ];
+        if (!$this->custom_healthcheck_found) {
+            $docker_compose['services'][$this->container_name]['healthcheck'] = [
+                'test' => [
+                    'CMD-SHELL',
+                    $this->generate_healthcheck_commands()
+                ],
+                'interval' => $this->application->health_check_interval . 's',
+                'timeout' => $this->application->health_check_timeout . 's',
+                'retries' => $this->application->health_check_retries,
+                'start_period' => $this->application->health_check_start_period . 's'
+            ];
+        }
         if (!is_null($this->application->limits_cpuset)) {
             data_set($docker_compose, 'services.' . $this->container_name . '.cpuset', $this->application->limits_cpuset);
         }
@@ -1235,24 +1275,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
 
         if ($this->pull_request_id === 0) {
             if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
-                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
-                if (count($custom_compose) > 0) {
-                    $ipv4 = data_get($custom_compose, 'ip.0');
-                    $ipv6 = data_get($custom_compose, 'ip6.0');
-                    data_forget($custom_compose, 'ip');
-                    data_forget($custom_compose, 'ip6');
-                    if ($ipv4 || $ipv6) {
-                        data_forget($docker_compose['services'][$this->container_name], 'networks');
-                    }
-                    if ($ipv4) {
-                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
-                    }
-                    if ($ipv6) {
-                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
-                    }
-                    $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
-                }
-            } else {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
                 data_forget($docker_compose, 'services.' . $this->container_name);
                 $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
@@ -1271,6 +1293,24 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                         $docker_compose['services'][$this->application->uuid]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
                     }
                     $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
+                }
+            } else {
+                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
+                if (count($custom_compose) > 0) {
+                    $ipv4 = data_get($custom_compose, 'ip.0');
+                    $ipv6 = data_get($custom_compose, 'ip6.0');
+                    data_forget($custom_compose, 'ip');
+                    data_forget($custom_compose, 'ip6');
+                    if ($ipv4 || $ipv6) {
+                        data_forget($docker_compose['services'][$this->container_name], 'networks');
+                    }
+                    if ($ipv4) {
+                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv4_address'] = $ipv4;
+                    }
+                    if ($ipv6) {
+                        $docker_compose['services'][$this->container_name]['networks'][$this->destination->network]['ipv6_address'] = $ipv6;
+                    }
+                    $docker_compose['services'][$this->container_name] = array_merge_recursive($docker_compose['services'][$this->container_name], $custom_compose);
                 }
             }
         }
@@ -1652,16 +1692,69 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         ]);
     }
 
+    private function run_pre_deployment_command()
+    {
+        if (empty($this->application->pre_deployment_command)) {
+            return;
+        }
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        if ($containers->count() == 0) {
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Executing pre-deployment command (see debug log for output): {$this->application->pre_deployment_command}");
+
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Names');
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->pre_deployment_command_container . '-' . $this->application->uuid)) {
+                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->pre_deployment_command)  . '"';
+                $exec = "docker exec {$containerName} {$cmd}";
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                    ],
+                );
+                return;
+            }
+        }
+        throw new RuntimeException('Pre-deployment command: Could not find a valid container. Is the container name correct?');
+    }
+
+    private function run_post_deployment_command()
+    {
+        if (empty($this->application->post_deployment_command)) {
+            return;
+        }
+        $this->application_deployment_queue->addLogEntry("Executing post-deployment command (see debug log for output): {$this->application->post_deployment_command}");
+
+        $containers = getCurrentApplicationContainerStatus($this->server, $this->application->id, $this->pull_request_id);
+        foreach ($containers as $container) {
+            $containerName = data_get($container, 'Names');
+            if ($containers->count() == 1 || str_starts_with($containerName, $this->application->post_deployment_command_container . '-' . $this->application->uuid)) {
+                $cmd = 'sh -c "' . str_replace('"', '\"', $this->application->post_deployment_command)  . '"';
+                $exec = "docker exec {$containerName} {$cmd}";
+                $this->execute_remote_command(
+                    [
+                        executeInDocker($this->deployment_uuid, $exec), 'hidden' => true
+                    ],
+                );
+                return;
+            }
+        }
+        throw new RuntimeException('Post-deployment command: Could not find a valid container. Is the container name correct?');
+    }
+
     private function next(string $status)
     {
         queue_next_deployment($this->application);
         // If the deployment is cancelled by the user, don't update the status
-        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value) {
+        if (
+            $this->application_deployment_queue->status !== ApplicationDeploymentStatus::CANCELLED_BY_USER->value && $this->application_deployment_queue->status !== ApplicationDeploymentStatus::FAILED->value
+        ) {
             $this->application_deployment_queue->update([
                 'status' => $status,
             ]);
         }
-        if ($status === ApplicationDeploymentStatus::FAILED->value) {
+        if ($this->application_deployment_queue->status === ApplicationDeploymentStatus::FAILED->value) {
             $this->application->environment->project->team?->notify(new DeploymentFailed($this->application, $this->deployment_uuid, $this->preview));
             return;
         }

@@ -12,9 +12,13 @@ class CleanupDatabase extends Command
 
     public function handle()
     {
-        echo "Running database cleanup...\n";
+        if ($this->option('yes')) {
+            echo "Running database cleanup...\n";
+        } else {
+            echo "Running database cleanup in dry-run mode...\n";
+        }
         $keep_days = 60;
-
+        echo "Keep days: $keep_days\n";
         // Cleanup failed jobs table
         $failed_jobs = DB::table('failed_jobs')->where('failed_at', '<', now()->subDays(7));
         $count = $failed_jobs->count();
@@ -32,7 +36,7 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup activity_log table
-        $activity_log = DB::table('activity_log')->where('created_at', '<', now()->subDays($keep_days));
+        $activity_log = DB::table('activity_log')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $activity_log->count();
         echo "Delete $count entries from activity_log.\n";
         if ($this->option('yes')) {
@@ -40,7 +44,7 @@ class CleanupDatabase extends Command
         }
 
         // Cleanup application_deployment_queues table
-        $application_deployment_queues = DB::table('application_deployment_queues')->where('created_at', '<', now()->subDays($keep_days));
+        $application_deployment_queues = DB::table('application_deployment_queues')->where('created_at', '<', now()->subDays($keep_days))->orderBy('created_at', 'desc')->skip(10);
         $count = $application_deployment_queues->count();
         echo "Delete $count entries from application_deployment_queues.\n";
         if ($this->option('yes')) {

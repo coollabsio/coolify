@@ -289,10 +289,10 @@
                     </div>
                 @endforelse
             </div>
-            @if ($isDatabase)
+            {{-- @if ($isDatabase)
                 <div class="text-center">Swarm clusters are excluded from this type of resource at the moment. It will
                     be activated soon. Stay tuned.</div>
-            @endif
+            @endif --}}
         @endif
         @if ($current_step === 'destinations')
             <ul class="pb-10 steps">

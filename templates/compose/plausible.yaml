@@ -2,6 +2,7 @@
 # documentation: https://plausible.io/docs/self-hosting
 # slogan: "Plausible Analytics is a simple, open-source, lightweight (< 1 KB) and privacy-friendly web analytics alternative to Google Analytics."
 # tags: analytics, privacy, google, alternative
+# port: 8000
 
 version: "3.3"
 services:
@@ -10,7 +11,7 @@ services:
     command: sh -c "sleep 10 && /entrypoint.sh db createdb && /entrypoint.sh db migrate && /entrypoint.sh run"
     environment:
       - DATABASE_URL=postgres://postgres:$SERVICE_PASSWORD_POSTGRES@plausible_db/plausible
-      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE
+      - BASE_URL=$SERVICE_FQDN_PLAUSIBLE_8000
       - SECRET_KEY_BASE=$SERVICE_BASE64_64_PLAUSIBLE
       - TOTP_VAULT_KEY=$SERVICE_REALBASE64_TOTP
     depends_on:

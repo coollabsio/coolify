@@ -2,6 +2,7 @@
 # slogan: Ghost is a content management system (CMS) and blogging platform.
 # tags: cms, blog, content, management, system
 # logo: svgs/ghost.svg
+# port: 2368
 
 services:
   ghost:
@@ -9,7 +10,7 @@ services:
     volumes:
       - ghost-content-data:/var/lib/ghost/content
     environment:
-      - url=$SERVICE_FQDN_GHOST
+      - url=$SERVICE_FQDN_GHOST_2368
       - database__client=mysql
       - database__connection__host=mysql
       - database__connection__user=$SERVICE_USER_MYSQL

@@ -2,12 +2,13 @@
 # slogan: Grafana is the open source analytics & monitoring solution for every database.
 # tags: grafana,analytics,monitoring,dashboard
 # logo: svgs/grafana.svg
+# port: 3000
 
 services:
   grafana:
     image: grafana/grafana-oss
     environment:
-      - SERVICE_FQDN_GRAFANA
+      - SERVICE_FQDN_GRAFANA_3000
       - GF_SERVER_ROOT_URL=${SERVICE_FQDN_GRAFANA}
       - GF_SERVER_DOMAIN=${SERVICE_FQDN_GRAFANA}
       - GF_SECURITY_ADMIN_PASSWORD=${SERVICE_PASSWORD_GRAFANA}

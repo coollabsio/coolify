@@ -80,7 +80,7 @@ function getFilesystemVolumesFromServer(ServiceApplication|ServiceDatabase $oneS
         return handleError($e);
     }
 }
-function updateCompose($resource)
+function updateCompose(ServiceApplication|ServiceDatabase $resource)
 {
     try {
         $name = data_get($resource, 'name');
@@ -90,6 +90,9 @@ function updateCompose($resource)
         // Switch Image
         $image = data_get($resource, 'image');
         data_set($dockerCompose, "services.{$name}.image", $image);
+        $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
+        $resource->service->docker_compose_raw = $dockerComposeRaw;
+        $resource->service->save();
 
         if (!str($resource->fqdn)->contains(',')) {
             // Update FQDN
@@ -105,7 +108,6 @@ function updateCompose($resource)
             $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();
             $url = Url::fromString($resource->fqdn);
             $url = $url->getHost();
-            ray($url);
             if ($generatedEnv) {
                 $url = Str::of($resource->fqdn)->after('://');
                 $generatedEnv->value = $url;
@@ -113,9 +115,6 @@ function updateCompose($resource)
             }
         }
 
-        $dockerComposeRaw = Yaml::dump($dockerCompose, 10, 2);
-        $resource->service->docker_compose_raw = $dockerComposeRaw;
-        $resource->service->save();
     } catch (\Throwable $e) {
         return handleError($e);
     }

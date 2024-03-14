@@ -1,5 +1,6 @@
 <?php
 
+use App\Jobs\ServerFilesFromServerJob;
 use App\Models\Application;
 use App\Models\ApplicationPreview;
 use App\Models\EnvironmentVariable;
@@ -615,7 +616,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             } catch (\Exception $e) {
                 throw new \Exception($e->getMessage());
             }
-
+            $allServices = getServiceTemplates();
             $topLevelVolumes = collect(data_get($yaml, 'volumes', []));
             $topLevelNetworks = collect(data_get($yaml, 'networks', []));
             $dockerComposeVersion = data_get($yaml, 'version') ?? '3.8';
@@ -630,7 +631,22 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 }
             }
             $definedNetwork = collect([$resource->uuid]);
-            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource) {
+            $services = collect($services)->map(function ($service, $serviceName) use ($topLevelVolumes, $topLevelNetworks, $definedNetwork, $isNew, $generatedServiceFQDNS, $resource, $allServices) {
+                // Workarounds for beta users.
+                if ($serviceName === 'registry') {
+                    $tempServiceName = "docker-registry";
+                } else {
+                    $tempServiceName = $serviceName;
+                }
+                if (str(data_get($service, 'image'))->contains('glitchtip')) {
+                    $tempServiceName = 'glitchtip';
+                }
+                $serviceDefinition = data_get($allServices, $tempServiceName);
+                $predefinedPort = data_get($serviceDefinition, 'port');
+                if ($serviceName === 'plausible') {
+                    $predefinedPort = '8000';
+                }
+                // End of workarounds for beta users.
                 $serviceVolumes = collect(data_get($service, 'volumes', []));
                 $servicePorts = collect(data_get($service, 'ports', []));
                 $serviceNetworks = collect(data_get($service, 'networks', []));
@@ -852,7 +868,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 ]
                             );
                         }
-                        $savedService->getFilesFromServer(isInit: true);
+                        dispatch(new ServerFilesFromServerJob($savedService));
                         return $volume;
                     });
                     data_set($service, 'volumes', $serviceVolumes->toArray());
@@ -898,17 +914,24 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 // SERVICE_FQDN_UMAMI_1000
                                 $port = $key->afterLast('_');
                             } else {
-                                // SERVICE_FQDN_UMAMI
-                                $port = null;
+                                $last = $key->afterLast('_');
+                                if (is_numeric($last->value())) {
+                                    // SERVICE_FQDN_3001
+                                    $port = $last;
+                                } else {
+                                    // SERVICE_FQDN_UMAMI
+                                    $port = null;
+                                }
                             }
                             if ($port) {
                                 $fqdn = "$fqdn:$port";
                             }
                             if (substr_count($key->value(), '_') >= 2) {
-                                if (is_null($value)) {
-                                    $value = Str::of('/');
+                                if ($value) {
+                                    $path = $value->value();
+                                } else {
+                                    $path = null;
                                 }
-                                $path = $value->value();
                                 if ($generatedServiceFQDNS->count() > 0) {
                                     $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
                                     if ($alreadyGenerated) {
@@ -938,6 +961,25 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                                 'is_preview' => false,
                             ]);
+                        }
+                        // Caddy needs exact port in some cases.
+
+                        if ($predefinedPort && !$key->endsWith("_{$predefinedPort}")) {
+                            if ($resource->server->proxyType() === 'CADDY') {
+                                $env = EnvironmentVariable::where([
+                                    'key' => $key,
+                                    'service_id' => $resource->id,
+                                ])->first();
+                                if ($env) {
+                                    $env_url = Url::fromString($savedService->fqdn);
+                                    $env_port = $env_url->getPort();
+                                    if ($env_port !== $predefinedPort) {
+                                        $env_url = $env_url->withPort($predefinedPort);
+                                        $savedService->fqdn = $env_url->__toString();
+                                        $savedService->save();
+                                    }
+                                }
+                            }
                         }
                         // data_forget($service, "environment.$variableName");
                         // $yaml = data_forget($yaml, "services.$serviceName.environment.$variableName");
@@ -986,6 +1028,22 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                     if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
                                         $savedService->fqdn = $fqdn;
                                         $savedService->save();
+                                    }
+                                    // Caddy needs exact port in some cases.
+                                    if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                        $env = EnvironmentVariable::where([
+                                            'key' => $key,
+                                            'service_id' => $resource->id,
+                                        ])->first();
+                                        if ($env) {
+                                            $env_url = Url::fromString($env->value);
+                                            $env_port = $env_url->getPort();
+                                            if ($env_port !== $predefinedPort) {
+                                                $env_url = $env_url->withPort($predefinedPort);
+                                                $savedService->fqdn = $env_url->__toString();
+                                                $savedService->save();
+                                            }
+                                        }
                                     }
                                 }
                             } else {
@@ -1048,6 +1106,16 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                 if (!$isDatabase && $fqdns->count() > 0) {
                     if ($fqdns) {
                         $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            uuid: $resource->uuid,
+                            domains: $fqdns,
+                            is_force_https_enabled: true,
+                            serviceLabels: $serviceLabels,
+                            is_gzip_enabled: $savedService->isGzipEnabled(),
+                            is_stripprefix_enabled: $savedService->isStripprefixEnabled(),
+                            service_name: $serviceName
+                        ));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            network: $resource->destination->network,
                             uuid: $resource->uuid,
                             domains: $fqdns,
                             is_force_https_enabled: true,
@@ -1354,10 +1422,11 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             $fqdn = "$fqdn:$port";
                         }
                         if (substr_count($key->value(), '_') >= 2) {
-                            if (is_null($value)) {
-                                $value = Str::of('/');
+                            if ($value) {
+                                $path = $value->value();
+                            } else {
+                                $path = null;
                             }
-                            $path = $value->value();
                             if ($generatedServiceFQDNS->count() > 0) {
                                 $alreadyGenerated = $generatedServiceFQDNS->has($key->value());
                                 if ($alreadyGenerated) {
@@ -1495,7 +1564,17 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 return $preview_fqdn;
                             });
                         }
-                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik($uuid, $fqdns, serviceLabels: $serviceLabels));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForTraefik(
+                            uuid: $uuid,
+                            domains: $fqdns,
+                            serviceLabels: $serviceLabels
+                        ));
+                        $serviceLabels = $serviceLabels->merge(fqdnLabelsForCaddy(
+                            network: $resource->destination->network,
+                            uuid: $uuid,
+                            domains: $fqdns,
+                            serviceLabels: $serviceLabels
+                        ));
                     }
                 }
             }
