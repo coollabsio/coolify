@@ -202,8 +202,8 @@ services:
 
             ## Edge Functions routes
             - name: functions-v1
-              _comment: 'Edge Functions: /functions/v1/* -> http://functions:9000/*'
-              url: http://functions:9000/
+              _comment: 'Edge Functions: /functions/v1/* -> http://supabase-edge-functions:9000/*'
+              url: http://supabase-edge-functions:9000/
               routes:
                 - name: functions-v1-all
                   strip_path: true
@@ -256,7 +256,7 @@ services:
                   config:
                     hide_credentials: true
   supabase-studio:
-    image: supabase/studio:20240205-b145c86
+    image: supabase/studio:20240301-0942bfe
     healthcheck:
       test:
         [
@@ -885,7 +885,7 @@ services:
       - PGRST_APP_SETTINGS_JWT_EXP=${JWT_EXPIRY:-3600}
     command: "postgrest"
   supabase-auth:
-    image: supabase/gotrue:v2.132.3
+    image: supabase/gotrue:v2.143.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -913,7 +913,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
 
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE}
+      - GOTRUE_SITE_URL=${SERVICE_SITE_URL}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
 
@@ -937,12 +937,23 @@ services:
       - GOTRUE_MAILER_URLPATHS_CONFIRMATION=${MAILER_URLPATHS_CONFIRMATION:-/auth/v1/verify}
       - GOTRUE_MAILER_URLPATHS_RECOVERY=${MAILER_URLPATHS_RECOVERY:-/auth/v1/verify}
       - GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE=${MAILER_URLPATHS_EMAIL_CHANGE:-/auth/v1/verify}
+      - GOTRUE_MAILER_TEMPLATES_INVITE=${MAILER_TEMPLATES_INVITE}
+      - GOTRUE_MAILER_TEMPLATES_CONFIRMATION=${MAILER_TEMPLATES_CONFIRMATION}
+      - GOTRUE_MAILER_TEMPLATES_RECOVERY=${MAILER_TEMPLATES_RECOVERY}
+      - GOTRUE_MAILER_TEMPLATES_MAGIC_LINK=${MAILER_TEMPLATES_MAGIC_LINK}
+      - GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE=${MAILER_TEMPLATES_EMAIL_CHANGE}
+
+      - GOTRUE_MAILER_SUBJECTS_CONFIRMATION=${MAILER_SUBJECTS_CONFIRMATION}
+      - GOTRUE_MAILER_SUBJECTS_RECOVERY=${MAILER_SUBJECTS_RECOVERY}
+      - GOTRUE_MAILER_SUBJECTS_MAGIC_LINK=${MAILER_SUBJECTS_MAGIC_LINK}
+      - GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE=${MAILER_SUBJECTS_EMAIL_CHANGE}
+      - GOTRUE_MAILER_SUBJECTS_INVITE=${MAILER_SUBJECTS_INVITE}
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
   supabase-realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    image: supabase/realtime:v2.25.50
+    image: supabase/realtime:v2.25.66
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -961,7 +972,7 @@ services:
       - DB_USER=supabase_admin
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_NAME=${POSTGRES_DB:-supabase}
-      - DB_AFTER_CONNECT_QUERY='SET search_path TO _realtime'
+      - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=supabaserealtime
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - FLY_ALLOC_ID=fly123
@@ -1091,7 +1102,7 @@ services:
       - ./volumes/storage:/var/lib/storage
 
   supabase-meta:
-    image: supabase/postgres-meta:v0.77.2
+    image: supabase/postgres-meta:v0.79.0
     depends_on:
       supabase-db:
         # Disable this if you are using an external Postgres database
@@ -1107,7 +1118,7 @@ services:
       - PG_META_DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
 
   supabase-edge-functions:
-    image: supabase/edge-runtime:v1.36.1
+    image: supabase/edge-runtime:v1.38.0
     depends_on:
       supabase-analytics:
         condition: service_healthy
