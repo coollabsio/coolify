@@ -1128,9 +1128,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->custom_healthcheck_found = false;
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile_from_repo', "ignore_errors" => true
             ]);
-            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
             if (str($dockerfile)->contains('HEALTHCHECK')) {
                 $this->custom_healthcheck_found = true;
             }
