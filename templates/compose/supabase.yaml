@@ -663,7 +663,7 @@ services:
                 kong: 'starts_with(string!(.appname), "supabase-kong")'
                 auth: 'starts_with(string!(.appname), "supabase-auth")'
                 rest: 'starts_with(string!(.appname), "supabase-rest")'
-                realtime: 'starts_with(string!(.appname), "supabase-realtime")'
+                realtime: 'starts_with(string!(.appname), "realtime-dev.supabase-realtime")'
                 storage: 'starts_with(string!(.appname), "supabase-storage")'
                 functions: 'starts_with(string!(.appname), "supabase-functions")'
                 db: 'starts_with(string!(.appname), "supabase-db")'
