@@ -24,8 +24,9 @@ class Textarea extends Component
         public bool    $readonly = false,
         public ?string $helper = null,
         public bool    $realtimeValidation = false,
-        // public bool    $allowToPeak = true,
-        public string  $defaultClass = "textarea leading-normal bg-coolgray-100 rounded text-white scrollbar disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+        public bool    $allowToPeak = true,
+        public string  $defaultClass = "textarea leading-normal bg-coolgray-100 rounded text-white w-full scrollbar disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50",
+        public string  $defaultClassInput = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
     ) {
         //
     }

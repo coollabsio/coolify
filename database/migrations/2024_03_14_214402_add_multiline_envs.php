@@ -14,6 +14,9 @@ return new class extends Migration
         Schema::table('environment_variables', function (Blueprint $table) {
             $table->boolean('is_multiline')->default(false);
         });
+        Schema::table('shared_environment_variables', function (Blueprint $table) {
+            $table->boolean('is_multiline')->default(false);
+        });
     }
 
     /**
@@ -22,6 +25,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('environment_variables', function (Blueprint $table) {
+            $table->dropColumn('is_multiline');
+        });
+        Schema::table('shared_environment_variables', function (Blueprint $table) {
             $table->dropColumn('is_multiline');
         });
     }
