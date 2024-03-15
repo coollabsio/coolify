@@ -1359,20 +1359,47 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = collect();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->runtime_environment_variables as $env) {
-                $real_value = escapeEnvVariables($env->real_value);
+                // This is necessary because we have to escape the value of the environment variable
+                // but only if the environment variable is created after the 15th of March 2024
+                // when I implemented the escaping feature.
+
+                // Old environment variables are not escaped, because it could break the application
+                // as the application could expect the unescaped value.
+
+                // Yes, I worked on March 15th, 2024, and I implemented this feature.
+                // It was a national holiday in Hungary.
+
+                // Welcome to the life of a solopreneur.
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $real_value = escapeEnvVariables($env->real_value);
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
         } else {
             foreach ($this->application->runtime_environment_variables_preview as $env) {
-                $real_value = escapeEnvVariables($env->real_value);
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $real_value = escapeEnvVariables($env->real_value);
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
                 $environment_variables->push("$env->key=$real_value");
             }
         }
