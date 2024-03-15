@@ -942,6 +942,7 @@ services:
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
   supabase-realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
+    container_name: realtime-dev.supabase-realtime
     image: supabase/realtime:v2.25.50
     depends_on:
       supabase-db:
@@ -961,7 +962,7 @@ services:
       - DB_USER=supabase_admin
       - DB_PASSWORD=${SERVICE_PASSWORD_POSTGRES}
       - DB_NAME=${POSTGRES_DB:-supabase}
-      - DB_AFTER_CONNECT_QUERY='SET search_path TO _realtime'
+      - DB_AFTER_CONNECT_QUERY=SET search_path TO _realtime
       - DB_ENC_KEY=supabaserealtime
       - API_JWT_SECRET=${SERVICE_PASSWORD_JWT}
       - FLY_ALLOC_ID=fly123
