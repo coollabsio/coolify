@@ -940,9 +940,10 @@ services:
 
       - GOTRUE_EXTERNAL_PHONE_ENABLED=${ENABLE_PHONE_SIGNUP:-true}
       - GOTRUE_SMS_AUTOCONFIRM=${ENABLE_PHONE_AUTOCONFIRM:-true}
-  supabase-realtime:
+  realtime-dev.supabase-realtime:
     # This container name looks inconsistent but is correct because realtime constructs tenant id by parsing the subdomain
-    container_name: realtime-dev.supabase-realtime
+    # Name of service has to be changed as coolify is generating container names automatically
+    # container_name: realtime-dev.supabase-realtime
     image: supabase/realtime:v2.25.50
     depends_on:
       supabase-db:
