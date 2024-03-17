@@ -79,6 +79,9 @@ class GetLogs extends Component
             }
         }
         if (!$refresh && ($this->resource?->getMorphClass() === 'App\Models\Service' || str($this->container)->contains('-pr-'))) return;
+        if (!$this->numberOfLines) {
+            $this->numberOfLines = 1000;
+        }
         if ($this->container) {
             if ($this->showTimeStamps) {
                 if ($this->server->isSwarm()) {
