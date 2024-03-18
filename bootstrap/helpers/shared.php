@@ -818,7 +818,7 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $isDirectory = (bool) data_get($volume, 'isDirectory', false) || (bool) data_get($volume, 'is_directory', false);
                             }
                         }
-                        if ($type->value() === 'bind') {
+                        if ($type?->value() === 'bind') {
                             if ($source->value() === "/var/run/docker.sock") {
                                 return $volume;
                             }

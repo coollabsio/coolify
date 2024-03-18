@@ -752,7 +752,7 @@ class Application extends BaseModel
                         $type = data_get_str($volume, 'type');
                         $source = data_get_str($volume, 'source');
                     }
-                    if ($type->value() === 'bind') {
+                    if ($type?->value() === 'bind') {
                         if ($source->value() === "/var/run/docker.sock") {
                             continue;
                         }

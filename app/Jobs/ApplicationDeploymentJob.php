@@ -423,7 +423,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 $this->execute_remote_command(
-                    ["cd {$this->basedir} && {$this->docker_compose_custom_start_command}", "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
                 );
             } else {
                 $server_workdir = $this->application->workdir();
