@@ -749,7 +749,8 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
+            ray(str($this->application->custom_docker_run_options));
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
@@ -760,6 +761,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($this->pull_request_id !== 0) {
                     $this->application->settings->is_consistent_container_name_enabled = true;
                     $this->application_deployment_queue->addLogEntry("Pull request deployment, rolling update is not supported.");
+                }
+                if (str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+                    $this->application_deployment_queue->addLogEntry("Custom IP address is set, rolling update is not supported.");
                 }
                 $this->stop_running_container(force: true);
                 $this->start_by_compose_file();
@@ -1274,9 +1278,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // }
 
         if ($this->pull_request_id === 0) {
+            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
                     $ipv6 = data_get($custom_compose, 'ip6.0');
@@ -1294,7 +1298,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
             } else {
-                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
                     $ipv6 = data_get($custom_compose, 'ip6.0');
