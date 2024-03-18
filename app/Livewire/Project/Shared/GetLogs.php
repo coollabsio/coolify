@@ -71,6 +71,9 @@ class GetLogs extends Component
     }
     public function getLogs($refresh = false)
     {
+        if (!$this->server->isFunctional()) {
+            return;
+        }
         if ($this->resource?->getMorphClass() === 'App\Models\Application') {
             if (str($this->container)->contains('-pr-')) {
                 $this->pull_request = "Pull Request: " . str($this->container)->afterLast('-pr-')->beforeLast('_')->value();
