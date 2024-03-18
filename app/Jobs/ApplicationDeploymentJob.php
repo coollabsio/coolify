@@ -1276,7 +1276,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->pull_request_id === 0) {
             if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                data_forget($docker_compose, 'services.' . $this->container_name);
                 $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
