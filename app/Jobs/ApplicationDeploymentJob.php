@@ -1413,7 +1413,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $environment_variables->push("SOURCE_COMMIT=unknown");
             }
         }
-        ray($environment_variables->all());
         return $environment_variables->all();
     }
 

@@ -108,7 +108,7 @@ class EnvironmentVariable extends Model
     }
     private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if (!$environment_variable || !$resource) {
+        if ((is_null($environment_variable) && $environment_variable == '') || is_null($resource)) {
             return null;
         }
         $environment_variable = trim($environment_variable);
