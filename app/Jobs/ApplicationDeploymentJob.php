@@ -1128,9 +1128,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->custom_healthcheck_found = false;
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile_from_repo', "ignore_errors" => true
             ]);
-            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
             if (str($dockerfile)->contains('HEALTHCHECK')) {
                 $this->custom_healthcheck_found = true;
             }
@@ -1359,22 +1359,57 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = collect();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->runtime_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                // This is necessary because we have to escape the value of the environment variable
+                // but only if the environment variable is created after the 15th of March 2024
+                // when I implemented the escaping feature.
+
+                // Old environment variables are not escaped, because it could break the application
+                // as the application could expect the unescaped value.
+
+                // Yes, I worked on March 15th, 2024, and I implemented this feature.
+                // It was a national holiday in Hungary.
+
+                // Welcome to the life of a solopreneur.
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
         } else {
             foreach ($this->application->runtime_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->created_at > '2024-03-15T20:42:42.000000Z') {
+                    $real_value = escapeEnvVariables($env->real_value);
+                } else {
+                    $real_value = $env->value;
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
         }
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
+        }
+        // Add HOST if not exists
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+            $environment_variables->push("HOST=0.0.0.0");
         }
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
             if (!is_null($this->commit)) {
@@ -1383,6 +1418,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $environment_variables->push("SOURCE_COMMIT=unknown");
             }
         }
+        ray($environment_variables->all());
         return $environment_variables->all();
     }
 

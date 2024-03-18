@@ -772,7 +772,7 @@
     "uptime-kuma": {
         "documentation": "https:\/\/github.com\/louislam\/uptime-kuma?tab=readme-ov-file",
         "slogan": "Uptime Kuma is a monitoring tool for tracking the status and performance of your applications in real-time.",
-        "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogJ2xvdWlzbGFtL3VwdGltZS1rdW1hOjEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fMzAwMQogICAgdm9sdW1lczoKICAgICAgLSAndXB0aW1lLWt1bWE6L2FwcC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtIGV4dHJhL2hlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "compose": "c2VydmljZXM6CiAgdXB0aW1lLWt1bWE6CiAgICBpbWFnZTogJ2xvdWlzbGFtL3VwdGltZS1rdW1hOjEnCiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fVVBUSU1FLUtVTUFfMzAwMQogICAgdm9sdW1lczoKICAgICAgLSAndXB0aW1lLWt1bWE6L2FwcC9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQtU0hFTEwKICAgICAgICAtIGV4dHJhL2hlYWx0aGNoZWNrCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
         "tags": [
             "monitoring",
             "status",

@@ -21,6 +21,7 @@ class Show extends Component
         'env.key' => 'required|string',
         'env.value' => 'nullable',
         'env.is_build_time' => 'required|boolean',
+        'env.is_multiline' => 'required|boolean',
         'env.is_shown_once' => 'required|boolean',
         'env.real_value' => 'nullable',
     ];
@@ -28,6 +29,7 @@ class Show extends Component
         'env.key' => 'Key',
         'env.value' => 'Value',
         'env.is_build_time' => 'Build Time',
+        'env.is_multiline' => 'Multiline',
         'env.is_shown_once' => 'Shown Once',
     ];
 

@@ -76,11 +76,13 @@
                     element = element.parentElement;
                 }
                 element = element.children[1];
-                if (element.nodeName === 'INPUT') {
+                if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
                     if (element.type === 'password') {
                         element.type = 'text';
+                        this.type = 'text';
                     } else {
                         element.type = 'password';
+                        this.type = 'password';
                     }
                 }
             }

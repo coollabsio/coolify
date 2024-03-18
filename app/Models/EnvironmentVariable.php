@@ -49,7 +49,7 @@ class EnvironmentVariable extends Model
             set: fn (?string $value = null) => $this->set_environment_variables($value),
         );
     }
-    public function realValue(): Attribute
+    public function resource()
     {
         $resource = null;
         if ($this->application_id) {
@@ -71,9 +71,19 @@ class EnvironmentVariable extends Model
                 }
             }
         }
+        return $resource;
+    }
+    public function realValue(): Attribute
+    {
+        $resource = $this->resource();
         return Attribute::make(
             get: function () use ($resource) {
-                return $this->get_real_environment_variables($this->value, $resource);
+                $env = $this->get_real_environment_variables($this->value, $resource);
+                return data_get($env, 'value', $env);
+                if (is_string($env)) {
+                    return $env;
+                }
+                return $env->value;
             }
         );
     }
@@ -89,7 +99,7 @@ class EnvironmentVariable extends Model
             }
         );
     }
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null): string|null
+    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
         if (!$environment_variable || !$resource) {
             return null;
@@ -112,7 +122,7 @@ class EnvironmentVariable extends Model
             }
             $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
-                return $environment_variable_found->value;
+                return $environment_variable_found;
             }
         }
         return $environment_variable;
