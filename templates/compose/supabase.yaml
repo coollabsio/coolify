@@ -3,7 +3,7 @@
 # tags: firebase, alternative, open-source
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
-# port: 3000
+# port: 8000
 
 services:
   supabase-kong:
@@ -14,7 +14,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASE_3000
+      - SERVICE_FQDN_SUPABASE_8000
       - JWT_SERCET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
@@ -281,7 +281,7 @@ services:
       - DEFAULT_PROJECT_NAME=${STUDIO_DEFAULT_PROJECT:-Default Project}
 
       - SUPABASE_URL=http://supabase-kong:8000
-      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASE}
+      - SUPABASE_PUBLIC_URL=${SERVICE_FQDN_SUPABASE_8000}
       - SUPABASE_ANON_KEY=${SERVICE_SUPABASEANON_KEY}
       - SUPABASE_SERVICE_KEY=${SERVICE_SUPABASESERVICE_KEY}
 
@@ -914,7 +914,7 @@ services:
       - GOTRUE_DB_DRIVER=postgres
       - GOTRUE_DB_DATABASE_URL=postgres://supabase_auth_admin:${SERVICE_PASSWORD_POSTGRES}@${POSTGRES_HOST:-supabase-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-supabase}
 
-      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE}
+      - GOTRUE_SITE_URL=${SERVICE_FQDN_SUPABASE_8000}
       - GOTRUE_URI_ALLOW_LIST=${ADDITIONAL_REDIRECT_URLS}
       - GOTRUE_DISABLE_SIGNUP=${DISABLE_SIGNUP:-false}
 
