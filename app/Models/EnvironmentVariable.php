@@ -14,12 +14,15 @@ class EnvironmentVariable extends Model
         'key' => 'string',
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
+        'is_multiline' => 'boolean',
+        'is_preview' => 'boolean',
+        'version' => 'string'
     ];
     protected $appends = ['real_value', 'is_shared'];
 
     protected static function booted()
     {
-        static::created(function ($environment_variable) {
+        static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
                 $application = Application::find($environment_variable->application_id);
@@ -31,11 +34,15 @@ class EnvironmentVariable extends Model
                         'key' => $environment_variable->key,
                         'value' => $environment_variable->value,
                         'is_build_time' => $environment_variable->is_build_time,
+                        'is_multiline' => $environment_variable->is_multiline,
                         'application_id' => $environment_variable->application_id,
-                        'is_preview' => true,
+                        'is_preview' => true
                     ]);
                 }
             }
+            $environment_variable->update([
+                'version' => config('version')
+            ]);
         });
     }
     public function service()
