@@ -3,6 +3,7 @@
 # tags: firebase, alternative, open-source
 # minversion: 4.0.0-beta.228
 # logo: svgs/supabase.svg
+# port: 3000
 
 services:
   supabase-kong:
@@ -13,7 +14,7 @@ services:
       supabase-analytics:
         condition: service_healthy
     environment:
-      - SERVICE_FQDN_SUPABASE
+      - SERVICE_FQDN_SUPABASE_3000
       - JWT_SERCET=${SERVICE_PASSWORD_JWT}
       - KONG_DATABASE=off
       - KONG_DECLARATIVE_CONFIG=/home/kong/kong.yml
