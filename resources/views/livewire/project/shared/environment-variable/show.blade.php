@@ -21,7 +21,7 @@
                 @endif
             @else
                 @if ($env->is_multiline)
-                    <x-forms.input id="env.key" />
+                    <x-forms.input isMultiline="{{ $env->is_multiline }}" id="env.key" />
                     <x-forms.textarea type="password" id="env.value" />
                 @else
                     <x-forms.input id="env.key" />

@@ -749,7 +749,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            ray(str($this->application->custom_docker_run_options));
             if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
