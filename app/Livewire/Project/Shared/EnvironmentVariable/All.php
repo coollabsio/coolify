@@ -11,7 +11,7 @@ class All extends Component
 {
     public $resource;
     public bool $showPreview = false;
-    public string|null $modalId = null;
+    public ?string $modalId = null;
     public ?string $variables = null;
     public ?string $variablesPreview = null;
     public string $view = 'normal';
@@ -34,6 +34,9 @@ class All extends Component
             if ($item->is_shown_once) {
                 return "$item->key=(locked secret)";
             }
+            if ($item->is_multiline) {
+                return "$item->key=(multiline, edit in normal view)";
+            }
             return "$item->key=$item->value";
         })->sort()->join('
 ');
@@ -41,6 +44,9 @@ class All extends Component
             $this->variablesPreview = $this->resource->environment_variables_preview->map(function ($item) {
                 if ($item->is_shown_once) {
                     return "$item->key=(locked secret)";
+                }
+                if ($item->is_multiline) {
+                    return "$item->key=(multiline, edit in normal view)";
                 }
                 return "$item->key=$item->value";
             })->sort()->join('
@@ -67,7 +73,7 @@ class All extends Component
                 $found = $this->resource->environment_variables()->where('key', $key)->first();
             }
             if ($found) {
-                if ($found->is_shown_once) {
+                if ($found->is_shown_once || $found->is_multiline) {
                     continue;
                 }
                 $found->value = $variable;
@@ -144,6 +150,7 @@ class All extends Component
             $environment->key = $data['key'];
             $environment->value = $data['value'];
             $environment->is_build_time = $data['is_build_time'];
+            $environment->is_multiline = $data['is_multiline'];
             $environment->is_preview = $data['is_preview'];
 
             switch ($this->resource->type()) {

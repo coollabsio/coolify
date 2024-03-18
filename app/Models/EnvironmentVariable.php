@@ -14,12 +14,15 @@ class EnvironmentVariable extends Model
         'key' => 'string',
         'value' => 'encrypted',
         'is_build_time' => 'boolean',
+        'is_multiline' => 'boolean',
+        'is_preview' => 'boolean',
+        'version' => 'string'
     ];
     protected $appends = ['real_value', 'is_shared'];
 
     protected static function booted()
     {
-        static::created(function ($environment_variable) {
+        static::created(function (EnvironmentVariable $environment_variable) {
             if ($environment_variable->application_id && !$environment_variable->is_preview) {
                 $found = ModelsEnvironmentVariable::where('key', $environment_variable->key)->where('application_id', $environment_variable->application_id)->where('is_preview', true)->first();
                 $application = Application::find($environment_variable->application_id);
@@ -31,11 +34,15 @@ class EnvironmentVariable extends Model
                         'key' => $environment_variable->key,
                         'value' => $environment_variable->value,
                         'is_build_time' => $environment_variable->is_build_time,
+                        'is_multiline' => $environment_variable->is_multiline,
                         'application_id' => $environment_variable->application_id,
-                        'is_preview' => true,
+                        'is_preview' => true
                     ]);
                 }
             }
+            $environment_variable->update([
+                'version' => config('version')
+            ]);
         });
     }
     public function service()
@@ -49,7 +56,7 @@ class EnvironmentVariable extends Model
             set: fn (?string $value = null) => $this->set_environment_variables($value),
         );
     }
-    public function realValue(): Attribute
+    public function resource()
     {
         $resource = null;
         if ($this->application_id) {
@@ -71,9 +78,19 @@ class EnvironmentVariable extends Model
                 }
             }
         }
+        return $resource;
+    }
+    public function realValue(): Attribute
+    {
+        $resource = $this->resource();
         return Attribute::make(
             get: function () use ($resource) {
-                return $this->get_real_environment_variables($this->value, $resource);
+                $env = $this->get_real_environment_variables($this->value, $resource);
+                return data_get($env, 'value', $env);
+                if (is_string($env)) {
+                    return $env;
+                }
+                return $env->value;
             }
         );
     }
@@ -89,9 +106,9 @@ class EnvironmentVariable extends Model
             }
         );
     }
-    private function get_real_environment_variables(?string $environment_variable = null, $resource = null): string|null
+    private function get_real_environment_variables(?string $environment_variable = null, $resource = null)
     {
-        if (!$environment_variable || !$resource) {
+        if ((is_null($environment_variable) && $environment_variable == '') || is_null($resource)) {
             return null;
         }
         $environment_variable = trim($environment_variable);
@@ -112,7 +129,7 @@ class EnvironmentVariable extends Model
             }
             $environment_variable_found = SharedEnvironmentVariable::where("type", $type)->where('key', $variable)->where('team_id', $resource->team()->id)->where("{$type}_id", $id)->first();
             if ($environment_variable_found) {
-                return $environment_variable_found->value;
+                return $environment_variable_found;
             }
         }
         return $environment_variable;

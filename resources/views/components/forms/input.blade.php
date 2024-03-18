@@ -1,4 +1,7 @@
-<div class="w-full">
+<div @class([
+    'flex-1' => $isMultiline,
+    'w-full' => !$isMultiline,
+])>
     @if ($label)
         <label for="small-input" class="flex items-center gap-1 mb-1 text-sm font-medium">{{ $label }}
             @if ($required)
@@ -10,7 +13,7 @@
         </label>
     @endif
     @if ($type === 'password')
-        <div class="relative" x-data>
+        <div class="relative" x-data="{ type: 'password' }">
             @if ($allowToPeak)
                 <div x-on:click="changePasswordFieldType"
                     class="absolute inset-y-0 right-0 flex items-center pr-2 cursor-pointer hover:text-white">
@@ -22,8 +25,9 @@
                     </svg>
                 </div>
             @endif
-            <input value="{{ $value }}" {{ $attributes->merge(['class' => $defaultClass]) }}
-                @required($required) @if ($id !== 'null') wire:model={{ $id }} @endif
+            <input x-cloak x-show="type" value="{{ $value }}"
+                {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
+                @if ($id !== 'null') wire:model={{ $id }} @endif
                 wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
@@ -33,9 +37,11 @@
     @else
         <input @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
-            @if ($id !== 'null') wire:model={{ $id }} @endif wire:dirty.class.remove='text-white' wire:dirty.class="input-warning"
-            wire:loading.attr="disabled" type="{{ $type }}" @disabled($disabled)
-            @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}">
+            @if ($id !== 'null') wire:model={{ $id }} @endif
+            wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+            type="{{ $type }}" @disabled($disabled)
+            @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
+            placeholder="{{ $attributes->get('placeholder') }}">
     @endif
     @if (!$label && $helper)
         <x-helper :helper="$helper" />
