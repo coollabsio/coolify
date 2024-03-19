@@ -561,8 +561,8 @@ services:
           \set jwt_exp `echo "$JWT_EXP"`
           \set db_name `echo "${POSTGRES_DB:-postgres}"`
 
-          ALTER DATABASE :'db_name' SET "app.settings.jwt_secret" TO :'jwt_secret';
-          ALTER DATABASE :'db_name' SET "app.settings.jwt_exp" TO :'jwt_exp';
+          ALTER DATABASE :db_name SET "app.settings.jwt_secret" TO :'jwt_secret';
+          ALTER DATABASE :db_name SET "app.settings.jwt_exp" TO :'jwt_exp';
 
       - type: bind
         source: ./volumes/db/logs.sql
