@@ -54,16 +54,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -87,16 +87,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -119,16 +119,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -151,16 +151,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -183,16 +183,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -215,16 +215,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>
@@ -247,16 +247,16 @@
                                 <div class="flex gap-2">
                                     <div class="pb-2 font-bold text-white" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
-                                        <div title="running" class="mt-1 bg-success badge badge-xs"></div>
+                                        <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('exited')">
-                                        <div title="exited" class="mt-1 bg-error badge badge-xs"></div>
+                                        <div title="exited" class="mt-1 bg-error badge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('restarting')">
-                                        <div title="restarting" class="mt-1 bg-warningbadge badge-xs"></div>
+                                        <div title="restarting" class="mt-1 bg-warningbadge "></div>
                                     </template>
                                     <template x-if="item.status.startsWith('degraded')">
-                                        <div title="degraded" class="mt-1 bg-warning badge badge-xs"></div>
+                                        <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
                                 <div class="max-w-full truncate description" x-text="item.description"></div>

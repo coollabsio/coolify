@@ -28,7 +28,7 @@
             <input x-cloak x-show="type" value="{{ $value }}"
                 {{ $attributes->merge(['class' => $defaultClass]) }} @required($required)
                 @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+                wire:dirty.class.remove='dark:text-white text-black' wire:dirty.class="input-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}">
@@ -38,7 +38,7 @@
         <input @if ($value) value="{{ $value }}" @endif
             {{ $attributes->merge(['class' => $defaultClass]) }} @required($required) @readonly($readonly)
             @if ($id !== 'null') wire:model={{ $id }} @endif
-            wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+            wire:dirty.class.remove='dark:text-white text-black' wire:dirty.class="input-warning" wire:loading.attr="disabled"
             type="{{ $type }}" @disabled($disabled)
             @if ($id !== 'null') id={{ $id }} @endif name="{{ $name }}"
             placeholder="{{ $attributes->get('placeholder') }}">

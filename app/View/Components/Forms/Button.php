@@ -16,7 +16,7 @@ class Button extends Component
         public bool        $isModal = false,
         public bool        $noStyle = false,
         public ?string     $modalId = null,
-        public string      $defaultClass = "btn btn-primary btn-sm font-normal text-white normal-case no-animation rounded border-none"
+        public string      $defaultClass = "button"
     ) {
         if ($this->noStyle) {
             $this->defaultClass = "";

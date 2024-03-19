@@ -18,6 +18,7 @@
         "vue": "3.4.21"
     },
     "dependencies": {
+        "@tailwindcss/forms": "^0.5.7",
         "@tailwindcss/typography": "0.5.10",
         "alpinejs": "3.13.5",
         "daisyui": "4.7.2",

@@ -3,31 +3,31 @@
     <livewire:project.application.heading :application="$application" />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-6">
         <div class="flex flex-col gap-4 xl:w-48">
-            <a :class="activeTab === 'general' && 'text-white'"
+            <a :class="activeTab === 'general' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
             @if ($application->destination->server->isSwarm())
-                <a :class="activeTab === 'swarm' && 'text-white'"
+                <a :class="activeTab === 'swarm' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'swarm'; window.location.hash = 'swarm'" href="#">Swarm
                     Configuration</a>
             @endif
-            <a :class="activeTab === 'advanced' && 'text-white'"
+            <a :class="activeTab === 'advanced' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'advanced'; window.location.hash = 'advanced'" href="#">Advanced</a>
             @if ($application->build_pack !== 'static')
-                <a :class="activeTab === 'environment-variables' && 'text-white'"
+                <a :class="activeTab === 'environment-variables' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'environment-variables'; window.location.hash = 'environment-variables'"
                     href="#">Environment
                     Variables</a>
             @endif
             @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
-                <a :class="activeTab === 'storages' && 'text-white'"
+                <a :class="activeTab === 'storages' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'" href="#">Storages
                 </a>
             @endif
             @if ($application->git_based())
-                <a :class="activeTab === 'source' && 'text-white'"
+                <a :class="activeTab === 'source' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'source'; window.location.hash = 'source'" href="#">Source</a>
             @endif
-            <a :class="activeTab === 'servers' && 'text-white'" class="flex items-center gap-2"
+            <a :class="activeTab === 'servers' && 'dark:text-white text-black'" class="flex items-center gap-2"
                 @click.prevent="activeTab = 'servers'; window.location.hash = 'servers'" href="#">Servers
                 @if (str($application->status)->contains('degraded'))
                     <span title="Some servers are unavailable">
@@ -38,42 +38,42 @@
                     </span>
                 @endif
             </a>
-            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+            <a :class="activeTab === 'scheduled-tasks' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
 
-            <a :class="activeTab === 'webhooks' && 'text-white'"
+            <a :class="activeTab === 'webhooks' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'webhooks'; window.location.hash = 'webhooks'" href="#">Webhooks
             </a>
             @if ($application->git_based())
-                <a :class="activeTab === 'previews' && 'text-white'"
+                <a :class="activeTab === 'previews' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'previews'; window.location.hash = 'previews'" href="#">Preview
                     Deployments
                 </a>
             @endif
             @if ($application->build_pack !== 'static' && $application->build_pack !== 'dockercompose')
-                <a :class="activeTab === 'health' && 'text-white'"
+                <a :class="activeTab === 'health' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'health'; window.location.hash = 'health'" href="#">Healthchecks
                 </a>
             @endif
-            <a :class="activeTab === 'rollback' && 'text-white'"
+            <a :class="activeTab === 'rollback' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'rollback'; window.location.hash = 'rollback'" href="#">Rollback
             </a>
             @if ($application->build_pack !== 'dockercompose')
-                <a :class="activeTab === 'resource-limits' && 'text-white'"
+                <a :class="activeTab === 'resource-limits' && 'dark:text-white text-black'"
                     @click.prevent="activeTab = 'resource-limits'; window.location.hash = 'resource-limits'"
                     href="#">Resource Limits
                 </a>
             @endif
-            <a :class="activeTab === 'resource-operations' && 'text-white'"
+            <a :class="activeTab === 'resource-operations' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'resource-operations'; window.location.hash = 'resource-operations'"
                 href="#">Resource Operations
             </a>
-            <a :class="activeTab === 'tags' && 'text-white'"
+            <a :class="activeTab === 'tags' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'tags'; window.location.hash = 'tags'" href="#">Tags
             </a>
-            <a :class="activeTab === 'danger' && 'text-white'"
+            <a :class="activeTab === 'danger' && 'dark:text-white text-black'"
                 @click.prevent="activeTab = 'danger'; window.location.hash = 'danger'" href="#">Danger Zone
             </a>
         </div>

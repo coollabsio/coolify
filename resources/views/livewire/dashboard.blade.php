@@ -3,7 +3,7 @@
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
     <h1>Dashboard</h1>
-    <div class="subtitle">Your self-hosted environment</div>
+    {{-- <div class="subtitle">Your self-hosted environment</div> --}}
     @if (request()->query->get('success'))
         <div class="mb-10 text-white rounded alert alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"

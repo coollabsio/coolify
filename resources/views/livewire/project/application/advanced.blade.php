@@ -4,7 +4,7 @@
             <h2>Advanced</h2>
         </div>
         <div>Advanced configuration for your application.</div>
-        <div class="flex flex-col pt-4 w-96">
+        <div class="flex flex-col gap-2 pt-4 w-96">
             <h3>General</h3>
             @if ($application->git_based())
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave
@@ -42,7 +42,9 @@
             <x-forms.checkbox disabled instantSave id="is_custom_ssl" label="Is Custom SSL?" />
             <x-forms.checkbox disabled instantSave id="is_http2" label="Is Http2?" /> --}}
         </div>
-        <h3>GPU</h3>
+        @if ($application->build_pack !== 'dockercompose')
+            <h3>GPU</h3>
+        @endif
         <form wire:submit="submit">
             @if ($application->build_pack !== 'dockercompose')
                 <div class="w-96">

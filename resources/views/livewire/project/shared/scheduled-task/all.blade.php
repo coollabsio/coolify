@@ -1,11 +1,15 @@
 <div>
     <div class="flex gap-2">
-        <h2 class="pb-4">Scheduled Tasks</h2>
-        <x-forms.button class="btn" onclick="newTask.showModal()">+ Add</x-forms.button>
-        <livewire:project.shared.scheduled-task.add />
+        <h2>Scheduled Tasks</h2>
+        <x-slide-over>
+            <x-slot:title>New Scheduled Task</x-slot:title>
+            <x-slot:content>
+                <livewire:project.shared.scheduled-task.add />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+ Add</button>
+        </x-slide-over>
     </div>
-
-    <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap gap-2 pt-4">
         @forelse($resource->scheduled_tasks as $task)
             <a class="flex flex-col box"
                 @if ($resource->type() == 'application')
