@@ -119,16 +119,18 @@ class EmailSettings extends Component
     {
         try {
             $this->resetErrorBag();
-            $this->validate([
-                'team.smtp_from_address' => 'required|email',
-                'team.smtp_from_name' => 'required',
-                'team.smtp_host' => 'required',
-                'team.smtp_port' => 'required|numeric',
-                'team.smtp_encryption' => 'nullable',
-                'team.smtp_username' => 'nullable',
-                'team.smtp_password' => 'nullable',
-                'team.smtp_timeout' => 'nullable',
-            ]);
+            if (!$this->team->use_instance_email_settings) {
+                $this->validate([
+                    'team.smtp_from_address' => 'required|email',
+                    'team.smtp_from_name' => 'required',
+                    'team.smtp_host' => 'required',
+                    'team.smtp_port' => 'required|numeric',
+                    'team.smtp_encryption' => 'nullable',
+                    'team.smtp_username' => 'nullable',
+                    'team.smtp_password' => 'nullable',
+                    'team.smtp_timeout' => 'nullable',
+                ]);
+            }
             $this->team->save();
             refreshSession();
             $this->dispatch('success', 'Settings saved.');

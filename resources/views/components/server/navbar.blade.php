@@ -10,7 +10,7 @@
             <livewire:server.proxy.status :server="$server" />
         @endif
     </div>
-    <div class="subtitle ">{{ data_get($server, 'name') }}</div>
+    <div class="subtitle ">{{ data_get($server, 'name') }}.</div>
     <nav class="navbar-main">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [
@@ -18,17 +18,17 @@
             ]) }}">
             <button>General</button>
         </a>
-        <a class="{{ request()->routeIs('server.resources') ? 'text-white' : '' }}"
-            href="{{ route('server.resources', [
-                'server_uuid' => data_get($parameters, 'server_uuid'),
-            ]) }}">
-            <button>Resources</button>
-        </a>
         <a class="{{ request()->routeIs('server.private-key') ? 'text-white' : '' }}"
             href="{{ route('server.private-key', [
                 'server_uuid' => data_get($parameters, 'server_uuid'),
             ]) }}">
             <button>Private Key</button>
+        </a>
+        <a class="{{ request()->routeIs('server.resources') ? 'text-white' : '' }}"
+            href="{{ route('server.resources', [
+                'server_uuid' => data_get($parameters, 'server_uuid'),
+            ]) }}">
+            <button>Resources</button>
         </a>
         @if (!$server->isSwarmWorker() && !$server->settings->is_build_server)
             <a class="{{ request()->routeIs('server.proxy') ? 'text-white' : '' }}"
@@ -52,7 +52,11 @@
         @endif
 
         <div class="flex-1"></div>
-        @if ($server->proxyType() !== 'NONE' && $server->isFunctional() && !$server->isSwarmWorker() && !$server->settings->is_build_server)
+        @if (
+            $server->proxyType() !== 'NONE' &&
+                $server->isFunctional() &&
+                !$server->isSwarmWorker() &&
+                !$server->settings->is_build_server)
             <livewire:server.proxy.deploy :server="$server" />
         @endif
     </nav>

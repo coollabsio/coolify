@@ -55,12 +55,12 @@
                         <x-forms.button isError
                             wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                     @endif
-                    <x-new-modal
+                    <x-modal-confirmation
                         action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
                         isErrorButton buttonTitle="Remove Server">
                         This will stop the running application in this server and remove it as a deployment
                         destination.<br><br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
 
                 </div>
             @endforeach

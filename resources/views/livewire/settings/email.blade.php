@@ -1,15 +1,4 @@
 <div>
-    <dialog id="sendTestEmail" class="modal">
-        <form method="dialog" class="flex flex-col gap-2 rounded modal-box" wire:submit='submit'>
-            <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
-            <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification">
-                Send Email
-            </x-forms.button>
-        </form>
-        <form method="dialog" class="modal-backdrop">
-            <button>close</button>
-        </form>
-    </dialog>
     <div class="flex items-center gap-2">
         <h2>Transactional Email</h2>
     </div>
@@ -22,13 +11,16 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            @if (isEmailEnabled($settings) &&
-                    auth()->user()->isAdminFromSession() &&
-                    isTestEmailEnabled($settings))
-                <x-forms.button onclick="sendTestEmail.showModal()"
-                    class="text-white normal-case btn btn-xs no-animation btn-primary">
-                    Send Test Email
-                </x-forms.button>
+            @if (isEmailEnabled($settings) && auth()->user()->isAdminFromSession() && isTestEmailEnabled($settings))
+                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
+                    <form wire:submit='submit' class="flex flex-col gap-2">
+                        <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
+                        <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification"
+                            @click="modalOpen=false">
+                            Send Email
+                        </x-forms.button>
+                    </form>
+                </x-modal-input>
             @endif
         </div>
     </form>

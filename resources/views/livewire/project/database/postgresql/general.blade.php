@@ -82,7 +82,7 @@
     <div class="pb-16">
         <div class="flex gap-2 pt-4 pb-2">
             <h3>Initialization scripts</h3>
-            <x-forms.button class="btn" onclick="newInitScript.showModal()">+ Add</x-forms.button>
+            <x-forms.button  onclick="newInitScript.showModal()">+ Add</x-forms.button>
         </div>
         <div class="flex flex-col gap-2">
             @forelse(data_get($database,'init_scripts', []) as $script)

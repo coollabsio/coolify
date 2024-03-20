@@ -11,16 +11,20 @@ body {
     @apply text-sm antialiased scrollbar;
 }
 
-button[isError] {
+button[isError]:not(:disabled) {
     @apply bg-red-600 hover:bg-red-700;
 }
 
-button[isHighlighted] {
+button[isHighlighted]:not(:disabled) {
     @apply bg-coollabs hover:bg-coollabs-100;
 }
 
+.button {
+    @apply px-3 py-1.5 text-sm font-normal normal-case rounded dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit flex items-center justify-center;
+}
+
 h1 {
-    @apply pb-6 text-2xl font-bold dark:text-white text-neutral-800;
+    @apply text-2xl font-bold dark:text-white text-neutral-800;
 }
 
 h2 {
@@ -36,7 +40,7 @@ h4 {
 }
 
 a {
-    @apply dark:text-neutral-400 text-neutral-600;
+    @apply dark:hover:text-white dark:text-neutral-400 text-neutral-600;
 }
 
 label {
@@ -75,28 +79,44 @@ tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
 
-input.input-sm {
+input {
     @apply pr-10;
+}
+.input {
+    @apply block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
 }
 
 option {
     @apply text-white;
 }
-.badge {
-    @apply inline-block w-3 h-3 text-xs font-bold leading-none border border-black rounded-full ;
+.alert-success {
+    @apply flex items-center gap-2 text-success;
 }
+.alert-error {
+    @apply flex items-center gap-2 text-error;
+}
+.dropdown-item {
+    @apply relative flex cursor-pointer select-none dark:hover:text-white dark:hover:bg-coollabs items-center px-2 py-1.5 text-xs justify-center outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2
+}
+
+.badge {
+    @apply inline-block w-3 h-3 text-xs font-bold leading-none border border-black rounded-full;
+}
+
 .badge-success {
     @apply bg-success;
 }
+
 .badge-warning {
     @apply bg-warning;
 }
+
 .badge-error {
     @apply bg-error;
 }
-.button {
-    @apply px-3 py-1 text-sm font-normal normal-case rounded dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100;
-}
+
+
+
 [type='checkbox']:checked {
     background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='black' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
 }
@@ -104,12 +124,15 @@ option {
 .menu {
     @apply flex items-center gap-1;
 }
+
 .menu-item {
     @apply flex items-center w-full gap-2 px-4 py-1 min-w-48 hover:bg-coolgray-100 dark:hover:text-white;
 }
+
 .menu-item-active {
-    @apply rounded-none bg-coolgray-200 text-warning;
+    @apply rounded-none dark:bg-coolgray-200 dark:text-warning;
 }
+
 .icon {
     @apply w-4 h-4;
 }
@@ -123,9 +146,8 @@ option {
 }
 
 .custom-modal {
-    @apply flex flex-col gap-2 px-8 py-4 border bg-coolgray-100 border-coolgray-200;
+    @apply z-50 flex flex-col gap-2 px-8 py-4 border dark:bg-coolgray-100 dark:border-coolgray-200;
 }
-
 
 .navbar-main {
     @apply flex items-end gap-6 py-2 border-b-2 border-solid border-coolgray-200;
@@ -197,12 +219,13 @@ option {
     @apply inline-block font-bold text-warning;
 }
 
-
-
 .buyme {
     @apply block px-3 py-2 mt-10 text-sm font-semibold leading-6 text-center text-white rounded-md shadow-sm bg-coolgray-200 hover:bg-coolgray-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coolgray-200 hover:no-underline;
 }
 
+.title {
+    @apply hidden pb-0 lg:block lg:pb-8 ;
+}
 .subtitle {
     @apply pt-2 pb-10;
 }

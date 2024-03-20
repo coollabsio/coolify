@@ -13,14 +13,14 @@
                             </x-forms.button>
                         </a>
                     @endif
-                    <x-new-modal isErrorButton buttonTitle="Delete">
+                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         This source will be deleted. It is not reversible. <br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
                 </div>
             </div>
             <div class="subtitle">Your Private GitHub App for private repositories.</div>
             @if (!data_get($github_app, 'installation_id'))
-                <div class="mb-10 rounded alert alert-warning">
+                <div class="mb-10 rounded alert-error">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                         viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -148,12 +148,12 @@
         <div class="flex items-center gap-2 pb-4">
             <h1>GitHub App</h1>
             <div class="flex gap-2">
-                <x-new-modal isErrorButton buttonTitle="Delete">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     This source will be deleted. It is not reversible. <br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             </div>
         </div>
-        <div class="mb-10 rounded alert alert-warning">
+        <div class="mb-10 rounded alert-error">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

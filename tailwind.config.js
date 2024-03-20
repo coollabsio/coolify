@@ -30,11 +30,6 @@ module.exports = {
             colors
         },
     },
-    variants: {
-        scrollbar: ["dark"],
-        extend: {},
-    },
-
     plugins: [
         require("tailwindcss-scrollbar"),
         require("@tailwindcss/typography"),

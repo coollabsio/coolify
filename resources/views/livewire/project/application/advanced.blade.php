@@ -4,7 +4,7 @@
             <h2>Advanced</h2>
         </div>
         <div>Advanced configuration for your application.</div>
-        <div class="flex flex-col gap-2 pt-4 w-96">
+        <div class="pt-4 w-96">
             <h3>General</h3>
             @if ($application->git_based())
                 <x-forms.checkbox helper="Automatically deploy new commits based on Git webhooks." instantSave

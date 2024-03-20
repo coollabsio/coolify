@@ -40,14 +40,8 @@
     <body>
         {{-- <button onclick="changeTheme()" class="fixed z-50 left-52">Dark/light</button> --}}
         @livewire('wire-elements-modal')
-        <dialog id="help" class="modal">
-            <livewire:help />
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
         <x-toast />
-        <x-version class="fixed left-2 bottom-1" />
+        <x-version class="fixed left-7 bottom-1" />
         <script data-navigate-once>
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia(
                     '(prefers-color-scheme: dark)').matches)) {

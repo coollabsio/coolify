@@ -11,13 +11,17 @@
                 helper="For Preview Deployments, storage has a <span class='text-helper'>-pr-#PRNumber</span> in their
                     volume
                     name, example: <span class='text-helper'>-pr-1</span>" />
-            <x-forms.button class="btn" onclick="newStorage.showModal()">+ Add</x-forms.button>
-            <livewire:project.shared.storages.add :uuid="$resource->uuid" />
+            <x-slide-over>
+                <x-slot:title>New Persistent Storage</x-slot:title>
+                <x-slot:content>
+                    <livewire:project.shared.storages.add :uuid="$resource->uuid" />
+                </x-slot:content>
+                <button @click="slideOverOpen=true" class="button">+ Add</button>
+            </x-slide-over>
+            {{-- <x-forms.button onclick="newStorage.showModal()">+ Add</x-forms.button> --}}
         </div>
         <div class="pb-4">Persistent storage to preserve data between deployments.</div>
-        @if (
-            $resource->persistentStorages()->get()->count() === 0 &&
-                $resource->fileStorages()->get()->count() == 0)
+        @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)
             <div>No storage found.</div>
         @else
             @if ($resource->persistentStorages()->get()->count() > 0)
@@ -33,9 +37,7 @@
             @endif
         @endif
     @else
-        @if (
-            $resource->persistentStorages()->get()->count() > 0 ||
-                $resource->fileStorages()->get()->count() > 0)
+        @if ($resource->persistentStorages()->get()->count() > 0 || $resource->fileStorages()->get()->count() > 0)
             <h3 class="pt-4">{{ Str::headline($resource->name) }} </h3>
         @endif
         @if ($resource->persistentStorages()->get()->count() > 0)

@@ -10,13 +10,13 @@
         </div>
     </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-4 pt-10 sm:px-20">
+    <div class="flex flex-col gap-4 pt-10">
         @if ($current_step === 'type')
-            <ul class="pb-10 steps">
+            {{-- <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
                 <li class="step">Select a Server</li>
                 <li class="step">Select a Destination</li>
-            </ul>
+            </ul> --}}
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <x-resource-view wire="setType('public')">
@@ -167,7 +167,7 @@
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
                 <input
-                    class="w-full text-white rounded input input-sm bg-coolgray-200 disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+                    class="input"
                     wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
@@ -254,11 +254,11 @@
                 companies, and use of them does not imply any affiliation or endorsement.</div>
         @endif
         @if ($current_step === 'servers')
-            <ul class="pb-10 steps">
+            {{-- <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step">Select a Destination</li>
-            </ul>
+            </ul> --}}
 
             {{-- @if ($isDatabase)
                 <div class="flex items-center justify-center pt-4">
@@ -295,11 +295,11 @@
             @endif --}}
         @endif
         @if ($current_step === 'destinations')
-            <ul class="pb-10 steps">
+            {{-- <ul class="pb-10 steps">
                 <li class="step step-secondary">Select Resource Type</li>
                 <li class="step step-secondary">Select a Server</li>
                 <li class="step step-secondary">Select a Destination</li>
-            </ul>
+            </ul> --}}
 
             <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @if ($server->isSwarm())

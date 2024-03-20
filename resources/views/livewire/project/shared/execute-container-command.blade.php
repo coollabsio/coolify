@@ -50,7 +50,7 @@
             @endif
         </div>
     </div>
-    <div class="container w-full pt-10 mx-auto">
+    <div class="w-full pt-10 mx-auto">
         <livewire:activity-monitor header="Command output" />
     </div>
 </div>

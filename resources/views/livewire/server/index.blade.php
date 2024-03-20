@@ -2,9 +2,11 @@
     <div class="flex items-start gap-2">
         <h1>Servers</h1>
         <a class="text-white hover:no-underline" href="{{ route('server.create') }}">
-            <x-forms.button class="btn">+ Add</x-forms.button>
+            <x-forms.button >+ Add</x-forms.button>
         </a>
     </div>
+    <div class="subtitle">All your projects.</div>
+
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"

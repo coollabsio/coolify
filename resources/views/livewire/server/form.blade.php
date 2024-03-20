@@ -3,11 +3,11 @@
         <div class="flex gap-2">
             <h2>General</h2>
             @if ($server->id === 0)
-                <x-new-modal buttonTitle="Save" title="Change Localhost" action="submit">
+                <x-modal-confirmation buttonTitle="Save" title="Change Localhost" action="submit">
                     You could lose a lot of functionalities if you change the server details of the server where Coolify
                     is
                     running on.<br>Please think again.
-                </x-new-modal>
+                </x-modal-confirmation>
             @else
                 <x-forms.button type="submit">Save</x-forms.button>
                 @if ($server->isFunctional())

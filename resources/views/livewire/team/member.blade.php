@@ -11,7 +11,7 @@
     <td class="px-5 py-4 text-sm whitespace-nowrap">
         {{ data_get($member, 'pivot.role') }}
     </td>
-    <td class="px-5 py-4 text-sm whitespace-nowrap">
+    <td class="flex gap-2 px-5 py-4 text-sm whitespace-nowrap">
         @if (auth()->user()->isAdminFromSession())
             @if ($member->id !== auth()->user()->id)
                 @if (auth()->user()->isOwner())

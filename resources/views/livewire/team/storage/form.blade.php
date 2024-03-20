@@ -16,9 +16,9 @@
             <x-forms.button wire:click="test_s3_connection">
                 Validate Connection
             </x-forms.button>
-            <x-new-modal isErrorButton buttonTitle="Delete">
+            <x-modal-confirmation isErrorButton buttonTitle="Delete">
                 This storage will be deleted. It is not reversible. Your data won't be touched!<br>Please think again.
-            </x-new-modal>
+            </x-modal-confirmation>
         </div>
         <div class="flex gap-2">
             <x-forms.input label="Name" id="storage.name" />

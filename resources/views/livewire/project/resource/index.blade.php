@@ -3,15 +3,15 @@
         <div class="flex items-center gap-2">
             <h1>Resources</h1>
             @if ($environment->isEmpty())
-                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
                     Clone
                 </a>
             @else
                 <a href="{{ route('project.resource.create', ['project_uuid' => request()->route('project_uuid'), 'environment_name' => request()->route('environment_name')]) }}  "
-                    class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation">+
+                    class="button">+
                     New</a>
-                <a class="font-normal text-white normal-case border-none rounded hover:no-underline btn btn-primary btn-sm no-animation"
+                <a class="button"
                     href="{{ route('project.clone-me', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => request()->route('environment_name')]) }}">
                     Clone
                 </a>
@@ -45,7 +45,7 @@
             class="items-center justify-center box">+ Add New Resource</a>
     @else
         <div x-data="searchComponent()">
-            <x-forms.input autofocus="true" placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
+            <x-forms.input autofocus placeholder="Search for name, fqdn..." class="w-full" x-model="search" />
             <div class="grid grid-cols-1 gap-4 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                 <template x-for="item in filteredApplications" :key="item.id">
                     <span>

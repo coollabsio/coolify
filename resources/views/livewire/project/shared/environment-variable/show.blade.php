@@ -39,10 +39,10 @@
         @endif
         <div class="flex gap-2">
             @if ($isLocked)
-                <x-new-modal isErrorButton buttonTitle="Delete">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete">
                     You will delete environment variable <span
                         class="font-bold text-warning">{{ $env->key }}</span>.
-                </x-new-modal>
+                </x-modal-confirmation>
             @else
                 @if ($isDisabled)
                     <x-forms.button disabled type="submit">
@@ -51,10 +51,10 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-new-modal isErrorButton buttonTitle="Delete">
+                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         You will delete environment variable <span
                             class="font-bold text-warning">{{ $env->key }}</span>.
-                    </x-new-modal>
+                    </x-modal-confirmation>
                 @else
                     <x-forms.button type="submit">
                         Update
@@ -62,10 +62,10 @@
                     <x-forms.button wire:click='lock'>
                         Lock
                     </x-forms.button>
-                    <x-new-modal isErrorButton buttonTitle="Delete">
+                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         You will delete environment variable <span
                             class="font-bold text-warning">{{ $env->key }}</span>.
-                    </x-new-modal>
+                    </x-modal-confirmation>
                 @endif
             @endif
         </div>

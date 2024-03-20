@@ -2,10 +2,17 @@
     <div class="flex gap-2">
         <h1>Projects</h1>
         @if ($servers > 0)
-            <x-forms.button onclick="newEmptyProject.showModal()">+ Add</x-forms.button>
-            <livewire:project.add-empty />
+            <x-slide-over>
+                <x-slot:title>New Project</x-slot:title>
+                <x-slot:content>
+                    <livewire:project.add-empty />
+                </x-slot:content>
+                <button @click="slideOverOpen=true" class="button">+
+                    Add</button>
+            </x-slide-over>
         @endif
     </div>
+    <div class="subtitle">All your projects.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @if ($servers === 0)
             <div>

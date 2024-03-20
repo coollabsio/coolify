@@ -13,9 +13,9 @@
                 <x-forms.button type="submit">
                     Save
                 </x-forms.button>
-                <x-new-modal isErrorButton buttonTitle="Delete Scheduled Task">
+                <x-modal-confirmation isErrorButton buttonTitle="Delete Scheduled Task">
                     You will delete scheduled task <span class="font-bold text-warning">{{ $task->name }}</span>.
-                </x-new-modal>
+                </x-modal-confirmation>
             </div>
         </div>
         <div class="flex w-full gap-2">
