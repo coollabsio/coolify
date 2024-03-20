@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\MagicController;
-
+use App\Http\Controllers\OauthController;
 use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Dev\Compose as Compose;
 
@@ -92,6 +92,9 @@ Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->mi
 Route::middleware(['throttle:login'])->group(function () {
     Route::get('/auth/link', [Controller::class, 'link'])->name('auth.link');
 });
+
+Route::get('/auth/{provider}/redirect', [OauthController::class, 'redirect'])->name('auth.redirect');
+Route::get('/auth/{provider}/callback', [OauthController::class, 'callback'])->name('auth.callback');
 
 Route::prefix('magic')->middleware(['auth'])->group(function () {
     Route::get('/servers', [MagicController::class, 'servers']);

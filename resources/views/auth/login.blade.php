@@ -40,6 +40,11 @@
                         </a>
                     @endenv
                     <x-forms.button type="submit">{{ __('auth.login') }}</x-forms.button>
+                    @foreach ($enabled_oauth_providers as $provider_setting)
+                        <x-forms.button type="button" onclick="document.location.href='/auth/{{$provider_setting->provider}}/redirect'">
+                            {{ __("auth.login.$provider_setting->provider") }}
+                        </x-forms.button>
+                    @endforeach
                     @if (!$is_registration_enabled)
                         <div class="text-center ">{{ __('auth.registration_disabled') }}</div>
                     @endif
