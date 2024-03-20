@@ -2,12 +2,13 @@
 # slogan: Uptime Kuma is a monitoring tool for tracking the status and performance of your applications in real-time.
 # tags: monitoring, status, performance, web, services, applications, real-time
 # logo: svgs/uptime-kuma.svg
+# port: 3001
 
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     environment:
-      - SERVICE_FQDN
+      - SERVICE_FQDN_UPTIME-KUMA_3001
     volumes:
       - uptime-kuma:/app/data
     healthcheck:

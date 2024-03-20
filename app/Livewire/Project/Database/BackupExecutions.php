@@ -34,7 +34,7 @@ class BackupExecutions extends Component
         }
         $execution->delete();
         $this->dispatch('success', 'Backup deleted.');
-        $this->dispatch('refreshBackupExecutions');
+        $this->refreshBackupExecutions();
     }
     public function download($exeuctionId)
     {
@@ -65,6 +65,6 @@ class BackupExecutions extends Component
     }
     public function refreshBackupExecutions(): void
     {
-        $this->executions = data_get($this->backup, 'executions', []);
+        $this->executions = $this->backup->executions()->get()->sortByDesc('created_at');
     }
 }

@@ -29,6 +29,9 @@ class Logs extends Component
     {
         try {
             $server = $this->servers->firstWhere('id', $server_id);
+            if (!$server->isFunctional()) {
+                return;
+            }
             if ($server->isSwarm()) {
                 $containers = collect([
                     [
@@ -96,7 +99,6 @@ class Logs extends Component
                 $this->resource->databases()->get()->each(function ($database) {
                     $this->containers->push(data_get($database, 'name') . '-' . data_get($this->resource, 'uuid'));
                 });
-
                 if ($this->resource->server->isFunctional()) {
                     $this->servers = $this->servers->push($this->resource->server);
                 }

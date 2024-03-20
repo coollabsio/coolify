@@ -21,9 +21,14 @@ class EnvironmentEdit extends Component
     public function saveKey($data)
     {
         try {
+            $found = $this->environment->environment_variables()->where('key', $data['key'])->first();
+            if ($found) {
+                throw new \Exception('Variable already exists.');
+            }
             $this->environment->environment_variables()->create([
                 'key' => $data['key'],
                 'value' => $data['value'],
+                'is_multiline' => $data['is_multiline'],
                 'type' => 'environment',
                 'team_id' => currentTeam()->id,
             ]);

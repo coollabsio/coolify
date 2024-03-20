@@ -6,13 +6,22 @@
             <h2>General</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-col gap-2 lg:flex-row">
             <x-forms.input id="name" label="Name" required />
             <x-forms.input id="email" label="Email" readonly />
         </div>
     </form>
-    <h2 class="py-4">Subscription</h2>
-    <a href="{{ route('team.index') }}">Check in Team Settings</a>
+    <form wire:submit='resetPassword' class="flex flex-col max-w-xl pt-4">
+        <div class="flex items-center gap-2">
+            <h2>Reset Password</h2>
+            <x-forms.button type="submit" label="Save">Reset</x-forms.button>
+        </div>
+        <div class="flex flex-col gap-2">
+            <x-forms.input id="current_password" label="Current Password" required type="password" />
+            <x-forms.input id="new_password" label="New Password" required type="password" />
+            <x-forms.input id="new_password_confirmation" label="New Password Again" required type="password" />
+        </div>
+    </form>
     <h2 class="py-4">Two-factor Authentication</h2>
     @if (session('status') == 'two-factor-authentication-enabled')
         <div class="mb-4 font-medium">

@@ -9,11 +9,11 @@ services:
      volumes:
        - wordpress-files:/var/www/html
      environment:
-       SERVICE_FQDN:
-       WORDPRESS_DB_HOST: mysql
-       WORDPRESS_DB_USER: $SERVICE_USER_WORDPRESS
-       WORDPRESS_DB_PASSWORD: $SERVICE_PASSWORD_WORDPRESS
-       WORDPRESS_DB_NAME: wordpress
+       - SERVICE_FQDN
+       - WORDPRESS_DB_HOST=mysql
+       - WORDPRESS_DB_USER=$SERVICE_USER_WORDPRESS
+       - WORDPRESS_DB_PASSWORD=$SERVICE_PASSWORD_WORDPRESS
+       - WORDPRESS_DB_NAME=wordpress
      depends_on:
        - mysql
 
@@ -22,7 +22,7 @@ services:
      volumes:
        - mysql-data:/var/lib/mysql
      environment:
-       MYSQL_ROOT_PASSWORD: $SERVICE_PASSWORD_ROOT
-       MYSQL_DATABASE: wordpress
-       MYSQL_USER: $SERVICE_USER_WORDPRESS
-       MYSQL_PASSWORD: $SERVICE_PASSWORD_WORDPRESS
+       - MYSQL_ROOT_PASSWORD=$SERVICE_PASSWORD_ROOT
+       - MYSQL_DATABASE=wordpress
+       - MYSQL_USER=$SERVICE_USER_WORDPRESS
+       - MYSQL_PASSWORD=$SERVICE_PASSWORD_WORDPRESS

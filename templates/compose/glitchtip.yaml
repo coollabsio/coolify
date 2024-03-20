@@ -2,6 +2,7 @@
 # slogan: GlitchTip is a self-hosted, open-source error tracking system.
 # tags: error, tracking, open-source, self-hosted, sentry
 # logo: svgs/glitchtip.png
+# port: 8080
 
 version: "3.8"
 services:
@@ -21,7 +22,7 @@ services:
       - postgres
       - redis
     environment:
-      - SERVICE_FQDN_GLITCHTIP
+      - SERVICE_FQDN_GLITCHTIP_8080
       - DATABASE_URL=postgres://$SERVICE_USER_POSTGRESQL:$SERVICE_PASSWORD_POSTGRESQL@postgres:5432/${POSTGRESQL_DATABASE:-glitchtip}
       - SECRET_KEY=$SERVICE_BASE64_64_ENCRYPTION
       - EMAIL_URL=${EMAIL_URL:-consolemail://}

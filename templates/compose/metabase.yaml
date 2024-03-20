@@ -2,6 +2,7 @@
 # slogan: Fast analytics with the friendly UX and integrated tooling to let your company explore data on their own.
 # tags: analytics,bi,business,intelligence
 # logo: svgs/metabase.svg
+# port: 3000
 
 services:
   metabase:
@@ -9,7 +10,7 @@ services:
     volumes:
       - /dev/urandom:/dev/random:ro
     environment:
-      - SERVICE_FQDN_METABASE
+      - SERVICE_FQDN_METABASE_3000
       - MB_DB_TYPE=postgres
       - MB_DB_HOST=postgresql
       - MB_DB_PORT=5432

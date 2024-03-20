@@ -29,7 +29,6 @@ class NewDynamicConfiguration extends Component
                 'fileName' => 'required',
                 'value' => 'required',
             ]);
-
             if (data_get($this->parameters, 'server_uuid')) {
                 $this->server = Server::ownedByCurrentTeam()->whereUuid(data_get($this->parameters, 'server_uuid'))->first();
             }
@@ -39,14 +38,21 @@ class NewDynamicConfiguration extends Component
             if (is_null($this->server)) {
                 return redirect()->route('server.index');
             }
-            if (!str($this->fileName)->endsWith('.yaml') && !str($this->fileName)->endsWith('.yml')) {
-                $this->fileName = "{$this->fileName}.yaml";
+            $proxy_type = $this->server->proxyType();
+            if ($proxy_type === 'TRAEFIK_V2') {
+                if (!str($this->fileName)->endsWith('.yaml') && !str($this->fileName)->endsWith('.yml')) {
+                    $this->fileName = "{$this->fileName}.yaml";
+                }
+                if ($this->fileName === 'coolify.yaml') {
+                    $this->dispatch('error', 'File name is reserved.');
+                    return;
+                }
+            } else if ($proxy_type === 'CADDY') {
+                if (!str($this->fileName)->endsWith('.caddy')) {
+                    $this->fileName = "{$this->fileName}.caddy";
+                }
             }
-            if ($this->fileName === 'coolify.yaml') {
-                $this->dispatch('error', 'File name is reserved.');
-                return;
-            }
-            $proxy_path = get_proxy_path();
+            $proxy_path = $this->server->proxyPath();
             $file = "{$proxy_path}/dynamic/{$this->fileName}";
             if ($this->newFile) {
                 $exists = instant_remote_process(["test -f $file && echo 1 || echo 0"], $this->server);
@@ -55,11 +61,18 @@ class NewDynamicConfiguration extends Component
                     return;
                 }
             }
-            $yaml = Yaml::parse($this->value);
-            $yaml = Yaml::dump($yaml, 10, 2);
-            $this->value = $yaml;
+            if ($proxy_type === 'TRAEFIK_V2') {
+                $yaml = Yaml::parse($this->value);
+                $yaml = Yaml::dump($yaml, 10, 2);
+                $this->value = $yaml;
+            }
             $base64_value = base64_encode($this->value);
-            instant_remote_process(["echo '{$base64_value}' | base64 -d > {$file}"], $this->server);
+            instant_remote_process([
+                "echo '{$base64_value}' | base64 -d > {$file}",
+            ], $this->server);
+            if ($proxy_type === 'CADDY') {
+                $this->server->reloadCaddy();
+            }
             $this->dispatch('loadDynamicConfigurations');
             $this->dispatch('dynamic-configuration-added');
             $this->dispatch('success', 'Dynamic configuration saved.');

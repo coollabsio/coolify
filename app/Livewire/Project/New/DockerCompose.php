@@ -17,7 +17,6 @@ class DockerCompose extends Component
     public array $query;
     public function mount()
     {
-
         $this->parameters = get_route_parameters();
         $this->query = request()->query();
         if (isDev()) {
@@ -40,12 +39,17 @@ class DockerCompose extends Component
     }
     public function submit()
     {
+        $server_id = $this->query['server_id'];
         try {
             $this->validate([
                 'dockerComposeRaw' => 'required'
             ]);
             $this->dockerComposeRaw = Yaml::dump(Yaml::parse($this->dockerComposeRaw), 10, 2, Yaml::DUMP_MULTI_LINE_LITERAL_BLOCK);
-            $server_id = $this->query['server_id'];
+
+            $isValid = validateComposeFile($this->dockerComposeRaw, $server_id);
+            if ($isValid !== 'OK') {
+                return $this->dispatch('error', "Invalid docker-compose file.\n$isValid");
+            }
 
             $project = Project::where('uuid', $this->parameters['project_uuid'])->first();
             $environment = $project->load(['environments'])->environments->where('name', $this->parameters['environment_name'])->first();
@@ -74,7 +78,6 @@ class DockerCompose extends Component
                 'environment_name' => $environment->name,
                 'project_uuid' => $project->uuid,
             ]);
-
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

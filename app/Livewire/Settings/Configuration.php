@@ -2,12 +2,9 @@
 
 namespace App\Livewire\Settings;
 
-use App\Jobs\ContainerStatusJob;
 use App\Models\InstanceSettings as ModelsInstanceSettings;
 use App\Models\Server;
 use Livewire\Component;
-use Spatie\Url\Url;
-use Symfony\Component\Yaml\Yaml;
 
 class Configuration extends Component
 {
@@ -78,13 +75,7 @@ class Configuration extends Component
 
         $this->settings->save();
         $this->server = Server::findOrFail(0);
-        $this->setup_instance_fqdn();
+        $this->server->setupDynamicProxyConfiguration();
         $this->dispatch('success', 'Instance settings updated successfully!');
-    }
-
-    private function setup_instance_fqdn()
-    {
-        setup_dynamic_configuration();
-
     }
 }

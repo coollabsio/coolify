@@ -48,13 +48,15 @@ class Team extends Model implements SendsDiscord, SendsEmail
         }
         return explode(',', $recipients);
     }
-    static public function serverLimitReached() {
+    static public function serverLimitReached()
+    {
         $serverLimit = Team::serverLimit();
         $team = currentTeam();
         $servers = $team->servers->count();
         return $servers >= $serverLimit;
     }
-    public function serverOverflow() {
+    public function serverOverflow()
+    {
         if ($this->serverLimit() < $this->servers->count()) {
             return true;
         }
@@ -169,5 +171,18 @@ class Team extends Model implements SendsDiscord, SendsEmail
                 'is_reachable' => true,
             ]);
         }
+    }
+    public function isAnyNotificationEnabled()
+    {
+        if (isCloud()) {
+            return true;
+        }
+        if (!data_get(auth()->user(), 'is_notification_notifications_enabled')) {
+            return true;
+        }
+        if ($this->smtp_enabled || $this->resend_enabled || $this->discord_enabled || $this->telegram_enabled || $this->use_instance_email_settings) {
+            return true;
+        }
+        return false;
     }
 }

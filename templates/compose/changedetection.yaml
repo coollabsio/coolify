@@ -2,6 +2,7 @@
 # slogan: Website change detection monitor and notifications.
 # tags: web, alert, monitor
 # logo: svgs/changedetection.png
+# port: 5000
 
 services:
   changedetection:
@@ -9,7 +10,7 @@ services:
     volumes:
       - changedetection-data:/datastore
     environment:
-      - SERVICE_FQDN_CHANGEDETECTION
+      - SERVICE_FQDN_CHANGEDETECTION_5000
       - PUID=1000
       - PGID=1000
       - BASE_URL=$SERVICE_FQDN_CHANGEDETECTION

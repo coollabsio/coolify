@@ -85,7 +85,7 @@ if (isDev()) {
 Route::get('/admin', AdminIndex::class)->name('admin.index');
 
 Route::post('/forgot-password', [Controller::class, 'forgot_password'])->name('password.forgot');
-Route::get('/api/v1/test/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
+Route::get('/realtime', [Controller::class, 'realtime_test'])->middleware('auth');
 Route::get('/waitlist', WaitlistIndex::class)->name('waitlist.index');
 Route::get('/verify', [Controller::class, 'verify'])->middleware('auth')->name('verify.email');
 Route::get('/email/verify/{id}/{hash}', [Controller::class, 'email_verify'])->middleware(['auth'])->name('verify.verify');
@@ -111,7 +111,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('/boarding', BoardingIndex::class)->name('boarding');
+    Route::get('/onboarding', BoardingIndex::class)->name('onboarding');
 
     Route::get('/subscription', SubscriptionShow::class)->name('subscription.show');
     Route::get('/subscription/new', SubscriptionIndex::class)->name('subscription.index');
@@ -124,11 +124,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/', TagsIndex::class)->name('tags.index');
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', TeamNotificationIndex::class)->name('notification.index');
+    });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
         Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
-        Route::get('/notifications', TeamNotificationIndex::class)->name('team.notification.index');
         Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
         Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
         Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');

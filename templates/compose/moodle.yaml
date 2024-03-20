@@ -2,6 +2,7 @@
 # slogan: Moodle is the world’s most customisable and trusted eLearning solution that empowers educators to improve our world.
 # tags: moodle, elearning, education, lms, cms, open, source, low, code
 # logo: svgs/moodle.png
+# port: 8080
 
 services:
   mariadb:
@@ -20,7 +21,7 @@ services:
   moodle:
     image: docker.io/bitnami/moodle:4.3
     environment:
-      - SERVICE_FQDN_MOODLE
+      - SERVICE_FQDN_MOODLE_8080
       - MOODLE_DATABASE_HOST=mariadb
       - MOODLE_DATABASE_PORT_NUMBER=3306
       - MOODLE_DATABASE_USER=$SERVICE_USER_MARIADB

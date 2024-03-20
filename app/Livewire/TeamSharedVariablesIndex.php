@@ -13,9 +13,14 @@ class TeamSharedVariablesIndex extends Component
     public function saveKey($data)
     {
         try {
+            $found = $this->team->environment_variables()->where('key', $data['key'])->first();
+            if ($found) {
+                throw new \Exception('Variable already exists.');
+            }
             $this->team->environment_variables()->create([
                 'key' => $data['key'],
                 'value' => $data['value'],
+                'is_multiline' => $data['is_multiline'],
                 'type' => 'team',
                 'team_id' => currentTeam()->id,
             ]);

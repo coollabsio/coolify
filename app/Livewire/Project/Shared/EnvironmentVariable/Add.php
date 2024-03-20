@@ -11,17 +11,20 @@ class Add extends Component
     public string $key;
     public ?string $value = null;
     public bool $is_build_time = false;
+    public bool $is_multiline = false;
 
     protected $listeners = ['clearAddEnv' => 'clear'];
     protected $rules = [
         'key' => 'required|string',
         'value' => 'nullable',
         'is_build_time' => 'required|boolean',
+        'is_multiline' => 'required|boolean',
     ];
     protected $validationAttributes = [
         'key' => 'key',
         'value' => 'value',
         'is_build_time' => 'build',
+        'is_multiline' => 'multiline',
     ];
 
     public function mount()
@@ -43,6 +46,7 @@ class Add extends Component
             'key' => $this->key,
             'value' => $this->value,
             'is_build_time' => $this->is_build_time,
+            'is_multiline' => $this->is_multiline,
             'is_preview' => $this->is_preview,
         ]);
         $this->clear();
@@ -53,5 +57,6 @@ class Add extends Component
         $this->key = '';
         $this->value = '';
         $this->is_build_time = false;
+        $this->is_multiline = false;
     }
 }
