@@ -1,4 +1,4 @@
-FROM serversideup/php:8.2-fpm-nginx
+FROM serversideup/php:8.2-fpm-nginx-v2.2.1
 
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
