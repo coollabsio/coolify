@@ -20,7 +20,7 @@ class Auth extends Component {
     }
 
     public function mount() {
-        $this->oauth_settings_map = OauthSetting::all()->reduce(function($carry, $setting) {
+        $this->oauth_settings_map = OauthSetting::all()->sortBy('provider')->reduce(function($carry, $setting) {
             $carry[$setting->provider] = $setting;
             return $carry;
         }, []);

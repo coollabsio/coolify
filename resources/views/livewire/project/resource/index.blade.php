@@ -52,7 +52,7 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col w-full px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 box-title" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
                                         <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
@@ -66,16 +66,16 @@
                                         <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full truncate description" x-text="item.description"></div>
-                                <div class="max-w-full truncate description" x-text="item.fqdn"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.description"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.fqdn"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
-                                <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
+                                <div class="px-2 py-1 cursor-pointer box-description dark:bg-coolgray-100 dark:hover:bg-coolgray-300 bg-neutral-100 hover:bg-neutral-200"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>
                             </template>
-                            <div class="flex items-center px-2 text-xs cursor-pointer text-neutral-500/20 group-hover:text-white hover:bg-coolgray-300"
+                            <div class="flex items-center px-2 text-xs cursor-pointer dark:text-neutral-500/20 text-neutral-500 group-hover:text-neutral-700 group-hover:dark:text-white dark:hover:bg-coolgray-300 hover:bg-neutral-200"
                                 @click.prevent="goto(item)">Add tag</div>
                         </div>
                     </span>
@@ -85,7 +85,7 @@
                         <a class="h-24 box group" :href="item.hrefLink">
                             <div class="flex flex-col px-4 mx-2">
                                 <div class="flex gap-2">
-                                    <div class="pb-2 font-bold text-white" x-text="item.name"></div>
+                                    <div class="pb-2 font-bold box-title" x-text="item.name"></div>
                                     <template x-if="item.status.startsWith('running')">
                                         <div title="running" class="mt-1 bg-success badge "></div>
                                     </template>
@@ -99,10 +99,10 @@
                                         <div title="degraded" class="mt-1 bg-warning badge "></div>
                                     </template>
                                 </div>
-                                <div class="max-w-full truncate description" x-text="item.description"></div>
+                                <div class="max-w-full truncate box-description" x-text="item.description"></div>
                             </div>
                         </a>
-                        <div class="flex gap-1 pt-1 group-hover:text-white group min-h-6">
+                        <div class="flex gap-1 pt-1 group-hover:dark:text-white group-hover:text-black group min-h-6">
                             <template x-for="tag in item.tags">
                                 <div class="px-2 py-1 cursor-pointer description bg-coolgray-100 hover:bg-coolgray-300"
                                     @click.prevent="gotoTag(tag.name)" x-text="tag.name"></div>

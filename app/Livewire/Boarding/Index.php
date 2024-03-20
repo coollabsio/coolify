@@ -2,22 +2,27 @@
 
 namespace App\Livewire\Boarding;
 
-use App\Actions\Server\InstallDocker;
 use App\Enums\ProxyTypes;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\Server;
 use App\Models\Team;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class Index extends Component
 {
     protected $listeners = ['serverInstalled' => 'validateServer'];
-    public string $currentState = 'welcome';
 
+    #[Url()]
+    public string $state = 'welcome';
+
+    #[Url()]
     public ?string $selectedServerType = null;
     public ?Collection $privateKeys = null;
+
+    #[Url()]
     public ?int $selectedExistingPrivateKey = null;
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
@@ -27,6 +32,8 @@ class Index extends Component
     public ?PrivateKey $createdPrivateKey = null;
 
     public ?Collection $servers = null;
+
+    #[Url()]
     public ?int $selectedExistingServer = null;
     public ?string $remoteServerName = null;
     public ?string $remoteServerDescription = null;
@@ -38,7 +45,9 @@ class Index extends Component
     public ?Server $createdServer = null;
 
     public Collection $projects;
-    public ?int $selectedExistingProject = null;
+
+    #[Url()]
+    public ?int $selectedProject = null;
     public ?Project $createdProject = null;
 
     public bool $dockerInstallationStarted = false;
@@ -62,13 +71,33 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->remoteServerDescription = 'Created by Coolify';
             $this->remoteServerHost = 'coolify-testing-host';
         }
+        if ($this->state === 'create-project') {
+            $this->getProjects();
+        }
+        if ($this->state === 'create-resource') {
+            $this->selectExistingServer();
+            $this->selectExistingProject();
+        }
+        if ($this->state === 'private-key') {
+            $this->setServerType('remote');
+        }
+        if ($this->state === 'create-server') {
+            $this->selectExistingPrivateKey();
+        }
+        if ($this->state === 'validate-server') {
+            $this->selectExistingServer();
+        }
+        if ($this->state === 'select-existing-server') {
+            $this->selectExistingServer();
+        }
+
     }
     public function explanation()
     {
         if (isCloud()) {
             return $this->setServerType('remote');
         }
-        $this->currentState = 'select-server-type';
+        $this->state = 'select-server-type';
     }
 
     public function restartBoarding()
@@ -89,6 +118,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->selectedServerType = $type;
         if ($this->selectedServerType === 'localhost') {
             $this->createdServer = Server::find(0);
+            $this->selectedExistingServer = 0;
             if (!$this->createdServer) {
                 return $this->dispatch('error', 'Localhost server is not found. Something went wrong during installation. Please try to reinstall or contact support.');
             }
@@ -106,10 +136,10 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $this->servers = Server::ownedByCurrentTeam(['name'])->where('id', '!=', 0)->get();
             if ($this->servers->count() > 0) {
                 $this->selectedExistingServer = $this->servers->first()->id;
-                $this->currentState = 'select-existing-server';
+                $this->state = 'select-existing-server';
                 return;
             }
-            $this->currentState = 'private-key';
+            $this->state = 'private-key';
         }
     }
     public function selectExistingServer()
@@ -117,12 +147,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer = Server::find($this->selectedExistingServer);
         if (!$this->createdServer) {
             $this->dispatch('error', 'Server is not found.');
-            $this->currentState = 'private-key';
+            $this->state = 'private-key';
             return;
         }
         $this->selectedExistingPrivateKey = $this->createdServer->privateKey->id;
         $this->serverPublicKey = $this->createdServer->privateKey->publicKey();
-        $this->currentState = 'validate-server';
+        $this->state = 'validate-server';
     }
     public function getProxyType()
     {
@@ -130,7 +160,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->selectProxy(ProxyTypes::TRAEFIK_V2->value);
         // $proxyTypeSet = $this->createdServer->proxy->type;
         // if (!$proxyTypeSet) {
-        //     $this->currentState = 'select-proxy';
+        //     $this->state = 'select-proxy';
         //     return;
         // }
         $this->getProjects();
@@ -139,12 +169,12 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->createdPrivateKey = PrivateKey::find($this->selectedExistingPrivateKey);
         $this->privateKey = $this->createdPrivateKey->private_key;
-        $this->currentState = 'create-server';
+        $this->state = 'create-server';
     }
     public function createNewServer()
     {
         $this->selectedExistingServer = null;
-        $this->currentState = 'private-key';
+        $this->state = 'private-key';
     }
     public function setPrivateKey(string $type)
     {
@@ -153,7 +183,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         if ($type === 'create') {
             $this->createNewPrivateKey();
         }
-        $this->currentState = 'create-private-key';
+        $this->state = 'create-private-key';
     }
     public function savePrivateKey()
     {
@@ -168,7 +198,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'team_id' => currentTeam()->id
         ]);
         $this->createdPrivateKey->save();
-        $this->currentState = 'create-server';
+        $this->state = 'create-server';
     }
     public function saveServer()
     {
@@ -196,7 +226,8 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
         $this->createdServer->settings->is_cloudflare_tunnel = $this->isCloudflareTunnel;
         $this->createdServer->settings->save();
         $this->createdServer->addInitialNetwork();
-        $this->currentState = 'validate-server';
+        $this->selectedExistingServer = $this->createdServer->id;
+        $this->state = 'validate-server';
     }
     public function installServer()
     {
@@ -223,7 +254,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             $dockerVersion = instant_remote_process(["docker version|head -2|grep -i version| awk '{print $2}'"], $this->createdServer, true);
             $dockerVersion = checkMinimumDockerEngineVersion($dockerVersion);
             if (is_null($dockerVersion)) {
-                $this->currentState = 'validate-server';
+                $this->state = 'validate-server';
                 throw new \Exception('Docker not found or old version is installed.');
             }
             $this->createdServer->settings()->update([
@@ -249,14 +280,14 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
     {
         $this->projects = Project::ownedByCurrentTeam(['name'])->get();
         if ($this->projects->count() > 0) {
-            $this->selectedExistingProject = $this->projects->first()->id;
+            $this->selectedProject = $this->projects->first()->id;
         }
-        $this->currentState = 'create-project';
+        $this->state = 'create-project';
     }
     public function selectExistingProject()
     {
-        $this->createdProject = Project::find($this->selectedExistingProject);
-        $this->currentState = 'create-resource';
+        $this->createdProject = Project::find($this->selectedProject);
+        $this->state = 'create-resource';
     }
     public function createNewProject()
     {
@@ -264,7 +295,7 @@ uZx9iFkCELtxrh31QJ68AAAAEXNhaWxANzZmZjY2ZDJlMmRkAQIDBA==
             'name' => "My first project",
             'team_id' => currentTeam()->id
         ]);
-        $this->currentState = 'create-resource';
+        $this->state = 'create-resource';
     }
     public function showNewResource()
     {

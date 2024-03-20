@@ -10,7 +10,7 @@
                 @click.prevent="activeTab = 'smtp'; window.location.hash = 'smtp'" href="#">Transactional
                 Email</a>
             <a :class="activeTab === 'auth' && 'text-white'"
-                @click.prevent="activeTab = 'auth'; window.location.hash = 'auth'" href="#">Authentication</a>
+                @click.prevent="activeTab = 'auth'; window.location.hash = 'auth'" href="#">Authentication (OAuth)</a>
         </div>
         <div class="w-full pl-8">
             <div x-cloak x-show="activeTab === 'general'" class="h-full">

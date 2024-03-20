@@ -1,11 +1,14 @@
-<div class="flex items-center h-16 pt-2 lg:pt-4 shrink-0">
-    <a href="/" class="flex items-center w-12 h-12 -mx-1 text-xl font-bold text-white"><img
-            class="transition rounded " src="{{ asset('coolify-transparent.png') }}"></a>
-</div>
-<nav class="flex flex-col flex-1">
+<nav class="flex flex-col flex-1 pl-4 border-r dark:border-coolgray-300 dark:bg-coolgray-100 bg-neutral-50">
+    <div class="flex w-full px-2 pt-6 pb-4">
+        <div class="flex flex-col">
+            <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
+            <x-version />
+        </div>
+        <button onclick="changeTheme()">Dark/light</button>
+    </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
-        <li class="flex-1">
-            <ul role="list" class="flex flex-col h-full -mx-2 space-y-1">
+        <li class="flex-1 ">
+            <ul role="list" class="flex flex-col h-full space-y-1.5">
                 <li>
                     <a title="Dashboard" href="/"
                         class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
@@ -278,8 +281,8 @@
                     </a>
                 </li>
             </ul>
-        </li> --}}
-        {{-- <li class="mt-auto -mx-6">
+        </li>
+        <li class="mt-auto -mx-6">
             <a href="#"
                 class="flex items-center px-6 py-3 text-sm font-semibold leading-6 text-gray-900 gap-x-4 hover:bg-gray-50">
                 <img class="w-8 h-8 rounded-full bg-gray-50"

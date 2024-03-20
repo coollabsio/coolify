@@ -5,7 +5,7 @@
             <x-forms.button >+ Add</x-forms.button>
         </a>
     </div>
-    <div class="subtitle">All your projects.</div>
+    <div class="subtitle">All your servers are here.</div>
 
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)

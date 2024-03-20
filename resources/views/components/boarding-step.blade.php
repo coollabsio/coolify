@@ -1,9 +1,9 @@
 <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
     <div class="box-border col-span-2 min-w-[24rem] min-h-[21rem]">
         <h1 class="text-5xl font-bold">{{ $title }}</h1>
-        <div class="py-6 ">
+        <div class="py-6">
             @isset($question)
-                <p class="text-base">
+                <p class="text-base dark:text-neutral-400">
                     {{ $question }}
                 </p>
             @endisset

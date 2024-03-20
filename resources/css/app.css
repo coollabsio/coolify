@@ -11,6 +11,9 @@ body {
     @apply text-sm antialiased scrollbar;
 }
 
+.button {
+    @apply px-3 py-1.5 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit flex items-center justify-center;
+}
 button[isError]:not(:disabled) {
     @apply bg-red-600 hover:bg-red-700;
 }
@@ -19,9 +22,7 @@ button[isHighlighted]:not(:disabled) {
     @apply bg-coollabs hover:bg-coollabs-100;
 }
 
-.button {
-    @apply px-3 py-1.5 text-sm font-normal normal-case rounded dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit flex items-center justify-center;
-}
+
 
 h1 {
     @apply text-2xl font-bold dark:text-white text-neutral-800;
@@ -82,6 +83,7 @@ tr td:first-child {
 input {
     @apply pr-10;
 }
+
 .input {
     @apply block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
 }
@@ -89,12 +91,15 @@ input {
 option {
     @apply text-white;
 }
+
 .alert-success {
     @apply flex items-center gap-2 text-success;
 }
+
 .alert-error {
     @apply flex items-center gap-2 text-error;
 }
+
 .dropdown-item {
     @apply relative flex cursor-pointer select-none dark:hover:text-white dark:hover:bg-coollabs items-center px-2 py-1.5 text-xs justify-center outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2
 }
@@ -115,8 +120,6 @@ option {
     @apply bg-error;
 }
 
-
-
 [type='checkbox']:checked {
     background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='black' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
 }
@@ -126,11 +129,11 @@ option {
 }
 
 .menu-item {
-    @apply flex items-center w-full gap-2 px-4 py-1 min-w-48 hover:bg-coolgray-100 dark:hover:text-white;
+    @apply flex items-center w-full gap-2 py-1 pl-2 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
 }
 
 .menu-item-active {
-    @apply rounded-none dark:bg-coolgray-200 dark:text-warning;
+    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
 }
 
 .icon {
@@ -170,15 +173,21 @@ option {
 }
 
 .box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] bg-coolgray-100 hover:bg-coollabs-100 hover:text-white hover:no-underline;
+    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-neutral-50 hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 
 .box-without-bg {
-    @apply flex p-2 transition-colors hover:text-white hover:no-underline min-h-[4rem];
+    @apply flex p-2 transition-colors dark:hover:text-white hover:no-underline min-h-[4rem];
 }
 
+.box-title {
+    @apply font-bold text-black dark:text-white group-hover:dark:text-white;
+}
+.box-description {
+    @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
+}
 .description {
-    @apply text-xs font-bold text-neutral-500 group-hover:text-white;
+    @apply text-xs font-bold text-neutral-500 group-hover:dark:text-white group-hover:text-black;
 }
 
 .lds-heart {
@@ -224,8 +233,9 @@ option {
 }
 
 .title {
-    @apply hidden pb-0 lg:block lg:pb-8 ;
+    @apply hidden pb-0 lg:block lg:pb-8;
 }
+
 .subtitle {
     @apply pt-2 pb-10;
 }
@@ -237,4 +247,3 @@ option {
 .toast {
     z-index: 1;
 }
-

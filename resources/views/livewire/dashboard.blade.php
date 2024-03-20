@@ -5,7 +5,7 @@
     <h1 class="title">Dashboard</h1>
     {{-- <div class="subtitle">Your self-hosted environment</div> --}}
     @if (request()->query->get('success'))
-        <div class="mb-10 text-white rounded alert-success">
+        <div class="mb-10 rounded dark:text-white alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -22,26 +22,26 @@
                 @if (data_get($project, 'environments')->count() === 1)
                     <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                         href="{{ route('project.resource.index', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                        <div class="font-bold text-white">{{ $project->name }}</div>
-                        <div class="description">
+                        <div class="box-title">{{ $project->name }}</div>
+                        <div class="box-description">
                             {{ $project->description }}</div>
                     </a>
                 @else
                     <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                         href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                        <div class="font-bold text-white">{{ $project->name }}</div>
-                        <div class="description">
+                        <div class="box-title">{{ $project->name }}</div>
+                        <div class="box-description">
                             {{ $project->description }}</div>
                     </a>
                 @endif
-                <div class="flex items-center">
-                    <a class="mx-4 rounded group-hover:text-white hover:no-underline"
+                <div class="flex items-center group">
+                    <a class="mx-4 rounded hover:no-underline"
                         href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                        <span class="font-bold hover:text-warning">+ Add Resource</span>
+                        <span class="p-2 font-bold group-hover:dark:text-white group-hover:text-black dark:hover:bg-coollabs hover:bg-neutral-300">+ Add Resource</span>
                     </a>
-                    <a class="mx-4 rounded group-hover:text-white"
+                    <a class="mx-4 rounded group-hover:dark:text-white group-hover:text-black"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning" viewBox="0 0 24 24"
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-coollabs" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
@@ -54,9 +54,9 @@
             </div>
         @empty
             <div>
-                No projects found. Add your first server <a class="text-white underline"
+                No projects found. Add your first server <a class="underline dark:text-white"
                     onclick="newEmptyProject.showModal()">here</a> or
-                go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page.</a>
+                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding page.</a>
                 <livewire:project.add-empty />
             </div>
         @endforelse
@@ -71,10 +71,10 @@
                     'border-red-500' => !$server->settings->is_reachable,
                 ])>
                 <div class="flex flex-col mx-6">
-                    <div class="font-bold text-white">
+                    <div class="box-title">
                         {{ $server->name }}
                     </div>
-                    <div class="description">
+                    <div class="box-description">
                         {{ $server->description }}</div>
                     <div class="flex gap-1 text-xs text-error">
                         @if (!$server->settings->is_reachable)
@@ -93,8 +93,9 @@
         @empty
             <div>
                 No servers found.
-                Add your first server <a class="text-white underline" href="{{ route('server.create') }}">here</a> or
-                go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page.</a>
+                Add your first server <a class="underline dark:text-white" href="{{ route('server.create') }}">here</a>
+                or
+                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding page.</a>
             </div>
         @endforelse
     </div>
@@ -116,15 +117,15 @@
                         'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
                     ])>
                         <div class="flex flex-col mx-6">
-                            <div class="font-bold text-white">
+                            <div class="box-title">
                                 {{ data_get($deployment, 'application_name') }}
                             </div>
                             @if (data_get($deployment, 'pull_request_id') !== 0)
-                                <div class="description">
+                                <div class="box-description">
                                     PR #{{ data_get($deployment, 'pull_request_id') }}
                                 </div>
                             @endif
-                            <div class="description">
+                            <div class="box-description">
                                 {{ str(data_get($deployment, 'status'))->headline() }}
                             </div>
                         </div>

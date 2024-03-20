@@ -12,7 +12,7 @@
             </x-slide-over>
         @endif
     </div>
-    <div class="subtitle">All your projects.</div>
+    <div class="subtitle">All your projects are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @if ($servers === 0)
             <div>
