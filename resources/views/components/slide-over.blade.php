@@ -22,7 +22,7 @@
                                 'max-w-4xl w-screen' => $fullScreen,
                             ])>
                             <div
-                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-base-100 border-neutral-800">
+                                class="flex flex-col h-full py-6 overflow-hidden border-l shadow-lg bg-base border-neutral-800">
                                 <div class="px-4 pb-4 sm:px-5">
                                     <div class="flex items-start justify-between pb-1">
                                         <h2 class="text-2xl leading-6" id="slide-over-title">

@@ -7,12 +7,12 @@
             <x-slot:content>
                 <livewire:project.shared.environment-variable.add />
             </x-slot:content>
-            <button @click="slideOverOpen=true"
-                class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+
+            <button @click="slideOverOpen=true" class="button">+
                 Add</button>
         </x-slide-over>
     </div>
-    <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span class="text-warning">@{{team.VARIABLENAME}}</span> <x-helper
+    <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span
+            class="text-warning">@{{ team.VARIABLENAME }}</span> <x-helper
             helper="More info <a class='text-white underline' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
     </div>
 

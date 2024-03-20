@@ -8,9 +8,9 @@
                     Save
                 </x-forms.button>
                 @if (data_get($private_key, 'id') > 0)
-                    <x-new-modal isErrorButton buttonTitle="Delete">
+                    <x-modal-confirmation isErrorButton buttonTitle="Delete">
                         This private key will be deleted. It is not reversible. <br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
                 @endif
             </div>
             <x-forms.input id="private_key.name" label="Name" required />

@@ -1,7 +1,7 @@
 <form>
     <div class="flex flex-col">
         <h1>Clone</h1>
-        <div class="subtitle ">Quickly clone all resources to a new project or environment</div>
+        <div class="subtitle ">Quickly clone all resources to a new project or environment.</div>
     </div>
     <x-forms.input required id="newName" label="New Name" />
     <x-forms.button isHighlighted wire:click="clone('project')" class="mt-4">Clone to a new Project</x-forms.button>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html data-theme="coollabs" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<html data-theme="coolify" lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 
 <head>
     <meta charset="utf-8">
@@ -38,16 +38,27 @@
 @section('body')
 
     <body>
+        {{-- <button onclick="changeTheme()" class="fixed z-50 left-52">Dark/light</button> --}}
         @livewire('wire-elements-modal')
-        <dialog id="help" class="modal">
-            <livewire:help />
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
         <x-toast />
-        <x-version class="fixed left-2 bottom-1" />
+        <x-version class="fixed left-7 bottom-1" />
         <script data-navigate-once>
+            if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia(
+                    '(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark')
+            } else {
+                document.documentElement.classList.remove('dark')
+            }
+
+            function changeTheme() {
+                if (localStorage.theme === 'dark') {
+                    localStorage.theme = 'light'
+                    document.documentElement.classList.remove('dark')
+                } else {
+                    localStorage.theme = 'dark'
+                    document.documentElement.classList.add('dark')
+                }
+            }
             @auth
             window.Pusher = Pusher;
             window.Echo = new Echo({

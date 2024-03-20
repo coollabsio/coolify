@@ -15,8 +15,8 @@
         @isset($rate_limit_remaining)
             <div class="pt-1 ">Requests remaining till rate limited by Git: {{ $rate_limit_remaining }}</div>
         @endisset
-        @if (count($pull_requests) > 0)
-            <div wire:loading.remove wire:target='load_prs'>
+        <div wire:loading.remove wire:target='load_prs'>
+            @if ($pull_requests->count() > 0)
                 <div class="overflow-x-auto table-md">
                     <table>
                         <thead>
@@ -50,8 +50,8 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </div>
     @if ($application->previews->count() > 0)
         <div class="pb-4">Previews</div>

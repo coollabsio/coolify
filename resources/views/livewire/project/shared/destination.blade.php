@@ -6,10 +6,10 @@
             <div class="relative flex flex-col text-white cursor-default box-without-bg bg-coolgray-100 w-96">
                 <div class="text-xl font-bold">Primary Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
-                    <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge badge-xs">
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge ">
                     </div>
                 @elseif (str($resource->realStatus())->startsWith('exited'))
-                    <div title="{{ $resource->realStatus() }}" class="absolute bg-error -top-1 -left-1 badge badge-xs">
+                    <div title="{{ $resource->realStatus() }}" class="absolute bg-error -top-1 -left-1 badge ">
                     </div>
                 @endif
                 <div>
@@ -34,10 +34,10 @@
                     <div class="relative flex flex-col box w-96">
                         @if (str(data_get($destination, 'pivot.status'))->startsWith('running'))
                             <div title="{{ data_get($destination, 'pivot.status') }}"
-                                class="absolute bg-success -top-1 -left-1 badge badge-xs"></div>
+                                class="absolute bg-success -top-1 -left-1 badge "></div>
                         @elseif (str(data_get($destination, 'pivot.status'))->startsWith('exited'))
                             <div title="{{ data_get($destination, 'pivot.status') }}"
-                                class="absolute bg-error -top-1 -left-1 badge badge-xs"></div>
+                                class="absolute bg-error -top-1 -left-1 badge "></div>
                         @endif
                         <div>
                             Server: {{ data_get($destination, 'server.name') }}
@@ -55,12 +55,12 @@
                         <x-forms.button isError
                             wire:click="stop('{{ data_get($destination, 'server.id') }}')">Stop</x-forms.button>
                     @endif
-                    <x-new-modal
+                    <x-modal-confirmation
                         action="removeServer({{ data_get($destination, 'id') }},{{ data_get($destination, 'server.id') }})"
                         isErrorButton buttonTitle="Remove Server">
                         This will stop the running application in this server and remove it as a deployment
                         destination.<br><br>Please think again.
-                    </x-new-modal>
+                    </x-modal-confirmation>
 
                 </div>
             @endforeach

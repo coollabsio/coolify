@@ -50,7 +50,7 @@
                 <livewire:project.shared.environment-variable.add />
             </x-slot:content>
             <button @click="slideOverOpen=true"
-                class="font-normal text-white normal-case border-none rounded btn btn-primary btn-sm no-animation">+
+                class="button">+
                 Add</button>
         </x-slide-over>
     </div>

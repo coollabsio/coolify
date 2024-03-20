@@ -9,7 +9,7 @@ use Livewire\Component;
 class Index extends Component
 {
     public Application $application;
-    public array|Collection $deployments = [];
+    public ?Collection $deployments;
     public int $deployments_count = 0;
     public string $current_url;
     public int $skip = 0;
@@ -48,9 +48,9 @@ class Index extends Component
     }
     private function show_more()
     {
-        if (count($this->deployments) !== 0) {
+        if ($this->deployments->count() !== 0) {
             $this->show_next = true;
-            if (count($this->deployments) < $this->default_take) {
+            if ($this->deployments->count() < $this->default_take) {
                 $this->show_next = false;
             }
             return;
@@ -63,7 +63,6 @@ class Index extends Component
     }
     public function previous_page(?int $take = null)
     {
-
         if ($take) {
             $this->skip = $this->skip - $take;
         }

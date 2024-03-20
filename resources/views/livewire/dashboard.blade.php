@@ -2,10 +2,10 @@
     @if (session('error'))
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
-    <h1>Dashboard</h1>
-    <div class="subtitle">Your self-hosted environment</div>
+    <h1 class="title">Dashboard</h1>
+    {{-- <div class="subtitle">Your self-hosted environment</div> --}}
     @if (request()->query->get('success'))
-        <div class="mb-10 text-white rounded alert alert-success">
+        <div class="mb-10 text-white rounded alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                 viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

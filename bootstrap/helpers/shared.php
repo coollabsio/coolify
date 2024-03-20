@@ -1240,84 +1240,95 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
             }
             $baseName = generateApplicationContainerName($resource, $pull_request_id);
             $containerName = "$serviceName-$baseName";
-            if ($pull_request_id !== 0) {
-                if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $pull_request_id, $topLevelVolumes) {
-                        if (is_string($volume)) {
-                            $volume = str($volume);
-                            if ($volume->contains(':') && !$volume->startsWith('/')) {
-                                $name = $volume->before(':');
-                                $mount = $volume->after(':');
-                                $newName = $resource->uuid . "-{$name}-pr-$pull_request_id";
-                                $volume = str("$newName:$mount");
-                                $topLevelVolumes->put($newName, [
-                                    'name' => $newName,
-                                ]);
-                            }
-                        } else if (is_array($volume)) {
-                            $source = data_get($volume, 'source');
-                            if ($source) {
-                                $newSource = $resource->uuid . "-{$source}-pr-$pull_request_id";
-                                data_set($volume, 'source', $newSource);
-                                if (!str($source)->startsWith('/')) {
-                                    $topLevelVolumes->put($newSource, [
-                                        'name' => $newSource,
-                                    ]);
+            if (count($serviceVolumes) > 0) {
+                $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes, $pull_request_id) {
+                    if (is_string($volume)) {
+                        $volume = str($volume);
+                        if ($volume->contains(':') && !$volume->startsWith('/')) {
+                            $name = $volume->before(':');
+                            $mount = $volume->after(':');
+                            if ($name->startsWith('.') || $name->startsWith('~')) {
+                                $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
+                                if ($name->startsWith('.')) {
+                                    $name = $name->replaceFirst('.', $dir);
                                 }
-                            }
-                        }
-                        return $volume->value();
-                    });
-                    data_set($service, 'volumes', $serviceVolumes->toArray());
-                }
-            } else {
-                if (count($serviceVolumes) > 0) {
-                    $serviceVolumes = $serviceVolumes->map(function ($volume) use ($resource, $topLevelVolumes) {
-                        if (is_string($volume)) {
-                            $volume = str($volume);
-                            if ($volume->contains(':') && !$volume->startsWith('/')) {
-                                $name = $volume->before(':');
-                                $mount = $volume->after(':');
-                                if ($name->startsWith('.') || $name->startsWith('~')) {
-                                    $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
-                                    if ($name->startsWith('.')) {
-                                        $name = $name->replaceFirst('.', $dir);
-                                    }
-                                    if ($name->startsWith('~')) {
-                                        $name = $name->replaceFirst('~', $dir);
-                                    }
+                                if ($name->startsWith('~')) {
+                                    $name = $name->replaceFirst('~', $dir);
+                                }
+                                if ($pull_request_id !== 0) {
+                                    $name = $name . "-pr-$pull_request_id";
+                                }
+                                $volume = str("$name:$mount");
+                            } else {
+                                if ($pull_request_id !== 0) {
+                                    $name = $name . "-pr-$pull_request_id";
                                     $volume = str("$name:$mount");
+                                    $topLevelVolumes->put($name, [
+                                        'name' => $name,
+                                    ]);
                                 } else {
                                     $topLevelVolumes->put($name->value(), [
                                         'name' => $name->value(),
                                     ]);
                                 }
                             }
-                        } else if (is_array($volume)) {
-                            $source = data_get($volume, 'source');
-                            if ($source) {
-                                if ((str($source)->startsWith('.') || str($source)->startsWith('~')) && !str($source)->startsWith('/')) {
-                                    $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
-                                    if (str($source, '.')) {
-                                        $source = str('.', $dir, $source);
-                                    }
-                                    if (str($source, '~')) {
-                                        $source = str('~', $dir, $source);
-                                    }
-                                    data_set($volume, 'source', $source);
+                        } else {
+                            if ($volume->startsWith('/')) {
+                                $name = $volume->before(':');
+                                $mount = $volume->after(':');
+                                if ($pull_request_id !== 0) {
+                                    $name = $name . "-pr-$pull_request_id";
+                                }
+                                $volume = str("$name:$mount");
+                            }
+                        }
+
+                    } else if (is_array($volume)) {
+                        $source = data_get($volume, 'source');
+                        $target = data_get($volume, 'target');
+                        $read_only = data_get($volume, 'read_only');
+                        if ($source && $target) {
+                            if ((str($source)->startsWith('.') || str($source)->startsWith('~'))) {
+                                $dir = base_configuration_dir() . '/applications/' . $resource->uuid;
+                                if (str($source, '.')) {
+                                    $source = str($source)->replaceFirst('.', $dir);
+                                }
+                                if (str($source, '~')) {
+                                    $source = str($source)->replaceFirst('~', $dir);
+                                }
+                                if ($pull_request_id !== 0) {
+                                    $source = $source . "-pr-$pull_request_id";
+                                }
+                                if ($read_only) {
+                                    data_set($volume, 'source', $source . ':' . $target . ':ro');
                                 } else {
-                                    data_set($volume, 'source', $source);
+                                    data_set($volume, 'source', $source . ':' . $target);
+                                }
+                            } else {
+                                if ($pull_request_id !== 0) {
+                                    $source = $source . "-pr-$pull_request_id";
+                                }
+                                if ($read_only) {
+                                    data_set($volume, 'source', $source . ':' . $target . ':ro');
+                                } else {
+                                    data_set($volume, 'source', $source . ':' . $target);
+                                }
+                                if (!str($source)->startsWith('/')) {
                                     $topLevelVolumes->put($source, [
                                         'name' => $source,
                                     ]);
                                 }
                             }
                         }
-                        return $volume->value();
-                    });
-                    data_set($service, 'volumes', $serviceVolumes->toArray());
-                }
+                    }
+                    if (is_array($volume)) {
+                        return data_get($volume, 'source');
+                    }
+                    return $volume->value();
+                });
+                data_set($service, 'volumes', $serviceVolumes->toArray());
             }
+
             // Decide if the service is a database
             $isDatabase = isDatabaseImage(data_get_str($service, 'image'));
             data_set($service, 'is_database', $isDatabase);
@@ -1602,6 +1613,12 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
 
             return $service;
         });
+        if ($pull_request_id !== 0) {
+            $services->each(function ($service, $serviceName) use ($pull_request_id, $services) {
+                $services[$serviceName . "-pr-$pull_request_id"] = $service;
+                data_forget($services, $serviceName);
+            });
+        }
         $finalServices = [
             'version' => $dockerComposeVersion,
             'services' => $services->toArray(),

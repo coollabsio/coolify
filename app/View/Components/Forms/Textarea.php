@@ -25,8 +25,8 @@ class Textarea extends Component
         public ?string $helper = null,
         public bool    $realtimeValidation = false,
         public bool    $allowToPeak = true,
-        public string  $defaultClass = "textarea leading-normal bg-coolgray-100 rounded text-white w-full scrollbar disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50",
-        public string  $defaultClassInput = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+        public string  $defaultClass = "block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 scrollbar dark:read-only:text-neutral-500",
+        public string  $defaultClassInput = "block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500"
     ) {
         //
     }

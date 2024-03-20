@@ -4,7 +4,7 @@
         ->currentTeam()" />
     <div class="flex items-start gap-2">
         <h2 class="pb-4">S3 Storages</h2>
-        <a  class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button class="btn">+ Add
+        <a  class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button >+ Add
             </x-forms.button></a>
     </div>
     <div class="grid gap-2 lg:grid-cols-2">

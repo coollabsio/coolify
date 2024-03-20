@@ -4,7 +4,7 @@ WORKDIR /var/www/html
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --no-interaction --no-plugins --no-scripts --prefer-dist
 
-FROM node:19 as static-assets
+FROM node:20 as static-assets
 WORKDIR /app
 COPY . .
 COPY --from=base --chown=9999:9999 /var/www/html .
@@ -15,7 +15,7 @@ FROM serversideup/php:8.2-fpm-nginx
 
 ARG TARGETPLATFORM
 # https://github.com/cloudflare/cloudflared/releases
-ARG CLOUDFLARED_VERSION=2023.10.0
+ARG CLOUDFLARED_VERSION=2024.2.1
 ARG POSTGRES_VERSION=15
 
 WORKDIR /var/www/html

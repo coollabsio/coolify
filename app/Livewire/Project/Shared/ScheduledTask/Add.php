@@ -33,19 +33,23 @@ class Add extends Component
 
     public function submit()
     {
-        $this->validate();
-        $isValid = validate_cron_expression($this->frequency);
-        if (!$isValid) {
-            $this->dispatch('error', 'Invalid Cron / Human expression.');
-            return;
+        try {
+            $this->validate();
+            $isValid = validate_cron_expression($this->frequency);
+            if (!$isValid) {
+                $this->dispatch('error', 'Invalid Cron / Human expression.');
+                return;
+            }
+            $this->dispatch('saveScheduledTask', [
+                'name' => $this->name,
+                'command' => $this->command,
+                'frequency' => $this->frequency,
+                'container' => $this->container,
+            ]);
+            $this->clear();
+        } catch (\Exception $e) {
+            return handleError($e, $this);
         }
-        $this->dispatch('saveScheduledTask', [
-            'name' => $this->name,
-            'command' => $this->command,
-            'frequency' => $this->frequency,
-            'container' => $this->container,
-        ]);
-        $this->clear();
     }
 
     public function clear()

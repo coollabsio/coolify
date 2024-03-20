@@ -2,15 +2,15 @@ FROM alpine:3.17
 
 ARG TARGETPLATFORM
 # https://download.docker.com/linux/static/stable/
-ARG DOCKER_VERSION=24.0.5
+ARG DOCKER_VERSION=24.0.9
 # https://github.com/docker/compose/releases
-ARG DOCKER_COMPOSE_VERSION=2.21.0
+ARG DOCKER_COMPOSE_VERSION=2.25.0
 # https://github.com/docker/buildx/releases
-ARG DOCKER_BUILDX_VERSION=0.11.2
+ARG DOCKER_BUILDX_VERSION=0.13.1
 # https://github.com/buildpacks/pack/releases
-ARG PACK_VERSION=0.32.1
+ARG PACK_VERSION=0.33.2
 # https://github.com/railwayapp/nixpacks/releases
-ARG NIXPACKS_VERSION=1.20.0
+ARG NIXPACKS_VERSION=1.21.2
 
 USER root
 WORKDIR /artifacts
@@ -34,7 +34,7 @@ RUN if [[ ${TARGETPLATFORM} == 'linux/arm64' ]]; then \
     chmod +x ~/.docker/cli-plugins/docker-compose /usr/bin/docker /usr/local/bin/pack /root/.docker/cli-plugins/docker-buildx \
     ;fi
 
-COPY --from=minio/mc /usr/bin/mc /usr/bin/mc
+COPY --from=minio/mc:RELEASE.2024-03-13T23-51-57Z /usr/bin/mc /usr/bin/mc
 RUN chmod +x /usr/bin/mc
 
 ENTRYPOINT ["/sbin/tini", "--"]

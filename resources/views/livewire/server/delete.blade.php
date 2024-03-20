@@ -8,13 +8,13 @@
         </div>
         @if ($server->definedResources()->count() > 0)
             <div class="pb-2 text-red-500">You need to delete all resources before deleting this server.</div>
-            <x-new-modal disabled isErrorButton buttonTitle="Delete">
+            <x-modal-confirmation disabled isErrorButton buttonTitle="Delete">
                 This server will be deleted. It is not reversible. <br>Please think again.
-            </x-new-modal>
+            </x-modal-confirmation>
         @else
-            <x-new-modal isErrorButton buttonTitle="Delete">
+            <x-modal-confirmation isErrorButton buttonTitle="Delete">
                 This server will be deleted. It is not reversible. <br>Please think again.
-            </x-new-modal>
+            </x-modal-confirmation>
         @endif
     @endif
 </div>

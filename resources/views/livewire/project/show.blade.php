@@ -1,11 +1,17 @@
 <div>
     <div class="flex items-center gap-2">
         <h1>Environments</h1>
-        <x-forms.button class="btn" onclick="newEnvironment.showModal()">+ Add</x-forms.button>
-        <livewire:project.add-environment :project="$project" />
+        <x-slide-over>
+            <x-slot:title>New Environment</x-slot:title>
+            <x-slot:content>
+                <livewire:project.add-environment :project="$project" />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
         <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
     </div>
-    <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}</div>
+    <div class="text-xs truncate subtitle lg:text-sm">{{ $project->name }}.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($project->environments as $environment)
             <div class="gap-2 border border-transparent cursor-pointer box group" x-data

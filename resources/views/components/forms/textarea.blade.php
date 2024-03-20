@@ -25,7 +25,8 @@
             <input x-cloak x-show="type === 'password'" value="{{ $value }}"
                 {{ $attributes->merge(['class' => $defaultClassInput]) }} @required($required)
                 @if ($id !== 'null') wire:model={{ $id }} @endif
-                wire:dirty.class.remove='text-white' wire:dirty.class="input-warning" wire:loading.attr="disabled"
+                wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300'
+                wire:dirty.class="dark:focus:ring-warning dark:ring-warning" wire:loading.attr="disabled"
                 type="{{ $type }}" @readonly($readonly) @disabled($disabled) id="{{ $id }}"
                 name="{{ $name }}" placeholder="{{ $attributes->get('placeholder') }}"
                 aria-placeholder="{{ $attributes->get('placeholder') }}">
@@ -34,7 +35,7 @@
                 @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
                 @else
             wire:model={{ $value ?? $id }}
-            wire:dirty.class="input-warning" @endif
+                     wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300' wire:dirty.class="dark:focus:ring-warning dark:ring-warning" @endif
                 @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
                 name="{{ $name }}" name={{ $id }}></textarea>
 
@@ -44,7 +45,7 @@
             @if ($realtimeValidation) wire:model.debounce.200ms="{{ $id }}"
         @else
     wire:model={{ $value ?? $id }}
-    wire:dirty.class="input-warning" @endif
+    wire:dirty.class.remove='dark:focus:ring-coolgray-300 dark:ring-coolgray-300' wire:dirty.class="dark:focus:ring-warning dark:ring-warning" @endif
             @disabled($disabled) @readonly($readonly) @required($required) id="{{ $id }}"
             name="{{ $name }}" name={{ $id }}></textarea>
     @endif

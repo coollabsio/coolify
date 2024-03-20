@@ -1,6 +1,6 @@
 <div>
-    <h2>Private Key</h2>
-    <div class="subtitle ">Private Keys are used to connect to your servers without passwords.</div>
+    <h1>Private Key</h1>
+    <div class="subtitle">Private Keys are used to connect to your servers without passwords.</div>
     <x-forms.button class="mb-4" wire:click="generateNewKey">Generate new SSH key for me</x-forms.button>
     <form class="flex flex-col gap-2" wire:submit='createPrivateKey'>
         <div class="flex gap-2">

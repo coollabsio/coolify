@@ -10,11 +10,10 @@
 
     {{ $slot }}
     @if ($attributes->get('type') === 'submit')
-        <span wire:target="submit" wire:loading.delay class="loading loading-xs text-warning loading-spinner"></span>
+        <x-loading wire:target="submit" wire:loading.delay />
     @else
         @if ($attributes->whereStartsWith('wire:click')->first())
-            <span wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay
-                class="loading loading-xs loading-spinner"></span>
+            <x-loading wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay />
         @endif
     @endif
 </button>
