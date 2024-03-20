@@ -1377,7 +1377,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 // Old environment variables are not escaped, because it could break the application
                 // as the application could expect the unescaped value.
                 if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->value;
+                    $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
@@ -1385,7 +1385,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
                 if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->value;
+                    $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
@@ -1394,7 +1394,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         } else {
             foreach ($this->application->runtime_environment_variables_preview as $env) {
                 if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->value;
+                    $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
@@ -1402,7 +1402,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
                 if ($env->version === '4.0.0-beta.239') {
-                    $real_value = $env->value;
+                    $real_value = $env->real_value;
                 } else {
                     $real_value = escapeEnvVariables($env->real_value);
                 }
