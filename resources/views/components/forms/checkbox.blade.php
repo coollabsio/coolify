@@ -1,4 +1,4 @@
-<div class="flex flex-row items-center gap-4 px-2 py-1 my-2 form-control min-w-fit dark:hover:bg-coolgray-100">
+<div class="flex flex-row items-center gap-4 px-2 py-1 form-control min-w-fit dark:hover:bg-coolgray-100">
     <label class="flex gap-4 px-0 min-w-fit label">
         <span class="flex gap-2">
             @if ($label)

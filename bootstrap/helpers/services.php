@@ -94,7 +94,7 @@ function updateCompose(ServiceApplication|ServiceDatabase $resource)
         $resource->service->docker_compose_raw = $dockerComposeRaw;
         $resource->service->save();
 
-        if (!str($resource->fqdn)->contains(',')) {
+        if ($resource->fqdn && !str($resource->fqdn)->contains(',')) {
             // Update FQDN
             $variableName = "SERVICE_FQDN_" . Str::of($resource->name)->upper();
             $generatedEnv = EnvironmentVariable::where('service_id', $resource->service_id)->where('key', $variableName)->first();

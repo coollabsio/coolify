@@ -8,10 +8,15 @@
             <livewire:project.database.backup-now :backup="$backup" />
         @endif
         @if ($backup->database_id !== 0)
-            <x-forms.button isError wire:click="delete">Delete</x-forms.button>
+            <x-modal-confirmation isErrorButton>
+                <x-slot:button-title>
+                    Delete
+                </x-slot:button-title>
+                This will stop the scheduled backup for this database.<br>Please think again.
+            </x-modal-confirmation>
         @endif
     </div>
-    <div class="w-32 pb-2">
+    <div class="w-48 pb-2">
         <x-forms.checkbox instantSave label="Backup Enabled" id="backup.enabled" />
         <x-forms.checkbox instantSave label="S3 Enabled" id="backup.save_s3" />
     </div>

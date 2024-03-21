@@ -22,7 +22,7 @@
                 <div>Last run: {{ data_get($task->latest_log, 'status', 'No runs yet') }}</div>
             </a>
         @empty
-            <div class="text-neutral-500">No scheduled tasks configured.</div>
+            <div>No scheduled tasks configured.</div>
         @endforelse
     </div>
 </div>

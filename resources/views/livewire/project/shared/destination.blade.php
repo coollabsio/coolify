@@ -84,7 +84,7 @@
                 @endforeach
             </div>
         @else
-            <div class="text-neutral-500">No additional servers available to attach.</div>
+            <div>No additional servers available to attach.</div>
         @endif
     @endif
 </div>

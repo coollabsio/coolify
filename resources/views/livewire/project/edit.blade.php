@@ -33,7 +33,7 @@
             <livewire:project.shared.environment-variable.show wire:key="environment-{{ $env->id }}"
                 :env="$env" type="project" />
         @empty
-            <div class="text-neutral-500">No environment variables found.</div>
+            <div>No environment variables found.</div>
         @endforelse
     </div>
 </div>

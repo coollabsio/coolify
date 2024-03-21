@@ -41,7 +41,7 @@
                     @endif
                 @endif
             @else
-                <div class="text-neutral-500">(This is you)</div>
+                <div>(This is you)</div>
             @endif
         @endif
     </td>

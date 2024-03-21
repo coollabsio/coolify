@@ -11,15 +11,13 @@
             stroke-width="1.5" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round"
                 d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" />
-        </svg>
+        </svg>  
     </button>
 
     <div x-show="dropdownOpen" @click.away="dropdownOpen=false" x-transition:enter="ease-out duration-200"
         x-transition:enter-start="-translate-y-2" x-transition:enter-end="translate-y-0"
-        class="absolute top-0 z-50 w-64 mt-6 -translate-x-1/2 left-1/2" x-cloak>
-        <div class="p-1 mt-1 dark:bg-coolgray-100 ">
-            {{-- <div class="px-2 py-1.5 text-sm font-semibold">Domains</div> --}}
-            {{-- <div class="h-px my-1 -mx-1 "></div> --}}
+        class="absolute top-0 z-50 mt-6 min-w-max" x-cloak>
+        <div class="p-1 mt-1 dark:bg-coolgray-200">
             @if (
                 (data_get($application, 'fqdn') ||
                     collect(json_decode($this->application->docker_compose_domains))->count() > 0 ||

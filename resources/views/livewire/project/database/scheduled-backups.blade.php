@@ -1,7 +1,7 @@
 <div>
     <div class="flex flex-wrap gap-2">
         @forelse($database->scheduledBackups as $backup)
-            @if ($type === 'database')
+            @if ($type == 'database')
                 <a class="flex flex-col box"
                     href="{{ route('project.database.backup.execution', [...$parameters, 'backup_uuid' => $backup->uuid]) }}">
                     <div>Frequency: {{ $backup->frequency }}</div>
@@ -25,10 +25,10 @@
     </div>
     @if ($type === 'service-database' && $selectedBackup)
         <div class="pt-10">
-            <livewire:project.database.backup-edit key="{{ $selectedBackup->id }}" :backup="$selectedBackup" :s3s="$s3s"
+            <livewire:project.database.backup-edit wire:key="{{ $selectedBackup->id }}" :backup="$selectedBackup" :s3s="$s3s"
                 :status="data_get($database, 'status')" />
             <h3 class="py-4">Executions</h3>
-            <livewire:project.database.backup-executions key="{{ $selectedBackup->id }}" :backup="$selectedBackup"
+            <livewire:project.database.backup-executions wire:keykey="{{ $selectedBackup->id }}" :backup="$selectedBackup"
                 :executions="$selectedBackup->executions" />
         </div>
     @endif

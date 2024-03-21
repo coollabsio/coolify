@@ -24,7 +24,12 @@
                     class="flex items-center gap-2 group-hover:text-white p-2 border border-coolgray-200 hover:text-white hover:no-underline min-w-[24rem] cursor-default">
                     <div>{{ $token->name }}</div>
                 </div>
-                <x-forms.button wire:click="revoke('{{ $token->id }}')">Revoke</x-forms.button>
+                <x-modal-confirmation isErrorButton action="revoke({{ data_get($token, 'id') }})">
+                    <x-slot:button-title>
+                        Revoke token
+                    </x-slot:button-title>
+                    This API Token will be deleted and anything using it will fail. <br>Please think again.
+                </x-modal-confirmation>
             </div>
         @empty
             <div>

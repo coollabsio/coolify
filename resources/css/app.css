@@ -4,7 +4,7 @@
 
 html,
 body {
-    @apply text-black bg-white dark:bg-base dark:text-neutral-400;
+    @apply bg-white text-neutral-600 dark:bg-base dark:text-neutral-400;
 }
 
 body {
@@ -12,7 +12,7 @@ body {
 }
 
 .button {
-    @apply px-3 py-1.5 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit flex items-center justify-center;
+    @apply flex items-center justify-center px-3 py-1 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit;
 }
 button[isError]:not(:disabled) {
     @apply bg-red-600 hover:bg-red-700;
@@ -21,7 +21,6 @@ button[isError]:not(:disabled) {
 button[isHighlighted]:not(:disabled) {
     @apply bg-coollabs hover:bg-coollabs-100;
 }
-
 
 
 h1 {
@@ -41,7 +40,7 @@ h4 {
 }
 
 a {
-    @apply dark:hover:text-white dark:text-neutral-400 text-neutral-600;
+    @apply  hover:text-black dark:hover:text-white;
 }
 
 label {
@@ -101,7 +100,7 @@ option {
 }
 
 .dropdown-item {
-    @apply relative flex cursor-pointer select-none dark:hover:text-white dark:hover:bg-coollabs items-center px-2 py-1.5 text-xs justify-center outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2
+    @apply relative flex cursor-pointer select-none dark:hover:text-white dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-center outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
 
 .badge {

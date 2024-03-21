@@ -10,7 +10,7 @@
                 {{ $title }}
             </div>
             @if($upgrade)
-                <div class="text-neutral-500">{{ $upgrade }}</div>
+                <div>{{ $upgrade }}</div>
             @else
                 <div class="hidden text-xs font-bold text-neutral-500 group-hover:flex">
                     {{ $description }}

@@ -11,10 +11,10 @@
                 <div>({{ $pull_request }})</div>
             @endif
             @if ($streamLogs)
-                <span wire:poll.2000ms='getLogs(true)' class="loading loading-xs text-warning loading-spinner"></span>
+                <x-loading wire:poll.2000ms='getLogs(true)' />
             @endif
         </div>
-        <form wire:submit='getLogs(true)' class="flex items-end gap-2 pt-2 ">
+        <form wire:submit='getLogs(true)' class="flex items-end gap-2 ">
             <div class="w-96">
                 <x-forms.input label="Only Show Number of Lines" placeholder="1000" required
                     id="numberOfLines"></x-forms.input>

@@ -14,7 +14,7 @@
                             class="text-warning">{{ session('currentTeam.name') }}</span></span>
                 </div>
                 @if (request()->query->get('cancelled'))
-                    <div class="mb-6 rounded alert">
+                    <div class="mb-6 rounded alert-error">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
                             viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

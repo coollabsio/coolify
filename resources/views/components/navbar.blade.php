@@ -1,4 +1,4 @@
-<nav class="flex flex-col flex-1 pl-4 border-r dark:border-coolgray-300 dark:bg-coolgray-100 bg-neutral-50">
+<nav class="flex flex-col flex-1 pl-4 border-r dark:border-coolgray-200 dark:bg-base bg-neutral-50">
     <div class="flex w-full px-2 pt-6 pb-4">
         <div class="flex flex-col">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>

@@ -2,11 +2,12 @@
 
 namespace App\Livewire\Project\Service;
 
+use App\Models\Service;
 use Livewire\Component;
 
 class StackForm extends Component
 {
-    public $service;
+    public Service $service;
     public $fields = [];
     protected $listeners = ["saveCompose"];
     public $rules = [

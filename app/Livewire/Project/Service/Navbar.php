@@ -16,17 +16,24 @@ class Navbar extends Component
     public array $parameters;
     public array $query;
     public $isDeploymentProgress = false;
+
     public function getListeners()
     {
+        $userId = auth()->user()->id;
         return [
+            "echo-private:user.{$userId},ServiceStatusChanged" => 'serviceStarted',
             "serviceStatusChanged"
         ];
+    }
+    public function serviceStarted() {
+        $this->dispatch('success', 'Service started.');
     }
     public function serviceStatusChanged()
     {
         $this->dispatch('refresh')->self();
     }
-    public function check_status() {
+    public function check_status()
+    {
         $this->dispatch('check_status');
         $this->dispatch('success', 'Service status updated.');
     }
@@ -44,7 +51,7 @@ class Navbar extends Component
             $this->isDeploymentProgress = false;
         }
     }
-    public function deploy()
+    public function start()
     {
         $this->checkDeployments();
         if ($this->isDeploymentProgress) {
@@ -73,9 +80,9 @@ class Navbar extends Component
             return;
         }
         PullImage::run($this->service);
-        $this->dispatch('image-pulled');
         StopService::run($this->service);
         $this->service->parse();
+        $this->dispatch('imagePulled');
         $activity = StartService::run($this->service);
         $this->dispatch('activityMonitor', $activity->id);
     }

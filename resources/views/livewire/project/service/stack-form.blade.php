@@ -1,14 +1,17 @@
-<form wire:submit='submit' class="flex flex-col gap-4 pb-2">
-    <div class="flex gap-2">
-        <div>
+<form wire:submit.prevent='submit' class="flex flex-col gap-4 pb-2">
+    <div>
+        <div class="flex gap-2">
             <h2>Service Stack</h2>
-            <div>Configuration</div>
+            <x-forms.button type="submit">Save</x-forms.button>
+            <x-slide-over closeWithX fullScreen>
+                <x-slot:title>Docker Compose</x-slot:title>
+                <x-slot:content>
+                    <livewire:project.service.edit-compose serviceId="{{ $service->id }}" />
+                </x-slot:content>
+                <button @click.prevent="slideOverOpen=true" class="button">Edit Compose File</button>
+            </x-slide-over>
         </div>
-        <x-forms.button type="submit">Save</x-forms.button>
-        <x-forms.button class="w-64"
-            onclick="Livewire.dispatch('openModal', {component: 'modal.edit-compose', arguments:  {{ json_encode(['serviceId' => $service->id]) }}  })">Edit
-            Compose
-            File</x-forms.button>
+        <div>Configuration</div>
     </div>
     <div class="flex gap-2">
         <x-forms.input id="service.name" required label="Service Name" placeholder="My super wordpress site" />

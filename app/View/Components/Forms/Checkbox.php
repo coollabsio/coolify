@@ -19,7 +19,7 @@ class Checkbox extends Component
         public ?string     $helper = null,
         public string|bool $instantSave = false,
         public bool        $disabled = false,
-        public string      $defaultClass = "border-coolgray-500 text-warning focus:ring-warning dark:bg-coolgray-100 rounded cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed",
+        public string      $defaultClass = "dark:border-neutral-700 text-warning focus:ring-warning dark:bg-coolgray-100 rounded cursor-pointer dark:disabled:bg-base dark:disabled:cursor-not-allowed",
     ) {
         //
     }

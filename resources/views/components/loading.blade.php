@@ -1,6 +1,8 @@
 @props(['text' => null])
 <div class="inline-flex items-center justify-center" {{ $attributes }}>
-    <div>{{ $text }}</div>
+    @if (isset($text))
+        <div>{{ $text }}</div>
+    @endif
     <svg class="w-4 h-4 mx-1 ml-3 text-warning animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
         viewBox="0 0 24 24">
         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

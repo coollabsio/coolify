@@ -1,15 +1,16 @@
 @props(['closeWithX' => false, 'fullScreen' => false])
 <div x-data="{
     slideOverOpen: false
-}" class="relative w-auto h-auto">
+}" class="relative w-auto h-auto" {{ $attributes }}
+   >
     {{ $slot }}
     <template x-teleport="body">
         <div x-show="slideOverOpen" @if (!$closeWithX) @keydown.window.escape="slideOverOpen=false" @endif
-            class="relative z-[99]">
+            class="relative z-[99] ">
             <div x-show="slideOverOpen" @if (!$closeWithX) @click="slideOverOpen = false" @endif
                 class="fixed inset-0 bg-black bg-opacity-60"></div>
             <div class="fixed inset-0 overflow-hidden">
-                <div class="absolute inset-0 overflow-hidden">
+                <div class="absolute inset-0 overflow-hidden ">
                     <div class="fixed inset-y-0 right-0 flex max-w-full pl-10">
                         <div x-show="slideOverOpen"
                             @if (!$closeWithX) @click.away="slideOverOpen = false" @endif
@@ -39,7 +40,7 @@
                                         </div>
                                     </div>
                                 </div>
-                                <div class="relative flex-1 px-4 mt-5 sm:px-5">
+                                <div class="relative flex-1 px-4 mt-5 overflow-auto sm:px-5 scrollbar">
                                     <div class="absolute inset-0 px-4 sm:px-5">
                                         {{ $content }}
                                     </div>

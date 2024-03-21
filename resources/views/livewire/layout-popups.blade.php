@@ -17,7 +17,7 @@
             </x-slot:button-text>
         </x-popup>
         {{-- <div class="toast">
-            <div class="flex flex-col text-white rounded alert bg-coolgray-200">
+            <div class="flex flex-col text-white rounded alert-error bg-coolgray-200">
                 <span>Love Coolify as we do? <a href="https://coolify.io/sponsorships"
                         class="underline text-warning">Please
                         consider donating!</a>💜</span>
@@ -40,7 +40,7 @@
     @endif
     @if (!currentTeam()->isAnyNotificationEnabled())
         <div class="toast">
-            <div class="flex flex-col text-white rounded alert bg-coolgray-200">
+            <div class="flex flex-col text-white rounded alert-error bg-coolgray-200">
                 <span><span class="font-bold text-red-500">WARNING:</span> No notifications enabled.<br><br> It is
                     highly recommended to enable at least
                     one

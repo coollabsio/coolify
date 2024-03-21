@@ -14,11 +14,17 @@
         </div>
     @else
         @if ($disabled)
-            <x-forms.button isError disabled>{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError disabled>
+                {{ $buttonTitle }}
+            </x-forms.button>
         @elseif ($isErrorButton)
-            <x-forms.button isError @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button isError @click="modalOpen=true">
+                {{ $buttonTitle }}
+            </x-forms.button>
         @else
-            <x-forms.button @click="modalOpen=true">{{ $buttonTitle }}</x-forms.button>
+            <x-forms.button @click="modalOpen=true" class="flex gap-2">
+                {{ $buttonTitle }}
+            </x-forms.button>
         @endif
     @endif
     <template x-teleport="body">
@@ -53,14 +59,36 @@
                         type="button">Cancel
                     </x-forms.button>
                     <div class="flex-1"></div>
-                    @if ($isErrorButton)
-                        <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
-                            wire:click.prevent="{{ $action }}">Continue
-                        </x-forms.button>
-                    @else
-                        <x-forms.button @click="modalOpen=false" class="w-24" isHighlighted type="button"
-                            wire:click.prevent="{{ $action }}">Continue
-                        </x-forms.button>
+                    @if ($attributes->whereStartsWith('wire:click')->first())
+                        @if ($isErrorButton)
+                            <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
+                                wire:click.prevent="{{ $attributes->get('wire:click') }}">Continue
+                            </x-forms.button>
+                        @else
+                            <x-forms.button @click="modalOpen=false" class="w-24" isHighlighted type="button"
+                                wire:click.prevent="{{ $attributes->get('wire:click') }}">Continue
+                            </x-forms.button>
+                        @endif
+                    @elseif ($attributes->whereStartsWith('@click')->first())
+                        @if ($isErrorButton)
+                            <x-forms.button class="w-24" isError type="button"
+                                @click="modalOpen=false;{{ $attributes->get('@click') }}">Continue
+                            </x-forms.button>
+                        @else
+                            <x-forms.button class="w-24" isHighlighted type="button"
+                                @click="modalOpen=false;{{ $attributes->get('@click') }}">Continue
+                            </x-forms.button>
+                        @endif
+                    @elseif ($action)
+                        @if ($isErrorButton)
+                            <x-forms.button @click="modalOpen=false" class="w-24" isError type="button"
+                                wire:click.prevent="{{ $action }}">Continue
+                            </x-forms.button>
+                        @else
+                            <x-forms.button @click="modalOpen=false" class="w-24" isHighlighted type="button"
+                                wire:click.prevent="{{ $action }}">Continue
+                            </x-forms.button>
+                        @endif
                     @endif
                 </div>
             </div>

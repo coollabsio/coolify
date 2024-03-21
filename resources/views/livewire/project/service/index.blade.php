@@ -55,9 +55,15 @@
                 <div x-cloak x-show="activeTab === 'backups'">
                     <div class="flex gap-2 ">
                         <h2 class="pb-4">Scheduled Backups</h2>
-                        <x-forms.button onclick="createScheduledBackup.showModal()">+ Add</x-forms.button>
+                        <x-slide-over>
+                            <x-slot:title>New Scheduled Backup</x-slot:title>
+                            <x-slot:content>
+                                <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="$s3s" />
+                            </x-slot:content>
+                            <button @click="slideOverOpen=true" class="button">+
+                                Add</button>
+                        </x-slide-over>
                     </div>
-                    <livewire:project.database.create-scheduled-backup :database="$serviceDatabase" :s3s="$s3s" />
                     <livewire:project.database.scheduled-backups :database="$serviceDatabase" />
                 </div>
             @endisset

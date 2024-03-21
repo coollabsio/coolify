@@ -7,7 +7,12 @@
                 <h2>{{ Str::headline($application->name) }}</h2>
             @endif
             <x-forms.button type="submit">Save</x-forms.button>
-            <x-forms.button isError wire:click='delete'>Delete</x-forms.button>
+            <x-modal-confirmation isErrorButton>
+                <x-slot:button-title>
+                    Delete
+                </x-slot:button-title>
+                This will delete this service application. It is not reversible.<br>Please think again.
+            </x-modal-confirmation>
         </div>
         <div class="flex flex-col gap-2">
             <div class="flex gap-2">

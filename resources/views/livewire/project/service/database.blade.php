@@ -28,12 +28,12 @@
             </div>
         </div>
         <h3 class="pt-2">Advanced</h3>
-        <div class="w-64">
-            <x-forms.checkbox instantSave label="Exclude from service status"
+        <div class="w-96">
+            <x-forms.checkbox instantSave="instantSaveExclude" label="Exclude from service status"
                 helper="If you do not need to monitor this resource, enable. Useful if this service is optional."
                 id="database.exclude_from_status"></x-forms.checkbox>
             <x-forms.checkbox helper="Drain logs to your configured log drain endpoint in your Server settings."
-                instantSave="instantSaveAdvanced" id="database.is_log_drain_enabled" label="Drain Logs" />
+                instantSave="instantSaveLogDrain" id="database.is_log_drain_enabled" label="Drain Logs" />
         </div>
     </form>
 </div>

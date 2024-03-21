@@ -1,11 +1,11 @@
 <?php
 
-namespace App\Livewire\Modal;
+namespace App\Livewire\Project\Service;
 
 use App\Models\Service;
-use LivewireUI\Modal\ModalComponent;
+use Livewire\Component;
 
-class EditCompose extends ModalComponent
+class EditCompose extends Component
 {
     public Service $service;
     public $serviceId;
@@ -16,13 +16,13 @@ class EditCompose extends ModalComponent
     public function mount() {
         $this->service = Service::find($this->serviceId);
     }
-    public function render()
-    {
-        return view('livewire.modal.edit-compose');
-    }
-    public function submit() {
+
+    public function saveEditedCompose() {
         $this->dispatch('warning', "Saving new docker compose...");
         $this->dispatch('saveCompose', $this->service->docker_compose_raw);
-        $this->closeModal();
+    }
+    public function render()
+    {
+        return view('livewire.project.service.edit-compose');
     }
 }
