@@ -10,17 +10,18 @@ use Visus\Cuid2\Cuid2;
 class Input extends Component
 {
     public function __construct(
-        public string|null $id = null,
-        public string|null $name = null,
-        public string|null $type = 'text',
-        public string|null $value = null,
-        public string|null $label = null,
-        public bool        $required = false,
-        public bool        $disabled = false,
-        public bool        $readonly = false,
-        public string|null $helper = null,
-        public bool        $allowToPeak = true,
-        public string      $defaultClass = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
+        public ?string $id = null,
+        public ?string $name = null,
+        public ?string $type = 'text',
+        public ?string $value = null,
+        public ?string $label = null,
+        public bool    $required = false,
+        public bool    $disabled = false,
+        public bool    $readonly = false,
+        public ?string $helper = null,
+        public bool    $allowToPeak = true,
+        public bool    $isMultiline = false,
+        public string  $defaultClass = "input input-sm bg-coolgray-100 rounded text-white w-full disabled:bg-coolgray-200/50 disabled:border-none placeholder:text-coolgray-500 read-only:text-neutral-500 read-only:bg-coolgray-200/50"
     ) {
     }
 

@@ -15,18 +15,9 @@
                 subscription is activated.<br> Please be patient.</span>
         </div>
     @endif
-    @if ($projects->count() === 0 && $servers->count() === 0)
-        No resources found. Add your first server & private key <a class="text-white underline"
-            href="{{ route('server.create') }}">here</a> or go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page</a>.
-    @endif
-    @if ($projects->count() > 0)
-        <h3 class="pb-4">Projects</h3>
-        @if ($projects->count() === 1)
-            <div class="grid grid-cols-1 gap-2">
-            @else
-                <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
-        @endif
-        @foreach ($projects as $project)
+    <h3 class="pb-4">Projects</h3>
+    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+        @forelse ($projects as $project)
             <div class="gap-2 border border-transparent cursor-pointer box group">
                 @if (data_get($project, 'environments')->count() === 1)
                     <a class="flex flex-col flex-1 mx-6 hover:no-underline"
@@ -61,88 +52,96 @@
                     </a>
                 </div>
             </div>
-        @endforeach
-</div>
-@if ($projects->count() > 0)
+        @empty
+            <div>
+                No projects found. Add your first server <a class="text-white underline"
+                    onclick="newEmptyProject.showModal()">here</a> or
+                go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page.</a>
+                <livewire:project.add-empty />
+            </div>
+        @endforelse
+    </div>
     <h3 class="py-4">Servers</h3>
-@endif
-@if ($servers->count() === 1)
-    <div class="grid grid-cols-1 gap-2">
-    @else
-        <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
-@endif
-@foreach ($servers as $server)
-    <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}" @class([
-        'gap-2 border cursor-pointer box group',
-        'border-transparent' => $server->settings->is_reachable,
-        'border-red-500' => !$server->settings->is_reachable,
-    ])>
-        <div class="flex flex-col mx-6">
-            <div class="font-bold text-white">
-                {{ $server->name }}
-            </div>
-            <div class="description">
-                {{ $server->description }}</div>
-            <div class="flex gap-1 text-xs text-error">
-                @if (!$server->settings->is_reachable)
-                    <span>Not reachable</span>
-                @endif
-                @if (!$server->settings->is_reachable && !$server->settings->is_usable)
-                    &
-                @endif
-                @if (!$server->settings->is_usable)
-                    <span>Not usable by Coolify</span>
-                @endif
-            </div>
-        </div>
-        <div class="flex-1"></div>
-    </a>
-@endforeach
-</div>
-
-<div class="flex items-center gap-2">
-    <h3 class="py-4">Deployments</h3>
-    @if (count($deployments_per_server) > 0)
-        <x-loading />
-    @endif
-    <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
-</div>
-<div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
-    @forelse ($deployments_per_server as $server_name => $deployments)
-        <h4 class="py-4">{{ $server_name }}</h4>
-        <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-            @foreach ($deployments as $deployment)
-                <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                    'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                    'border-coolgray-500' => data_get($deployment, 'status') === 'queued',
-                    'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+    <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
+        @forelse ($servers as $server)
+            <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
+                @class([
+                    'gap-2 border cursor-pointer box group',
+                    'border-transparent' => $server->settings->is_reachable,
+                    'border-red-500' => !$server->settings->is_reachable,
                 ])>
-                    <div class="flex flex-col mx-6">
-                        <div class="font-bold text-white">
-                            {{ data_get($deployment, 'application_name') }}
-                        </div>
-                        @if (data_get($deployment, 'pull_request_id') !== 0)
-                            <div class="description">
-                                PR #{{ data_get($deployment, 'pull_request_id') }}
-                            </div>
-                        @endif
-                        <div class="description">
-                            {{ str(data_get($deployment, 'status'))->headline() }}
-                        </div>
+                <div class="flex flex-col mx-6">
+                    <div class="font-bold text-white">
+                        {{ $server->name }}
                     </div>
-                    <div class="flex-1"></div>
-                </a>
-            @endforeach
-        </div>
-    @empty
-        <div>No deployments running.</div>
-    @endforelse
-</div>
-@endif
-<script>
-    function gotoProject(uuid, environment = 'production') {
-        window.location.href = '/project/' + uuid + '/' + environment;
-    }
-</script>
-{{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
+                    <div class="description">
+                        {{ $server->description }}</div>
+                    <div class="flex gap-1 text-xs text-error">
+                        @if (!$server->settings->is_reachable)
+                            <span>Not reachable</span>
+                        @endif
+                        @if (!$server->settings->is_reachable && !$server->settings->is_usable)
+                            &
+                        @endif
+                        @if (!$server->settings->is_usable)
+                            <span>Not usable by Coolify</span>
+                        @endif
+                    </div>
+                </div>
+                <div class="flex-1"></div>
+            </a>
+        @empty
+            <div>
+                No servers found.
+                Add your first server <a class="text-white underline" href="{{ route('server.create') }}">here</a> or
+                go to the <a class="text-white underline" href="{{ route('onboarding') }}">onboarding page.</a>
+            </div>
+        @endforelse
+    </div>
+    <div class="flex items-center gap-2">
+        <h3 class="py-4">Deployments</h3>
+        @if (count($deployments_per_server) > 0)
+            <x-loading />
+        @endif
+        <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
+    </div>
+    <div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
+        @forelse ($deployments_per_server as $server_name => $deployments)
+            <h4 class="py-4">{{ $server_name }}</h4>
+            <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
+                @foreach ($deployments as $deployment)
+                    <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                        'gap-2 cursor-pointer box group border-l-2 border-dotted',
+                        'border-coolgray-500' => data_get($deployment, 'status') === 'queued',
+                        'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                    ])>
+                        <div class="flex flex-col mx-6">
+                            <div class="font-bold text-white">
+                                {{ data_get($deployment, 'application_name') }}
+                            </div>
+                            @if (data_get($deployment, 'pull_request_id') !== 0)
+                                <div class="description">
+                                    PR #{{ data_get($deployment, 'pull_request_id') }}
+                                </div>
+                            @endif
+                            <div class="description">
+                                {{ str(data_get($deployment, 'status'))->headline() }}
+                            </div>
+                        </div>
+                        <div class="flex-1"></div>
+                    </a>
+                @endforeach
+            </div>
+        @empty
+            <div>No deployments running.</div>
+        @endforelse
+    </div>
+
+
+    <script>
+        function gotoProject(uuid, environment = 'production') {
+            window.location.href = '/project/' + uuid + '/' + environment;
+        }
+    </script>
+    {{-- <x-forms.button wire:click='getIptables'>Get IPTABLES</x-forms.button> --}}
 </div>

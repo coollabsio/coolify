@@ -423,7 +423,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         if ($this->application->settings->is_raw_compose_deployment_enabled) {
             if ($this->docker_compose_custom_start_command) {
                 $this->execute_remote_command(
-                    ["cd {$this->basedir} && {$this->docker_compose_custom_start_command}", "hidden" => true],
+                    [executeInDocker($this->deployment_uuid, "cd {$this->workdir} && {$this->docker_compose_custom_start_command}"), "hidden" => true],
                 );
             } else {
                 $server_workdir = $this->application->workdir();
@@ -749,7 +749,7 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 $this->write_deployment_configurations();
                 $this->server = $this->original_server;
             }
-            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0) {
+            if (count($this->application->ports_mappings_array) > 0 || (bool) $this->application->settings->is_consistent_container_name_enabled || $this->pull_request_id !== 0 || str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
                 $this->application_deployment_queue->addLogEntry("----------------------------------------");
                 if (count($this->application->ports_mappings_array) > 0) {
                     $this->application_deployment_queue->addLogEntry("Application has ports mapped to the host system, rolling update is not supported.");
@@ -760,6 +760,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                 if ($this->pull_request_id !== 0) {
                     $this->application->settings->is_consistent_container_name_enabled = true;
                     $this->application_deployment_queue->addLogEntry("Pull request deployment, rolling update is not supported.");
+                }
+                if (str($this->application->custom_docker_run_options)->contains('--ip') || str($this->application->custom_docker_run_options)->contains('--ip6')) {
+                    $this->application_deployment_queue->addLogEntry("Custom IP address is set, rolling update is not supported.");
                 }
                 $this->stop_running_container(force: true);
                 $this->start_by_compose_file();
@@ -1128,9 +1131,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $this->custom_healthcheck_found = false;
         if ($this->application->build_pack === 'dockerfile' || $this->application->dockerfile) {
             $this->execute_remote_command([
-                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile', "ignore_errors" => true
+                executeInDocker($this->deployment_uuid, "cat {$this->workdir}{$this->dockerfile_location}"), "hidden" => true, "save" => 'dockerfile_from_repo', "ignore_errors" => true
             ]);
-            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile'))->trim()->explode("\n"));
+            $dockerfile = collect(Str::of($this->saved_outputs->get('dockerfile_from_repo'))->trim()->explode("\n"));
             if (str($dockerfile)->contains('HEALTHCHECK')) {
                 $this->custom_healthcheck_found = true;
             }
@@ -1274,10 +1277,9 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         // }
 
         if ($this->pull_request_id === 0) {
+            $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
             if ((bool)$this->application->settings->is_consistent_container_name_enabled) {
                 $docker_compose['services'][$this->application->uuid] = $docker_compose['services'][$this->container_name];
-                data_forget($docker_compose, 'services.' . $this->container_name);
-                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
                     $ipv6 = data_get($custom_compose, 'ip6.0');
@@ -1295,7 +1297,6 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
                     $docker_compose['services'][$this->application->uuid] = array_merge_recursive($docker_compose['services'][$this->application->uuid], $custom_compose);
                 }
             } else {
-                $custom_compose = convert_docker_run_to_compose($this->application->custom_docker_run_options);
                 if (count($custom_compose) > 0) {
                     $ipv4 = data_get($custom_compose, 'ip.0');
                     $ipv6 = data_get($custom_compose, 'ip6.0');
@@ -1359,22 +1360,52 @@ class ApplicationDeploymentJob implements ShouldQueue, ShouldBeEncrypted
         $environment_variables = collect();
         if ($this->pull_request_id === 0) {
             foreach ($this->application->runtime_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                // This is necessary because we have to escape the value of the environment variable
+                // but only if the environment variable is created after 4.0.0-beta.240
+                // when I implemented the escaping feature.
+
+                // Old environment variables are not escaped, because it could break the application
+                // as the application could expect the unescaped value.
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
         } else {
             foreach ($this->application->runtime_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
             foreach ($this->application->nixpacks_environment_variables_preview as $env) {
-                $environment_variables->push("$env->key=$env->real_value");
+                if ($env->version === '4.0.0-beta.239') {
+                    $real_value = $env->real_value;
+                } else {
+                    $real_value = escapeEnvVariables($env->real_value);
+                }
+                $environment_variables->push("$env->key=$real_value");
             }
         }
         // Add PORT if not exists, use the first port as default
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('PORT'))->isEmpty()) {
             $environment_variables->push("PORT={$ports[0]}");
+        }
+        // Add HOST if not exists
+        if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('HOST'))->isEmpty()) {
+            $environment_variables->push("HOST=0.0.0.0");
         }
         if ($environment_variables->filter(fn ($env) => Str::of($env)->startsWith('SOURCE_COMMIT'))->isEmpty()) {
             if (!is_null($this->commit)) {
