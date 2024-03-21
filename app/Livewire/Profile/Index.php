@@ -11,11 +11,8 @@ class Index extends Component
     public int $userId;
     public string $email;
 
-    #[Validate('required')]
     public string $current_password;
-    #[Validate('required|min:8')]
     public string $new_password;
-    #[Validate('required|min:8|same:new_password')]
     public string $new_password_confirmation;
 
     #[Validate('required')]
@@ -29,7 +26,9 @@ class Index extends Component
     public function submit()
     {
         try {
-            $this->validate();
+            $this->validate([
+                'name' => 'required',
+            ]);
             auth()->user()->update([
                 'name' => $this->name,
             ]);
@@ -42,7 +41,11 @@ class Index extends Component
     public function resetPassword()
     {
         try {
-            $this->validate();
+            $this->validate([
+                'current_password' => 'required',
+                'new_password' => 'required|min:8',
+                'new_password_confirmation' => 'required|min:8|same:new_password',
+            ]);
             if (!Hash::check($this->current_password, auth()->user()->password)) {
                 $this->dispatch('error', 'Current password is incorrect.');
                 return;
