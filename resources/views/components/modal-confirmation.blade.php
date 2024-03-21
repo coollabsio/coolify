@@ -54,7 +54,7 @@
                 <div class="relative w-auto pb-8">
                     {{ $slot }}
                 </div>
-                <div class="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+                <div class="flex flex-row justify-end space-x-2">
                     <x-forms.button @click="modalOpen=false" class="w-24 bg-coolgray-200 hover:bg-coolgray-300"
                         type="button">Cancel
                     </x-forms.button>
