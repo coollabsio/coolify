@@ -11,3 +11,4 @@ services:
       - SERVICE_FQDN_POCKETBASE_8080
     volumes:
       - pocketbase-data:/app/pb_data
+      - pocketbase-hooks:/app/pb_hooks
