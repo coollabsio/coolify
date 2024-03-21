@@ -1,7 +1,7 @@
 <div class="pb-6">
     <h1>Security</h1>
     <div class="subtitle">Security related settings.</div>
-  
+
     <nav class="navbar-main">
         <a  href="{{ route('security.private-key.index') }}">
             <button>Private Keys</button>
@@ -9,9 +9,5 @@
         <a  href="{{ route('security.api-tokens') }}">
             <button>API tokens</button>
         </a>
-        <div class="flex-1"></div>
-        <div class="-mt-9">
-            <livewire:switch-team />
-        </div>
     </nav>
 </div>

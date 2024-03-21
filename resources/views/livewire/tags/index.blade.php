@@ -1,12 +1,12 @@
 <div>
     <h1>Tags</h1>
-    <div class="flex flex-col gap-2 pb-6 ">
+    <div class="flex flex-col pb-6 ">
         <div class="subtitle">Tags help you to perform actions on multiple resources.</div>
         <div class="flex flex-wrap gap-2">
             @if ($tags->count() === 0)
                 <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
             @else
-                <x-forms.select wire:model.live="tag">
+                <x-forms.select wire:model.live="tag" label="Tags">
                     <option value="null" disabled selected>Select a tag</option>
                     @foreach ($tags as $oneTag)
                         <option value="{{ $oneTag->name }}">{{ $oneTag->name }}</option>

@@ -6,7 +6,6 @@
             helper="Tokens are created with the current team as scope. You will only have access to this team's resources." />
     </div>
     <h4>Create New Token</h4>
-    <span>Currently active team: <span class="text-warning">{{ session('currentTeam.name') }}</span></span>
     <form class="flex items-end gap-2 pt-4" wire:submit='addNewToken'>
         <x-forms.input required id="description" label="Description" />
         <x-forms.button type="submit">Create New Token</x-forms.button>

@@ -8,7 +8,9 @@ use Livewire\Component;
 class SwitchTeam extends Component
 {
     public string $selectedTeamId = 'default';
-
+    public function mount() {
+        $this->selectedTeamId = auth()->user()->currentTeam()->id;
+    }
     public function updatedSelectedTeamId()
     {
         $this->switch_to($this->selectedTeamId);

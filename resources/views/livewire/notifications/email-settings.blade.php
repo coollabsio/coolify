@@ -14,8 +14,7 @@
                 <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
                     <form wire:submit='submit' class="flex flex-col w-full gap-2">
                         <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
-                        <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification"
-                            @click="modalOpen=false">
+                        <x-forms.button wire:click="sendTestNotification" @click="modalOpen=false">
                             Send Email
                         </x-forms.button>
                     </form>

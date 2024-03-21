@@ -1,12 +1,14 @@
 <div>
-    <h1>Project: {{ data_get($project, 'name') }}</h1>
-    <div class="pb-10">Edit project details here.</div>
-    <form wire:submit='submit' class="flex flex-col gap-2 pb-10">
-        <div class="flex items-end gap-2">
-            <h2>General</h2>
-            <x-forms.button type="submit">Save</x-forms.button>
-            <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
+    <form wire:submit='submit' class="flex flex-col pb-10">
+        <div class="flex gap-2">
+            <h1>Project: {{ data_get($project, 'name') }}</h1>
+            <div class="flex items-end gap-2">
+                <x-forms.button type="submit">Save</x-forms.button>
+                <livewire:project.delete-project :disabled="$project->resource_count() > 0" :project_id="$project->id" />
+            </div>
         </div>
+        <div class="pt-2 pb-10">Edit project details here.</div>
+
         <div class="flex gap-2">
             <x-forms.input label="Name" id="project.name" />
             <x-forms.input label="Description" id="project.description" />
@@ -19,8 +21,7 @@
             <x-slot:content>
                 <livewire:project.shared.environment-variable.add />
             </x-slot:content>
-            <button @click="slideOverOpen=true"
-                class="button">+
+            <button @click="slideOverOpen=true" class="button">+
                 Add</button>
         </x-slide-over>
     </div>

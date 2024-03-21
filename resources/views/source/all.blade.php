@@ -40,7 +40,6 @@
         @empty
             <div>
                 <div>No sources found.</div>
-                <x-use-magic-bar link="/source/new" />
             </div>
         @endforelse
     </div>

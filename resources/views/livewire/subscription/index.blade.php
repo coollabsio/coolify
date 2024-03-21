@@ -1,17 +1,11 @@
 @if ($settings->is_resale_license_active)
     @if (auth()->user()->isAdminFromSession())
-        <div class="flex justify-center mx-10">
-            <div x-data>
+            <div>
                 <div class="flex gap-2">
-                    <h1>Subscription</h1>
-                    <livewire:switch-team />
+                    <h1>Choose a Plan</h1>
                     @if (subscriptionProvider() === 'stripe' && $alreadySubscribed)
                         <x-forms.button wire:click='stripeCustomerPortal'>Manage My Subscription</x-forms.button>
                     @endif
-                </div>
-                <div class="flex items-center pb-8">
-                    <span>Currently active team: <span
-                            class="text-warning">{{ session('currentTeam.name') }}</span></span>
                 </div>
                 @if (request()->query->get('cancelled'))
                     <div class="mb-6 rounded alert-error">
@@ -29,15 +23,10 @@
                     <livewire:subscription.pricing-plans />
                 @endif
             </div>
-        </div>
     @else
         <div class="flex flex-col justify-center mx-10">
             <div class="flex gap-2">
                 <h1>Subscription</h1>
-                <livewire:switch-team />
-            </div>
-            <div class="flex items-center pb-8">
-                <span>Currently active team: <span class="text-warning">{{ session('currentTeam.name') }}</span></span>
             </div>
             <div>You are not an admin or have been removed from this team. If this does not make sense, please <span
                     class="text-white underline cursor-pointer" wire:click="help" onclick="help.showModal()">contact

@@ -129,11 +129,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');
-        Route::get('/new', TeamCreate::class)->name('team.create');
+        // Route::get('/new', TeamCreate::class)->name('team.create');
         Route::get('/members', TeamMemberIndex::class)->name('team.member.index');
         Route::get('/shared-variables', TeamSharedVariablesIndex::class)->name('team.shared-variables.index');
         Route::get('/storages', TeamStorageIndex::class)->name('team.storage.index');
-        Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
+        // Route::get('/storages/new', TeamStorageCreate::class)->name('team.storage.create');
         Route::get('/storages/{storage_uuid}', TeamStorageShow::class)->name('team.storage.show');
     });
 
@@ -178,7 +178,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     });
 
     Route::get('/servers', ServerIndex::class)->name('server.index');
-    Route::get('/server/new', ServerCreate::class)->name('server.create');
+    // Route::get('/server/new', ServerCreate::class)->name('server.create');
 
     Route::prefix('server/{server_uuid}')->group(function () {
         Route::get('/', ServerShow::class)->name('server.show');
@@ -195,14 +195,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/security/private-key', fn () => view('security.private-key.index', [
         'privateKeys' => PrivateKey::ownedByCurrentTeam(['name', 'uuid', 'is_git_related'])->get()
     ]))->name('security.private-key.index');
-    Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
+    // Route::get('/security/private-key/new', SecurityPrivateKeyCreate::class)->name('security.private-key.create');
     Route::get('/security/private-key/{private_key_uuid}', SecurityPrivateKeyShow::class)->name('security.private-key.show');
 
     Route::get('/security/api-tokens', ApiTokens::class)->name('security.api-tokens');
 });
 
 Route::middleware(['auth'])->group(function () {
-    Route::get('/source/new', fn () => view('source.new'))->name('source.new');
     Route::get('/sources', function () {
         $sources = currentTeam()->sources();
         return view('source.all', [

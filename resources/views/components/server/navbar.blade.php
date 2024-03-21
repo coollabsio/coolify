@@ -10,7 +10,7 @@
             <livewire:server.proxy.status :server="$server" />
         @endif
     </div>
-    <div class="subtitle ">{{ data_get($server, 'name') }}.</div>
+    <div class="subtitle">{{ data_get($server, 'name') }}.</div>
     <nav class="navbar-main">
         <a class="{{ request()->routeIs('server.show') ? 'text-white' : '' }}"
             href="{{ route('server.show', [

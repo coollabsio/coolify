@@ -280,6 +280,10 @@ function base_url(bool $withPort = true): string
     return url('/');
 }
 
+function isSubscribed()
+{
+    return auth()->user()->currentTeam()->subscription()->exists() || auth()->user()->isInstanceAdmin();
+}
 function isDev(): bool
 {
     return config('app.env') === 'local';
@@ -1282,7 +1286,6 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 $volume = str("$name:$mount");
                             }
                         }
-
                     } else if (is_array($volume)) {
                         $source = data_get($volume, 'source');
                         $target = data_get($volume, 'target');

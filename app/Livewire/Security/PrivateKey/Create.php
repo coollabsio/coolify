@@ -67,7 +67,7 @@ class Create extends Component
                 'team_id' => currentTeam()->id
             ]);
             if ($this->from === 'server') {
-                return redirect()->route('server.create');
+                return redirect()->route('dashboard');
             }
             return redirect()->route('security.private-key.show', ['private_key_uuid' => $private_key->uuid]);
         } catch (\Throwable $e) {

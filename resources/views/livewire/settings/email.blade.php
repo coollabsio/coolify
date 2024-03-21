@@ -11,17 +11,6 @@
             <x-forms.button type="submit">
                 Save
             </x-forms.button>
-            {{-- @if (isEmailEnabled($settings) && auth()->user()->isAdminFromSession() && isTestEmailEnabled($settings))
-                <x-modal-input buttonTitle="Send Test Email" title="Send Test Email">
-                    <form wire:submit='submit' class="flex flex-col gap-2">
-                        <x-forms.input placeholder="test@example.com" id="emails" label="Recipients" required />
-                        <x-forms.button onclick="sendTestEmail.close()" wire:click="sendTestNotification"
-                            @click="modalOpen=false">
-                            Send Email
-                        </x-forms.button>
-                    </form>
-                </x-modal-input>
-            @endif --}}
         </div>
     </form>
     <div class="flex flex-col gap-4">

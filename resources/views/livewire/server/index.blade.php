@@ -1,9 +1,14 @@
 <div>
     <div class="flex items-start gap-2">
         <h1>Servers</h1>
-        <a class="text-white hover:no-underline" href="{{ route('server.create') }}">
-            <x-forms.button >+ Add</x-forms.button>
-        </a>
+        <x-slide-over fullScreen closeWithX>
+            <x-slot:title>New Server</x-slot:title>
+            <x-slot:content>
+                <livewire:server.create />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
     </div>
     <div class="subtitle">All your servers are here.</div>
 
@@ -12,8 +17,12 @@
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"
                 @class([
                     'gap-2 border cursor-pointer box group',
-                    'border-transparent' => $server->settings->is_reachable && $server->settings->is_usable && !$server->settings->force_disabled,
-                    'border-red-500' => !$server->settings->is_reachable || $server->settings->force_disabled,
+                    'border-transparent' =>
+                        $server->settings->is_reachable &&
+                        $server->settings->is_usable &&
+                        !$server->settings->force_disabled,
+                    'border-red-500' =>
+                        !$server->settings->is_reachable || $server->settings->force_disabled,
                 ])>
                 <div class="flex flex-col mx-6">
                     <div class="font-bold text-white">
@@ -41,7 +50,6 @@
         @empty
             <div>
                 <div>No servers found. Without a server, you won't be able to do much.</div>
-                <x-use-magic-bar link="/server/new" />
             </div>
         @endforelse
         @isset($error)

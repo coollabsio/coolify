@@ -166,9 +166,7 @@
             <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
-                <input
-                    class="input"
-                    wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
+                <input class="input" wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
             </div>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 @if ($loadingServices)
@@ -285,7 +283,7 @@
                                 Go to servers page
                             </a></div>
 
-                        <x-use-magic-bar link="/server/new" />
+                        <x-use-magic-bar link="/servers" />
                     </div>
                 @endforelse
             </div>

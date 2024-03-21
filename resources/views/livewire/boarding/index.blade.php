@@ -328,8 +328,16 @@
             @endif
         </div>
         <div class="flex justify-center gap-2 pt-4">
-            <a wire:click='skipBoarding'>Skip boarding process</a>
-            <a wire:click='restartBoarding'>Restart boarding process</a>
+            <a wire:click='skipBoarding' class="cursor-pointer">Skip boarding process</a>
+            <a wire:click='restartBoarding' class="cursor-pointer">Restart boarding process</a>
+            <x-modal-input title="How can we help?">
+                <x-slot:content>
+                    <div class="cursor-pointer dark:hover:text-white" title="Send us feedback or get help!">
+                        Feedback
+                    </div>
+                </x-slot:content>
+                <livewire:help />
+            </x-modal-input>
         </div>
     </div>
 </section>

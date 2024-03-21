@@ -1,11 +1,17 @@
 <div>
-    <x-team.navbar :team="auth()
-        ->user()
-        ->currentTeam()" />
+    <x-team.navbar :team="auth()->user()->currentTeam()" />
     <div class="flex items-start gap-2">
         <h2 class="pb-4">S3 Storages</h2>
-        <a  class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button >+ Add
-            </x-forms.button></a>
+        <x-slide-over fullScreen closeWithX>
+            <x-slot:title>New S3 Storage</x-slot:title>
+            <x-slot:content>
+                <livewire:team.storage.create />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
+        {{-- <a class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button>+ Add
+            </x-forms.button></a> --}}
     </div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($s3 as $storage)
@@ -21,7 +27,6 @@
         @empty
             <div>
                 <div>No storage found.</div>
-                <x-use-magic-bar link="/team/storages/new" />
             </div>
         @endforelse
     </div>

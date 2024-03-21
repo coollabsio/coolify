@@ -1,23 +1,21 @@
 <div>
     <div class="flex gap-2">
         <h1>Projects</h1>
-        @if ($servers > 0)
-            <x-slide-over>
-                <x-slot:title>New Project</x-slot:title>
-                <x-slot:content>
-                    <livewire:project.add-empty />
-                </x-slot:content>
-                <button @click="slideOverOpen=true" class="button">+
-                    Add</button>
-            </x-slide-over>
-        @endif
+        <x-slide-over>
+            <x-slot:title>New Project</x-slot:title>
+            <x-slot:content>
+                <livewire:project.add-empty />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
     </div>
     <div class="subtitle">All your projects are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @if ($servers === 0)
             <div>
                 <div>No servers found. Without a server, you won't be able to do much.</div>
-                <x-use-magic-bar link="/server/new" />
+                <x-use-magic-bar link="/servers" />
             </div>
         @else
             @forelse ($projects as $project)
@@ -46,7 +44,6 @@
             @empty
                 <div>
                     <div>No project found.</div>
-                    <x-use-magic-bar />
                 </div>
             @endforelse
         @endif

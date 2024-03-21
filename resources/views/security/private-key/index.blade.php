@@ -2,7 +2,14 @@
     <x-security.navbar />
     <div class="flex gap-2">
         <h2 class="pb-4">Private Keys</h2>
-        <a  href="{{ route('security.private-key.create') }}"><x-forms.button>+ Add</x-forms.button></a>
+        <x-slide-over  closeWithX fullScreen>
+            <x-slot:title>New Private Key</x-slot:title>
+            <x-slot:content>
+                <livewire:security.private-key.create />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
     </div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($privateKeys as $key)
@@ -13,10 +20,7 @@
                 </div>
             </a>
         @empty
-            <div>
-                <div>No private keys found.</div>
-                <x-use-magic-bar link="/security/private-key/new" />
-            </div>
+            <div>No private keys found.</div>
         @endforelse
     </div>
 </x-layout>

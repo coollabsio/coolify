@@ -319,6 +319,15 @@
             <template x-for="(toast, index) in toasts" :key="toast.id">
                 <li :id="toast.id" x-data="{
                     toastHovered: false,
+                    copyNotification: false,
+                    copyToClipboard() {
+                        navigator.clipboard.writeText(toast.description);
+                        this.copyNotification = true;
+                        let that = this;
+                        setTimeout(function() {
+                            that.copyNotification = false;
+                        }, 1000);
+                    }
                 }" x-init="if (position.includes('bottom')) {
                     $el.firstElementChild.classList.add('toast-bottom');
                     $el.firstElementChild.classList.add('opacity-0', 'translate-y-full');
@@ -344,6 +353,7 @@
                         }, 2000)
                     }
                 });
+
                 setTimeout(function() {
 
                     setTimeout(function() {
@@ -374,13 +384,13 @@
                     }, 5);
                 }, 4000);"
                     @mouseover="toastHovered=true" @mouseout="toastHovered=false"
-                    class="absolute w-full duration-100 ease-out sm:max-w-xs"
+                    class="absolute w-full duration-100 ease-out sm:max-w-xs "
                     :class="{ 'toast-no-description': !toast.description }">
                     <span
                         class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out bg-coolgray-100 border border-coolgray-200 rounded sm:max-w-xs group"
                         :class="{ 'p-4': !toast.html, 'p-0': toast.html }">
                         <template x-if="!toast.html">
-                            <div class="relative">
+                            <div class="relative w-full">
                                 <div class="flex items-start"
                                     :class="{ 'text-green-500': toast.type=='success', 'text-blue-500': toast.type=='info', 'text-orange-400': toast.type=='warning', 'text-red-500': toast.type=='danger', 'text-gray-800': toast.type=='default' }">
 
@@ -411,19 +421,45 @@
                                     <p class="leading-2 text-neutral-200" x-html="toast.message">
                                     </p>
                                 </div>
-                                <p x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
-                                    class="mt-1.5 text-xs leading-2 opacity-90 whitespace-pre-wrap"
-                                    x-html="toast.description"></p>
+                                <div x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
+                                    class="mt-1.5 text-xs px-2 opacity-90 whitespace-pre-wrap w-full break-words"
+                                    x-html="toast.description"></div>
                             </div>
                         </template>
                         <template x-if="toast.html">
                             <div x-html="toast.html"></div>
                         </template>
+                        <span class="absolute mt-1 text-xs right-[4.4rem] text-success font-bold"
+                            x-show="copyNotification"
+                            :class="{
+                                'opacity-100': toastHovered,
+                                'opacity-0': !
+                                    toastHovered
+                            }">
+                            Copied
+                        </span>
+                        <span @click="copyToClipboard()"
+                            class="absolute right-7 p-1.5 mr-2.5 text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-coolgray-400 hover:text-neutral-300"
+                            :class="{
+                                'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
+                                'top-0 mt-3': (toast
+                                    .description || toast.html),
+                                'opacity-100': toastHovered,
+                                'opacity-0': !
+                                    toastHovered
+                            }">
+
+                            <svg class="w-4 h-4 stroke-current" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                            </svg>
+                        </span>
                         <span @click="burnToast(toast.id)"
                             class="absolute right-0 p-1.5 mr-2.5 text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-coolgray-400 hover:text-neutral-300"
                             :class="{
                                 'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
-                                'top-0 mt-2.5': (toast
+                                'top-0 mt-3.5': (toast
                                     .description || toast.html),
                                 'opacity-100': toastHovered,
                                 'opacity-0': !

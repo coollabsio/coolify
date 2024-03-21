@@ -2,8 +2,8 @@
     @if (session('error'))
         <span x-data x-init="$wire.emit('error', '{{ session('error') }}')" />
     @endif
-    <h1 class="title">Dashboard</h1>
-    {{-- <div class="subtitle">Your self-hosted environment</div> --}}
+    <h1>Dashboard</h1>
+    <div class="subtitle">Your self-hosted infrastructure.</div>
     @if (request()->query->get('success'))
         <div class="mb-10 rounded dark:text-white alert-success">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-current shrink-0" fill="none"
@@ -16,6 +16,7 @@
         </div>
     @endif
     <h3 class="pb-4">Projects</h3>
+
     <div class="grid grid-cols-1 gap-2 xl:grid-cols-2">
         @forelse ($projects as $project)
             <div class="gap-2 border border-transparent cursor-pointer box group">
@@ -37,7 +38,9 @@
                 <div class="flex items-center group">
                     <a class="mx-4 rounded hover:no-underline"
                         href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                        <span class="p-2 font-bold group-hover:dark:text-white group-hover:text-black dark:hover:bg-coollabs hover:bg-neutral-300">+ Add Resource</span>
+                        <span
+                            class="p-2 font-bold group-hover:dark:text-white group-hover:text-black dark:hover:bg-coollabs hover:bg-neutral-300">+
+                            Add Resource</span>
                     </a>
                     <a class="mx-4 rounded group-hover:dark:text-white group-hover:text-black"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
@@ -53,11 +56,19 @@
                 </div>
             </div>
         @empty
-            <div>
-                No projects found. Add your first server <a class="underline dark:text-white"
-                    onclick="newEmptyProject.showModal()">here</a> or
-                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding page.</a>
-                <livewire:project.add-empty />
+            <div class="flex gap-1">
+                <span class='font-bold text-warning'>No projects found.</span> Add your first project
+                <div>
+                    <x-slide-over fullScreen closeWithX>
+                        <x-slot:title>New Project</x-slot:title>
+                        <x-slot:content>
+                            <livewire:project.add-empty />
+                        </x-slot:content>
+                        <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
+                        </div>
+                    </x-slide-over>
+                </div> or
+                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a> page.
             </div>
         @endforelse
     </div>
@@ -91,13 +102,40 @@
                 <div class="flex-1"></div>
             </a>
         @empty
-            <div>
-                No servers found.
-                Add your first server <a class="underline dark:text-white" href="{{ route('server.create') }}">here</a>
-                or
-                go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding page.</a>
-            </div>
-        @endforelse
+            @if ($private_keys->count() === 0)
+                <div class="flex gap-1">
+                   <span class='font-bold text-warning'>No private keys found.</span> Before you can add your server, first add a private key
+                    <div>
+                        <x-slide-over fullScreen closeWithX>
+                            <x-slot:title>New Private Key</x-slot:title>
+                            <x-slot:content>
+                                <livewire:security.private-key.create from="server" />
+                            </x-slot:content>
+                            <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
+                            </div>
+                        </x-slide-over>
+                    </div> or
+                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                    page.
+                </div>
+            @else
+                <div class="flex gap-1">
+                    <span class='font-bold text-warning'>No servers found.</span> Add your first server
+                    <div>
+                        <x-slide-over fullScreen closeWithX>
+                            <x-slot:title>New Server</x-slot:title>
+                            <x-slot:content>
+                                <livewire:server.create />
+                            </x-slot:content>
+                            <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
+                            </div>
+                        </x-slide-over>
+                    </div> or
+                    go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
+                    page.
+                </div>
+            @endif
+            @endforelse
     </div>
     <div class="flex items-center gap-2">
         <h3 class="py-4">Deployments</h3>

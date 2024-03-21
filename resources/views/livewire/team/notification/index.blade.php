@@ -1,6 +1,5 @@
 <div>
     <x-notifications.navbar />
-    <h2 class="pb-4">Notifications</h2>
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'email' }" class="flex h-full">
         <div class="flex flex-col gap-4 min-w-fit">
             <a :class="activeTab === 'email' && 'text-white'"

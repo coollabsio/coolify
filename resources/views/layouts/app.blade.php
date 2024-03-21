@@ -1,7 +1,9 @@
 @extends('layouts.base')
 @section('body')
     @parent
-    <livewire:layout-popups />
+    @if (isSubscribed())
+        <livewire:layout-popups />
+    @endif
     @auth
         <livewire:realtime-connection />
     @endauth

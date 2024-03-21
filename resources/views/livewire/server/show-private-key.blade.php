@@ -1,9 +1,14 @@
 <div>
     <div class="flex items-end gap-2 pb-6 ">
         <h2>Private Key</h2>
-        <a href="{{ route('security.private-key.create') }}">
-            <x-forms.button>Add a new Private Key</x-forms.button>
-        </a>
+        <x-slide-over fullScreen closeWithX>
+            <x-slot:title>New Team</x-slot:title>
+            <x-slot:content>
+                <livewire:security.private-key.create />
+            </x-slot:content>
+            <button @click="slideOverOpen=true" class="button">+
+                Add</button>
+        </x-slide-over>
         <x-forms.button wire:click.prevent='checkConnection'>
             Check connection
         </x-forms.button>
@@ -31,9 +36,7 @@
                 <div class="text-xs">{{ $private_key->description }}</div>
             </x-forms.button>
         @empty
-            <div>No private keys found.
-                <x-use-magic-bar link="/security/private-key/new" />
-            </div>
+            <div>No private keys found. </div>
         @endforelse
     </div>
 </div>

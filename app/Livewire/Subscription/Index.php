@@ -31,6 +31,6 @@ class Index extends Component
     }
     public function render()
     {
-        return view('livewire.subscription.index')->layout('layouts.subscription');
+        return view('livewire.subscription.index');
     }
 }

@@ -46,10 +46,11 @@ class Edit extends Component
 
     public function submit()
     {
-        $this->validate();
         try {
+            $this->validate();
             $this->project->save();
             $this->dispatch('saved');
+            $this->dispatch('success', 'Project updated.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }
