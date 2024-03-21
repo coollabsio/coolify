@@ -1005,61 +1005,63 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                                 'service_id' => $resource->id,
                             ])->first();
                             ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                            if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
-                                if (Str::lower($forService) === $serviceName) {
-                                    $fqdn = generateFqdn($resource->server, $containerName);
-                                } else {
-                                    $fqdn = generateFqdn($resource->server, Str::lower($forService) . '-' . $resource->uuid);
-                                }
-                                if ($port) {
-                                    $fqdn = "$fqdn:$port";
-                                }
-                                if ($foundEnv) {
-                                    $fqdn = data_get($foundEnv, 'value');
-                                } else {
-                                    if ($command->value() === 'URL') {
-                                        $fqdn = Str::of($fqdn)->after('://')->value();
+                            if (!is_null($command)) {
+                                if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
+                                    if (Str::lower($forService) === $serviceName) {
+                                        $fqdn = generateFqdn($resource->server, $containerName);
+                                    } else {
+                                        $fqdn = generateFqdn($resource->server, Str::lower($forService) . '-' . $resource->uuid);
                                     }
-                                    EnvironmentVariable::create([
-                                        'key' => $key,
-                                        'value' => $fqdn,
-                                        'is_build_time' => false,
-                                        'service_id' => $resource->id,
-                                        'is_preview' => false,
-                                    ]);
-                                }
-                                if (!$isDatabase) {
-                                    if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
-                                        $savedService->fqdn = $fqdn;
-                                        $savedService->save();
+                                    if ($port) {
+                                        $fqdn = "$fqdn:$port";
                                     }
-                                    // Caddy needs exact port in some cases.
-                                    if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
-                                        $env = EnvironmentVariable::where([
+                                    if ($foundEnv) {
+                                        $fqdn = data_get($foundEnv, 'value');
+                                    } else {
+                                        if ($command->value() === 'URL') {
+                                            $fqdn = Str::of($fqdn)->after('://')->value();
+                                        }
+                                        EnvironmentVariable::create([
                                             'key' => $key,
+                                            'value' => $fqdn,
+                                            'is_build_time' => false,
                                             'service_id' => $resource->id,
-                                        ])->first();
-                                        if ($env) {
-                                            $env_url = Url::fromString($env->value);
-                                            $env_port = $env_url->getPort();
-                                            if ($env_port !== $predefinedPort) {
-                                                $env_url = $env_url->withPort($predefinedPort);
-                                                $savedService->fqdn = $env_url->__toString();
-                                                $savedService->save();
+                                            'is_preview' => false,
+                                        ]);
+                                    }
+                                    if (!$isDatabase) {
+                                        if ($command->value() === 'FQDN' && is_null($savedService->fqdn) && !$foundEnv) {
+                                            $savedService->fqdn = $fqdn;
+                                            $savedService->save();
+                                        }
+                                        // Caddy needs exact port in some cases.
+                                        if ($predefinedPort && !$key->endsWith("_{$predefinedPort}") && $command?->value() === 'FQDN' && $resource->server->proxyType() === 'CADDY') {
+                                            $env = EnvironmentVariable::where([
+                                                'key' => $key,
+                                                'service_id' => $resource->id,
+                                            ])->first();
+                                            if ($env) {
+                                                $env_url = Url::fromString($env->value);
+                                                $env_port = $env_url->getPort();
+                                                if ($env_port !== $predefinedPort) {
+                                                    $env_url = $env_url->withPort($predefinedPort);
+                                                    $savedService->fqdn = $env_url->__toString();
+                                                    $savedService->save();
+                                                }
                                             }
                                         }
                                     }
-                                }
-                            } else {
-                                $generatedValue = generateEnvValue($command, $resource);
-                                if (!$foundEnv) {
-                                    EnvironmentVariable::create([
-                                        'key' => $key,
-                                        'value' => $generatedValue,
-                                        'is_build_time' => false,
-                                        'service_id' => $resource->id,
-                                        'is_preview' => false,
-                                    ]);
+                                } else {
+                                    $generatedValue = generateEnvValue($command, $resource);
+                                    if (!$foundEnv) {
+                                        EnvironmentVariable::create([
+                                            'key' => $key,
+                                            'value' => $generatedValue,
+                                            'is_build_time' => false,
+                                            'service_id' => $resource->id,
+                                            'is_preview' => false,
+                                        ]);
+                                    }
                                 }
                             }
                         } else {
@@ -1471,39 +1473,41 @@ function parseDockerComposeFile(Service|Application $resource, bool $isNew = fal
                             'application_id' => $resource->id,
                         ])->first();
                         ['command' => $command, 'forService' => $forService, 'generatedValue' => $generatedValue, 'port' => $port] = parseEnvVariable($value);
-                        if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
-                            if (Str::lower($forService) === $serviceName) {
-                                $fqdn = generateFqdn($server, $containerName);
-                            } else {
-                                $fqdn = generateFqdn($server, Str::lower($forService) . '-' . $resource->uuid);
-                            }
-                            if ($port) {
-                                $fqdn = "$fqdn:$port";
-                            }
-                            if ($foundEnv) {
-                                $fqdn = data_get($foundEnv, 'value');
-                            } else {
-                                if ($command->value() === 'URL') {
-                                    $fqdn = Str::of($fqdn)->after('://')->value();
+                        if (!is_null($command)) {
+                            if ($command?->value() === 'FQDN' || $command?->value() === 'URL') {
+                                if (Str::lower($forService) === $serviceName) {
+                                    $fqdn = generateFqdn($server, $containerName);
+                                } else {
+                                    $fqdn = generateFqdn($server, Str::lower($forService) . '-' . $resource->uuid);
                                 }
-                                EnvironmentVariable::create([
-                                    'key' => $key,
-                                    'value' => $fqdn,
-                                    'is_build_time' => false,
-                                    'application_id' => $resource->id,
-                                    'is_preview' => false,
-                                ]);
-                            }
-                        } else {
-                            $generatedValue = generateEnvValue($command);
-                            if (!$foundEnv) {
-                                EnvironmentVariable::create([
-                                    'key' => $key,
-                                    'value' => $generatedValue,
-                                    'is_build_time' => false,
-                                    'application_id' => $resource->id,
-                                    'is_preview' => false,
-                                ]);
+                                if ($port) {
+                                    $fqdn = "$fqdn:$port";
+                                }
+                                if ($foundEnv) {
+                                    $fqdn = data_get($foundEnv, 'value');
+                                } else {
+                                    if ($command?->value() === 'URL') {
+                                        $fqdn = Str::of($fqdn)->after('://')->value();
+                                    }
+                                    EnvironmentVariable::create([
+                                        'key' => $key,
+                                        'value' => $fqdn,
+                                        'is_build_time' => false,
+                                        'application_id' => $resource->id,
+                                        'is_preview' => false,
+                                    ]);
+                                }
+                            } else {
+                                $generatedValue = generateEnvValue($command);
+                                if (!$foundEnv) {
+                                    EnvironmentVariable::create([
+                                        'key' => $key,
+                                        'value' => $generatedValue,
+                                        'is_build_time' => false,
+                                        'application_id' => $resource->id,
+                                        'is_preview' => false,
+                                    ]);
+                                }
                             }
                         }
                     } else {
@@ -1655,29 +1659,30 @@ function parseEnvVariable(Str|string $value)
     $forService = null;
     $generatedValue = null;
     $port = null;
-
-    if ($count === 2) {
-        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-            // SERVICE_FQDN_UMAMI
-            $command = $value->after('SERVICE_')->beforeLast('_');
-            $forService = $value->afterLast('_');
-        } else {
-            // SERVICE_BASE64_UMAMI
-            $command = $value->after('SERVICE_')->beforeLast('_');
-        }
-    }
-    if ($count === 3) {
-        if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
-            // SERVICE_FQDN_UMAMI_1000
-            $command = $value->after('SERVICE_')->before('_');
-            $forService = $value->after('SERVICE_')->after('_')->before('_');
-            $port = $value->afterLast('_');
-            if (filter_var($port, FILTER_VALIDATE_INT) === false) {
-                $port = null;
+    if ($value->startsWith('SERVICE')) {
+        if ($count === 2) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+                $forService = $value->afterLast('_');
+            } else {
+                // SERVICE_BASE64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
             }
-        } else {
-            // SERVICE_BASE64_64_UMAMI
-            $command = $value->after('SERVICE_')->beforeLast('_');
+        }
+        if ($count === 3) {
+            if ($value->startsWith('SERVICE_FQDN') || $value->startsWith('SERVICE_URL')) {
+                // SERVICE_FQDN_UMAMI_1000
+                $command = $value->after('SERVICE_')->before('_');
+                $forService = $value->after('SERVICE_')->after('_')->before('_');
+                $port = $value->afterLast('_');
+                if (filter_var($port, FILTER_VALIDATE_INT) === false) {
+                    $port = null;
+                }
+            } else {
+                // SERVICE_BASE64_64_UMAMI
+                $command = $value->after('SERVICE_')->beforeLast('_');
+            }
         }
     }
     return [
