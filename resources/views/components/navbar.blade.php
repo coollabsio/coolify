@@ -6,7 +6,7 @@
         </div>
         {{-- <button onclick="changeTheme()">Dark/light</button> --}}
     </div>
-    <div class="px-2 pb-4">
+    <div class="px-2 pt-2 pb-6">
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
@@ -96,7 +96,7 @@
                     <li>
                         <a title="Notifications"
                             class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('notification.index') }}">
+                            href="{{ route('notification.email') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2"

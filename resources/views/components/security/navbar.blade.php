@@ -2,7 +2,7 @@
     <h1>Security</h1>
     <div class="subtitle">Security related settings.</div>
 
-    <nav class="navbar-main">
+    <nav class="pt-2 navbar-main">
         <a  href="{{ route('security.private-key.index') }}">
             <button>Private Keys</button>
         </a>

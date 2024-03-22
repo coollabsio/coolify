@@ -6,7 +6,7 @@ use App\Models\Team;
 use App\Notifications\Test;
 use Livewire\Component;
 
-class DiscordSettings extends Component
+class Discord extends Component
 {
     public Team $team;
     protected $rules = [
@@ -54,5 +54,9 @@ class DiscordSettings extends Component
     {
         $this->team?->notify(new Test());
         $this->dispatch('success', 'Test notification sent.');
+    }
+    public function render()
+    {
+        return view('livewire.notifications.discord');
     }
 }

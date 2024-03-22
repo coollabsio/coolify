@@ -21,9 +21,12 @@ use App\Livewire\Settings\Index as SettingsIndex;
 use App\Livewire\Settings\License as SettingsLicense;
 use App\Livewire\Profile\Index as ProfileIndex;
 
+use App\Livewire\Notifications\Email as NotificationEmail;
+use App\Livewire\Notifications\Telegram as NotificationTelegram;
+use App\Livewire\Notifications\Discord as NotificationDiscord;
+
 use App\Livewire\Team\Index as TeamIndex;
 use App\Livewire\Team\Create as TeamCreate;
-use App\Livewire\Team\Notification\Index as TeamNotificationIndex;
 
 use App\Livewire\Team\Storage\Index as TeamStorageIndex;
 use App\Livewire\Team\Storage\Create as TeamStorageCreate;
@@ -125,7 +128,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
     Route::prefix('notifications')->group(function () {
-        Route::get('/', TeamNotificationIndex::class)->name('notification.index');
+        Route::get('/email', NotificationEmail::class)->name('notification.email');
+        Route::get('/telegram', NotificationTelegram::class)->name('notification.telegram');
+        Route::get('/discord', NotificationDiscord::class)->name('notification.discord');
     });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');

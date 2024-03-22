@@ -1,5 +1,6 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col">
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
             <h2>Telegram</h2>
             <x-forms.button type="submit">
@@ -12,7 +13,7 @@
                 </x-forms.button>
             @endif
         </div>
-        <div class="w-48">
+        <div class="w-32">
             <x-forms.checkbox instantSave id="team.telegram_enabled" label="Enabled" />
         </div>
         <div class="flex gap-2">

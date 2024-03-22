@@ -1,5 +1,6 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col">
+    <x-notification.navbar />
+    <form wire:submit='submit' class="flex flex-col gap-4">
         <div class="flex items-center gap-2">
             <h2>Email</h2>
             <x-forms.button type="submit">
@@ -24,7 +25,7 @@
     </form>
     @if (isCloud())
         @if ($this->sharedEmailEnabled)
-            <div class="w-64 pb-4">
+            <div class="w-64 py-4">
                 <x-forms.checkbox instantSave="instantSaveInstance" id="team.use_instance_email_settings"
                     label="Use Hosted Email Service" />
             </div>
