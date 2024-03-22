@@ -18,7 +18,6 @@
                 </x-slot:content>
                 <button @click="slideOverOpen=true" class="button">+ Add</button>
             </x-slide-over>
-            {{-- <x-forms.button onclick="newStorage.showModal()">+ Add</x-forms.button> --}}
         </div>
         <div class="pb-4">Persistent storage to preserve data between deployments.</div>
         @if ($resource->persistentStorages()->get()->count() === 0 && $resource->fileStorages()->get()->count() == 0)

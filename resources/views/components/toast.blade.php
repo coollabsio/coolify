@@ -2,7 +2,6 @@
     title: 'Default Toast Notification',
     description: '',
     type: 'default',
-    position: 'top-center',
     expanded: false,
     popToast(custom) {
         let html = '';
@@ -14,7 +13,7 @@
 }" x-init="window.toast = function(message, options = {}) {
     let description = '';
     let type = 'default';
-    let position = 'top-center';
+    let position = 'bottom-right';
     let html = '';
     if (typeof options.description != 'undefined') description = options.description;
     if (typeof options.type != 'undefined') type = options.type;
@@ -30,7 +29,7 @@
             timeout: null,
             expanded: false,
             layout: 'default',
-            position: 'top-center',
+            position: '',
             paddingBetweenToasts: 15,
             deleteToastWithId(id) {
                 for (let i = 0; i < this.toasts.length; i++) {

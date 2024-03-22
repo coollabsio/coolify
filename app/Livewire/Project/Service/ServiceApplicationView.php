@@ -59,7 +59,7 @@ class ServiceApplicationView extends Component
             $this->validate();
             $this->application->save();
             updateCompose($this->application);
-            $this->dispatch('success', 'Application saved.');
+            $this->dispatch('success', 'Service saved.');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         } finally {

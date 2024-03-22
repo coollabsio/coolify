@@ -10,7 +10,7 @@
                 Add</button>
         </x-slide-over>
     </div>
-    <div class="subtitle ">All Sources.</div>
+    <div class="subtitle ">Git sources for your applications.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($sources as $source)
             @if ($source->getMorphClass() === 'App\Models\GithubApp')

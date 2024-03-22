@@ -26,7 +26,7 @@ class Navbar extends Component
         ];
     }
     public function serviceStarted() {
-        $this->dispatch('success', 'Service started.');
+        $this->dispatch('success', 'Service status changed.');
     }
     public function serviceStatusChanged()
     {

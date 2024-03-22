@@ -13,7 +13,6 @@ class Button extends Component
      */
     public function __construct(
         public bool        $disabled = false,
-        public bool        $isModal = false,
         public bool        $noStyle = false,
         public ?string     $modalId = null,
         public string      $defaultClass = "button"

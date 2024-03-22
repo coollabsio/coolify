@@ -38,9 +38,8 @@
 @section('body')
 
     <body>
-        @livewire('wire-elements-modal')
+        {{-- @livewire('wire-elements-modal') --}}
         <x-toast />
-        {{-- <x-version class="fixed left-7 bottom-1" /> --}}
         <script data-navigate-once>
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia(
                     '(prefers-color-scheme: dark)').matches)) {
@@ -89,9 +88,11 @@
                 if (element.nodeName === 'INPUT' || element.nodeName === 'TEXTAREA') {
                     if (element.type === 'password') {
                         element.type = 'text';
+                        element.classList.add('truncate');
                         this.type = 'text';
                     } else {
                         element.type = 'password';
+                        element.classList.remove('truncate');
                         this.type = 'password';
                     }
                 }
@@ -231,10 +232,6 @@
                             description: message[1],
                         })
                     }
-                })
-                window.Livewire.on('installDocker', () => {
-                    console.log('Installing Docker...');
-                    installDocker.showModal();
                 })
             });
         </script>

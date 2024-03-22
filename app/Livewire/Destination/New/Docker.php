@@ -5,7 +5,7 @@ namespace App\Livewire\Destination\New;
 use App\Models\Server;
 use App\Models\StandaloneDocker as ModelsStandaloneDocker;
 use App\Models\SwarmDocker;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Livewire\Component;
 use Visus\Cuid2\Cuid2;
 
@@ -14,7 +14,7 @@ class Docker extends Component
     public string $name;
     public string $network;
 
-    public Collection $servers;
+    public ?Collection $servers = null;
     public Server $server;
     public ?int $server_id = null;
     public bool $is_swarm = false;
@@ -34,6 +34,9 @@ class Docker extends Component
 
     public function mount()
     {
+        if (is_null($this->servers)) {
+            $this->servers = Server::ownedByCurrentTeam()->get();
+        }
         if (request()->query('server_id')) {
             $this->server_id = request()->query('server_id');
         } else {

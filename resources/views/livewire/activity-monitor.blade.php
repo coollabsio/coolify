@@ -14,7 +14,7 @@
             <pre class="font-mono whitespace-pre-wrap" @if ($isPollingActive) wire:poll.1000ms="polling" @endif>{{ RunRemoteProcess::decodeOutput($this->activity) }}</pre>
         </div>
     @else
-        @if (isset($showWaiting))
+        @if ($showWaiting)
             <x-loading text="Waiting..." />
         @endif
     @endif

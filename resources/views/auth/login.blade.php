@@ -5,7 +5,7 @@
                 Coolify
             </a>
             <div
-                class="w-full bg-white rounded shadow dark:border md:mt-0 sm:max-w-md xl:p-0 dark:bg-base dark:border-coolgray-200">
+                class="w-full bg-white shadow md:mt-0 sm:max-w-md xl:p-0 dark:bg-base ">
                 <div class="p-6 space-y-4 md:space-y-6 sm:p-8">
                     <form action="/login" method="POST" class="flex flex-col gap-2">
                         @csrf
@@ -15,6 +15,7 @@
 
                         <x-forms.input value="password" type="password" name="password" required
                             label="{{ __('input.password') }}" />
+
                         <a href="/forgot-password" class="text-xs">
                             {{ __('auth.forgot_password') }}?
                         </a>
@@ -28,8 +29,7 @@
                         @endenv
                         <x-forms.button class="mt-10" type="submit">{{ __('auth.login') }}</x-forms.button>
                         @if ($is_registration_enabled)
-                            <a href="/register"
-                                class="button bg-coollabs-gradient">
+                            <a href="/register" class="button bg-coollabs-gradient">
                                 {{ __('auth.register_now') }}
                             </a>
                         @endif

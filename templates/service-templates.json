@@ -668,6 +668,40 @@
         "logo": "svgs\/posthog.svg",
         "minversion": "4.0.0-beta.222"
     },
+    "shlink": {
+        "documentation": "https:\/\/shlink.io\/",
+        "slogan": "",
+        "compose": "c2VydmljZXM6CiAgc2hsaW5rOgogICAgaW1hZ2U6ICdzaGxpbmtpby9zaGxpbms6c3RhYmxlJwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1NITElOS184MDgwCiAgICAgIC0gJ0RFRkFVTFRfRE9NQUlOPSR7U0VSVklDRV9VUkxfU0hMSU5LfScKICAgICAgLSBJU19IVFRQU19FTkFCTEVEPWZhbHNlCiAgICAgIC0gJ0lOSVRJQUxfQVBJX0tFWT0ke1NFUlZJQ0VfQkFTRTY0X1NITElOS0FQSUtFWX0nCiAgICB2b2x1bWVzOgogICAgICAtICdzaGxpbmstZGF0YTovZXRjL3NobGluay9kYXRhJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIGN1cmwKICAgICAgICAtICctZicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjgwODAvcmVzdC92My9oZWFsdGgnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUKICBzaGxpbmstd2ViOgogICAgaW1hZ2U6IHNobGlua2lvL3NobGluay13ZWItY2xpZW50CiAgICBlbnZpcm9ubWVudDoKICAgICAgLSBTRVJWSUNFX0ZRRE5fU0hMSU5LV0VCXzgwODAKICAgICAgLSAnU0hMSU5LX1NFUlZFUl9BUElfS0VZPSR7U0VSVklDRV9CQVNFNjRfU0hMSU5LQVBJS0VZfScKICAgICAgLSAnU0hMSU5LX1NFUlZFUl9VUkw9JHtTRVJWSUNFX0ZRRE5fU0hMSU5LfScKICAgIGhlYWx0aGNoZWNrOgogICAgICB0ZXN0OgogICAgICAgIC0gQ01ECiAgICAgICAgLSBjdXJsCiAgICAgICAgLSAnLWYnCiAgICAgICAgLSAnaHR0cDovL2xvY2FsaG9zdDo4MDgwJwogICAgICBpbnRlcnZhbDogMnMKICAgICAgdGltZW91dDogMTBzCiAgICAgIHJldHJpZXM6IDE1Cg==",
+        "tags": [
+            "links",
+            "shortener",
+            "sharing",
+            "url",
+            "short",
+            "link",
+            "sharing"
+        ],
+        "logo": "svgs\/unknown.svg",
+        "minversion": "0.0.0",
+        "port": "8080"
+    },
+    "slash": {
+        "documentation": "https:\/\/github.com\/yourselfhosted\/slash",
+        "slogan": "An open source, self-hosted links shortener and sharing platform.",
+        "compose": "c2VydmljZXM6CiAgc2xhc2g6CiAgICBpbWFnZTogeW91cnNlbGZob3N0ZWQvc2xhc2gKICAgIGVudmlyb25tZW50OgogICAgICAtIFNFUlZJQ0VfRlFETl9TTEFTSF81MjMxCiAgICB2b2x1bWVzOgogICAgICAtICdzbGFzaC1kYXRhOi92YXIvb3B0L3NsYXNoJwogICAgaGVhbHRoY2hlY2s6CiAgICAgIHRlc3Q6CiAgICAgICAgLSBDTUQKICAgICAgICAtIHdnZXQKICAgICAgICAtICctcScKICAgICAgICAtICctLXNwaWRlcicKICAgICAgICAtICdodHRwOi8vbG9jYWxob3N0OjUyMzEnCiAgICAgIGludGVydmFsOiAycwogICAgICB0aW1lb3V0OiAxMHMKICAgICAgcmV0cmllczogMTUK",
+        "tags": [
+            "links",
+            "shortener",
+            "sharing",
+            "url",
+            "short",
+            "link",
+            "sharing"
+        ],
+        "logo": "svgs\/unknown.svg",
+        "minversion": "0.0.0",
+        "port": "5231"
+    },
     "snapdrop": {
         "documentation": "https:\/\/github.com\/RobinLinus\/snapdrop",
         "slogan": "A self-hosted file-sharing service for secure and convenient file transfers, whether on a local network or the internet.",

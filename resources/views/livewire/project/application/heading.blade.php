@@ -5,20 +5,20 @@
             href="{{ route('project.application.configuration', $parameters) }}">
             <button>Configuration</button>
         </a>
-        @if (!$application->destination->server->isSwarm())
-            <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
-                href="{{ route('project.application.command', $parameters) }}">
-                <button>Execute Command</button>
-            </a>
-        @endif
-        <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
-            href="{{ route('project.application.logs', $parameters) }}">
-            <button>Logs</button>
-        </a>
         <a class="{{ request()->routeIs('project.application.deployment.index') ? 'text-white' : '' }}"
             href="{{ route('project.application.deployment.index', $parameters) }}">
             <button>Deployments</button>
         </a>
+        <a class="{{ request()->routeIs('project.application.logs') ? 'text-white' : '' }}"
+            href="{{ route('project.application.logs', $parameters) }}">
+            <button>Logs</button>
+        </a>
+        @if (!$application->destination->server->isSwarm())
+        <a class="{{ request()->routeIs('project.application.command') ? 'text-white' : '' }}"
+            href="{{ route('project.application.command', $parameters) }}">
+            <button>Command</button>
+        </a>
+    @endif
         <x-applications.links :application="$application" />
         <div class="flex-1"></div>
         @if ($application->build_pack === 'dockercompose' && is_null($application->docker_compose_raw))

@@ -12,11 +12,6 @@
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
     <div class="flex flex-col gap-4 pt-10">
         @if ($current_step === 'type')
-            {{-- <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Resource Type</li>
-                <li class="step">Select a Server</li>
-                <li class="step">Select a Destination</li>
-            </ul> --}}
             <h2>Applications</h2>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <x-resource-view wire="setType('public')">
@@ -252,20 +247,8 @@
                 companies, and use of them does not imply any affiliation or endorsement.</div>
         @endif
         @if ($current_step === 'servers')
-            {{-- <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Resource Type</li>
-                <li class="step step-secondary">Select a Server</li>
-                <li class="step">Select a Destination</li>
-            </ul> --}}
-
-            {{-- @if ($isDatabase)
-                <div class="flex items-center justify-center pt-4">
-                    <x-forms.checkbox instantSave wire:model="includeSwarm"
-                        helper="Swarm clusters are excluded from this list by default. For database, services or complex compose deployments with databases to work with Swarm,
-                you need to set a few things on the server. Read more <a class='text-white underline' href='https://coolify.io/docs/docker/swarm#database-requirements' target='_blank'>here</a>."
-                        label="Include Swarm Clusters" />
-                </div>
-            @endif --}}
+            <h2>Select a server</h2>
+            <div class="pb-5"></div>
             <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @forelse($servers as $server)
                     <div class="w-64 box group" wire:click="setServer({{ $server }})">
@@ -282,8 +265,6 @@
                         <div>No validated & reachable servers found. <a class="text-white underline" href="/servers">
                                 Go to servers page
                             </a></div>
-
-                        <x-use-magic-bar link="/servers" />
                     </div>
                 @endforelse
             </div>
@@ -293,12 +274,9 @@
             @endif --}}
         @endif
         @if ($current_step === 'destinations')
-            {{-- <ul class="pb-10 steps">
-                <li class="step step-secondary">Select Resource Type</li>
-                <li class="step step-secondary">Select a Server</li>
-                <li class="step step-secondary">Select a Destination</li>
-            </ul> --}}
-
+            <h2>Select a destination</h2>
+            <div>Destinations are used to segregate resources by network. If you are unsure, select the default
+                Standalone Docker (coolify).</div>
             <div class="flex flex-col justify-center gap-4 text-left xl:flex-row xl:flex-wrap">
                 @if ($server->isSwarm())
                     @foreach ($swarmDockers as $swarmDocker)
@@ -323,14 +301,6 @@
                         </div>
                     @endforeach
                 @endif
-                <a href="{{ route('destination.new', ['server_id' => $server_id]) }}"
-                    class="items-center justify-center text-center box-without-bg group bg-coollabs hover:bg-coollabs-100">
-                    <div class="flex flex-col mx-6 ">
-                        <div class="font-bold text-white">
-                            + Add New
-                        </div>
-                    </div>
-                </a>
             </div>
         @endif
         @if ($current_step === 'existing-postgresql')

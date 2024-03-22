@@ -2,6 +2,7 @@
     'title' => 'Are you sure?',
     'buttonTitle' => 'Open Modal',
     'isErrorButton' => false,
+    'buttonFullWidth' => false,
     'disabled' => false,
     'action' => 'delete',
     'content' => null,
@@ -14,17 +15,35 @@
         </div>
     @else
         @if ($disabled)
-            <x-forms.button isError disabled>
-                {{ $buttonTitle }}
-            </x-forms.button>
+            @if ($buttonFullWidth)
+                <x-forms.button class="w-full" isError disabled>
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @else
+                <x-forms.button isError disabled>
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @endif
         @elseif ($isErrorButton)
-            <x-forms.button isError @click="modalOpen=true">
-                {{ $buttonTitle }}
-            </x-forms.button>
+            @if ($buttonFullWidth)
+                <x-forms.button class="w-full" isError @click="modalOpen=true">
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @else
+                <x-forms.button isError @click="modalOpen=true">
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @endif
         @else
-            <x-forms.button @click="modalOpen=true" class="flex gap-2">
-                {{ $buttonTitle }}
-            </x-forms.button>
+            @if ($buttonFullWidth)
+                <x-forms.button @click="modalOpen=true" class="flex w-full gap-2">
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @else
+                <x-forms.button @click="modalOpen=true" class="flex gap-2">
+                    {{ $buttonTitle }}
+                </x-forms.button>
+            @endif
         @endif
     @endif
     <template x-teleport="body">

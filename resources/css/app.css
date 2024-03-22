@@ -84,7 +84,7 @@ input {
 }
 
 .input {
-    @apply block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
+    @apply block w-full py-1.5 pr-[2.8rem] rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
 }
 
 option {
@@ -100,7 +100,7 @@ option {
 }
 
 .dropdown-item {
-    @apply relative flex cursor-pointer select-none dark:hover:text-white dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-center outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
+    @apply relative flex cursor-pointer select-none dark:text-white dark:hover:bg-coollabs items-center pr-4 pl-2 py-1 text-xs justify-start outline-none transition-colors data-[disabled]:pointer-events-none data-[disabled]:opacity-50 gap-2 w-full;
 }
 
 .badge {

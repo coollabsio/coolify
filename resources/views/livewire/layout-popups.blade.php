@@ -1,9 +1,22 @@
-<div>
-    @if (data_get(auth()->user(), 'is_notification_sponsorship_enabled'))
+<div x-data="{
+    popups: {
+        sponsorship: true,
+        notification: true
+    },
+    init() {
+        this.popups.sponsorship = localStorage.getItem('popupSponsorship') !== 'false';
+        this.popups.notification = localStorage.getItem('popupNotification') !== 'false';
+    }
+}">
+    <span x-show="popups.sponsorship">
         <x-popup>
             <x-slot:title>
                 Love Coolify as we do?
             </x-slot:title>
+            <x-slot:icon>
+                <img src="https://cdn-icons-png.flaticon.com/512/8236/8236748.png"
+                    class="w-8 h-8 sm:w-12 sm:h-12 lg:w-16 lg:h-16">
+            </x-slot:icon>
             <x-slot:description>
                 <span>Please
                     consider donating on <a href="https://github.com/sponsors/coollabsio"
@@ -12,23 +25,11 @@
                 <span>It enables us to keep creating features without paywalls, ensuring our work remains free and
                     open.</span>
             </x-slot:description>
-            <x-slot:button-text wire:click='disableSponsorship'>
+            <x-slot:button-text @click="disableSponsorship()">
                 Disable This Popup
             </x-slot:button-text>
         </x-popup>
-        {{-- <div class="toast">
-            <div class="flex flex-col text-white rounded alert-error bg-coolgray-200">
-                <span>Love Coolify as we do? <a href="https://coolify.io/sponsorships"
-                        class="underline text-warning">Please
-                        consider donating!</a>💜</span>
-                <span>It enables us to keep creating features without paywalls, ensuring our work remains free and
-                    open.</span>
-                <x-forms.button class="bg-coolgray-400" wire:click='disableSponsorship'>Disable This
-                    Popup</x-forms.button>
-            </div>
-        </div> --}}
-    @endif
-    {{-- <x-popup /> --}}
+    </span>
     @if (currentTeam()->serverOverflow())
         <x-banner :closable=false>
             <div><span class="font-bold text-red-500">WARNING:</span> The number of active servers exceeds the limit
@@ -39,17 +40,38 @@
         </x-banner>
     @endif
     @if (!currentTeam()->isAnyNotificationEnabled())
-        <div class="toast">
-            <div class="flex flex-col text-white rounded alert-error bg-coolgray-200">
-                <span><span class="font-bold text-red-500">WARNING:</span> No notifications enabled.<br><br> It is
+        <span x-show="popups.notification">
+            <x-popup>
+                <x-slot:title>
+                    No notifications enabled.
+                </x-slot:title>
+                <x-slot:icon>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="text-red-500 stroke-current w-14 h-14 shrink-0"
+                        fill="none" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </x-slot:icon>
+                <x-slot:description>
+                    It is
                     highly recommended to enable at least
                     one
                     notification channel to receive important alerts.<br>Visit <a
                         href="{{ route('notification.index') }}" class="text-white underline">/notification</a> to
                     enable notifications.</span>
-                <x-forms.button class="bg-coolgray-400" wire:click='disableNotifications'>Disable This
-                    Popup</x-forms.button>
-            </div>
-        </div>
+        </x-slot:description>
+        <x-slot:button-text @click="disableNotification()">
+            Accept and Close
+        </x-slot:button-text>
+        </x-popup>
+        </span>
     @endif
+    <script>
+        function disableSponsorship() {
+            localStorage.setItem('popupSponsorship', false);
+        }
+        function disableNotification() {
+            localStorage.setItem('popupNotification', false);
+        }
+    </script>
 </div>

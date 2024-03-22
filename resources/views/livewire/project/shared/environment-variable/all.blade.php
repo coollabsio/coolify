@@ -1,4 +1,4 @@
-<div class="flex flex-col gap-2">
+<div class="flex flex-col gap-4">
     <div>
         <div class="flex items-center gap-2">
             <h2>Environment Variables</h2>
