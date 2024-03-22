@@ -38,8 +38,7 @@
                     <div class="flex items-center group">
                         <a class="mx-4 rounded hover:no-underline"
                             href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
-                            <span
-                                class="p-2 font-bold on-box">+
+                            <span class="p-2 font-bold on-box">+
                                 Add Resource</span>
                         </a>
                         <a class="mx-4"
@@ -59,18 +58,11 @@
         </div>
     @else
         <div class="flex flex-col gap-1">
-            <div class='font-bold text-warning'>No projects found.</div>
-            <div class="flex gap-1">Add your first project
-                <div>
-                    <x-slide-over fullScreen closeWithX>
-                        <x-slot:title>New Project</x-slot:title>
-                        <x-slot:content>
-                            <livewire:project.add-empty />
-                        </x-slot:content>
-                        <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
-                        </div>
-                    </x-slide-over>
-                </div> or
+            <div class='font-bold dark:text-warning'>No projects found.</div>
+            <div class="flex items-center gap-1">
+                <x-modal-input buttonTitle="Add" title="New Project">
+                    <livewire:project.add-empty />
+                </x-modal-input> your first project or
                 go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a> page.
             </div>
         </div>
@@ -111,78 +103,69 @@
     @else
         @if ($private_keys->count() === 0)
             <div class="flex flex-col gap-1">
-                <div class='font-bold text-warning'>No private keys found.</div>
-                <div class="flex gap-1">Before you can add your server, first add a private key
-                    <div>
-                        <x-slide-over fullScreen closeWithX>
-                            <x-slot:title>New Private Key</x-slot:title>
-                            <x-slot:content>
-                                <livewire:security.private-key.create from="server" />
-                            </x-slot:content>
-                            <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
-                            </div>
-                        </x-slide-over>
-                    </div> or
+                <div class='font-bold dark:text-warning'>No private keys found.</div>
+                <div class="flex items-center gap-1">Before you can add your server, first <x-modal-input
+                        buttonTitle="add" title="New Private Key">
+                        <livewire:security.private-key.create from="server" />
+                    </x-modal-input> a private key
+                    or
                     go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
                     page.
                 </div>
             </div>
         @else
             <div class="flex gap-1">
-                <span class='font-bold text-warning'>No servers found.</span> Add your first server
-                <div>
-                    <x-slide-over fullScreen closeWithX>
-                        <x-slot:title>New Server</x-slot:title>
-                        <x-slot:content>
-                            <livewire:server.create />
-                        </x-slot:content>
-                        <div class="underline cursor-pointer dark:text-white" @click="slideOverOpen=true">here
-                        </div>
-                    </x-slide-over>
-                </div> or
+                <span class='font-bold text-warning'>No servers found.</span>
+                <x-modal-input buttonTitle="Add"
+                    title="New Server">
+                    <livewire:server.create />
+                </x-modal-input> your first server
+                or
                 go to the <a class="underline dark:text-white" href="{{ route('onboarding') }}">onboarding</a>
                 page.
             </div>
         @endif
     @endif
-    <div class="flex items-center gap-2">
-        <h3 class="py-4">Deployments</h3>
-        @if (count($deployments_per_server) > 0)
-            <x-loading />
-        @endif
-        <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
-    </div>
-    <div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
-        @forelse ($deployments_per_server as $server_name => $deployments)
-            <h4 class="py-4">{{ $server_name }}</h4>
-            <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
-                @foreach ($deployments as $deployment)
-                    <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
-                        'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                        'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                        'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                    ])>
-                        <div class="flex flex-col mx-6">
-                            <div class="box-title">
-                                {{ data_get($deployment, 'application_name') }}
-                            </div>
-                            @if (data_get($deployment, 'pull_request_id') !== 0)
-                                <div class="box-description">
-                                    PR #{{ data_get($deployment, 'pull_request_id') }}
+    @if ($servers->count() > 0 && $projects->count() > 0)
+        <div class="flex items-center gap-2">
+            <h3 class="py-4">Deployments</h3>
+            @if (count($deployments_per_server) > 0)
+                <x-loading />
+            @endif
+            <x-forms.button wire:click='cleanup_queue'>Cleanup Queues</x-forms.button>
+        </div>
+        <div wire:poll.1000ms="get_deployments" class="grid grid-cols-1">
+            @forelse ($deployments_per_server as $server_name => $deployments)
+                <h4 class="py-4">{{ $server_name }}</h4>
+                <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
+                    @foreach ($deployments as $deployment)
+                        <a href="{{ data_get($deployment, 'deployment_url') }}" @class([
+                            'gap-2 cursor-pointer box group border-l-2 border-dotted',
+                            'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
+                            'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                        ])>
+                            <div class="flex flex-col mx-6">
+                                <div class="box-title">
+                                    {{ data_get($deployment, 'application_name') }}
                                 </div>
-                            @endif
-                            <div class="box-description">
-                                {{ str(data_get($deployment, 'status'))->headline() }}
+                                @if (data_get($deployment, 'pull_request_id') !== 0)
+                                    <div class="box-description">
+                                        PR #{{ data_get($deployment, 'pull_request_id') }}
+                                    </div>
+                                @endif
+                                <div class="box-description">
+                                    {{ str(data_get($deployment, 'status'))->headline() }}
+                                </div>
                             </div>
-                        </div>
-                        <div class="flex-1"></div>
-                    </a>
-                @endforeach
-            </div>
-        @empty
-            <div>No deployments running.</div>
-        @endforelse
-    </div>
+                            <div class="flex-1"></div>
+                        </a>
+                    @endforeach
+                </div>
+            @empty
+                <div>No deployments running.</div>
+            @endforelse
+        </div>
+    @endif
 
 
     <script>

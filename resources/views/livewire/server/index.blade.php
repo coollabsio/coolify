@@ -1,17 +1,11 @@
 <div>
     <div class="flex items-start gap-2">
         <h1>Servers</h1>
-        <x-slide-over fullScreen closeWithX>
-            <x-slot:title>New Server</x-slot:title>
-            <x-slot:content>
-                <livewire:server.create />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Server">
+            <livewire:server.create />
+        </x-modal-input>
     </div>
     <div class="subtitle">All your servers are here.</div>
-
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($servers as $server)
             <a href="{{ route('server.show', ['server_uuid' => data_get($server, 'uuid')]) }}"

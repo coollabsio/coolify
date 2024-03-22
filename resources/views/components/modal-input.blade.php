@@ -6,7 +6,7 @@
     'action' => 'delete',
     'content' => null,
 ])
-<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
+<div x-data="{ modalOpen: false }" :class="{ 'z-40': modalOpen }" @keydown.window.escape="modalOpen=false" class="relative w-auto h-auto">
     @if ($content)
         <div @click="modalOpen=true">
             {{ $content }}

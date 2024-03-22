@@ -90,8 +90,7 @@ class Select extends Component
                 $this->allServices = getServiceTemplates();
                 $this->services = $this->allServices->filter(function ($service, $key) {
                     return str_contains(strtolower($key), strtolower($this->search));
-                });;
-                $this->dispatch('success', 'Successfully loaded services.');
+                });
             }
         } catch (\Throwable $e) {
             return handleError($e, $this);

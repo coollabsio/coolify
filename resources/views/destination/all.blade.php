@@ -1,14 +1,9 @@
 <x-layout>
     <div class="flex items-start gap-2">
         <h1>Destinations</h1>
-        <x-slide-over fullScreen closeWithX>
-            <x-slot:title>New Destination</x-slot:title>
-            <x-slot:content>
-                <livewire:destination.new.docker :server_id="$server_id" />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Destination">
+            <livewire:destination.new.docker :server_id="$server_id" />
+        </x-modal-input>
     </div>
     <div class="subtitle">Endpoints to deploy your resources.</div>
     <div class="grid gap-2 lg:grid-cols-2">
