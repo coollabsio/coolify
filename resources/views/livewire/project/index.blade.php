@@ -9,6 +9,9 @@
             <button @click="slideOverOpen=true" class="button">+
                 Add</button>
         </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Project">
+            <livewire:project.add-empty />
+        </x-modal-input>
     </div>
     <div class="subtitle">All your projects are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">

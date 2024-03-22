@@ -2,16 +2,16 @@
     <h1>Notifications</h1>
     <div class="subtitle">Get notified about your infrastructure.</div>
     <nav class="navbar-main">
-        <a class="{{ request()->routeIs('notification.email') ? 'dark:text-white' : '' }}"
-            href="{{ route('notification.email') }}">
+        <a class="{{ request()->routeIs('notifications.email') ? 'dark:text-white' : '' }}"
+            href="{{ route('notifications.email') }}">
             <button>Email</button>
         </a>
-        <a class="{{ request()->routeIs('notification.telegram') ? 'dark:text-white' : '' }}"
-            href="{{ route('notification.telegram') }}">
+        <a class="{{ request()->routeIs('notifications.telegram') ? 'dark:text-white' : '' }}"
+            href="{{ route('notifications.telegram') }}">
             <button>Telegram</button>
         </a>
-        <a class="{{ request()->routeIs('notification.discord') ? 'dark:text-white' : '' }}"
-            href="{{ route('notification.discord') }}">
+        <a class="{{ request()->routeIs('notifications.discord') ? 'dark:text-white' : '' }}"
+            href="{{ route('notifications.discord') }}">
             <button>Discord</button>
         </a>
     </nav>

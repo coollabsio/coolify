@@ -128,9 +128,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/{tag_name}', TagsShow::class)->name('tags.show');
     });
     Route::prefix('notifications')->group(function () {
-        Route::get('/email', NotificationEmail::class)->name('notification.email');
-        Route::get('/telegram', NotificationTelegram::class)->name('notification.telegram');
-        Route::get('/discord', NotificationDiscord::class)->name('notification.discord');
+        Route::get('/email', NotificationEmail::class)->name('notifications.email');
+        Route::get('/telegram', NotificationTelegram::class)->name('notifications.telegram');
+        Route::get('/discord', NotificationDiscord::class)->name('notifications.discord');
     });
     Route::prefix('team')->group(function () {
         Route::get('/', TeamIndex::class)->name('team.index');

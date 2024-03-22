@@ -9,7 +9,7 @@
     >
 
     {{ $slot }}
-    @if ($attributes->whereStartsWith('wire:click')->first() && $attributes->get('type') === 'submit')
+    @if ($attributes->whereStartsWith('wire:click')->first())
         <x-loading wire:target="{{ $attributes->whereStartsWith('wire:click')->first() }}" wire:loading.delay />
     @endif
 </button>

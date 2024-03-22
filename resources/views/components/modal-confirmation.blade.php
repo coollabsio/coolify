@@ -47,7 +47,7 @@
         @endif
     @endif
     <template x-teleport="body">
-        <div x-show="modalOpen" class="fixed top-0 left-0 z-[99] flex items-center justify-center w-screen h-screen"
+        <div x-show="modalOpen" class="fixed top-0 lg:top-10 left-0 z-[99] flex items-start justify-center w-screen h-screen"
             x-cloak>
             <div x-show="modalOpen" x-transition:enter="ease-out duration-100" x-transition:enter-start="opacity-0"
                 x-transition:enter-end="opacity-100" x-transition:leave="ease-in duration-100"

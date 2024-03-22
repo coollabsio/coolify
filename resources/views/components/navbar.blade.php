@@ -96,7 +96,7 @@
                     <li>
                         <a title="Notifications"
                             class="{{ request()->is('notifications*') ? 'menu-item-active menu-item' : 'menu-item' }}"
-                            href="{{ route('notification.email') }}">
+                            href="{{ route('notifications.email') }}">
                             <svg class="icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                                 <path fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2"
