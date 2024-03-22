@@ -14,7 +14,7 @@
         </div>
     </form>
     <div class="flex flex-col gap-4">
-        <div class="p-4 border border-coolgray-500">
+        <div class="p-4 border dark:border-coolgray-300">
             <form wire:submit='submit' class="flex flex-col">
                 <div class="flex gap-2">
                     <h3>SMTP Server</h3>
@@ -41,7 +41,7 @@
                 </div>
             </form>
         </div>
-        <div class="p-4 border border-coolgray-500">
+        <div class="p-4 border dark:border-coolgray-300">
             <form wire:submit='submitResend' class="flex flex-col">
                 <div class="flex gap-2">
                     <h3>Resend</h3>

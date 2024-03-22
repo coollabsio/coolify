@@ -4,7 +4,7 @@
         <h2>Log Drains</h2>
         <div class="pb-4">Sends service logs to 3rd party tools.</div>
         <div class="flex flex-col gap-4 pt-4">
-            <div class="p-4 border border-coolgray-500">
+            <div class="p-4 border dark:border-coolgray-300">
                 <form wire:submit='submit("newrelic")' class="flex flex-col">
                     <h3>New Relic</h3>
                     <div class="w-32">
