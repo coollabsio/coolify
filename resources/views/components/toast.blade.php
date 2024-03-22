@@ -13,7 +13,7 @@
 }" x-init="window.toast = function(message, options = {}) {
     let description = '';
     let type = 'default';
-    let position = 'bottom-right';
+    let position = 'top-center';
     let html = '';
     if (typeof options.description != 'undefined') description = options.description;
     if (typeof options.type != 'undefined') type = options.type;

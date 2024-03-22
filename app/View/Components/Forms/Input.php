@@ -29,7 +29,9 @@ class Input extends Component
     {
         if (is_null($this->id)) $this->id = new Cuid2(7);
         if (is_null($this->name)) $this->name = $this->id;
-
+        if ($this->type === 'password') {
+            $this->defaultClass = $this->defaultClass . "  pr-[2.8rem]";
+        }
         // $this->label = Str::title($this->label);
         return view('components.forms.input');
     }

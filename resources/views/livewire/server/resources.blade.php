@@ -2,7 +2,7 @@
     <x-server.navbar :server="$server" :parameters="$parameters" />
     @if ($server->isFunctional())
         <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex h-full">
-            <div class="flex flex-col gap-4 xl:w-32">
+            <div class="flex flex-col gap-4">
                 <a :class="activeTab === 'managed' && 'text-white'"
                     @click.prevent="activeTab = 'managed'; window.location.hash = 'managed'" href="#">Managed</a>
                 <a :class="activeTab === 'unmanaged' && 'text-white'"

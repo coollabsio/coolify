@@ -84,7 +84,7 @@ input {
 }
 
 .input {
-    @apply block w-full py-1.5 pr-[2.8rem] rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
+    @apply block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
 }
 
 option {
