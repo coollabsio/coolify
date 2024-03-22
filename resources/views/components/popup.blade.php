@@ -6,9 +6,9 @@
     x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0"
     x-transition:leave="transition ease-in duration-300" x-transition:leave-start="translate-y-0"
     x-transition:leave-end="translate-y-full" x-init="setTimeout(() => { bannerVisible = true }, bannerVisibleAfter);"
-    class="fixed bottom-0 right-0 w-full h-auto duration-300 ease-out sm:px-5 sm:pb-5 sm:w-[26rem] lg:w-full" x-cloak>
+    class="fixed bottom-0 right-0 w-full h-auto duration-300 ease-out sm:px-5 sm:pb-5 sm:w-[26rem] lg:w-full z-[999]" x-cloak>
     <div
-        class="flex flex-col items-center justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border-t shadow-lg dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:border-0 sm:rounded-xl">
+        class="flex flex-col items-center justify-between w-full h-full max-w-4xl p-6 mx-auto bg-white border shadow-lg lg:border-t dark:border-coolgray-300 dark:bg-coolgray-100 lg:p-8 lg:flex-row sm:rounded">
         <div
             class="flex flex-col items-start h-full pb-6 text-xs lg:items-center lg:flex-row lg:pb-0 lg:pr-6 lg:space-x-5 dark:text-neutral-300">
             @if (isset($icon))
