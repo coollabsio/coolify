@@ -85,8 +85,10 @@
                             class="{{ request()->is('destination*') ? 'menu-item-active menu-item' : 'menu-item' }}"
                             href="{{ route('destination.all') }}">
 
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon"  viewBox="0 0 24 24">
-                                <path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 4L3 8v12l6-3l6 3l6-4V4l-6 3l-6-3zm-2 8.001V12m4 .001V12m3-2l2 2m2 2l-2-2m0 0l2-2m-2 2l-2 2"/>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24">
+                                <path fill="none" stroke="currentColor" stroke-linecap="round"
+                                    stroke-linejoin="round" stroke-width="2"
+                                    d="M9 4L3 8v12l6-3l6 3l6-4V4l-6 3l-6-3zm-2 8.001V12m4 .001V12m3-2l2 2m2 2l-2-2m0 0l2-2m-2 2l-2 2" />
                             </svg>
                             Destinations
                         </a>
@@ -233,8 +235,7 @@
                     <li>
                         <a title="Sponsor us" class="menu-item" href="https://coolify.io/sponsorships"
                             target="_blank">
-                            <svg class="text-pink-500 icon" viewBox="0 0 24 24"
-                                xmlns="http://www.w3.org/2000/svg">
+                            <svg class="text-pink-500 icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <g fill="none" stroke="currentColor" stroke-linecap="round"
                                     stroke-linejoin="round" stroke-width="2">
                                     <path d="M19.5 12.572L12 20l-7.5-7.428A5 5 0 1 1 12 6.006a5 5 0 1 1 7.5 6.572" />

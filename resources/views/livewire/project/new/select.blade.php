@@ -10,10 +10,11 @@
         </div>
     </div>
     <div class="pb-4 ">Deploy resources, like Applications, Databases, Services...</div>
-    <div class="flex flex-col gap-4 pt-10">
+    <div class="flex flex-col gap-4 pt-4">
         @if ($current_step === 'type')
             <h2>Applications</h2>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+            <h4>Git Based</h4>
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-1">
                 <x-resource-view wire="setType('public')">
                     <x-slot:title>Public Repository</x-slot>
                     <x-slot:description>
@@ -49,9 +50,10 @@
                     </x-slot:logo>
                 </x-resource-view>
             </div>
+            <h4>Docker Based</h4>
             <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
                 <x-resource-view wire="setType('dockerfile')">
-                    <x-slot:title>Based on a Dockerfile</x-slot>
+                    <x-slot:title>Dockerfile</x-slot>
                     <x-slot:description>
                         You can deploy a simple Dockerfile, without Git.
                     </x-slot>
@@ -62,7 +64,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('docker-compose-empty')">
-                    <x-slot:title>Based on a Docker Compose</x-slot>
+                    <x-slot:title>Docker Compose</x-slot>
                     <x-slot:description>
                         You can deploy complex application easily with Docker Compose, without Git.
                     </x-slot>
@@ -73,7 +75,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('docker-image')">
-                    <x-slot:title>Based on an existing Docker Image</x-slot>
+                    <x-slot:title>Existing Docker Image</x-slot>
                     <x-slot:description>
                         You can deploy an existing Docker Image from any Registry, without Git.
                     </x-slot>
@@ -85,9 +87,9 @@
                 </x-resource-view>
             </div>
             <h2 class="py-4">Databases</h2>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                 <x-resource-view wire="setType('postgresql')">
-                    <x-slot:title> New PostgreSQL</x-slot>
+                    <x-slot:title>PostgreSQL</x-slot>
                     <x-slot:description>
                         PostgreSQL is an object-relational database known for its
                         robustness, advanced features, and strong standards compliance.
@@ -99,7 +101,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('redis')">
-                    <x-slot:title> New Redis</x-slot>
+                    <x-slot:title>Redis</x-slot>
                     <x-slot:description>
                         Redis is an open-source, in-memory data structure store, used as a database, cache, and message
                         broker.
@@ -111,7 +113,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mongodb')">
-                    <x-slot:title> New MongoDB</x-slot>
+                    <x-slot:title>MongoDB</x-slot>
                     <x-slot:description>
                         MongoDB is a source-available, NoSQL database that uses JSON-like documents with
                         optional schemas.
@@ -123,7 +125,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mysql')">
-                    <x-slot:title>New MySQL</x-slot>
+                    <x-slot:title>MySQL</x-slot>
                     <x-slot:description>
                         MySQL is a relational database known for its speed, reliability, and
                         flexibility.
@@ -135,7 +137,7 @@
                     </x-slot:logo>
                 </x-resource-view>
                 <x-resource-view wire="setType('mariadb')">
-                    <x-slot:title> New Mariadb</x-slot>
+                    <x-slot:title>Mariadb</x-slot>
                     <x-slot:description>
                         MariaDB is a relational database that serves as a drop-in
                         replacement for MySQL.
@@ -161,9 +163,12 @@
             <div class="flex items-center gap-4" wire:init='loadServices'>
                 <h2 class="py-4">Services</h2>
                 <x-forms.button wire:click="loadServices('force')">Reload List</x-forms.button>
-                <input class="input" wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
+                <input class="input" autofocus wire:model.live.debounce.200ms="search" autofocus placeholder="Search...">
             </div>
-            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-3">
+            <div class="pb-4 text-xs">Trademarks Policy: The respective trademarks mentioned here are owned by the
+                respective
+                companies, and use of them does not imply any affiliation or endorsement.</div>
+            <div class="grid justify-start grid-cols-1 gap-4 text-left xl:grid-cols-2">
                 @if ($loadingServices)
                     <span class="loading loading-xs loading-spinner"></span>
                 @else
@@ -242,9 +247,7 @@
                     @endforelse
                 @endif
             </div>
-            <div class="py-4 pb-10">Trademarks Policy: The respective trademarks mentioned here are owned by the
-                respective
-                companies, and use of them does not imply any affiliation or endorsement.</div>
+
         @endif
         @if ($current_step === 'servers')
             <h2>Select a server</h2>

@@ -128,7 +128,7 @@ option {
 }
 
 .menu-item {
-    @apply flex items-center w-full gap-2 py-1 pl-2 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
+    @apply flex items-center w-full gap-3 py-1 pl-2 dark:hover:bg-coolgray-100 dark:hover:text-white hover:bg-neutral-300;
 }
 
 .menu-item-active {
@@ -136,7 +136,11 @@ option {
 }
 
 .icon {
-    @apply w-4 h-4;
+    @apply w-6 h-6;
+}
+
+.icon:hover {
+    @apply text-white;
 }
 
 .scrollbar {
@@ -163,13 +167,8 @@ option {
     @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
 }
 
-.icon {
-    @apply w-6 h-6;
-}
 
-.icon:hover {
-    @apply text-white;
-}
+
 
 .box {
     @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-neutral-50 hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
