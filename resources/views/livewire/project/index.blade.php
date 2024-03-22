@@ -11,7 +11,6 @@
         </x-slide-over>
     </div>
     <div class="subtitle">All your projects are here.</div>
-
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
             <div class="gap-2 border border-transparent cursor-pointer box group" x-data

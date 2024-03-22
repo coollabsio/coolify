@@ -6,14 +6,14 @@
             @if ($tags->count() === 0)
                 <div>No tags yet defined yet. Go to a resource and add a tag there.</div>
             @else
-                <x-forms.select wire:model.live="tag" label="Tags">
+                <x-forms.select wire:model.live="tag">
                     <option value="null" disabled selected>Select a tag</option>
                     @foreach ($tags as $oneTag)
                         <option value="{{ $oneTag->name }}">{{ $oneTag->name }}</option>
                     @endforeach
                 </x-forms.select>
                 @if ($tag)
-                    <div>
+                    <div class="pt-5">
                         <div class="flex items-end gap-2 ">
                             <div class="w-[500px]">
                                 <x-forms.input readonly label="Deploy Webhook URL" id="webhook" />

@@ -44,7 +44,7 @@
                             stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
                 </button>
-                <div class="flex-1 text-xl font-bold leading-6 dark:text-white">Dashboard</div>
+                {{-- <div class="flex-1 text-xl font-bold leading-6 dark:text-white">Dashboard</div> --}}
                 {{-- <a href="#">
                     <span class="sr-only">Your profile</span>
                     <img class="w-8 h-8 rounded-full bg-gray-50"
