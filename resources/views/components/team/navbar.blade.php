@@ -1,14 +1,9 @@
 <div class="pb-6">
     <div class="flex items-end gap-2">
         <h1>Team</h1>
-        <x-slide-over>
-            <x-slot:title>New Team</x-slot:title>
-            <x-slot:content>
-                <livewire:team.create/>
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
+        <x-modal-input buttonTitle="+ Add" title="New Team">
+            <livewire:team.create/>
+        </x-modal-input>
     </div>
     <div class="subtitle">Team settings & shared environment variables.</div>
     <nav class="navbar-main">

@@ -11,8 +11,28 @@ body {
     @apply text-sm antialiased scrollbar;
 }
 
+.input, .select  {
+    @apply text-black dark:bg-coolgray-100 dark:text-white ring-neutral-300 dark:ring-coolgray-300 ;
+}
+/* Readonly */
+.input  {
+    @apply dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 placeholder:text-neutral-300 dark:placeholder:text-neutral-700;
+}
+/* Focus */
+.input, .select  {
+    @apply focus:ring-2 dark:focus:ring-coolgray-300 focus:ring-neutral-400;
+}
+
+.input, .select {
+    @apply block w-full py-1.5 rounded border-0 text-sm pr-10 ring-1 ring-inset;
+}
+
+option {
+    @apply text-white dark:bg-coolgray-100;
+}
+
 .button {
-    @apply flex items-center justify-center px-3 py-1 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit;
+    @apply flex items-center justify-center px-3 py-1 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 hover:text-black dark:hover:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit;
 }
 button[isError]:not(:disabled) {
     @apply bg-red-600 hover:bg-red-700;
@@ -79,18 +99,6 @@ tr td:first-child {
     @apply pl-4 pr-3 font-bold sm:pl-6;
 }
 
-input {
-    @apply pr-10;
-}
-
-.input {
-    @apply block w-full py-1.5 rounded border-0 text-sm ring-inset ring-1 dark:bg-coolgray-100 dark:text-white text-black focus:ring-2 dark:focus:ring-coolgray-300 dark:ring-coolgray-300 dark:read-only:text-neutral-500 dark:read-only:ring-0 dark:read-only:bg-coolgray-100/40 dark:placeholder:text-neutral-700;
-}
-
-option {
-    @apply text-white;
-}
-
 .alert-success {
     @apply flex items-center gap-2 text-success;
 }
@@ -136,12 +144,10 @@ option {
 }
 
 .icon {
-    @apply w-6 h-6;
+    @apply w-6 h-6 hover:text-white;
 }
 
-.icon:hover {
-    @apply text-white;
-}
+
 
 .scrollbar {
     @apply scrollbar-thumb-coollabs-100 scrollbar-track-coolgray-200 scrollbar-w-2;
@@ -167,11 +173,12 @@ option {
     @apply px-2 text-xs border border-dashed rounded border-neutral-700 text-warning;
 }
 
-
-
-
 .box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-neutral-50 hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-neutral-100 hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+}
+
+.on-box {
+    @apply rounded hover:bg-neutral-300 dark:hover:bg-coolgray-500/20;
 }
 
 .box-without-bg {
@@ -223,7 +230,13 @@ option {
 }
 
 .text-helper {
-    @apply inline-block font-bold text-warning;
+    @apply inline-block font-bold text-coollabs dark:text-warning;
+}
+.info-helper {
+    @apply cursor-pointer text-coollabs dark:text-warning;
+}
+.info-helper-popup {
+    @apply absolute z-40 hidden text-xs rounded text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-100 dark:text-neutral-300;
 }
 
 .buyme {

@@ -23,9 +23,9 @@
                         {{ $environment->description }}</div>
                 </a>
                 <div class="flex items-center">
-                    <a class="mx-4 rounded group-hover:text-white"
+                    <a class="mx-4"
                         href="{{ route('project.environment.edit', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => $environment->name]) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning" viewBox="0 0 24 24"
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon on-box" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />

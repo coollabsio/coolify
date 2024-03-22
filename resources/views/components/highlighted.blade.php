@@ -1,1 +1,1 @@
-<span class="inline-block font-bold text-warning">{{ $text }}</span>
+<span class="text-helper">{{ $text }}</span>

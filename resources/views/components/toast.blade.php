@@ -386,7 +386,7 @@
                     class="absolute w-full duration-100 ease-out sm:max-w-xs "
                     :class="{ 'toast-no-description': !toast.description }">
                     <span
-                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out bg-coolgray-100 border border-coolgray-200 rounded sm:max-w-xs group"
+                        class="relative flex flex-col items-start shadow-[0_5px_15px_-3px_rgb(0_0_0_/_0.08)] w-full transition-all duration-100 ease-out dark:bg-coolgray-100 bg-neutral-100 dark:border dark:border-coolgray-200 rounded sm:max-w-xs group"
                         :class="{ 'p-4': !toast.html, 'p-0': toast.html }">
                         <template x-if="!toast.html">
                             <div class="relative w-full">
@@ -417,7 +417,7 @@
                                             d="M2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12ZM11.9996 7C12.5519 7 12.9996 7.44772 12.9996 8V12C12.9996 12.5523 12.5519 13 11.9996 13C11.4474 13 10.9996 12.5523 10.9996 12V8C10.9996 7.44772 11.4474 7 11.9996 7ZM12.001 14.99C11.4488 14.9892 11.0004 15.4363 10.9997 15.9886L10.9996 15.9986C10.9989 16.5509 11.446 16.9992 11.9982 17C12.5505 17.0008 12.9989 16.5537 12.9996 16.0014L12.9996 15.9914C13.0004 15.4391 12.5533 14.9908 12.001 14.99Z"
                                             fill="currentColor"></path>
                                     </svg>
-                                    <p class="leading-2 text-neutral-200" x-html="toast.message">
+                                    <p class="text-black leading-2 dark:text-neutral-200" x-html="toast.message">
                                     </p>
                                 </div>
                                 <div x-show="toast.description" :class="{ 'pl-5': toast.type!='default' }"
@@ -438,7 +438,7 @@
                             Copied
                         </span>
                         <span @click="copyToClipboard()"
-                            class="absolute right-7 p-1.5 mr-2.5 text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-coolgray-400 hover:text-neutral-300"
+                            class="absolute right-7 p-1.5 mr-2.5 text-neutral-700 hover:text-neutral-900 dark:text-neutral-400 hover:bg-neutral-300  duration-100 ease-in-out rounded-full opacity-0 cursor-pointer dark:hover:bg-coolgray-400 dark:hover:text-neutral-300"
                             :class="{
                                 'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
                                 'top-0 mt-3': (toast
@@ -455,7 +455,7 @@
                             </svg>
                         </span>
                         <span @click="burnToast(toast.id)"
-                            class="absolute right-0 p-1.5 mr-2.5 text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-coolgray-400 hover:text-neutral-300"
+                            class="absolute right-0 p-1.5 mr-2.5 text-neutral-700 hover:text-neutral-900 dark:text-neutral-400 duration-100 ease-in-out rounded-full opacity-0 cursor-pointer hover:bg-neutral-300 dark:hover:bg-coolgray-400 dark:hover:text-neutral-300"
                             :class="{
                                 'top-1/2 -translate-y-1/2': !toast.description && !toast.html,
                                 'top-0 mt-3.5': (toast

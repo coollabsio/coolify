@@ -39,12 +39,12 @@
                         <a class="mx-4 rounded hover:no-underline"
                             href="{{ route('project.resource.create', ['project_uuid' => data_get($project, 'uuid'), 'environment_name' => data_get($project, 'environments.0.name', 'production')]) }}">
                             <span
-                                class="p-2 font-bold group-hover:dark:text-white group-hover:text-black dark:hover:bg-coollabs hover:bg-neutral-300">+
+                                class="p-2 font-bold on-box">+
                                 Add Resource</span>
                         </a>
-                        <a class="mx-4 rounded group-hover:dark:text-white group-hover:text-black"
+                        <a class="mx-4"
                             href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:bg-coollabs" viewBox="0 0 24 24"
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon on-box" viewBox="0 0 24 24"
                                 stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                                 stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none" />

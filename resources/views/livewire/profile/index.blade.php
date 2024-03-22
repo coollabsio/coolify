@@ -12,7 +12,7 @@
         </div>
     </form>
     <form wire:submit='resetPassword' class="flex flex-col max-w-xl pt-4">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 pb-2">
             <h2>Change Password</h2>
             <x-forms.button type="submit" label="Save">Save</x-forms.button>
         </div>

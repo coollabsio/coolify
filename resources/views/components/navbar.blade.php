@@ -1,4 +1,4 @@
-<nav class="flex flex-col flex-1 pl-4 border-r dark:border-coolgray-200 dark:bg-base bg-neutral-50">
+<nav class="flex flex-col flex-1 pl-4 bg-white border-r dark:border-coolgray-200 dark:bg-base">
     <div class="flex w-full px-2 pt-6 pb-4">
         <div class="flex flex-col">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
@@ -6,7 +6,7 @@
         </div>
         {{-- <button onclick="changeTheme()">Dark/light</button> --}}
     </div>
-    <div class="px-2 pt-2 pb-6">
+    <div class="px-2 pt-2 pb-7">
         <livewire:switch-team />
     </div>
     <ul role="list" class="flex flex-col flex-1 gap-y-7">

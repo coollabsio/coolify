@@ -1,14 +1,6 @@
 <div>
     <div class="flex gap-2">
         <h1>Projects</h1>
-        <x-slide-over>
-            <x-slot:title>New Project</x-slot:title>
-            <x-slot:content>
-                <livewire:project.add-empty />
-            </x-slot:content>
-            <button @click="slideOverOpen=true" class="button">+
-                Add</button>
-        </x-slide-over>
         <x-modal-input buttonTitle="+ Add" title="New Project">
             <livewire:project.add-empty />
         </x-modal-input>
@@ -25,9 +17,9 @@
                         {{ $project->description }}</div>
                 </a>
                 <div class="flex items-center">
-                    <a class="mx-4 rounded group-hover:text-white"
+                    <a class="mx-4 on-box"
                         href="{{ route('project.edit', ['project_uuid' => data_get($project, 'uuid')]) }}">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon hover:text-warning" viewBox="0 0 24 24"
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon on-box" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round"
                             stroke-linejoin="round">
                             <path stroke="none" d="M0 0h24v24H0z" fill="none" />
