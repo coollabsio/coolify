@@ -26,7 +26,7 @@ class Show extends Component
                 $this->dispatch('error', 'Network already added to this server.');
                 return;
             } else {
-                $docker = SwarmDocker::create([
+                SwarmDocker::create([
                     'name' => $this->server->name . "-" . $name,
                     'network' => $this->name,
                     'server_id' => $this->server->id,
@@ -38,7 +38,7 @@ class Show extends Component
                 $this->dispatch('error', 'Network already added to this server.');
                 return;
             } else {
-                $docker = StandaloneDocker::create([
+                StandaloneDocker::create([
                     'name' => $this->server->name . "-" . $name,
                     'network' => $name,
                     'server_id' => $this->server->id,
