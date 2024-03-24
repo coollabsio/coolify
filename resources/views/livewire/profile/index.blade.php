@@ -53,7 +53,7 @@
             <div class="pb-6 ">Here are the recovery codes for your account. Please store them in a secure
                 location.
             </div>
-            <div class="text-white">
+            <div class="dark:text-white">
                 @foreach (request()->user()->recoveryCodes() as $code)
                     <div>{{ $code }}</div>
                 @endforeach
@@ -79,7 +79,7 @@
                         secure
                         location.
                     </div>
-                    <div class="text-white">
+                    <div class="dark:text-white">
                         @foreach (request()->user()->recoveryCodes() as $code)
                             <div>{{ $code }}</div>
                         @endforeach

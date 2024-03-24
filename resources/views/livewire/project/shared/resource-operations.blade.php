@@ -14,7 +14,7 @@
                             <x-modal-confirmation action="cloneTo({{ data_get($destination, 'id') }})">
                                 <x:slot name="content">
                                     <div class="flex flex-col gap-2 box">
-                                        <div class="font-bold text-white">{{ $server->name }}</div>
+                                        <div class="font-bold dark:text-white">{{ $server->name }}</div>
                                         <div>{{ $destination->name }}</div>
                                     </div>
                                 </x:slot>
@@ -40,7 +40,7 @@
                     <x-modal-confirmation action="moveTo({{ data_get($environment, 'id') }})">
                         <x:slot name="content">
                             <div class="flex flex-col gap-2 box">
-                                <div class="font-bold text-white">{{ $project->name }}</div>
+                                <div class="font-bold dark:text-white">{{ $project->name }}</div>
                                 <div><span class="text-warning">{{ $environment->name }}</span> environment</div>
                             </div>
                         </x:slot>

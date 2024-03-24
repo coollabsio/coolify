@@ -7,7 +7,7 @@
                 Save
             </x-forms.button>
             @if ($team->telegram_enabled)
-                <x-forms.button class="text-white normal-case btn btn-xs no-animation btn-primary"
+                <x-forms.button class="dark:text-white normal-case btn btn-xs no-animation btn-primary"
                     wire:click="sendTestNotification">
                     Send Test Notifications
                 </x-forms.button>
@@ -18,7 +18,7 @@
         </div>
         <div class="flex gap-2">
             <x-forms.input type="password"
-                helper="Get it from the <a class='inline-block text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
+                helper="Get it from the <a class='inline-block dark:text-white underline' href='https://t.me/botfather' target='_blank'>BotFather Bot</a> on Telegram."
                 required id="team.telegram_token" label="Token" />
             <x-forms.input helper="Recommended to add your bot to a group chat and add its Chat ID here." required
                 id="team.telegram_chat_id" label="Chat ID" />

@@ -13,14 +13,14 @@
     @if (session()->has('token'))
         <div class="py-4 font-bold text-warning">Please copy this token now. For your security, it won't be shown again.
         </div>
-        <div class="pb-4 font-bold text-white"> {{ session('token') }}</div>
+        <div class="pb-4 font-bold dark:text-white"> {{ session('token') }}</div>
     @endif
     <h4 class="py-4">Issued Tokens</h4>
     <div class="grid gap-2 lg:grid-cols-1">
         @forelse ($tokens as $token)
             <div class="flex items-center gap-2">
                 <div
-                    class="flex items-center gap-2 group-hover:text-white p-2 border border-coolgray-200 hover:text-white hover:no-underline min-w-[24rem] cursor-default">
+                    class="flex items-center gap-2 group-hover:dark:text-white p-2 border border-coolgray-200 hover:dark:text-white hover:no-underline min-w-[24rem] cursor-default">
                     <div>{{ $token->name }}</div>
                 </div>
                 <x-modal-confirmation isErrorButton action="revoke({{ data_get($token, 'id') }})">

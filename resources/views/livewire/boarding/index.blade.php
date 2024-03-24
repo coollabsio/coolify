@@ -19,7 +19,7 @@
                         integrations, deploy databases and services, monitor these resources with notifications and
                         alerts
                         without vendor lock-in
-                        and <a href="https://coolify.io" class="text-white hover:underline">much much more</a>.
+                        and <a href="https://coolify.io" class="dark:text-white hover:underline">much much more</a>.
                         <br><br>
                         <span class="text-xl">
                             <x-highlighted text="Self-hosting with superpowers!" /></span>
@@ -332,7 +332,7 @@
             <a wire:click='restartBoarding' class="cursor-pointer">Restart boarding process</a>
             <x-modal-input title="How can we help?">
                 <x-slot:content>
-                    <div class="cursor-pointer dark:hover:text-white" title="Send us feedback or get help!">
+                    <div class="cursor-pointer dark:hover:dark:text-white" title="Send us feedback or get help!">
                         Feedback
                     </div>
                 </x-slot:content>

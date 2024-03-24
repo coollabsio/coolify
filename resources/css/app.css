@@ -4,7 +4,7 @@
 
 html,
 body {
-    @apply bg-white text-neutral-600 dark:bg-base dark:text-neutral-400;
+    @apply bg-neutral-100 text-neutral-800 dark:bg-base dark:text-neutral-400;
 }
 
 body {
@@ -28,14 +28,14 @@ body {
 }
 
 option {
-    @apply text-white dark:bg-coolgray-100;
+    @apply dark:text-white dark:bg-coolgray-100;
 }
 
 .button {
-    @apply flex items-center justify-center px-3 py-1 text-sm font-normal normal-case rounded bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 hover:text-black dark:hover:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit;
+    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 min-w-fit hover:dark:text-white ;
 }
 button[isError]:not(:disabled) {
-    @apply bg-red-600 hover:bg-red-700;
+    @apply text-white bg-red-600 hover:bg-red-700;
 }
 
 button[isHighlighted]:not(:disabled) {
@@ -44,19 +44,19 @@ button[isHighlighted]:not(:disabled) {
 
 
 h1 {
-    @apply text-2xl font-bold dark:text-white text-neutral-800;
+    @apply text-2xl font-bold dark:text-white;
 }
 
 h2 {
-    @apply text-xl font-bold dark:text-white text-neutral-800;
+    @apply text-xl font-bold dark:text-white;
 }
 
 h3 {
-    @apply text-lg font-bold dark:text-white text-neutral-800;
+    @apply text-lg font-bold dark:text-white;
 }
 
 h4 {
-    @apply text-base font-bold dark:text-white text-neutral-800;
+    @apply text-base font-bold dark:text-white;
 }
 
 a {
@@ -64,11 +64,11 @@ a {
 }
 
 label {
-    @apply dark:text-neutral-400 text-neutral-600;
+    @apply dark:text-neutral-400;
 }
 
 table {
-    @apply min-w-full divide-y divide-coolgray-200;
+    @apply min-w-full divide-y dark:divide-coolgray-200 divide-neutral-300;
 }
 
 thead {
@@ -76,7 +76,7 @@ thead {
 }
 
 tbody {
-    @apply divide-y divide-coolgray-200;
+    @apply divide-y dark:divide-coolgray-200 divide-neutral-300;
 }
 
 tr {
@@ -112,7 +112,7 @@ tr td:first-child {
 }
 
 .badge {
-    @apply inline-block w-3 h-3 text-xs font-bold leading-none border border-black rounded-full;
+    @apply inline-block w-3 h-3 text-xs font-bold leading-none border rounded-full border-neutral-200 dark:border-black;
 }
 
 .badge-success {
@@ -142,11 +142,13 @@ tr td:first-child {
 .menu-item-active {
     @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning bg-neutral-200;
 }
-
-.icon {
-    @apply w-6 h-6 hover:text-white;
+.heading-item-active {
+    @apply text-black rounded-none dark:bg-coolgray-200 dark:text-warning;
 }
 
+.icon {
+    @apply w-6 h-6 dark:hover:text-white;
+}
 
 
 .scrollbar {
@@ -162,7 +164,7 @@ tr td:first-child {
 }
 
 .navbar-main {
-    @apply flex items-center h-10 gap-6 pb-2 border-b-2 border-solid border-coolgray-200;
+    @apply flex items-center h-10 gap-6 pb-2 border-b-2 border-solid dark:border-coolgray-200;
 }
 
 .loading {
@@ -174,7 +176,7 @@ tr td:first-child {
 }
 
 .box {
-    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-neutral-100 hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
+    @apply flex p-2 transition-colors cursor-pointer min-h-[4rem] dark:bg-coolgray-100 bg-white border border-neutral-200 dark:border-black hover:bg-neutral-200 dark:hover:bg-coollabs-100 dark:hover:text-white hover:no-underline;
 }
 
 .on-box {
@@ -230,13 +232,13 @@ tr td:first-child {
 }
 
 .text-helper {
-    @apply inline-block font-bold text-coollabs dark:text-warning;
+    @apply inline-block font-bold text-red-500 dark:text-warning;
 }
 .info-helper {
     @apply cursor-pointer text-coollabs dark:text-warning;
 }
 .info-helper-popup {
-    @apply absolute z-40 hidden text-xs rounded text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-100 dark:text-neutral-300;
+    @apply absolute z-40 hidden text-xs rounded text-neutral-700 group-hover:block dark:border-coolgray-500 border-neutral-900 dark:bg-coolgray-400 bg-neutral-200 dark:text-neutral-300;
 }
 
 .buyme {

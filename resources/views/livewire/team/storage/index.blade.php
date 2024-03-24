@@ -10,17 +10,17 @@
             <button @click="slideOverOpen=true" class="button">+
                 Add</button>
         </x-slide-over>
-        {{-- <a class="text-white hover:no-underline" href="/team/storages/new"> <x-forms.button>+ Add
+        {{-- <a class="dark:text-white hover:no-underline" href="/team/storages/new"> <x-forms.button>+ Add
             </x-forms.button></a> --}}
     </div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($s3 as $storage)
             <div x-data x-on:click="goto('{{ $storage->uuid }}')" @class(['gap-2 border cursor-pointer box group border-transparent'])>
                 <div class="flex flex-col mx-6">
-                    <div class=" group-hover:text-white">
+                    <div class=" group-hover:dark:text-white">
                         {{ $storage->name }}
                     </div>
-                    <div class="text-xs group-hover:text-white">
+                    <div class="text-xs group-hover:dark:text-white">
                         {{ $storage->description }}</div>
                 </div>
             </div>

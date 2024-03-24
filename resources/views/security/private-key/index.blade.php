@@ -15,7 +15,7 @@
         @forelse ($privateKeys as $key)
             <a class="text-center hover:no-underline box group"
                 href="{{ route('security.private-key.show', ['private_key_uuid' => data_get($key, 'uuid')]) }}">
-                <div class="group-hover:text-white">
+                <div class="group-hover:dark:text-white">
                     <div>{{ $key->name }}</div>
                 </div>
             </a>

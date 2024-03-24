@@ -1,5 +1,5 @@
 <div>
-    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 border lg:items-start border-coolgray-300">
+    <form wire:submit='submit' class="flex flex-col items-center gap-4 p-4 border lg:items-start dark:border-coolgray-300">
         @if ($isLocked)
             <div class="flex flex-1 w-full gap-2">
                 <x-forms.input disabled id="env.key" />

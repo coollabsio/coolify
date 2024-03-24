@@ -3,7 +3,7 @@
     <div class="">Server related configurations.</div>
     <div class="grid grid-cols-1 gap-4 py-4">
         <div class="flex gap-2">
-            <div class="relative flex flex-col text-white cursor-default box-without-bg bg-coolgray-100 w-96">
+            <div class="relative flex flex-col dark:text-white cursor-default box-without-bg bg-coolgray-100 w-96">
                 <div class="text-xl font-bold">Primary Server</div>
                 @if (str($resource->realStatus())->startsWith('running'))
                     <div title="{{ $resource->realStatus() }}" class="absolute bg-success -top-1 -left-1 badge ">
@@ -73,7 +73,7 @@
             <div class="grid grid-cols-1 gap-4">
                 @foreach ($networks as $network)
                     <div wire:click="addServer('{{ $network->id }}','{{ data_get($network, 'server.id') }}')"
-                        class="relative flex flex-col text-white cursor-default box w-96">
+                        class="relative flex flex-col dark:text-white cursor-default box w-96">
                         <div>
                             Server: {{ data_get($network, 'server.name') }}
                         </div>

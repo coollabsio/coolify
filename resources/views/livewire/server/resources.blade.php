@@ -3,9 +3,9 @@
     @if ($server->isFunctional())
         <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'managed' }" class="flex h-full">
             <div class="flex flex-col gap-4">
-                <a :class="activeTab === 'managed' && 'text-white'"
+                <a :class="activeTab === 'managed' && 'dark:text-white'"
                     @click.prevent="activeTab = 'managed'; window.location.hash = 'managed'" href="#">Managed</a>
-                <a :class="activeTab === 'unmanaged' && 'text-white'"
+                <a :class="activeTab === 'unmanaged' && 'dark:text-white'"
                     @click.prevent="activeTab = 'unmanaged'; window.location.hash = 'unmanaged'"
                     href="#">Unmanaged</a>
             </div>
@@ -45,7 +45,7 @@
                                                 </thead>
                                                 <tbody class="divide-y divide-coolgray-400">
                                                     @forelse ($server->definedResources()->sortBy('name',SORT_NATURAL) as $resource)
-                                                        <tr class="text-white bg-coolblack hover:bg-coolgray-100">
+                                                        <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100">
                                                             <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                                 {{ data_get($resource->project(), 'name') }}
                                                             </td>
@@ -115,7 +115,7 @@
                                                 </thead>
                                                 <tbody class="divide-y divide-coolgray-400">
                                                     @forelse ($unmanagedContainers->sortBy('name',SORT_NATURAL) as $resource)
-                                                        <tr class="text-white bg-coolblack hover:bg-coolgray-100">
+                                                        <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100">
                                                             <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                                 {{ data_get($resource, 'Names') }}
                                                             </td>

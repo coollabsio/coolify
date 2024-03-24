@@ -123,7 +123,7 @@
                                             </thead>
                                             <tbody class="divide-y divide-coolgray-400">
                                                 @forelse ($applications->sortBy('name',SORT_NATURAL) as $resource)
-                                                    <tr class="text-white bg-coolblack hover:bg-coolgray-100">
+                                                    <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100">
                                                         <td class="px-5 py-4 text-sm whitespace-nowrap">
                                                             {{ data_get($resource->project(), 'name') }}
                                                         </td>

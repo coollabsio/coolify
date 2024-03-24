@@ -29,7 +29,7 @@
                 <h1>Subscription</h1>
             </div>
             <div>You are not an admin or have been removed from this team. If this does not make sense, please <span
-                    class="text-white underline cursor-pointer" wire:click="help">contact
+                    class="dark:text-white underline cursor-pointer" wire:click="help">contact
                     us</span>.</div>
         </div>
     @endif

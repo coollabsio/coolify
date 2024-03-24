@@ -16,7 +16,7 @@
                         <div class="absolute top-0 flex justify-center w-16 pt-5 left-full">
                             <button type="button" class="-m-2.5 p-2.5" x-on:click="open = !open">
                                 <span class="sr-only">Close sidebar</span>
-                                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
+                                <svg class="w-6 h-6 dark:text-white" fill="none" viewBox="0 0 24 24" stroke-width="1.5"
                                     stroke="currentColor" aria-hidden="true">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -53,11 +53,9 @@
                 </a> --}}
             </div>
 
-            <main class="lg:pl-48">
-                <div>
-                    <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
-                        {{ $slot }}
-                    </div>
+            <main class="lg:pl-48" >
+                <div class="p-4 sm:px-6 lg:px-8 lg:py-6">
+                    {{ $slot }}
                 </div>
             </main>
         </div>

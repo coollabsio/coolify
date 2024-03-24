@@ -23,7 +23,7 @@
         @elseif(auth()->user()->teams()->get()->count() === 1 || auth()->user()->currentTeam()->personal_team)
             <div>You can't delete your last / personal team.</div>
         @elseif(currentTeam()->subscription && currentTeam()->subscription?->lemon_status !== 'cancelled')
-            <div>Please cancel your subscription <a class="text-white underline"
+            <div>Please cancel your subscription <a class="dark:text-white underline"
                     href="{{ route('subscription.show') }}">here</a> before delete this team.</div>
         @else
             @if (currentTeam()->isEmpty())

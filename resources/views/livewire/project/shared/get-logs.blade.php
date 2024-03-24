@@ -24,7 +24,7 @@
             <x-forms.checkbox instantSave label="Include Timestamps" id="showTimeStamps"></x-forms.checkbox>
         </form>
         <div :class="fullscreen ? 'fullscreen' : 'relative w-full py-4 mx-auto'">
-            <div class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
+            <div class="flex flex-col-reverse w-full px-4 py-2 overflow-y-auto dark:text-white bg-coolgray-100 scrollbar border-coolgray-300"
                 :class="fullscreen ? '' : 'max-h-96 border border-solid rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"

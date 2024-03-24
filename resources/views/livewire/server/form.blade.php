@@ -83,20 +83,20 @@
                         @endif
                         @if ($server->settings->is_swarm_worker)
                             <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Manager?" />
                         @else
                             <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_manager"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Manager?" />
                         @endif
                         @if ($server->settings->is_swarm_manager)
                             <x-forms.checkbox disabled instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Worker?" />
                         @else
                             <x-forms.checkbox instantSave type="checkbox" id="server.settings.is_swarm_worker"
-                                helper="For more information, please read the documentation <a class='text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
+                                helper="For more information, please read the documentation <a class='dark:text-white' href='https://coolify.io/docs/docker/swarm' target='_blank'>here</a>."
                                 label="Is it a Swarm Worker?" />
                         @endif
                     @endif

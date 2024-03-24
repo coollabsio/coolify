@@ -25,7 +25,7 @@
                             <div class='text-helper'>https://github.com/coollabsio/coolify-examples/tree/main</div>
                         </div>
                         <div>
-                            For example application deployments, checkout <a class="text-white underline"
+                            For example application deployments, checkout <a class="dark:text-white underline"
                                 href="https://github.com/coollabsio/coolify-examples/" target="_blank">Coolify
                                 Examples</a>.
                         </div>

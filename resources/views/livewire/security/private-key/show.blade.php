@@ -22,11 +22,11 @@
                 <x-forms.input readonly id="public_key" />
                 <div class="flex items-end gap-2 py-2 ">
                     <div class="pl-1 ">Private Key <span class='text-helper'>*</span></div>
-                    <div class="text-xs text-white underline cursor-pointer" x-cloak x-show="!showPrivateKey"
+                    <div class="text-xs dark:text-white underline cursor-pointer" x-cloak x-show="!showPrivateKey"
                         x-on:click="showPrivateKey = true">
                         Edit
                     </div>
-                    <div class="text-xs text-white underline cursor-pointer" x-cloak x-show="showPrivateKey"
+                    <div class="text-xs dark:text-white underline cursor-pointer" x-cloak x-show="showPrivateKey"
                         x-on:click="showPrivateKey = false">
                         Hide
                     </div>

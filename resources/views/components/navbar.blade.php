@@ -1,10 +1,10 @@
-<nav class="flex flex-col flex-1 pl-4 bg-white border-r dark:border-coolgray-200 dark:bg-base">
-    <div class="flex w-full px-2 pt-6 pb-4">
+<nav class="flex flex-col flex-1 pl-2 bg-white border-r dark:border-coolgray-200 dark:bg-base">
+    <div class="flex w-full pt-6 pb-4 pl-3">
         <div class="flex flex-col">
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
             <x-version />
         </div>
-        {{-- <button onclick="changeTheme()">Dark/light</button> --}}
+        <button onclick="changeTheme()">Dark/light</button>
     </div>
     <div class="px-2 pt-2 pb-7">
         <livewire:switch-team />

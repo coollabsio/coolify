@@ -21,7 +21,6 @@
         "@tailwindcss/forms": "^0.5.7",
         "@tailwindcss/typography": "0.5.10",
         "alpinejs": "3.13.5",
-        "daisyui": "4.7.2",
         "ioredis": "5.3.2",
         "tailwindcss-scrollbar": "0.1.0"
     }

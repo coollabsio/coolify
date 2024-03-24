@@ -11,7 +11,7 @@
             @if ($destination->getMorphClass() === 'App\Models\StandaloneDocker')
                 <a class="flex gap-4 text-center hover:no-underline box group"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
-                    <div class="group-hover:text-white">
+                    <div class="group-hover:dark:text-white">
                         <div>{{ $destination->name }}</div>
                     </div>
                 </a>
@@ -20,7 +20,7 @@
                 <a class="flex gap-4 text-center hover:no-underline box group"
                     href="{{ route('destination.show', ['destination_uuid' => data_get($destination, 'uuid')]) }}">
 
-                    <div class="group-hover:text-white">
+                    <div class="group-hover:dark:text-white">
                         <div>{{ $destination->name }}</div>
                     </div>
                 </a>

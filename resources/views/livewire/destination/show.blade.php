@@ -18,13 +18,13 @@
             Available for using:
             @forelse ($server->standaloneDockers as $docker)
                 <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
-                    <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
+                    <button class="dark:text-white btn-link">{{ data_get($docker, 'network') }} </button>
                 </a>
             @empty
             @endforelse
             @forelse ($server->swarmDockers as $docker)
                 <a href="{{ route('destination.show', ['destination_uuid' => data_get($docker, 'uuid')]) }}">
-                    <button class="text-white btn-link">{{ data_get($docker, 'network') }} </button>
+                    <button class="dark:text-white btn-link">{{ data_get($docker, 'network') }} </button>
                 </a>
             @empty
             @endforelse

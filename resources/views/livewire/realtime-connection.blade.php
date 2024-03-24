@@ -34,7 +34,7 @@
             </script>
         @endscript
         <div class="toast z-[9999]" x-cloak x-show="showNotification">
-            <div class="flex flex-col text-white border border-red-500 border-dashed rounded alert-error bg-coolgray-200">
+            <div class="flex flex-col dark:text-white border border-red-500 border-dashed rounded alert-error bg-coolgray-200">
                 <span><span class="font-bold text-left text-red-500">WARNING: </span>Coolify could not connect to the new
                     realtime service introduced in beta.154. <br>This will cause unusual problems on the UI if not
                     fixed!<br><br>Please check the

@@ -16,7 +16,7 @@
                 <div class="grid grid-cols-1 gap-2 pb-4 lg:grid-cols-4">
                     @foreach ($server->destinations() as $destination)
                         <div class="cursor-pointer box-without-bg bg-coolgray-200 group"
-                            :class="'{{ $selectedDestination === $destination->id }}' && 'bg-coollabs text-white'"
+                            :class="'{{ $selectedDestination === $destination->id }}' && 'bg-coollabs dark:text-white'"
                             wire:click="selectServer('{{ $server->id }}', '{{ $destination->id }}')">
                             {{ $destination->name }}
                         </div>
@@ -32,7 +32,7 @@
         @foreach ($environment->applications->sortBy('name') as $application)
             <div class="cursor-default box-without-bg bg-coolgray-100 group">
                 <div class="flex flex-col">
-                    <div class="font-bold text-white">{{ $application->name }}</div>
+                    <div class="font-bold dark:text-white">{{ $application->name }}</div>
                     <div class="description">{{ $application->description }}</div>
                 </div>
             </div>
@@ -40,7 +40,7 @@
         @foreach ($environment->databases()->sortBy('name') as $database)
             <div class="cursor-default box-without-bg bg-coolgray-100 group">
                 <div class="flex flex-col">
-                    <div class="font-bold text-white">{{ $database->name }}</div>
+                    <div class="font-bold dark:text-white">{{ $database->name }}</div>
                     <div class="description">{{ $database->description }}</div>
                 </div>
             </div>
@@ -48,7 +48,7 @@
         @foreach ($environment->services->sortBy('name') as $service)
             <div class="cursor-default box-without-bg bg-coolgray-100 group">
                 <div class="flex flex-col">
-                    <div class="font-bold text-white">{{ $service->name }}</div>
+                    <div class="font-bold dark:text-white">{{ $service->name }}</div>
                     <div class="description">{{ $service->description }}</div>
                 </div>
             </div>

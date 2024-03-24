@@ -7,15 +7,15 @@
         </x-slot:content>
     </x-slide-over>
     <div class="navbar-main">
-        <a class="{{ request()->routeIs('project.database.configuration') ? 'text-white' : '' }}"
+        <a class="{{ request()->routeIs('project.database.configuration') ? 'dark:text-white' : '' }}"
             href="{{ route('project.database.configuration', $parameters) }}">
             <button>Configuration</button>
         </a>
-        <a class="{{ request()->routeIs('project.database.command') ? 'text-white' : '' }}"
+        <a class="{{ request()->routeIs('project.database.command') ? 'dark:text-white' : '' }}"
             href="{{ route('project.database.command', $parameters) }}">
             <button>Execute Command</button>
         </a>
-        <a class="{{ request()->routeIs('project.database.logs') ? 'text-white' : '' }}"
+        <a class="{{ request()->routeIs('project.database.logs') ? 'dark:text-white' : '' }}"
             href="{{ route('project.database.logs', $parameters) }}">
             <button>Logs</button>
         </a>
@@ -24,7 +24,7 @@
                 $database->getMorphClass() === 'App\Models\StandaloneMongodb' ||
                 $database->getMorphClass() === 'App\Models\StandaloneMysql' ||
                 $database->getMorphClass() === 'App\Models\StandaloneMariadb')
-            <a class="{{ request()->routeIs('project.database.backup.index') ? 'text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.database.backup.index') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.database.backup.index', $parameters) }}">
                 <button>Backups</button>
             </a>

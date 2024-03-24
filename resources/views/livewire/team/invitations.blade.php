@@ -22,7 +22,7 @@
                                 </thead>
                                 <tbody class="divide-y divide-coolgray-400">
                                     @foreach ($invitations as $invite)
-                                        <tr class="text-white bg-coolblack hover:bg-coolgray-100/40">
+                                        <tr class="dark:text-white bg-coolblack hover:bg-coolgray-100/40">
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->email }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->via }}</td>
                                             <td class="px-5 py-4 text-sm whitespace-nowrap">{{ $invite->role }}</td>

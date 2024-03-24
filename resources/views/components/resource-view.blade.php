@@ -21,7 +21,7 @@
     @isset($documentation)
         <div class="flex-1"></div>
         <div class="flex items-center px-2 " title="Read the documentation.">
-            <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:text-white text-neutral-600"
+            <a class="p-2 rounded hover:bg-coolgray-200 hover:no-underline group-hover:dark:text-white text-neutral-600"
                 onclick="event.stopPropagation()" href="{{ $documentation }}" target="_blank">
                 Docs
             </a>

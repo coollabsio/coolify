@@ -17,7 +17,7 @@
         @endif
         <div id="screen" :class="fullscreen ? 'fullscreen' : ''">
             <div @if ($isKeepAliveOn) wire:poll.2000ms="polling" @endif
-                class="relative flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto text-white bg-coolgray-100 scrollbar border-coolgray-300"
+                class="relative flex flex-col-reverse w-full p-2 px-4 mt-4 overflow-y-auto dark:text-white bg-coolgray-100 scrollbar border-coolgray-300"
                 :class="fullscreen ? '' : 'max-h-[40rem] border border-dotted rounded'">
                 <button title="Minimize" x-show="fullscreen" class="fixed top-4 right-4"
                     x-on:click="makeFullscreen"><svg class="icon" viewBox="0 0 24 24"

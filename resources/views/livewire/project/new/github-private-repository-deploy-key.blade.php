@@ -13,7 +13,7 @@
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                             wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex gap-4 mx-6">
-                                <div class="group-hover:text-white">
+                                <div class="group-hover:dark:text-white">
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay
@@ -24,7 +24,7 @@
                         <div class="gap-2 py-4 cursor-pointer group hover:bg-coollabs bg-coolgray-200"
                             wire:click.defer="setPrivateKey('{{ $key->id }}')" wire:key="{{ $key->id }}">
                             <div class="flex gap-4 mx-6">
-                                <div class="group-hover:text-white">
+                                <div class="group-hover:dark:text-white">
                                     {{ $key->name }}
                                 </div>
                                 <span wire:target="loadRepositories" wire:loading.delay

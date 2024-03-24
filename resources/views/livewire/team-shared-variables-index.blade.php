@@ -13,7 +13,7 @@
     </div>
     <div class="flex items-center gap-2 pb-4">You can use these variables anywhere with <span
             class="text-warning">@{{ team.VARIABLENAME }}</span> <x-helper
-            helper="More info <a class='text-white underline' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
+            helper="More info <a class='underline dark:text-white' href='https://coolify.io/docs/environment-variables#shared-variables' target='_blank'>here</a>."></x-helper>
     </div>
 
     <div class="flex flex-col gap-2">

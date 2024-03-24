@@ -31,7 +31,7 @@
                             <div class="flex flex-col gap-2 py-2">
                                 @if (str_replace('|', '.', $fileName) === 'coolify.yaml' || str_replace('|', '.', $fileName) === 'Caddyfile' || str_replace('|', '.', $fileName) === 'coolify.caddy' || str_replace('|', '.', $fileName) === 'default_redirect_404.caddy')
                                     <div>
-                                        <h3 class="text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
+                                        <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
                                     </div>
                                     <x-forms.textarea disabled name="proxy_settings"
                                         wire:model="contents.{{ $fileName }}" rows="5" />

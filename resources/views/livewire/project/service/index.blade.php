@@ -2,18 +2,18 @@
     <livewire:project.service.navbar :service="$service" :parameters="$parameters" :query="$query" />
     <div class="flex h-full pt-6">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a class="{{ request()->routeIs('project.service.configuration') ? 'text-white' : '' }}"
+            <a class="{{ request()->routeIs('project.service.configuration') ? 'dark:text-white' : '' }}"
                 href="{{ route('project.service.configuration', [...$parameters, 'stack_service_uuid' => null]) }}">
                 <button><- Back</button>
             </a>
-            <a :class="activeTab === 'general' && 'text-white'"
+            <a :class="activeTab === 'general' && 'dark:text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'; if(window.location.search) window.location.search = ''"
                 href="#">General</a>
-            <a :class="activeTab === 'storages' && 'text-white'"
+            <a :class="activeTab === 'storages' && 'dark:text-white'"
                 @click.prevent="activeTab = 'storages'; window.location.hash = 'storages'; if(window.location.search) window.location.search = ''"
                 href="#">Storages
             </a>
-            <a :class="activeTab === 'scheduled-tasks' && 'text-white'"
+            <a :class="activeTab === 'scheduled-tasks' && 'dark:text-white'"
                 @click.prevent="activeTab = 'scheduled-tasks'; window.location.hash = 'scheduled-tasks'"
                 href="#">Scheduled Tasks
             </a>
@@ -21,7 +21,7 @@
                 $serviceDatabase?->databaseType() === 'standalone-mysql' ||
                     $serviceDatabase?->databaseType() === 'standalone-postgresql' ||
                     $serviceDatabase?->databaseType() === 'standalone-mariadb')
-                <a :class="activeTab === 'backups' && 'text-white'"
+                <a :class="activeTab === 'backups' && 'dark:text-white'"
                     @click.prevent="activeTab = 'backups'; window.location.hash = 'backups'" href="#">Backups</a>
             @endif
         </div>

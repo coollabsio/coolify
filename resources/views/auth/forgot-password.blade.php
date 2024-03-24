@@ -3,7 +3,7 @@
         <div>
             <div class="flex flex-col items-center pb-8">
                 <a href="{{ route('dashboard') }}">
-                    <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                    <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
                 </a>
                 <x-version />
             </div>
@@ -20,7 +20,7 @@
                     </form>
                 @else
                     <div>Transactional emails are not active on this instance.</div>
-                    <div>See how to set it in our <a class="text-white" target="_blank"
+                    <div>See how to set it in our <a class="dark:text-white" target="_blank"
                             href="{{ config('constants.docs.base_url') }}">docs</a>, or how to
                         manually reset password.
                     </div>

@@ -2,7 +2,7 @@
     <div class="w-96 min-w-fit">
         <div class="flex flex-col items-center pb-8">
             <a href="{{ route('dashboard') }}">
-                <div class="text-5xl font-bold tracking-tight text-center text-white">Coolify</div>
+                <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
             </a>
         </div>
         <div class="flex items-center justify-center pb-4 text-center">

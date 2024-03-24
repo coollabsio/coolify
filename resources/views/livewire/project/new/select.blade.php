@@ -151,10 +151,10 @@
 
                 {{-- <div class="box group" wire="setType('existing-postgresql')">
                     <div class="flex flex-col mx-6">
-                        <div class="group-hover:text-white">
+                        <div class="group-hover:dark:text-white">
                             Backup Existing PostgreSQL
                         </div>
-                        <div class="text-xs group-hover:text-white">
+                        <div class="text-xs group-hover:dark:text-white">
                             Schedule a backup of an existing PostgreSQL database.
                         </div>
                     </div>
@@ -231,7 +231,7 @@
                             {{-- <button class="text-left box group" wire:loading.attr="disabled"
                                 wire:click="setType('one-click-service-{{ $serviceName }}')">
                                 <div class="flex flex-col mx-2">
-                                    <div class="font-bold text-white group-hover:text-white">
+                                    <div class="font-bold dark:text-white group-hover:dark:text-white">
                                         {{ Str::headline($serviceName) }}
                                     </div>
                                     @if (data_get($service, 'slogan'))
@@ -256,16 +256,16 @@
                 @forelse($servers as $server)
                     <div class="w-64 box group" wire:click="setServer({{ $server }})">
                         <div class="flex flex-col mx-6">
-                            <div class="font-bold group-hover:text-white">
+                            <div class="font-bold group-hover:dark:text-white">
                                 {{ $server->name }}
                             </div>
-                            <div class="text-xs group-hover:text-white">
+                            <div class="text-xs group-hover:dark:text-white">
                                 {{ $server->description }}</div>
                         </div>
                     </div>
                 @empty
                     <div>
-                        <div>No validated & reachable servers found. <a class="text-white underline" href="/servers">
+                        <div>No validated & reachable servers found. <a class="dark:text-white underline" href="/servers">
                                 Go to servers page
                             </a></div>
                     </div>
@@ -285,7 +285,7 @@
                     @foreach ($swarmDockers as $swarmDocker)
                         <div class="box group" wire:click="setDestination('{{ $swarmDocker->uuid }}')">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold group-hover:text-white">
+                                <div class="font-bold group-hover:dark:text-white">
                                     Swarm Docker <span class="text-xs">({{ $swarmDocker->name }})</span>
                                 </div>
                             </div>
@@ -295,10 +295,10 @@
                     @foreach ($standaloneDockers as $standaloneDocker)
                         <div class="box group" wire:click="setDestination('{{ $standaloneDocker->uuid }}')">
                             <div class="flex flex-col mx-6">
-                                <div class="font-bold group-hover:text-white">
+                                <div class="font-bold group-hover:dark:text-white">
                                     Standalone Docker <span class="text-xs">({{ $standaloneDocker->name }})</span>
                                 </div>
-                                <div class="text-xs group-hover:text-white">
+                                <div class="text-xs group-hover:dark:text-white">
                                     Network: {{ $standaloneDocker->network }}</div>
                             </div>
                         </div>

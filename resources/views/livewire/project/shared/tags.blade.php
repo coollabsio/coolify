@@ -2,7 +2,7 @@
     <h2>Tags</h2>
     <div class="flex gap-2 pt-4">
         @forelse ($this->resource->tags as $tagId => $tag)
-            <div class="px-2 py-1 text-center text-white select-none w-fit bg-coolgray-100 hover:bg-coolgray-200">
+            <div class="px-2 py-1 text-center dark:text-white select-none w-fit bg-coolgray-100 hover:bg-coolgray-200">
                 {{ $tag->name }}
                 <svg wire:click="deleteTag('{{ $tag->id }}')"
                     xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"

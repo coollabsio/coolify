@@ -49,7 +49,7 @@
             @if ($application->build_pack !== 'dockercompose')
                 <div class="w-96">
                     <x-forms.checkbox
-                        helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='text-white underline' target='_blank'>here</a>."
+                        helper="Enable GPU usage for this application. More info <a href='https://docs.docker.com/compose/gpu-support/' class='dark:text-white underline' target='_blank'>here</a>."
                         instantSave id="application.settings.is_gpu_enabled" label="Attach GPU" />
                     @if ($application->settings->is_gpu_enabled)
                         <h5>GPU Settings</h5>
@@ -64,7 +64,7 @@
                     <x-forms.input label="GPU Count" placeholder="empty means use all GPUs"
                         id="application.settings.gpu_count"> </x-forms.input>
                     <x-forms.input label="GPU Device Ids" placeholder="0,2"
-                        helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='text-white underline' target='_blank'>here</a>."
+                        helper="Comma separated list of device ids. More info <a href='https://docs.docker.com/compose/gpu-support/#access-specific-devices' class='dark:text-white underline' target='_blank'>here</a>."
                         id="application.settings.gpu_device_ids"> </x-forms.input>
 
                 </div>

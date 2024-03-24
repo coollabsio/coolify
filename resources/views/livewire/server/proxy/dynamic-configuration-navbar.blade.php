@@ -1,5 +1,5 @@
 <div class="flex gap-2">
-    <h3 class="text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
+    <h3 class="dark:text-white">File: {{ str_replace('|', '.', $fileName) }}</h3>
     <div class="flex gap-2">
         <x-slide-over>
             <x-slot:title>Edit Configuration</x-slot:title>

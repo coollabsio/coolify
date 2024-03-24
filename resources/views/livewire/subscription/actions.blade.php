@@ -30,7 +30,7 @@
             </div>
         </div>
         <div class="pt-4">
-            If you have any problem, please <a class="text-white underline" href="{{ config('coolify.contact') }}"
+            If you have any problem, please <a class="dark:text-white underline" href="{{ config('coolify.contact') }}"
                 target="_blank">contact us.</a>
         </div>
     @endif
@@ -40,7 +40,7 @@
         @if (currentTeam()->subscription->lemon_status === 'cancelled')
             <div class="pb-4">Subscriptions ends at: {{ getRenewDate() }}</div>
             <div class="py-4">If you would like to change the subscription to a lower/higher plan, <a
-                    class="text-white underline" href="{{ config('coolify.contact') }}" target="_blank">please
+                    class="dark:text-white underline" href="{{ config('coolify.contact') }}" target="_blank">please
                     contact
                     us.</a></div>
         @else
@@ -56,10 +56,10 @@
                 @endif
             </div>
             <div>
-                <x-forms.button><a class="text-white hover:no-underline" href="{{ getPaymentLink() }}">Update Payment
+                <x-forms.button><a class="dark:text-white hover:no-underline" href="{{ getPaymentLink() }}">Update Payment
                         Details</a>
                 </x-forms.button>
-                <a class="text-white hover:no-underline"
+                <a class="dark:text-white hover:no-underline"
                     href="https://app.lemonsqueezy.com/my-orders"><x-forms.button>Manage My
                         Subscription</x-forms.button></a>
             </div>

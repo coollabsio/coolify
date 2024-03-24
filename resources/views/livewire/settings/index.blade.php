@@ -2,14 +2,14 @@
     <x-settings.navbar />
     <div x-data="{ activeTab: window.location.hash ? window.location.hash.substring(1) : 'general' }" class="flex h-full pt-1">
         <div class="flex flex-col gap-4 min-w-fit">
-            <a :class="activeTab === 'general' && 'text-white'"
+            <a :class="activeTab === 'general' && 'dark:text-white'"
                 @click.prevent="activeTab = 'general'; window.location.hash = 'general'" href="#">General</a>
-            <a :class="activeTab === 'backup' && 'text-white'"
+            <a :class="activeTab === 'backup' && 'dark:text-white'"
                 @click.prevent="activeTab = 'backup'; window.location.hash = 'backup'" href="#">Instance Backup</a>
-            <a :class="activeTab === 'smtp' && 'text-white'"
+            <a :class="activeTab === 'smtp' && 'dark:text-white'"
                 @click.prevent="activeTab = 'smtp'; window.location.hash = 'smtp'" href="#">Transactional
                 Email</a>
-            <a :class="activeTab === 'auth' && 'text-white'"
+            <a :class="activeTab === 'auth' && 'dark:text-white'"
                 @click.prevent="activeTab = 'auth'; window.location.hash = 'auth'" href="#">Authentication (OAuth)</a>
         </div>
         <div class="w-full pl-8">
