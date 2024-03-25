@@ -17,10 +17,10 @@
                     </div>
                     <div>
                         <x-forms.input name="recovery_code" label="{{ __('input.recovery_code') }}" />
-                        <div class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
+                        {{-- <div class="pt-2 text-xs cursor-pointer hover:underline hover:dark:text-white"
                             x-on:click="showRecovery = !showRecovery">Use
                             One-Time Code
-                        </div>
+                        </div> --}}
                     </div>
                     <x-forms.button type="submit">{{ __('auth.login') }}</x-forms.button>
                 </form>
