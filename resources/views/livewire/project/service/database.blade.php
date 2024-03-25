@@ -23,7 +23,7 @@
                 <x-forms.checkbox instantSave id="database.is_public" label="Accessible over the internet" />
             </div>
             @if ($db_url_public)
-                <x-forms.input label="Database URL (public)"
+                <x-forms.input label="Database IP:PORT (public)"
                     helper="Your credentials are available in your environment variables." type="password" readonly
                     wire:model="db_url_public" />
             @endif
