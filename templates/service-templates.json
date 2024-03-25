@@ -641,7 +641,7 @@
     "pocketbase": {
         "documentation": "https:\/\/pocketbase.io\/docs\/",
         "slogan": "Open Source backend for your next SaaS and Mobile app in 1 file",
-        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0VfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncG9ja2V0YmFzZS1kYXRhOi9hcHAvcGJfZGF0YScK",
+        "compose": "c2VydmljZXM6CiAgcG9ja2V0YmFzZToKICAgIGltYWdlOiAnZ2hjci5pby9jb29sbGFic2lvL3BvY2tldGJhc2U6bGF0ZXN0JwogICAgZW52aXJvbm1lbnQ6CiAgICAgIC0gU0VSVklDRV9GUUROX1BPQ0tFVEJBU0VfODA4MAogICAgdm9sdW1lczoKICAgICAgLSAncG9ja2V0YmFzZS1kYXRhOi9hcHAvcGJfZGF0YScKICAgICAgLSAncG9ja2V0YmFzZS1ob29rczovYXBwL3BiX2hvb2tzJwo=",
         "tags": [
             "pocketbase",
             "backend",
