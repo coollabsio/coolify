@@ -8,6 +8,7 @@ use App\Actions\Proxy\StartProxy;
 use App\Actions\Shared\ComplexStatusCheck;
 use App\Models\ApplicationPreview;
 use App\Models\Server;
+use App\Models\ServiceDatabase;
 use App\Notifications\Container\ContainerRestarted;
 use App\Notifications\Container\ContainerStopped;
 use Illuminate\Bus\Queueable;
@@ -149,31 +150,63 @@ class ContainerStatusJob implements ShouldQueue, ShouldBeEncrypted
                     }
                 } else {
                     $uuid = data_get($labels, 'com.docker.compose.service');
+                    $type = data_get($labels, 'coolify.type');
+
                     if ($uuid) {
-                        $database = $databases->where('uuid', $uuid)->first();
-                        if ($database) {
-                            $isPublic = data_get($database, 'is_public');
-                            $foundDatabases[] = $database->id;
-                            $statusFromDb = $database->status;
-                            if ($statusFromDb !== $containerStatus) {
-                                $database->update(['status' => $containerStatus]);
-                            }
-                            if ($isPublic) {
-                                $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
-                                    if ($this->server->isSwarm()) {
-                                        return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
-                                    } else {
-                                        return data_get($value, 'Name') === "/$uuid-proxy";
+                        if ($type === 'service') {
+                            $database_id = data_get($labels, 'coolify.service.subId');
+                            if ($database_id) {
+                                $service_db = ServiceDatabase::where('id', $database_id)->first();
+                                if ($service_db) {
+                                    $uuid = $service_db->service->uuid;
+                                    $isPublic = data_get($service_db, 'is_public');
+                                    if ($isPublic) {
+                                        $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
+                                            if ($this->server->isSwarm()) {
+                                                return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                            } else {
+                                                return data_get($value, 'Name') === "/$uuid-proxy";
+                                            }
+                                        })->first();
+                                        if (!$foundTcpProxy) {
+                                            StartDatabaseProxy::run($service_db);
+                                            $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$service_db->service->name}", $this->server));
+                                        }
                                     }
-                                })->first();
-                                if (!$foundTcpProxy) {
-                                    StartDatabaseProxy::run($database);
-                                    $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
                                 }
                             }
                         } else {
-                            // Notify user that this container should not be there.
+                            $database = $databases->where('uuid', $uuid)->first();
+                            if ($uuid == 'postgresql') {
+                                ray($database);
+                            }
+                            if ($database) {
+                                $isPublic = data_get($database, 'is_public');
+                                $foundDatabases[] = $database->id;
+                                $statusFromDb = $database->status;
+                                if ($statusFromDb !== $containerStatus) {
+                                    $database->update(['status' => $containerStatus]);
+                                }
+                                ray($database);
+                                if ($isPublic) {
+                                    $foundTcpProxy = $containers->filter(function ($value, $key) use ($uuid) {
+                                        if ($this->server->isSwarm()) {
+                                            return data_get($value, 'Spec.Name') === "coolify-proxy_$uuid";
+                                        } else {
+                                            return data_get($value, 'Name') === "/$uuid-proxy";
+                                        }
+                                    })->first();
+                                    if (!$foundTcpProxy) {
+                                        ray('asdffff');
+                                        StartDatabaseProxy::run($database);
+                                        $this->server->team?->notify(new ContainerRestarted("TCP Proxy for {$database->name}", $this->server));
+                                    }
+                                }
+                            } else {
+                                // Notify user that this container should not be there.
+                            }
                         }
+
                     }
                     if (data_get($container, 'Name') === '/coolify-db') {
                         $foundDatabases[] = 0;

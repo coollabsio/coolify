@@ -37,7 +37,6 @@ class Database extends Component
     public function instantSaveExclude()
     {
         $this->submit();
-
     }
     public function instantSaveLogDrain()
     {
