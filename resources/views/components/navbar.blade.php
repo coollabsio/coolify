@@ -4,7 +4,7 @@
             <div class="text-2xl font-bold tracking-wide dark:text-white">Coolify</div>
             <x-version />
         </div>
-        <button onclick="changeTheme()">Dark/light</button>
+        {{-- <button onclick="changeTheme()">Dark/light</button> --}}
     </div>
     <div class="px-2 pt-2 pb-7">
         <livewire:switch-team />
