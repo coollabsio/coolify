@@ -15,14 +15,11 @@ class Index extends Component
 {
     protected $listeners = ['serverInstalled' => 'validateServer'];
 
-    #[Url()]
     public string $state = 'welcome';
 
-    #[Url()]
     public ?string $selectedServerType = null;
     public ?Collection $privateKeys = null;
 
-    #[Url()]
     public ?int $selectedExistingPrivateKey = null;
     public ?string $privateKeyType = null;
     public ?string $privateKey = null;
@@ -33,7 +30,6 @@ class Index extends Component
 
     public ?Collection $servers = null;
 
-    #[Url()]
     public ?int $selectedExistingServer = null;
     public ?string $remoteServerName = null;
     public ?string $remoteServerDescription = null;
@@ -46,7 +42,6 @@ class Index extends Component
 
     public Collection $projects;
 
-    #[Url()]
     public ?int $selectedProject = null;
     public ?Project $createdProject = null;
 

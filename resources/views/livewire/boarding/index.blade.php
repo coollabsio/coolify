@@ -329,14 +329,17 @@
         </div>
         <div class="flex flex-col justify-center gap-4 pt-4 lg:gap-2 lg:flex">
             <div class="flex justify-center w-full gap-2">
-                <x-forms.button wire:click='skipBoarding'>Skip onboarding</x-forms.button>
-                <x-forms.button wire:click='restartBoarding'>Restart onboarding</x-forms.button>
+                <div class="cursor-pointer hover:underline dark:hover:text-white" wire:click='skipBoarding'>Skip
+                    onboarding</div>
+                <div class="cursor-pointer hover:underline dark:hover:text-white" wire:click='restartBoarding'>Restart
+                    onboarding</div>
             </div>
             <x-modal-input title="How can we help?">
                 <x-slot:content>
-                    <x-forms.button class="w-full" title="Send us feedback or get help!">
+                    <div class="w-full text-center cursor-pointer hover:underline dark:hover:text-white"
+                        title="Send us feedback or get help!">
                         Feedback
-                    </x-forms.button>
+                    </div>
                 </x-slot:content>
                 <livewire:help />
             </x-modal-input>
