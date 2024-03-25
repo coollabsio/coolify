@@ -49,7 +49,9 @@ class Docker extends Component
         } else {
             $this->network = new Cuid2(7);
         }
-        $this->name = str("{$this->servers->first()->name}-{$this->network}")->kebab();
+        if ($this->servers->count() > 0) {
+            $this->name = str("{$this->servers->first()->name}-{$this->network}")->kebab();
+        }
     }
 
     public function generate_name()
