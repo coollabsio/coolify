@@ -8,7 +8,7 @@
     <div class="subtitle">All your projects are here.</div>
     <div class="grid gap-2 lg:grid-cols-2">
         @forelse ($projects as $project)
-            <div class="gap-2 border border-transparent cursor-pointer box group" x-data
+            <div class="box group" x-data
                 x-on:click="goto('{{ $project->uuid }}')">
                 <a class="flex flex-col flex-1 mx-6 hover:no-underline"
                     href="{{ route('project.show', ['project_uuid' => data_get($project, 'uuid')]) }}">

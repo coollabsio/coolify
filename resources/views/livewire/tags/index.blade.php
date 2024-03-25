@@ -24,20 +24,25 @@
                         </div>
                         <div class="grid grid-cols-1 gap-2 pt-4 lg:grid-cols-2 xl:grid-cols-3">
                             @foreach ($applications as $application)
-                                <a href="{{ $application->link() }}" class="flex flex-col box group">
-                                    <span
-                                        class="font-bold dark:text-white">{{ $application->project()->name }}/{{ $application->environment->name }}</span>
-                                    <span class="dark:text-white ">{{ $application->name }}</span>
-                                    <span class="description">{{ $application->description }}</span>
-                                </a>
+                                <div class="box group">
+                                    <a href="{{ $application->link() }}" class="flex flex-col ">
+                                        <div class="box-title">{{ $application->name }}</div>
+                                        <div class="box-description">
+                                            {{ $application->project()->name }}/{{ $application->environment->name }}
+                                        </div>
+                                        <div class="box-description">{{ $application->description }}</div>
+                                    </a>
+                                </div>
                             @endforeach
                             @foreach ($services as $service)
-                                <a href="{{ $service->link() }}" class="flex flex-col box group">
-                                    <span
-                                        class="font-bold dark:text-white">{{ $service->project()->name }}/{{ $service->environment->name }}</span>
-                                    <span class="dark:text-white ">{{ $service->name }}</span>
-                                    <span class="description">{{ $service->description }}</span>
-                                </a>
+                                <div class="box group">
+                                    <a href="{{ $service->link() }}" class="flex flex-col ">
+                                        <div class="box-title">{{ $service->name }}</div>
+                                        <div class="box-description">
+                                            {{ $service->project()->name }}/{{ $service->environment->name }}</div>
+                                        <div class="box-description">{{ $service->description }}</div>
+                                    </a>
+                                </div>
                             @endforeach
                         </div>
                         <div class="flex items-center gap-2">
@@ -51,22 +56,23 @@
                                 <h4 class="py-4">{{ $server_name }}</h4>
                                 <div class="grid grid-cols-1 gap-2 lg:grid-cols-3">
                                     @foreach ($deployments as $deployment)
-                                        <a href="{{ data_get($deployment, 'deployment_url') }}"
-                                            @class([
-                                                'gap-2 cursor-pointer box group border-l-2 border-dotted',
-                                                'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
-                                                'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
-                                            ])>
-                                            <div class="flex flex-col mx-6">
-                                                <div class="font-bold dark:text-white">
-                                                    {{ data_get($deployment, 'application_name') }}
+                                        <div @class([
+                                            'box-without-bg dark:bg-coolgray-100 bg-white gap-2 cursor-pointer group border-l-2 border-dotted',
+                                            'dark:border-coolgray-300' => data_get($deployment, 'status') === 'queued',
+                                            'border-yellow-500' => data_get($deployment, 'status') === 'in_progress',
+                                        ])>
+                                            <a href="{{ data_get($deployment, 'deployment_url') }}">
+                                                <div class="flex flex-col mx-6">
+                                                    <div class="box-title">
+                                                        {{ data_get($deployment, 'application_name') }}
+                                                    </div>
+                                                    <div class="box-description">
+                                                        {{ str(data_get($deployment, 'status'))->headline() }}
+                                                    </div>
                                                 </div>
-                                                <div class="description">
-                                                    {{ str(data_get($deployment, 'status'))->headline() }}
-                                                </div>
-                                            </div>
-                                            <div class="flex-1"></div>
-                                        </a>
+                                                <div class="flex-1"></div>
+                                            </a>
+                                        </div>
                                     @endforeach
                                 </div>
                             @empty

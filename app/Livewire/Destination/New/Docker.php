@@ -35,7 +35,7 @@ class Docker extends Component
     public function mount()
     {
         if (is_null($this->servers)) {
-            $this->servers = Server::ownedByCurrentTeam()->get();
+            $this->servers = Server::isReachable()->get();
         }
         if (request()->query('server_id')) {
             $this->server_id = request()->query('server_id');

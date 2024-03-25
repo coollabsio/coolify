@@ -16,7 +16,7 @@
         </div>
 
         <x-forms.button type="submit">
-            Continue
+            Validate Connection & Continue
         </x-forms.button>
     </form>
 </div>
