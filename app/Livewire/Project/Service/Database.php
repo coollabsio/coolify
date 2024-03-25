@@ -79,7 +79,6 @@ class Database extends Component
     public function submit()
     {
         try {
-            ray('asdf');
             $this->validate();
             $this->database->save();
             updateCompose($this->database);

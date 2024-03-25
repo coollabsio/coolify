@@ -25,7 +25,8 @@ class StartDatabaseProxy
         $proxyContainerName = "{$database->uuid}-proxy";
         if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
             $databaseType = $database->databaseType();
-            $network = data_get($database, 'service.destination.network');
+            // $connectPredefined = data_get($database, 'service.connect_to_docker_network');
+            $network = $database->service->uuid;
             $server = data_get($database, 'service.destination.server');
             $proxyContainerName = "{$database->service->uuid}-proxy";
             switch ($databaseType) {

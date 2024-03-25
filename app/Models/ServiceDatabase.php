@@ -57,8 +57,7 @@ class ServiceDatabase extends BaseModel
         if ($this->service->server->isLocalhost() || isDev()) {
             $realIp = base_ip();
         }
-        $url = "{$realIp}:{$port}";
-        return $url;
+        return "{$realIp}:{$port}";
     }
     public function service()
     {
