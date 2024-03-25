@@ -8,13 +8,13 @@
                 class="grid grid-cols-2 p-1 text-xs font-semibold leading-5 text-center rounded dark:text-white gap-x-1 bg-white/5">
                 <legend class="sr-only">Payment frequency</legend>
                 <label class="cursor-pointer rounded px-2.5 py-1"
-                    :class="selected === 'monthly' ? 'bg-coollabs-100 dark:text-white' : ''">
+                    :class="selected === 'monthly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'monthly'" name="frequency" value="monthly"
                         class="sr-only">
                     <span>Monthly</span>
                 </label>
                 <label class="cursor-pointer rounded px-2.5 py-1"
-                    :class="selected === 'yearly' ? 'bg-coollabs-100 dark:text-white' : ''">
+                    :class="selected === 'yearly' ? 'bg-coollabs-100 text-white' : ''">
                     <input type="radio" x-on:click="selected = 'yearly'" name="frequency" value="annually"
                         class="sr-only">
                     <span>Annually</span>
@@ -27,7 +27,7 @@
                     days trial</span> included on all plans, without credit card details.</div>
         @endif
         <div x-show="selected === 'monthly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">
-            <div>Save <span class="font-bold dark:text-warning">10%</span> annually with the yearly plans.
+            <div>Save <span class="font-bold text-black dark:text-warning">10%</span> annually with the yearly plans.
             </div>
         </div>
         <div x-show="selected === 'yearly'" class="flex justify-center h-10 mt-3 text-sm leading-6 ">

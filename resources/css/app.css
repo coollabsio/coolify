@@ -41,7 +41,7 @@ option {
 }
 
 .button {
-    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-normal normal-case rounded cursor-pointer bg-neutral-200 hover:bg-neutral-300 dark:bg-coolgray-200 dark:text-white dark:hover:bg-coolgray-100 dark:hover:dark:text-white dark:disabled:bg-coolgray-100/40 dark:disabled:text-neutral-800 disabled:bg-neutral-100 disabled:text-neutral-200 disabled:cursor-not-allowed min-w-fit hover:dark:text-white focus:outline-1 ;
+    @apply flex items-center justify-center gap-2 px-3 py-1 text-sm font-bold text-white normal-case rounded cursor-pointer hover:bg-black/80 bg-coolgray-200 hover:bg-coolgray-100 hover:text-white disabled:bg-coolgray-100/10 disabled:cursor-not-allowed min-w-fit focus:outline-1 dark:disabled:text-neutral-600;
 }
 
 button[isError]:not(:disabled) {
@@ -94,7 +94,7 @@ tr {
 }
 
 tr th {
-    @apply px-3 py-3.5 text-left text-white;
+    @apply px-3 py-3.5 text-left text-black dark:text-white;
 }
 
 tr th:first-child {
