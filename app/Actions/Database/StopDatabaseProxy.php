@@ -17,10 +17,12 @@ class StopDatabaseProxy
     public function handle(StandaloneRedis|StandalonePostgresql|StandaloneMongodb|StandaloneMysql|StandaloneMariadb|ServiceDatabase $database)
     {
         $server = data_get($database, 'destination.server');
+        $uuid = $database->uuid;
         if ($database->getMorphClass() === 'App\Models\ServiceDatabase') {
+            $uuid = $database->service->uuid;
             $server = data_get($database, 'service.server');
         }
-        instant_remote_process(["docker rm -f {$database->uuid}-proxy"], $server);
+        instant_remote_process(["docker rm -f {$uuid}-proxy"], $server);
         $database->is_public = false;
         $database->save();
     }
