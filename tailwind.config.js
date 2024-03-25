@@ -15,7 +15,6 @@ const colors = {
 module.exports = {
     darkMode: "selector",
     content: [
-        './vendor/wire-elements/modal/resources/views/*.blade.php',
         './storage/framework/views/*.php',
         "./resources/**/*.blade.php",
         "./app/**/*.php",

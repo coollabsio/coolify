@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9bdaf702cdd870434444f8937a816fdb",
+    "content-hash": "e095b8a9eb22df2943cbc3e9649ff9e8",
     "packages": [
         {
             "name": "amphp/amp",
@@ -11858,64 +11858,6 @@
                 "source": "https://github.com/webmozarts/assert/tree/1.11.0"
             },
             "time": "2022-06-03T18:03:27+00:00"
-        },
-        {
-            "name": "wire-elements/modal",
-            "version": "2.0.9",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/wire-elements/modal.git",
-                "reference": "899b05e313403669aa8a359db71a066246184355"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/wire-elements/modal/zipball/899b05e313403669aa8a359db71a066246184355",
-                "reference": "899b05e313403669aa8a359db71a066246184355",
-                "shasum": ""
-            },
-            "require": {
-                "livewire/livewire": "^3.2.3",
-                "php": "^8.1",
-                "spatie/laravel-package-tools": "^1.9"
-            },
-            "require-dev": {
-                "orchestra/testbench": "^8.5",
-                "phpunit/phpunit": "^9.5"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "LivewireUI\\Modal\\LivewireModalServiceProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "LivewireUI\\Modal\\": "src"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Philo Hermans",
-                    "email": "me@philohermans.com"
-                }
-            ],
-            "description": "Laravel Livewire modal component",
-            "keywords": [
-                "laravel",
-                "livewire",
-                "modal"
-            ],
-            "support": {
-                "issues": "https://github.com/wire-elements/modal/issues",
-                "source": "https://github.com/wire-elements/modal/tree/2.0.9"
-            },
-            "time": "2023-12-08T09:31:14+00:00"
         },
         {
             "name": "yosymfony/parser-utils",
