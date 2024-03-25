@@ -433,7 +433,7 @@ function sslip(Server $server)
 
 function getServiceTemplates()
 {
-    if (isDev()) {
+    if (!isDev()) {
         $services = File::get(base_path('templates/service-templates.json'));
         $services = collect(json_decode($services))->sortKeys();
     } else {
@@ -448,13 +448,6 @@ function getServiceTemplates()
             $services = collect([]);
         }
     }
-    // $version = config('version');
-    // $services = $services->map(function ($service) use ($version) {
-    //     if (version_compare($version, data_get($service, 'minVersion', '0.0.0'), '<')) {
-    //         $service->disabled = true;
-    //     }
-    //     return $service;
-    // });
     return $services;
 }
 
