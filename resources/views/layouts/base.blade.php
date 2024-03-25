@@ -38,7 +38,6 @@
 @section('body')
 
     <body>
-        {{-- @livewire('wire-elements-modal') --}}
         <x-toast />
         <script data-navigate-once>
             if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia(

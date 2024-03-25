@@ -1,7 +1,7 @@
 @extends('layouts.base')
 @section('body')
     @parent
-    @if (isSubscribed())
+    @if (isSubscribed() || !isCloud())
         <livewire:layout-popups />
     @endif
     @auth

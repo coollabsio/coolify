@@ -12,7 +12,7 @@
     <ul role="list" class="flex flex-col flex-1 gap-y-7">
         <li class="flex-1 ">
             <ul role="list" class="flex flex-col h-full space-y-1.5">
-                @if (isSubscribed())
+                @if (isSubscribed() || !isCloud())
                     <li>
                         <a title="Dashboard" href="/"
                             class="{{ request()->is('/') ? 'menu-item-active menu-item' : 'menu-item' }}">
@@ -263,7 +263,7 @@
                         <livewire:help />
                     </x-modal-input>
                 </li>
-                <li >
+                <li>
                     <form action="/logout" method="POST">
                         @csrf
                         <button title="Logout" type="submit" class="gap-2 mb-6 menu-item">

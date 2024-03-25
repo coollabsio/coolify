@@ -5,7 +5,7 @@
                 <a href="{{ route('dashboard') }}">
                     <div class="text-5xl font-bold tracking-tight text-center dark:text-white">Coolify</div>
                 </a>
-                <x-version />
+                {{-- <x-version /> --}}
             </div>
 
             <div class="flex items-center gap-2">
